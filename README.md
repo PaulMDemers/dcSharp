@@ -144,7 +144,7 @@ Next targets:
 - Use the coalesced hardware advancement path to support broader scheduler event batching without losing timer determinism.
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Add fixture expectations for structured device-domain access counts.
+- Add more fixture expectations around device-domain access counts.
 
 ## Development Bias
 

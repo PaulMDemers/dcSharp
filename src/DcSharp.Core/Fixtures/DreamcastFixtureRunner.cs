@@ -129,6 +129,15 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected at least {minControllerScriptChanges} controller script changes, got {summary.Scheduler.ControllerScriptChanges}");
         }
 
+        foreach (var (domain, minCount) in fixture.MinDeviceAccessDomains)
+        {
+            var count = summary.DeviceAccessDomains.SingleOrDefault(access => string.Equals(access.Domain, domain, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+            if (count < minCount)
+            {
+                failures.Add($"expected at least {minCount} {domain} device accesses, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.PvrTaCommands)
         {
             var count = summary.Video.PvrTaCommandKinds.SingleOrDefault(kind => string.Equals(kind.Kind, expected.Kind, StringComparison.Ordinal))?.Count ?? 0;

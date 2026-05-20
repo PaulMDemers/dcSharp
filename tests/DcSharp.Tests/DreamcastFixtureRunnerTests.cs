@@ -76,7 +76,11 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 100,
             MinHardwareAdvanceBatches = 20,
             MaxHardwareAdvanceBatch = 5,
-            MinControllerScriptChanges = 1
+            MinControllerScriptChanges = 1,
+            MinDeviceAccessDomains =
+            {
+                ["tmu"] = 3
+            }
         };
         var summary = CreateSummary(
             vblankEvents: 2,
@@ -84,6 +88,7 @@ public class DreamcastFixtureRunnerTests
             hardwareBatches: 20,
             maxHardwareBatch: 5,
             controllerScriptChanges: 1,
+            tmuDeviceAccesses: 3,
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5);
@@ -106,7 +111,11 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 101,
             MinHardwareAdvanceBatches = 21,
             MaxHardwareAdvanceBatch = 4,
-            MinControllerScriptChanges = 2
+            MinControllerScriptChanges = 2,
+            MinDeviceAccessDomains =
+            {
+                ["tmu"] = 3
+            }
         };
         var summary = CreateSummary(
             vblankEvents: 2,
@@ -114,6 +123,7 @@ public class DreamcastFixtureRunnerTests
             hardwareBatches: 20,
             maxHardwareBatch: 5,
             controllerScriptChanges: 1,
+            tmuDeviceAccesses: 2,
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5);
@@ -128,6 +138,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 10 Maple transfers, got 9", failures);
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
+        Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
     }
 
     private static DreamcastRunSummary CreateSummary(
@@ -136,6 +147,7 @@ public class DreamcastFixtureRunnerTests
         ulong hardwareBatches,
         ulong maxHardwareBatch,
         ulong controllerScriptChanges,
+        int tmuDeviceAccesses = 0,
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
         int mapleGetConditionTransfers = 0) =>
@@ -155,8 +167,8 @@ public class DreamcastFixtureRunnerTests
             null,
             null,
             new DreamcastLoadSummary(0, "0x00000000", 0, "0x00000000", 0, 0, [], 0),
-            0,
-            [],
+            tmuDeviceAccesses,
+            tmuDeviceAccesses == 0 ? [] : [new DreamcastDeviceAccessDomainSummary("tmu", tmuDeviceAccesses)],
             [],
             [],
             0,

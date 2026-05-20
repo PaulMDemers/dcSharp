@@ -47,7 +47,11 @@
         "dcSharp timer callback count 3",
         "dcSharp KallistiOS timer callback probe done"
       ],
-      "minHardwareAdvanceTicks": 1000
+      "minHardwareAdvanceTicks": 1000,
+      "minDeviceAccessDomains": {
+        "scif": 1,
+        "tmu": 1
+      }
     },
     {
       "name": "maple_controller_neutral",

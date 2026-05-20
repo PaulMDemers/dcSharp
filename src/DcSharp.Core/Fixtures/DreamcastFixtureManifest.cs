@@ -58,6 +58,7 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MinHardwareAdvanceBatches { get; set; }
     public ulong? MaxHardwareAdvanceBatch { get; set; }
     public ulong? MinControllerScriptChanges { get; set; }
+    public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
