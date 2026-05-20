@@ -25,6 +25,17 @@ public class DreamcastControllerStateParserTests
     }
 
     [Fact]
+    public void ParseScriptMapEntryAcceptsAddressAndScript()
+    {
+        var entry = DreamcastControllerStateParser.ParseScriptMapEntry("b0:0:none;10:b,ltrig=7");
+
+        Assert.Equal(0x40, entry.Key);
+        Assert.Equal(DreamcastControllerButtons.None, entry.Value.StateAt(0).Buttons);
+        Assert.Equal(DreamcastControllerButtons.B, entry.Value.StateAt(10).Buttons);
+        Assert.Equal(7, entry.Value.StateAt(10).LeftTrigger);
+    }
+
+    [Fact]
     public void ParseStateAcceptsButtonsTriggersAndAxes()
     {
         var state = DreamcastControllerStateParser.ParseState("start,a,joyx=-12,joyy=13,joy2x=-2,joy2y=3,ltrig=40,rtrig=80");

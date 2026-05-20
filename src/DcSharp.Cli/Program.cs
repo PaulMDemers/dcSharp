@@ -118,7 +118,7 @@ static void RunElf(string path, string[] args)
     }
 
     Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
-    if (EffectiveController(options.Emulation, 0x40) is { } controllerB)
+    if (EffectiveController(options.Emulation, 0x40, result.Cpu.InstructionsExecuted) is { } controllerB)
     {
         Console.WriteLine($"Controller B: {FormatController(controllerB)}");
     }
@@ -339,6 +339,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     DreamcastControllerState? controllerB = null;
     var controllers = new Dictionary<byte, DreamcastControllerState>();
     DreamcastControllerScript? controllerAScript = null;
+    var controllerScripts = new Dictionary<byte, DreamcastControllerScript>();
     string? framebufferDumpPath = null;
     var framebufferWidth = 320;
     var framebufferHeight = 240;
@@ -386,6 +387,11 @@ static CliRunOptions ParseRunOptions(string[] args)
                 break;
             case "--controller-a-script" when index + 1 < args.Length:
                 controllerAScript = DreamcastControllerStateParser.ParseScript(args[index + 1]);
+                index++;
+                break;
+            case "--controller-script" when index + 1 < args.Length:
+                var (scriptAddress, script) = DreamcastControllerStateParser.ParseScriptMapEntry(args[index + 1]);
+                controllerScripts[scriptAddress] = script;
                 index++;
                 break;
             case "--dump-framebuffer" when index + 1 < args.Length:
@@ -461,7 +467,8 @@ static CliRunOptions ParseRunOptions(string[] args)
             controllerAScript,
             traceCapture,
             controllerB,
-            controllers.Count == 0 ? null : controllers),
+            controllers.Count == 0 ? null : controllers,
+            controllerScripts.Count == 0 ? null : controllerScripts),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -545,25 +552,26 @@ static string FormatController(DreamcastControllerState state) =>
     $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
-    options.ControllerAScript?.StateAt(instructionsExecuted)
-    ?? EffectiveController(options, 0x20)
-    ?? options.ControllerA
+    EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
 
-static DreamcastControllerState? EffectiveController(DreamcastRunOptions options, byte address) =>
-    options.Controllers?.GetValueOrDefault(address)
-    ?? (address == 0x40 ? options.ControllerB : null);
+static DreamcastControllerState? EffectiveController(DreamcastRunOptions options, byte address, ulong instructionsExecuted) =>
+    options.ControllerScripts?.GetValueOrDefault(address)?.StateAt(instructionsExecuted)
+    ?? (address == 0x20 ? options.ControllerAScript?.StateAt(instructionsExecuted) : null)
+    ?? options.Controllers?.GetValueOrDefault(address)
+    ?? (address == 0x40 ? options.ControllerB : null)
+    ?? (address == 0x20 ? options.ControllerA : null);
 
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller map entry: --controller b0:b,ltrig=7");
-    Console.WriteLine("    Example controller script: --controller-a-script \"0:none;200000:start,a\"");
+    Console.WriteLine("    Example controller script: --controller-script \"a0:0:none;200000:start,a\"");
     Console.WriteLine("    Framebuffer dumps currently use RGB565.");
 }
 

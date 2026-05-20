@@ -43,6 +43,7 @@ public sealed class DreamcastFixtureDefinition
     public string? ControllerB { get; set; }
     public Dictionary<string, string> Controllers { get; set; } = [];
     public string? ControllerAScript { get; set; }
+    public Dictionary<string, string> ControllerScripts { get; set; } = [];
     public DreamcastStopReason ExpectedStopReason { get; set; }
     public List<string> SerialContains { get; set; } = [];
     public bool RequireVideoNonZero { get; set; }

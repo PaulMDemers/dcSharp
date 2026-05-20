@@ -35,6 +35,9 @@ public static class DreamcastFixtureRunner
         var controllerScript = fixture.ControllerAScript is null
             ? null
             : DreamcastControllerStateParser.ParseScript(fixture.ControllerAScript);
+        var controllerScripts = fixture.ControllerScripts.ToDictionary(
+            entry => DreamcastControllerStateParser.ParseMapleAddress(entry.Key),
+            entry => DreamcastControllerStateParser.ParseScript(entry.Value));
 
         return new DreamcastRunOptions(
             fixture.Instructions,
@@ -43,7 +46,8 @@ public static class DreamcastFixtureRunner
             controllerA,
             controllerScript,
             ControllerB: controllerB,
-            Controllers: controllers.Count == 0 ? null : controllers);
+            Controllers: controllers.Count == 0 ? null : controllers,
+            ControllerScripts: controllerScripts.Count == 0 ? null : controllerScripts);
     }
 
     public static IReadOnlyList<string> Validate(DreamcastFixtureDefinition fixture, DreamcastRunSummary summary)

@@ -38,7 +38,8 @@ public sealed record DreamcastRunSummary(
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var controllerA = options?.ControllerAScript?.StateAt(result.Cpu.InstructionsExecuted)
+        var controllerA = ControllerScriptFromMap(options, 0x20)?.StateAt(result.Cpu.InstructionsExecuted)
+            ?? options?.ControllerAScript?.StateAt(result.Cpu.InstructionsExecuted)
             ?? ControllerFromMap(options, 0x20)
             ?? options?.ControllerA
             ?? DreamcastControllerState.Neutral;
@@ -76,6 +77,9 @@ public sealed record DreamcastRunSummary(
 
     private static string Hex32(uint value) => $"0x{value:X8}";
     private static string Hex16(ushort value) => $"0x{value:X4}";
+    private static DreamcastControllerScript? ControllerScriptFromMap(DreamcastRunOptions? options, byte address) =>
+        options?.ControllerScripts?.GetValueOrDefault(address);
+
     private static DreamcastControllerState? ControllerFromMap(DreamcastRunOptions? options, byte address) =>
         options?.Controllers?.GetValueOrDefault(address);
 }

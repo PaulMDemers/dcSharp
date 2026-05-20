@@ -15,6 +15,19 @@ public static class DreamcastControllerStateParser
             ParseState(text[(separator + 1)..]));
     }
 
+    public static KeyValuePair<byte, DreamcastControllerScript> ParseScriptMapEntry(string text)
+    {
+        var separator = text.IndexOf(':');
+        if (separator <= 0)
+        {
+            throw new InvalidDataException("Controller script map entries must use address:script syntax.");
+        }
+
+        return new KeyValuePair<byte, DreamcastControllerScript>(
+            ParseMapleAddress(text[..separator]),
+            ParseScript(text[(separator + 1)..]));
+    }
+
     public static byte ParseMapleAddress(string text)
     {
         var normalized = text.Trim().Replace("-", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();

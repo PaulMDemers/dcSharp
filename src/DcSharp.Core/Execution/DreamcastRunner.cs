@@ -97,7 +97,8 @@ public sealed record DreamcastRunOptions(
     DreamcastControllerScript? ControllerAScript = null,
     DreamcastTraceCaptureOptions? TraceCapture = null,
     DreamcastControllerState? ControllerB = null,
-    IReadOnlyDictionary<byte, DreamcastControllerState>? Controllers = null);
+    IReadOnlyDictionary<byte, DreamcastControllerState>? Controllers = null,
+    IReadOnlyDictionary<byte, DreamcastControllerScript>? ControllerScripts = null);
 
 public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,

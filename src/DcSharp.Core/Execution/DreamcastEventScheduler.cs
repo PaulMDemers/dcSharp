@@ -7,14 +7,14 @@ public sealed class DreamcastEventScheduler
 {
     private readonly DreamcastMemory memory;
     private readonly ulong vblankInterval;
-    private readonly DreamcastControllerScript? controllerAScript;
+    private readonly Dictionary<byte, DreamcastControllerScript> controllerScripts = [];
+    private readonly Dictionary<byte, DreamcastControllerState> lastControllerStates = [];
     private ulong nextVblankInstruction;
     private ulong vblankEventsRaised;
     private ulong hardwareAdvanceTicks;
     private ulong hardwareAdvanceBatches;
     private ulong maxHardwareAdvanceBatch;
     private ulong controllerScriptChanges;
-    private DreamcastControllerState lastControllerA;
 
     public DreamcastEventScheduler(DreamcastMemory memory, DreamcastRunOptions options)
     {
@@ -23,9 +23,16 @@ public sealed class DreamcastEventScheduler
 
         this.memory = memory;
         vblankInterval = options.VBlankInterval;
-        controllerAScript = options.ControllerAScript;
         nextVblankInstruction = vblankInterval;
-        lastControllerA = memory.ControllerA;
+
+        AddControllerScript(DreamcastMemory.MaplePortAUnit0Address, options.ControllerAScript);
+        if (options.ControllerScripts is not null)
+        {
+            foreach (var (address, script) in options.ControllerScripts)
+            {
+                AddControllerScript(address, script);
+            }
+        }
     }
 
     public DreamcastSchedulerSnapshot CreateSnapshot() =>
@@ -64,17 +71,28 @@ public sealed class DreamcastEventScheduler
 
     private void ApplyInputScripts(ulong instructionsExecuted)
     {
-        if (controllerAScript is not null)
+        foreach (var (address, script) in controllerScripts)
         {
-            var state = controllerAScript.StateAt(instructionsExecuted);
-            if (state != lastControllerA)
+            var state = script.StateAt(instructionsExecuted);
+            if (state != lastControllerStates[address])
             {
                 controllerScriptChanges++;
-                lastControllerA = state;
+                lastControllerStates[address] = state;
             }
 
-            memory.ControllerA = state;
+            memory.SetController(address, state);
         }
+    }
+
+    private void AddControllerScript(byte address, DreamcastControllerScript? script)
+    {
+        if (script is null)
+        {
+            return;
+        }
+
+        controllerScripts[address] = script;
+        lastControllerStates[address] = memory.GetController(address) ?? DreamcastControllerState.Neutral;
     }
 
     private void RaiseDueVBlankEvents(ulong instructionsExecuted)

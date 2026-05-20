@@ -100,4 +100,25 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
         Assert.Equal(1UL, scheduler.CreateSnapshot().ControllerScriptChanges);
     }
+
+    [Fact]
+    public void AppliesMappedControllerScriptAtInstructionBoundary()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(
+            VBlankInterval: 0,
+            ControllerScripts: new Dictionary<byte, DreamcastControllerScript>
+            {
+                [0x40] = new(
+                    new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                    new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.B)))
+            }));
+
+        scheduler.AdvanceBeforeInstruction(4);
+        Assert.Equal(DreamcastControllerButtons.None, memory.GetController(0x40)?.Buttons);
+
+        scheduler.AdvanceBeforeInstruction(5);
+        Assert.Equal(DreamcastControllerButtons.B, memory.GetController(0x40)?.Buttons);
+        Assert.Equal(1UL, scheduler.CreateSnapshot().ControllerScriptChanges);
+    }
 }

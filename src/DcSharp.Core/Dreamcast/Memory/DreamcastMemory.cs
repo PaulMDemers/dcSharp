@@ -124,6 +124,12 @@ public sealed class DreamcastMemory
         }
     }
 
+    public DreamcastControllerState? GetController(byte address) =>
+        mapleControllers.GetValueOrDefault(address);
+
+    public void SetController(byte address, DreamcastControllerState state) =>
+        mapleControllers[address] = state;
+
     public static uint TranslateAddress(uint address)
     {
         var area = address & AreaMask;

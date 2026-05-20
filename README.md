@@ -49,7 +49,7 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --in
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-a-script "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-script "a0:0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller "b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
@@ -86,10 +86,10 @@ Use `--controller` to map virtual controllers to Maple addresses. The older `--c
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13
 ```
 
-Use `--controller-a-script` for instruction-indexed controller changes:
+Use `--controller-script` for instruction-indexed controller changes. The older `--controller-a-script` shorthand still works for A0:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-a-script "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-script "a0:0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 ```
 
 Use `--json` or `--summary-json` to emit a machine-readable run summary:
@@ -132,7 +132,7 @@ Next targets:
 
 - Use the coalesced hardware advancement path to support broader scheduler event batching without losing timer determinism.
 - Add focused KOS fixtures for timer callbacks.
-- Build richer frame/input script formats and multi-port support around the instruction-indexed controller script model.
+- Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 
 ## Development Bias

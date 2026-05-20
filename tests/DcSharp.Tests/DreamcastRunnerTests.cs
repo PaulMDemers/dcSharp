@@ -143,6 +143,27 @@ public class DreamcastRunnerTests
         Assert.Equal(DreamcastControllerButtons.Start, summary.ControllerA.Buttons);
     }
 
+    [Fact]
+    public void SummaryUsesMappedControllerScriptStateAtStopInstruction()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));
+        var options = new DreamcastRunOptions(
+            InstructionLimit: 3,
+            TraceTailLength: 0,
+            ControllerScripts: new Dictionary<byte, DreamcastControllerScript>
+            {
+                [0x20] = new(
+                    new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                    new DreamcastControllerScriptFrame(2, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start)))
+            });
+
+        var result = new DreamcastRunner().Run(elf, options);
+
+        var summary = DreamcastRunSummary.FromResult(result, options);
+
+        Assert.Equal(DreamcastControllerButtons.Start, summary.ControllerA.Buttons);
+    }
+
     private static byte[] CreateNopElf()
     {
         return CreateElfWithSegment(

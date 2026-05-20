@@ -72,7 +72,9 @@
       "artifact": "dcsharp_maple_controller_script.elf",
       "instructions": 70000000,
       "traceTail": 8,
-      "controllerAScript": "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80",
+      "controllerScripts": {
+        "a0": "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+      },
       "expectedStopReason": "ProgramExit",
       "serialContains": [
         "dcSharp Maple controller script probe first: buttons=0x00000000 joy=(0,0) triggers=(0,0)",
