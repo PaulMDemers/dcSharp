@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast;
+using System.Text;
 
 namespace DcSharp.Core.Dreamcast.Memory;
 
@@ -35,6 +36,14 @@ public sealed class DreamcastMemory
     private const uint MapleDmaAddress = 0x005F_6C04;
     private const uint MapleState = 0x005F_6C18;
     private const uint MapleStateDma = 1;
+    private const byte MapleResponseNone = 0xFF;
+    private const byte MapleResponseDeviceInfo = 5;
+    private const byte MapleResponseDataTransfer = 8;
+    private const byte MapleCommandDeviceInfo = 1;
+    private const byte MapleCommandGetCondition = 9;
+    private const byte MaplePortAUnit0Address = 0x20;
+    private const uint MapleFunctionController = 0x0100_0000;
+    private const uint MapleStandardControllerCapabilities = 0xFE06_0F00;
     private const ushort AsicEventPvrVBlankBegin = 0x0003;
     private const ushort AsicEventMapleDma = 0x000C;
 
@@ -389,26 +398,28 @@ public sealed class DreamcastMemory
         var dmaAddress = externalRegisters.GetValueOrDefault(MapleDmaAddress);
         if (dmaAddress != 0)
         {
-            WriteMapleNoDeviceResponses(dmaAddress);
+            WriteMapleResponses(dmaAddress);
         }
 
         externalRegisters[MapleState] = 0;
         RaiseAsicEvent(AsicEventMapleDma);
     }
 
-    private void WriteMapleNoDeviceResponses(uint dmaAddress)
+    private void WriteMapleResponses(uint dmaAddress)
     {
         var descriptor = dmaAddress | P1Base;
         for (var frames = 0; frames < 64; frames++)
         {
             var header = ReadUInt32(descriptor);
             var receiveBuffer = ReadUInt32(descriptor + 4) | P1Base;
-            var command = ReadUInt32(descriptor + 8);
+            var commandWord = ReadUInt32(descriptor + 8);
+            var command = (byte)(commandWord & 0xFF);
+            var destination = (byte)((commandWord >> 8) & 0xFF);
             var length = header & 0xFF;
 
-            if ((command & 0xFF) == 1 && receiveBuffer != P1Base)
+            if (receiveBuffer != P1Base)
             {
-                Write(receiveBuffer, [(byte)0xFF]);
+                WriteMapleResponse(receiveBuffer, command, destination);
             }
 
             descriptor += 12 + (length * 4);
@@ -417,6 +428,52 @@ public sealed class DreamcastMemory
                 return;
             }
         }
+    }
+
+    private void WriteMapleResponse(uint receiveBuffer, byte command, byte destination)
+    {
+        if (destination == MaplePortAUnit0Address && command == MapleCommandDeviceInfo)
+        {
+            WriteMapleControllerDeviceInfo(receiveBuffer);
+            return;
+        }
+
+        if (destination == MaplePortAUnit0Address && command == MapleCommandGetCondition)
+        {
+            WriteMapleControllerCondition(receiveBuffer);
+            return;
+        }
+
+        Write(receiveBuffer, [MapleResponseNone]);
+    }
+
+    private void WriteMapleControllerDeviceInfo(uint receiveBuffer)
+    {
+        var response = new byte[4 + 112];
+        response[0] = MapleResponseDeviceInfo;
+        response[2] = MaplePortAUnit0Address;
+        response[3] = 28;
+        WriteUInt32(response, 4, MapleFunctionController);
+        WriteUInt32(response, 8, MapleStandardControllerCapabilities);
+        response[20] = 0xFF;
+        response[21] = 0;
+        WriteFixedAscii(response.AsSpan(22, 30), "dcSharp Virtual Controller");
+        WriteFixedAscii(response.AsSpan(52, 60), "Produced by or under license from dcSharp");
+        WriteUInt16(response, 112, 0x01AE);
+        WriteUInt16(response, 114, 0x01F4);
+        Write(receiveBuffer, response);
+    }
+
+    private void WriteMapleControllerCondition(uint receiveBuffer)
+    {
+        var response = new byte[16];
+        response[0] = MapleResponseDataTransfer;
+        response[2] = MaplePortAUnit0Address;
+        response[3] = 3;
+        WriteUInt32(response, 4, MapleFunctionController);
+        WriteUInt32(response, 8, 0x0000_FFFF);
+        WriteUInt32(response, 12, 0x8080_8080);
+        Write(receiveBuffer, response);
     }
 
     private uint ReadP4(uint address, int size)
@@ -548,6 +605,26 @@ public sealed class DreamcastMemory
         2 => (uint)(data[0] | (data[1] << 8)),
         _ => (uint)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24))
     };
+
+    private static void WriteUInt16(Span<byte> bytes, int offset, ushort value)
+    {
+        bytes[offset] = (byte)value;
+        bytes[offset + 1] = (byte)(value >> 8);
+    }
+
+    private static void WriteUInt32(Span<byte> bytes, int offset, uint value)
+    {
+        bytes[offset] = (byte)value;
+        bytes[offset + 1] = (byte)(value >> 8);
+        bytes[offset + 2] = (byte)(value >> 16);
+        bytes[offset + 3] = (byte)(value >> 24);
+    }
+
+    private static void WriteFixedAscii(Span<byte> target, string value)
+    {
+        var bytes = Encoding.ASCII.GetBytes(value);
+        bytes.AsSpan(0, Math.Min(bytes.Length, target.Length)).CopyTo(target);
+    }
 }
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);

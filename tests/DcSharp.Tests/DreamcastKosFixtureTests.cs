@@ -61,6 +61,25 @@ public class DreamcastKosFixtureTests
         }
     }
 
+    [Fact]
+    public void MapleControllerKosFixtureReadsNeutralController()
+    {
+        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_maple_controller.elf", out var stream))
+        {
+            return;
+        }
+
+        using (stream)
+        {
+            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 60_000_000, TraceTailLength: 8));
+            var summary = DreamcastRunSummary.FromResult(result);
+
+            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
+            Assert.Contains("dcSharp Virtual Controller", summary.SerialText);
+            Assert.Contains("dcSharp Maple controller probe: buttons=0x00000000 joy=(0,0) triggers=(0,0)", summary.SerialText);
+        }
+    }
+
     private static bool ShouldRunKosFixtures() =>
         string.Equals(Environment.GetEnvironmentVariable("DCSHARP_RUN_KOS_FIXTURES"), "1", StringComparison.Ordinal);
 

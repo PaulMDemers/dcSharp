@@ -84,7 +84,7 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
-    public void MapleDmaStartWritesNoDeviceResponseAndRaisesEvent()
+    public void MapleDmaDevInfoWritesControllerResponseAndRaisesEvent()
     {
         var memory = new DreamcastMemory();
         memory.WriteUInt32(0x8C02_0000, 0x8000_0000);
@@ -95,9 +95,44 @@ public class DreamcastMemoryTests
 
         memory.WriteUInt32(0xA05F_6C18, 1);
 
-        Assert.Equal(0xFF, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(5, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(28, memory.ReadByte(0x8C03_0003));
+        Assert.Equal(0x0100_0000u, memory.ReadUInt32(0x8C03_0004));
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
         Assert.Equal(0x0320u, eventCode);
         Assert.Equal(9, level);
+    }
+
+    [Fact]
+    public void MapleDmaGetConditionWritesNeutralControllerState()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0001);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0100_2009);
+        memory.WriteUInt32(0x8C02_000C, 0x0100_0000);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(8, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(3, memory.ReadByte(0x8C03_0003));
+        Assert.Equal(0x0100_0000u, memory.ReadUInt32(0x8C03_0004));
+        Assert.Equal(0x0000_FFFFu, memory.ReadUInt32(0x8C03_0008));
+        Assert.Equal(0x8080_8080u, memory.ReadUInt32(0x8C03_000C));
+    }
+
+    [Fact]
+    public void MapleDmaUnknownDeviceWritesNoResponse()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0000);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0000_6001);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(0xFF, memory.ReadByte(0x8C03_0000));
     }
 }
