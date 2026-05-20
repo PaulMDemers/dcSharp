@@ -51,7 +51,7 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controll
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-a-script "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller-b "b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller "b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
@@ -80,10 +80,10 @@ Capture narrow trace/device logs while keeping the normal run summary readable:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-domain scif --device-kind Write
 ```
 
-Use `--controller-a` and `--controller-b` to script virtual controllers on Maple ports A0 and B0:
+Use `--controller` to map virtual controllers to Maple addresses. The older `--controller-a` and `--controller-b` shorthands still work:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13
 ```
 
 Use `--controller-a-script` for instruction-indexed controller changes:

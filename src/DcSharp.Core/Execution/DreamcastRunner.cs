@@ -16,7 +16,7 @@ public sealed class DreamcastRunner
         ArgumentNullException.ThrowIfNull(elf);
         ArgumentNullException.ThrowIfNull(options);
 
-        var memory = new DreamcastMemory(options.ControllerA, options.ControllerB);
+        var memory = new DreamcastMemory(options.ControllerA, options.ControllerB, options.Controllers);
         var load = new DreamcastElfLoader().Load(elf, memory);
         FirmwareStubs.Install(memory);
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
@@ -96,7 +96,8 @@ public sealed record DreamcastRunOptions(
     DreamcastControllerState? ControllerA = null,
     DreamcastControllerScript? ControllerAScript = null,
     DreamcastTraceCaptureOptions? TraceCapture = null,
-    DreamcastControllerState? ControllerB = null);
+    DreamcastControllerState? ControllerB = null,
+    IReadOnlyDictionary<byte, DreamcastControllerState>? Controllers = null);
 
 public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,

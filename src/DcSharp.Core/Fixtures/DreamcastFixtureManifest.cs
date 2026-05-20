@@ -41,6 +41,7 @@ public sealed class DreamcastFixtureDefinition
     public ulong VblankInterval { get; set; } = 200_000;
     public string? ControllerA { get; set; }
     public string? ControllerB { get; set; }
+    public Dictionary<string, string> Controllers { get; set; } = [];
     public string? ControllerAScript { get; set; }
     public DreamcastStopReason ExpectedStopReason { get; set; }
     public List<string> SerialContains { get; set; } = [];

@@ -104,7 +104,9 @@
       "artifact": "dcsharp_maple_controller_b.elf",
       "instructions": 70000000,
       "traceTail": 8,
-      "controllerB": "b,ltrig=7,rtrig=9,joyx=12,joyy=-13",
+      "controllers": {
+        "b0": "b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
+      },
       "expectedStopReason": "ProgramExit",
       "serialContains": [
         "dcSharp Maple controller B0 device info response=0x05",

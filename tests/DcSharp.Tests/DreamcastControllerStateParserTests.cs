@@ -4,6 +4,26 @@ namespace DcSharp.Tests;
 
 public class DreamcastControllerStateParserTests
 {
+    [Theory]
+    [InlineData("a0", 0x20)]
+    [InlineData("b0", 0x40)]
+    [InlineData("c0", 0x60)]
+    [InlineData("d0", 0x80)]
+    public void ParseMapleAddressAcceptsControllerPorts(string text, byte expectedAddress)
+    {
+        Assert.Equal(expectedAddress, DreamcastControllerStateParser.ParseMapleAddress(text));
+    }
+
+    [Fact]
+    public void ParseMapEntryAcceptsAddressAndState()
+    {
+        var entry = DreamcastControllerStateParser.ParseMapEntry("b0:b,ltrig=7");
+
+        Assert.Equal(0x40, entry.Key);
+        Assert.Equal(DreamcastControllerButtons.B, entry.Value.Buttons);
+        Assert.Equal(7, entry.Value.LeftTrigger);
+    }
+
     [Fact]
     public void ParseStateAcceptsButtonsTriggersAndAxes()
     {

@@ -42,7 +42,7 @@
 - Expose scheduler event diagnostics in run summaries. Done.
 - Expose Maple DMA command/response diagnostics in run summaries. Done.
 - Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls; CPU event skipping can now build on the same hardware batch path.
-- Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script`, optional B0 controller configuration, and a raw Maple condition transition fixture.
+- Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script`, generic `--controller address:state` mapping, optional B0 controller configuration, and a raw Maple condition transition fixture.
 
 ## Milestone 5: Video And Audio Bring-Up
 

@@ -78,12 +78,23 @@ public sealed class DreamcastMemory
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly List<byte> serialOutput = [];
 
-    public DreamcastMemory(DreamcastControllerState? controllerA = null, DreamcastControllerState? controllerB = null)
+    public DreamcastMemory(
+        DreamcastControllerState? controllerA = null,
+        DreamcastControllerState? controllerB = null,
+        IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null)
     {
         mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
         if (controllerB is { } controllerBState)
         {
             mapleControllers[MaplePortBUnit0Address] = controllerBState;
+        }
+
+        if (controllers is not null)
+        {
+            foreach (var (address, state) in controllers)
+            {
+                mapleControllers[address] = state;
+            }
         }
     }
 

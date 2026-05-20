@@ -351,6 +351,27 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void MapleDmaGetConditionUsesConfiguredControllerMap()
+    {
+        var memory = new DreamcastMemory(
+            controllers: new Dictionary<byte, DreamcastControllerState>
+            {
+                [0x40] = new(Buttons: DreamcastControllerButtons.B, LeftTrigger: 7)
+            });
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0001);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0100_4009);
+        memory.WriteUInt32(0x8C02_000C, 0x0100_0000);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(8, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(0xFFFD, memory.ReadUInt16(0x8C03_0008));
+        Assert.Equal(7, memory.ReadByte(0x8C03_000B));
+    }
+
+    [Fact]
     public void MapleDmaGetConditionForUnconfiguredPortBWritesNoResponse()
     {
         var memory = new DreamcastMemory();

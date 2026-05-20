@@ -2,6 +2,32 @@ namespace DcSharp.Core.Dreamcast.Input;
 
 public static class DreamcastControllerStateParser
 {
+    public static KeyValuePair<byte, DreamcastControllerState> ParseMapEntry(string text)
+    {
+        var separator = text.IndexOf(':');
+        if (separator <= 0)
+        {
+            throw new InvalidDataException("Controller map entries must use address:state syntax.");
+        }
+
+        return new KeyValuePair<byte, DreamcastControllerState>(
+            ParseMapleAddress(text[..separator]),
+            ParseState(text[(separator + 1)..]));
+    }
+
+    public static byte ParseMapleAddress(string text)
+    {
+        var normalized = text.Trim().Replace("-", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+        return normalized switch
+        {
+            "a0" => 0x20,
+            "b0" => 0x40,
+            "c0" => 0x60,
+            "d0" => 0x80,
+            _ => throw new InvalidDataException($"Unknown controller address: {text}")
+        };
+    }
+
     public static DreamcastControllerScript ParseScript(string text)
     {
         var frames = new List<DreamcastControllerScriptFrame>();

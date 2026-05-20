@@ -23,6 +23,27 @@ public class DreamcastFixtureRunnerTests
     }
 
     [Fact]
+    public void CreateRunOptionsParsesControllerMap()
+    {
+        var options = DreamcastFixtureRunner.CreateRunOptions(new DreamcastFixtureDefinition
+        {
+            Name = "controller_map",
+            Artifact = "controller_map.elf",
+            Instructions = 1,
+            Controllers =
+            {
+                ["a0"] = "start",
+                ["b0"] = "b,ltrig=7"
+            }
+        });
+
+        var controllers = Assert.IsAssignableFrom<IReadOnlyDictionary<byte, DreamcastControllerState>>(options.Controllers);
+        Assert.Equal(DreamcastControllerButtons.Start, controllers[0x20].Buttons);
+        Assert.Equal(DreamcastControllerButtons.B, controllers[0x40].Buttons);
+        Assert.Equal(7, controllers[0x40].LeftTrigger);
+    }
+
+    [Fact]
     public void ValidateAcceptsSchedulerExpectationsAtThreshold()
     {
         var fixture = new DreamcastFixtureDefinition
