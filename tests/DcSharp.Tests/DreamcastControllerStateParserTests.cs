@@ -1,0 +1,40 @@
+using DcSharp.Core.Dreamcast.Input;
+
+namespace DcSharp.Tests;
+
+public class DreamcastControllerStateParserTests
+{
+    [Fact]
+    public void ParseStateAcceptsButtonsTriggersAndAxes()
+    {
+        var state = DreamcastControllerStateParser.ParseState("start,a,joyx=-12,joyy=13,joy2x=-2,joy2y=3,ltrig=40,rtrig=80");
+
+        Assert.Equal(DreamcastControllerButtons.Start | DreamcastControllerButtons.A, state.Buttons);
+        Assert.Equal(-12, state.JoyX);
+        Assert.Equal(13, state.JoyY);
+        Assert.Equal(-2, state.Joy2X);
+        Assert.Equal(3, state.Joy2Y);
+        Assert.Equal(40, state.LeftTrigger);
+        Assert.Equal(80, state.RightTrigger);
+    }
+
+    [Fact]
+    public void ParseScriptOrdersFramesByInstruction()
+    {
+        var script = DreamcastControllerStateParser.ParseScript("20:start;0:none;10:a");
+
+        Assert.Equal(DreamcastControllerButtons.None, script.StateAt(0).Buttons);
+        Assert.Equal(DreamcastControllerButtons.None, script.StateAt(9).Buttons);
+        Assert.Equal(DreamcastControllerButtons.A, script.StateAt(10).Buttons);
+        Assert.Equal(DreamcastControllerButtons.A, script.StateAt(19).Buttons);
+        Assert.Equal(DreamcastControllerButtons.Start, script.StateAt(20).Buttons);
+    }
+
+    [Fact]
+    public void ParseScriptRejectsInvalidFrameSyntax()
+    {
+        var ex = Assert.Throws<InvalidDataException>(() => DreamcastControllerStateParser.ParseScript("100-start"));
+
+        Assert.Contains("instruction:state", ex.Message);
+    }
+}
