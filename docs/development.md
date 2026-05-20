@@ -32,6 +32,7 @@ Build individual KOS samples:
 wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
+wsl -e bash tools/kos/build-sample.sh samples/kos/timer_callback
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
@@ -118,6 +119,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
+- `dcsharp_timer_callback.elf`: chains the KOS TMU0 primary timer callback, observes three wakeups, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller_script.elf`: performs two raw Maple condition reads, observes a neutral first read and scripted second read, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller_b.elf`: probes raw B0 Maple device-info and condition responses, covers absent B0 and configured B0 state, shuts down, and reports `ProgramExit`.

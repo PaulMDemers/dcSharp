@@ -37,6 +37,19 @@
       ]
     },
     {
+      "name": "timer_callback",
+      "sample": "samples/kos/timer_callback",
+      "artifact": "dcsharp_timer_callback.elf",
+      "instructions": 60000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp timer callback count 3",
+        "dcSharp KallistiOS timer callback probe done"
+      ],
+      "minHardwareAdvanceTicks": 1000
+    },
+    {
       "name": "maple_controller_neutral",
       "sample": "samples/kos/maple_controller",
       "artifact": "dcsharp_maple_controller.elf",

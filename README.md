@@ -14,6 +14,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/hello`: default KOS init fixture that now reaches `main()` after Maple startup.
   - `samples/kos/minimal`: minimal init fixture that reaches `main()` and exits via the firmware-exit trap.
   - `samples/kos/timer`: default KOS fixture that exercises `timer_ms_gettime64()` and `thd_sleep()`.
+  - `samples/kos/timer_callback`: default KOS fixture that chains a TMU0 primary timer callback.
   - `samples/kos/maple_controller`: default KOS fixture that polls a virtual neutral controller.
   - `samples/kos/maple_controller_script`: raw Maple condition fixture that observes an instruction-indexed controller transition.
   - `samples/kos/maple_controller_b`: raw Maple fixture that probes optional B0 controller presence and state.
@@ -52,6 +53,8 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_probe.elf --instructions 50000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --instructions 50000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/timer_callback
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer_callback.elf --instructions 50000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
@@ -138,7 +141,7 @@ Current state:
 Next targets:
 
 - Use the coalesced hardware advancement path to support broader scheduler event batching without losing timer determinism.
-- Add focused KOS fixtures for timer callbacks.
+- Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 
