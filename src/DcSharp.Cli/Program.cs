@@ -185,19 +185,14 @@ static void RunElf(string path, string[] args)
 static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions options)
 {
     var summary = DreamcastRunSummary.FromResult(result, options);
-    var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    };
-    jsonOptions.Converters.Add(new JsonStringEnumConverter());
-
-    Console.WriteLine(JsonSerializer.Serialize(summary, jsonOptions));
+    Console.WriteLine(SerializeJson(summary));
 }
 
 static int RunFixtures(string manifestPath, string[] args)
 {
     var emitJson = false;
     string? artifactDirectoryOverride = null;
+    string? reportJsonPath = null;
     for (var index = 0; index < args.Length; index++)
     {
         switch (args[index])
@@ -208,6 +203,10 @@ static int RunFixtures(string manifestPath, string[] args)
                 break;
             case "--artifacts" when index + 1 < args.Length:
                 artifactDirectoryOverride = args[index + 1];
+                index++;
+                break;
+            case "--report-json" when index + 1 < args.Length:
+                reportJsonPath = args[index + 1];
                 index++;
                 break;
             default:
@@ -237,14 +236,16 @@ static int RunFixtures(string manifestPath, string[] args)
         results.Add(DreamcastFixtureRunner.Run(fixture, artifactPath));
     }
 
+    var reports = results.Select(FixtureReport.FromResult).ToArray();
+    var reportJson = SerializeJson(reports);
+    if (reportJsonPath is not null)
+    {
+        WriteTextFile(reportJsonPath, reportJson);
+    }
+
     if (emitJson)
     {
-        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-        {
-            WriteIndented = true
-        };
-        jsonOptions.Converters.Add(new JsonStringEnumConverter());
-        Console.WriteLine(JsonSerializer.Serialize(results.Select(FixtureReport.FromResult).ToArray(), jsonOptions));
+        Console.WriteLine(reportJson);
     }
     else
     {
@@ -263,9 +264,24 @@ static int RunFixtures(string manifestPath, string[] args)
         }
 
         Console.WriteLine($"Fixtures: {results.Count(result => result.Passed)}/{results.Count} passed");
+        if (reportJsonPath is not null)
+        {
+            Console.WriteLine($"Report JSON: {Path.GetFullPath(reportJsonPath)}");
+        }
     }
 
     return results.All(result => result.Passed) ? 0 : 1;
+}
+
+static string SerializeJson<T>(T value)
+{
+    var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+    jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+    return JsonSerializer.Serialize(value, jsonOptions);
 }
 
 static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
@@ -327,6 +343,12 @@ static StreamWriter CreateTextLog(string path)
     }
 
     return new StreamWriter(File.Create(fullPath), Encoding.UTF8);
+}
+
+static void WriteTextFile(string path, string content)
+{
+    using var writer = CreateTextLog(path);
+    writer.Write(content);
 }
 
 static CliRunOptions ParseRunOptions(string[] args)
@@ -567,7 +589,7 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
-    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
+    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--report-json path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller map entry: --controller b0:b,ltrig=7");

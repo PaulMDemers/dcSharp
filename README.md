@@ -70,6 +70,7 @@ Run every manifest-listed KOS fixture and validate the expected stop reason, ser
 
 ```bash
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 ```
 
 The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank-interval 0` to disable the current synthetic VBlank source while debugging timing-sensitive behavior.
