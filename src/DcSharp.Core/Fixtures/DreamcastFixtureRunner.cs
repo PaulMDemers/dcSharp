@@ -26,6 +26,9 @@ public static class DreamcastFixtureRunner
         var controllerA = fixture.ControllerA is null
             ? null
             : DreamcastControllerStateParser.ParseState(fixture.ControllerA);
+        var controllerB = fixture.ControllerB is null
+            ? null
+            : DreamcastControllerStateParser.ParseState(fixture.ControllerB);
         var controllerScript = fixture.ControllerAScript is null
             ? null
             : DreamcastControllerStateParser.ParseScript(fixture.ControllerAScript);
@@ -35,7 +38,8 @@ public static class DreamcastFixtureRunner
             fixture.TraceTail,
             fixture.VblankInterval,
             controllerA,
-            controllerScript);
+            controllerScript,
+            ControllerB: controllerB);
     }
 
     public static IReadOnlyList<string> Validate(DreamcastFixtureDefinition fixture, DreamcastRunSummary summary)

@@ -61,7 +61,8 @@ Useful run options:
 - `--trace-tail <count>` controls how many final SH-4 steps are retained.
 - `--vblank-interval <instructions>` controls the current synthetic VBlank cadence.
 - `--vblank-interval 0` disables synthetic VBlank.
-- `--controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80` scripts a static controller state for Maple port A.
+- `--controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80` scripts a static controller state for Maple port A0.
+- `--controller-b b,ltrig=7` adds a configured controller on Maple port B0.
 - `--controller-a-script "0:none;200000:start,a"` changes controller state at instruction-indexed boundaries.
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
@@ -83,7 +84,7 @@ PVR TA writes are classified into diagnostic command kinds such as `PolygonHeade
 
 AICA channel summaries decode sample format, loop enable, sample address, key-on state, and active channel count while remaining silence-safe.
 
-Maple summaries capture DMA command/response names, receive buffers, response sizes, and decoded controller state for `GetCondition` responses.
+Maple summaries capture DMA command/response names, destination labels, receive buffers, response sizes, and decoded controller state for `GetCondition` responses.
 
 ## Tests
 

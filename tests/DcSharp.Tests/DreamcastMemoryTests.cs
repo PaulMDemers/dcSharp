@@ -249,6 +249,7 @@ public class DreamcastMemoryTests
         var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
         Assert.Equal("DeviceInfo", transfer.CommandName);
         Assert.Equal("DeviceInfo", transfer.ResponseName);
+        Assert.Equal("A0", transfer.DestinationName);
         Assert.Equal("0x8C020000", transfer.DescriptorAddressHex);
         Assert.Equal("0x8C030000", transfer.ReceiveBufferAddressHex);
         Assert.Equal(116, transfer.ResponseBytes);
@@ -276,6 +277,7 @@ public class DreamcastMemoryTests
         var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
         Assert.Equal("GetCondition", transfer.CommandName);
         Assert.Equal("DataTransfer", transfer.ResponseName);
+        Assert.Equal("A0", transfer.DestinationName);
         Assert.Equal(16, transfer.ResponseBytes);
         Assert.Equal(DreamcastControllerButtons.None, transfer.ControllerState?.Buttons);
     }
@@ -314,6 +316,57 @@ public class DreamcastMemoryTests
         Assert.Equal(40, state.LeftTrigger);
         Assert.Equal(80, state.RightTrigger);
         Assert.Equal(-12, state.JoyX);
+    }
+
+    [Fact]
+    public void MapleDmaGetConditionWritesConfiguredPortBControllerState()
+    {
+        var memory = new DreamcastMemory(
+            controllerB: new DreamcastControllerState(
+                Buttons: DreamcastControllerButtons.B,
+                LeftTrigger: 7,
+                RightTrigger: 9,
+                JoyX: 12,
+                JoyY: -13));
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0001);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0100_4009);
+        memory.WriteUInt32(0x8C02_000C, 0x0100_0000);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(8, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(0x40, memory.ReadByte(0x8C03_0002));
+        Assert.Equal(0xFFFD, memory.ReadUInt16(0x8C03_0008));
+        Assert.Equal(9, memory.ReadByte(0x8C03_000A));
+        Assert.Equal(7, memory.ReadByte(0x8C03_000B));
+        Assert.Equal(140, memory.ReadByte(0x8C03_000C));
+        Assert.Equal(115, memory.ReadByte(0x8C03_000D));
+
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        var state = Assert.IsType<DreamcastControllerState>(transfer.ControllerState);
+        Assert.Equal("B0", transfer.DestinationName);
+        Assert.Equal(DreamcastControllerButtons.B, state.Buttons);
+    }
+
+    [Fact]
+    public void MapleDmaGetConditionForUnconfiguredPortBWritesNoResponse()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0001);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0100_4009);
+        memory.WriteUInt32(0x8C02_000C, 0x0100_0000);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(0xFF, memory.ReadByte(0x8C03_0000));
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        Assert.Equal("B0", transfer.DestinationName);
+        Assert.Equal("None", transfer.ResponseName);
+        Assert.Null(transfer.ControllerState);
     }
 
     [Fact]

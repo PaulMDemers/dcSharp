@@ -118,6 +118,11 @@ static void RunElf(string path, string[] args)
     }
 
     Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
+    if (options.Emulation.ControllerB is { } controllerB)
+    {
+        Console.WriteLine($"Controller B: {FormatController(controllerB)}");
+    }
+
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
     Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}");
@@ -162,7 +167,7 @@ static void RunElf(string path, string[] args)
     foreach (var transfer in result.Maple.Transfers.TakeLast(8))
     {
         var state = transfer.ControllerState is { } controller ? $", state={FormatController(controller)}" : string.Empty;
-        Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationHex}, recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
+        Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationName} ({transfer.DestinationHex}), recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
     }
 
     if (result.TraceTail.Count > 0)
@@ -331,6 +336,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     ulong vblankInterval = 200_000;
     var emitJson = false;
     var controllerA = DreamcastControllerState.Neutral;
+    DreamcastControllerState? controllerB = null;
     DreamcastControllerScript? controllerAScript = null;
     string? framebufferDumpPath = null;
     var framebufferWidth = 320;
@@ -366,6 +372,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 break;
             case "--controller-a" when index + 1 < args.Length:
                 controllerA = DreamcastControllerStateParser.ParseState(args[index + 1]);
+                index++;
+                break;
+            case "--controller-b" when index + 1 < args.Length:
+                controllerB = DreamcastControllerStateParser.ParseState(args[index + 1]);
                 index++;
                 break;
             case "--controller-a-script" when index + 1 < args.Length:
@@ -437,7 +447,7 @@ static CliRunOptions ParseRunOptions(string[] args)
         : new DreamcastTraceCaptureOptions(traceStartPc, traceEndPc, traceLogLimit);
 
     return new CliRunOptions(
-        new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript, traceCapture),
+        new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript, traceCapture, controllerB),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -529,7 +539,7 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");

@@ -7,6 +7,22 @@ namespace DcSharp.Tests;
 public class DreamcastFixtureRunnerTests
 {
     [Fact]
+    public void CreateRunOptionsParsesControllerB()
+    {
+        var options = DreamcastFixtureRunner.CreateRunOptions(new DreamcastFixtureDefinition
+        {
+            Name = "controller_b",
+            Artifact = "controller_b.elf",
+            Instructions = 1,
+            ControllerB = "b,ltrig=7"
+        });
+
+        var controllerB = Assert.IsType<DreamcastControllerState>(options.ControllerB);
+        Assert.Equal(DreamcastControllerButtons.B, controllerB.Buttons);
+        Assert.Equal(7, controllerB.LeftTrigger);
+    }
+
+    [Fact]
     public void ValidateAcceptsSchedulerExpectationsAtThreshold()
     {
         var fixture = new DreamcastFixtureDefinition

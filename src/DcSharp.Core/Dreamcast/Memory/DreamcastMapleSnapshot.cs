@@ -16,6 +16,7 @@ public sealed record DreamcastMapleDmaTransfer(
     string CommandName,
     byte Destination,
     string DestinationHex,
+    string DestinationName,
     byte Response,
     string ResponseName,
     int ResponseBytes,

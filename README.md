@@ -77,7 +77,7 @@ Capture narrow trace/device logs while keeping the normal run summary readable:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-domain scif --device-kind Write
 ```
 
-Use `--controller-a` to script the virtual controller on Maple port A:
+Use `--controller-a` and `--controller-b` to script virtual controllers on Maple ports A0 and B0:
 
 ```bash
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80
@@ -116,12 +116,12 @@ Current state:
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
 - AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
-- Maple DMA transfers are captured with command/response names, receive buffers, response sizes, and controller state for condition reads.
+- Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.
 - Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
-- The Maple controller fixtures see `dcSharp Virtual Controller`, read neutral or scripted controller state, and validate an instruction-indexed transition across two raw Maple condition reads.
+- The Maple controller fixtures see `dcSharp Virtual Controller`, read neutral or scripted controller state, and validate an instruction-indexed transition across two raw Maple condition reads. The Maple model supports A0 by default and an optional configured B0 controller.
 - The framebuffer fixture writes a 320x240 RGB565 pattern and exposes it through VRAM diagnostics.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
 

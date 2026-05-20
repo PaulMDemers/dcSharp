@@ -57,7 +57,8 @@ public sealed class DreamcastMemory
     private const byte MapleResponseDataTransfer = 8;
     private const byte MapleCommandDeviceInfo = 1;
     private const byte MapleCommandGetCondition = 9;
-    private const byte MaplePortAUnit0Address = 0x20;
+    public const byte MaplePortAUnit0Address = 0x20;
+    public const byte MaplePortBUnit0Address = 0x40;
     private const uint MapleFunctionController = 0x0100_0000;
     private const uint MapleStandardControllerCapabilities = 0xFE06_0F00;
     private const ushort AsicEventPvrVBlankBegin = 0x0003;
@@ -74,12 +75,16 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
+    private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly List<byte> serialOutput = [];
-    private DreamcastControllerState controllerA;
 
-    public DreamcastMemory(DreamcastControllerState? controllerA = null)
+    public DreamcastMemory(DreamcastControllerState? controllerA = null, DreamcastControllerState? controllerB = null)
     {
-        this.controllerA = controllerA ?? DreamcastControllerState.Neutral;
+        mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
+        if (controllerB is { } controllerBState)
+        {
+            mapleControllers[MaplePortBUnit0Address] = controllerBState;
+        }
     }
 
     public int SystemRamBytes => systemRam.Length;
@@ -88,8 +93,24 @@ public sealed class DreamcastMemory
     public IReadOnlyList<byte> SerialOutput => serialOutput;
     public DreamcastControllerState ControllerA
     {
-        get => controllerA;
-        set => controllerA = value;
+        get => mapleControllers.GetValueOrDefault(MaplePortAUnit0Address, DreamcastControllerState.Neutral);
+        set => mapleControllers[MaplePortAUnit0Address] = value;
+    }
+
+    public DreamcastControllerState? ControllerB
+    {
+        get => mapleControllers.GetValueOrDefault(MaplePortBUnit0Address);
+        set
+        {
+            if (value is { } controllerState)
+            {
+                mapleControllers[MaplePortBUnit0Address] = controllerState;
+            }
+            else
+            {
+                mapleControllers.Remove(MaplePortBUnit0Address);
+            }
+        }
     }
 
     public static uint TranslateAddress(uint address)
@@ -679,14 +700,14 @@ public sealed class DreamcastMemory
     {
         byte[] response;
         DreamcastControllerState? responseControllerState = null;
-        if (destination == MaplePortAUnit0Address && command == MapleCommandDeviceInfo)
+        if (mapleControllers.ContainsKey(destination) && command == MapleCommandDeviceInfo)
         {
-            response = CreateMapleControllerDeviceInfoResponse();
+            response = CreateMapleControllerDeviceInfoResponse(destination);
         }
-        else if (destination == MaplePortAUnit0Address && command == MapleCommandGetCondition)
+        else if (mapleControllers.TryGetValue(destination, out var controllerState) && command == MapleCommandGetCondition)
         {
-            responseControllerState = controllerA;
-            response = CreateMapleControllerConditionResponse();
+            responseControllerState = controllerState;
+            response = CreateMapleControllerConditionResponse(destination, controllerState);
         }
         else
         {
@@ -705,17 +726,18 @@ public sealed class DreamcastMemory
             MapleCommandName(command),
             destination,
             $"0x{destination:X2}",
+            MapleAddressName(destination),
             response[0],
             MapleResponseName(response[0]),
             response.Length,
             responseControllerState);
     }
 
-    private byte[] CreateMapleControllerDeviceInfoResponse()
+    private byte[] CreateMapleControllerDeviceInfoResponse(byte destination)
     {
         var response = new byte[4 + 112];
         response[0] = MapleResponseDeviceInfo;
-        response[2] = MaplePortAUnit0Address;
+        response[2] = destination;
         response[3] = 28;
         WriteUInt32(response, 4, MapleFunctionController);
         WriteUInt32(response, 8, MapleStandardControllerCapabilities);
@@ -728,22 +750,29 @@ public sealed class DreamcastMemory
         return response;
     }
 
-    private byte[] CreateMapleControllerConditionResponse()
+    private byte[] CreateMapleControllerConditionResponse(byte destination, DreamcastControllerState controllerState)
     {
         var response = new byte[16];
         response[0] = MapleResponseDataTransfer;
-        response[2] = MaplePortAUnit0Address;
+        response[2] = destination;
         response[3] = 3;
         WriteUInt32(response, 4, MapleFunctionController);
-        WriteUInt16(response, 8, (ushort)~(ushort)controllerA.Buttons);
-        response[10] = controllerA.RightTrigger;
-        response[11] = controllerA.LeftTrigger;
-        response[12] = ToUnsignedAxis(controllerA.JoyX);
-        response[13] = ToUnsignedAxis(controllerA.JoyY);
-        response[14] = ToUnsignedAxis(controllerA.Joy2X);
-        response[15] = ToUnsignedAxis(controllerA.Joy2Y);
+        WriteUInt16(response, 8, (ushort)~(ushort)controllerState.Buttons);
+        response[10] = controllerState.RightTrigger;
+        response[11] = controllerState.LeftTrigger;
+        response[12] = ToUnsignedAxis(controllerState.JoyX);
+        response[13] = ToUnsignedAxis(controllerState.JoyY);
+        response[14] = ToUnsignedAxis(controllerState.Joy2X);
+        response[15] = ToUnsignedAxis(controllerState.Joy2Y);
         return response;
     }
+
+    private static string MapleAddressName(byte address) => address switch
+    {
+        MaplePortAUnit0Address => "A0",
+        MaplePortBUnit0Address => "B0",
+        _ => $"0x{address:X2}"
+    };
 
     private static string MapleCommandName(byte command) => command switch
     {
