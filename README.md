@@ -62,6 +62,12 @@ Dump the current RGB565 framebuffer snapshot to PNG:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240
 ```
 
+Capture narrow trace/device logs while keeping the normal run summary readable:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-kind Write --device-address 0xFFE8000C
+```
+
 Use `--controller-a` to script the virtual controller on Maple port A:
 
 ```bash
@@ -98,6 +104,7 @@ Current state:
 - The CLI can dump the current RGB565 VRAM snapshot to a PNG file for quick visual fixture checks.
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
+- The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.

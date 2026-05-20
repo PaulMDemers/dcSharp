@@ -5,6 +5,7 @@ using DcSharp.Core.Execution;
 using DcSharp.Core.Fixtures;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -70,6 +71,16 @@ static void RunElf(string path, string[] args)
     if (options.FramebufferDumpPath is not null)
     {
         DumpFramebuffer(result, options);
+    }
+
+    if (options.TraceLogPath is not null)
+    {
+        DumpTraceLog(result, options.TraceLogPath);
+    }
+
+    if (options.DeviceLogPath is not null)
+    {
+        DumpDeviceLog(result, options);
     }
 
     if (options.EmitJson)
@@ -238,6 +249,49 @@ static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
     DreamcastFramebufferPngWriter.WriteRgb565Png(stream, result.Video.Vram, options.FramebufferWidth, options.FramebufferHeight);
 }
 
+static void DumpTraceLog(DreamcastRunResult result, string path)
+{
+    using var writer = CreateTextLog(path);
+    foreach (var step in result.TraceLog)
+    {
+        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
+        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
+        writer.WriteLine($"0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+    }
+}
+
+static void DumpDeviceLog(DreamcastRunResult result, CliRunOptions options)
+{
+    using var writer = CreateTextLog(options.DeviceLogPath!);
+    var accesses = result.DeviceAccesses.AsEnumerable();
+    if (options.DeviceKind is { } kind)
+    {
+        accesses = accesses.Where(access => access.Kind == kind);
+    }
+
+    if (options.DeviceAddressRange is { } range)
+    {
+        accesses = accesses.Where(access => range.Contains(access.Address));
+    }
+
+    foreach (var access in accesses)
+    {
+        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+    }
+}
+
+static StreamWriter CreateTextLog(string path)
+{
+    var fullPath = Path.GetFullPath(path);
+    var directory = Path.GetDirectoryName(fullPath);
+    if (!string.IsNullOrEmpty(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    return new StreamWriter(File.Create(fullPath), Encoding.UTF8);
+}
+
 static CliRunOptions ParseRunOptions(string[] args)
 {
     ulong instructionLimit = 1_000;
@@ -249,6 +303,13 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? framebufferDumpPath = null;
     var framebufferWidth = 320;
     var framebufferHeight = 240;
+    string? traceLogPath = null;
+    uint? traceStartPc = null;
+    uint? traceEndPc = null;
+    var traceLogLimit = 4096;
+    string? deviceLogPath = null;
+    MemoryAccessKind? deviceKind = null;
+    AddressRange? deviceAddressRange = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -289,6 +350,31 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--pixel-format" when index + 1 < args.Length && string.Equals(args[index + 1], "rgb565", StringComparison.OrdinalIgnoreCase):
                 index++;
                 break;
+            case "--trace-log" when index + 1 < args.Length:
+                traceLogPath = args[index + 1];
+                index++;
+                break;
+            case "--trace-pc" when index + 1 < args.Length:
+                (traceStartPc, traceEndPc) = ParseAddressRange(args[index + 1]);
+                index++;
+                break;
+            case "--trace-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedTraceLogLimit):
+                traceLogLimit = parsedTraceLogLimit;
+                index++;
+                break;
+            case "--device-log" when index + 1 < args.Length:
+                deviceLogPath = args[index + 1];
+                index++;
+                break;
+            case "--device-kind" when index + 1 < args.Length && Enum.TryParse<MemoryAccessKind>(args[index + 1], ignoreCase: true, out var parsedDeviceKind):
+                deviceKind = parsedDeviceKind;
+                index++;
+                break;
+            case "--device-address" when index + 1 < args.Length:
+                var (start, end) = ParseAddressRange(args[index + 1]);
+                deviceAddressRange = new AddressRange(start ?? 0, end ?? start ?? uint.MaxValue);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -304,12 +390,25 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--trace-tail must be zero or greater.");
     }
 
+    if (traceLogLimit < 0)
+    {
+        throw new InvalidDataException("--trace-log-limit must be zero or greater.");
+    }
+
+    var traceCapture = traceLogPath is null
+        ? null
+        : new DreamcastTraceCaptureOptions(traceStartPc, traceEndPc, traceLogLimit);
+
     return new CliRunOptions(
-        new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript),
+        new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript, traceCapture),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
-        framebufferHeight);
+        framebufferHeight,
+        traceLogPath,
+        deviceLogPath,
+        deviceKind,
+        deviceAddressRange);
 }
 
 static (int Width, int Height) ParseFramebufferSize(string text)
@@ -321,6 +420,44 @@ static (int Width, int Height) ParseFramebufferSize(string text)
     }
 
     return (width, height);
+}
+
+static (uint? Start, uint? End) ParseAddressRange(string text)
+{
+    var separator = text.IndexOf('-');
+    if (separator < 0)
+    {
+        var address = ParseAddress(text);
+        return (address, address);
+    }
+
+    var start = string.IsNullOrWhiteSpace(text[..separator]) ? (uint?)null : ParseAddress(text[..separator]);
+    var end = string.IsNullOrWhiteSpace(text[(separator + 1)..]) ? (uint?)null : ParseAddress(text[(separator + 1)..]);
+    if (start is { } startValue && end is { } endValue && endValue < startValue)
+    {
+        throw new InvalidDataException("Address ranges must be ordered from low to high.");
+    }
+
+    return (start, end);
+}
+
+static uint ParseAddress(string text)
+{
+    var value = text.Trim();
+    if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+    {
+        value = value[2..];
+        if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsedHex))
+        {
+            return parsedHex;
+        }
+    }
+    else if (uint.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDecimal))
+    {
+        return parsedDecimal;
+    }
+
+    throw new InvalidDataException($"Invalid address: {text}");
 }
 
 static string FormatController(DreamcastControllerState state) =>
@@ -335,7 +472,7 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-kind kind] [--device-address start-end] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
@@ -369,7 +506,16 @@ internal sealed record CliRunOptions(
     bool EmitJson,
     string? FramebufferDumpPath,
     int FramebufferWidth,
-    int FramebufferHeight);
+    int FramebufferHeight,
+    string? TraceLogPath,
+    string? DeviceLogPath,
+    MemoryAccessKind? DeviceKind,
+    AddressRange? DeviceAddressRange);
+
+internal sealed record AddressRange(uint Start, uint End)
+{
+    public bool Contains(uint address) => address >= Start && address <= End;
+}
 
 internal sealed record FixtureReport(
     string Name,

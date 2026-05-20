@@ -62,11 +62,15 @@ Useful run options:
 - `--controller-a-script "0:none;200000:start,a"` changes controller state at instruction-indexed boundaries.
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
+- `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
+- `--device-log artifacts/logs/devices.txt --device-kind Write --device-address 0xFFE8000C` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
 The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, text and JSON summaries include nearest function names for stop PCs and trace-tail entries.
+
+Generated framebuffer, trace, and device logs belong under `artifacts/` and stay out of git.
 
 ## Tests
 

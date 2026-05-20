@@ -31,6 +31,7 @@
 - Emit a run summary with final PC, executed instructions, memory faults, serial output, trace tail, and device accesses. Done for text and JSON CLI output.
 - Current KOS probe frontier: default KOS init reaches `main()`, prints both probe messages, runs shutdown, and stops as `ProgramExit`.
 - Symbolize stop PCs and trace-tail entries from ELF symbol tables when available. Done.
+- Add bounded trace and device-access log filters for focused debugging. Done.
 
 ## Milestone 4: Timers, Interrupts, And Maple Probe
 
