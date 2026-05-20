@@ -84,6 +84,37 @@
       "minMapleGetConditionTransfers": 28
     },
     {
+      "name": "maple_controller_b_absent",
+      "sample": "samples/kos/maple_controller_b",
+      "artifact": "dcsharp_maple_controller_b.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp Maple controller B0 device info response=0xff",
+        "dcSharp Maple controller B0 probe: no response"
+      ],
+      "minMapleTransfers": 9,
+      "minMapleDeviceInfoTransfers": 5,
+      "minMapleGetConditionTransfers": 4
+    },
+    {
+      "name": "maple_controller_b_configured",
+      "sample": "samples/kos/maple_controller_b",
+      "artifact": "dcsharp_maple_controller_b.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "controllerB": "b,ltrig=7,rtrig=9,joyx=12,joyy=-13",
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp Maple controller B0 device info response=0x05",
+        "dcSharp Maple controller B0 probe: buttons=0x00000002 joy=(12,-13) triggers=(7,9)"
+      ],
+      "minMapleTransfers": 9,
+      "minMapleDeviceInfoTransfers": 5,
+      "minMapleGetConditionTransfers": 4
+    },
+    {
       "name": "framebuffer",
       "sample": "samples/kos/framebuffer",
       "artifact": "dcsharp_framebuffer.elf",
