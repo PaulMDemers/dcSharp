@@ -89,7 +89,7 @@ Generated framebuffer, trace, and device logs belong under `artifacts/` and stay
 
 Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement ticks, coalesced hardware batches, max hardware batch size, and controller-script state changes.
 
-Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
+Structured run summaries include aggregate device-access counts by domain and access kind, plus recent device accesses. Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 
 PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
 

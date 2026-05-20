@@ -127,6 +127,7 @@ Current state:
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
+- Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
 - AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
@@ -143,7 +144,7 @@ Next targets:
 - Use the coalesced hardware advancement path to support broader scheduler event batching without losing timer determinism.
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
+- Add fixture expectations for structured device-domain access counts.
 
 ## Development Bias
 

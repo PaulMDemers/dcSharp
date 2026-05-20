@@ -25,6 +25,8 @@ public sealed record DreamcastRunSummary(
     DreamcastSymbolSummary? StopSymbol,
     DreamcastLoadSummary Load,
     int DeviceAccessCount,
+    IReadOnlyList<DreamcastDeviceAccessDomainSummary> DeviceAccessDomains,
+    IReadOnlyList<DreamcastDeviceAccessKindSummary> DeviceAccessKinds,
     IReadOnlyList<DreamcastMemoryAccessSummary> RecentDeviceAccesses,
     int SerialBytes,
     string SerialText,
@@ -61,6 +63,16 @@ public sealed record DreamcastRunSummary(
             result.StopPc is { } symbolPc ? DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(symbolPc), symbolPc) : null,
             DreamcastLoadSummary.FromResult(result),
             result.DeviceAccesses.Count,
+            result.DeviceAccesses
+                .GroupBy(DreamcastDeviceDomainClassifier.Classify, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new DreamcastDeviceAccessDomainSummary(group.Key, group.Count()))
+                .ToArray(),
+            result.DeviceAccesses
+                .GroupBy(access => access.Kind)
+                .OrderBy(group => group.Key)
+                .Select(group => new DreamcastDeviceAccessKindSummary(group.Key, group.Count()))
+                .ToArray(),
             result.DeviceAccesses
                 .TakeLast(Math.Max(0, recentDeviceAccessCount))
                 .Select(DreamcastMemoryAccessSummary.FromAccess)
@@ -127,6 +139,10 @@ public sealed record DreamcastLoadedSegmentSummary(
     uint Flags,
     string FlagsHex,
     uint Alignment);
+
+public sealed record DreamcastDeviceAccessDomainSummary(string Domain, int Count);
+
+public sealed record DreamcastDeviceAccessKindSummary(MemoryAccessKind Kind, int Count);
 
 public sealed record DreamcastMemoryAccessSummary(
     MemoryAccessKind Kind,

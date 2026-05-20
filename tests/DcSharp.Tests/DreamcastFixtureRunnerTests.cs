@@ -157,6 +157,8 @@ public class DreamcastFixtureRunnerTests
             new DreamcastLoadSummary(0, "0x00000000", 0, "0x00000000", 0, 0, [], 0),
             0,
             [],
+            [],
+            [],
             0,
             string.Empty,
             [],

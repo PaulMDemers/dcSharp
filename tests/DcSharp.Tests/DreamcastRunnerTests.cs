@@ -66,6 +66,9 @@ public class DreamcastRunnerTests
         Assert.Equal("0x8CFFFFF2", summary.StopPcHex);
         Assert.Equal("0x8C010000", summary.Load.EntryPointHex);
         Assert.Contains("arch: exit return code", summary.SerialText);
+        Assert.Equal(result.DeviceAccesses.Count, summary.DeviceAccessCount);
+        Assert.Contains(summary.DeviceAccessDomains, domain => domain.Domain == DreamcastDeviceDomainClassifier.Scif && domain.Count == result.DeviceAccesses.Count);
+        Assert.Contains(summary.DeviceAccessKinds, kind => kind.Kind == MemoryAccessKind.Write && kind.Count == result.DeviceAccesses.Count);
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
