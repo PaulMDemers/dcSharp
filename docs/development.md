@@ -46,6 +46,12 @@ JSON summary:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --instructions 50000000 --trace-tail 40 --json
 ```
 
+Manifest regression run:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
+```
+
 Useful run options:
 
 - `--instructions <count>` sets the execution budget.
@@ -57,6 +63,8 @@ Useful run options:
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
+
+The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 ## Tests
 
@@ -73,7 +81,7 @@ $env:DCSHARP_RUN_KOS_FIXTURES='1'
 dotnet test dcSharp.slnx --filter DreamcastKosFixtureTests
 ```
 
-The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`.
+The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`. The test suite and CLI runner both read `fixtures/kos.json`.
 
 ## Current Fixture Expectations
 

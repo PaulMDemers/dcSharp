@@ -2,6 +2,7 @@ using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
+using DcSharp.Core.Fixtures;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
 using System.Text;
@@ -24,6 +25,8 @@ try
         case "run" when args.Length >= 2:
             RunElf(args[1], args[2..]);
             return 0;
+        case "fixtures" when args.Length >= 2:
+            return RunFixtures(args[1], args[2..]);
         default:
             PrintUsage();
             return 1;
@@ -137,6 +140,80 @@ static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions o
     Console.WriteLine(JsonSerializer.Serialize(summary, jsonOptions));
 }
 
+static int RunFixtures(string manifestPath, string[] args)
+{
+    var emitJson = false;
+    string? artifactDirectoryOverride = null;
+    for (var index = 0; index < args.Length; index++)
+    {
+        switch (args[index])
+        {
+            case "--json":
+            case "--summary-json":
+                emitJson = true;
+                break;
+            case "--artifacts" when index + 1 < args.Length:
+                artifactDirectoryOverride = args[index + 1];
+                index++;
+                break;
+            default:
+                throw new InvalidDataException($"Unknown or invalid fixtures option: {args[index]}");
+        }
+    }
+
+    var repoRoot = FindRepoRoot(Path.GetFullPath(manifestPath)) ?? Directory.GetCurrentDirectory();
+    using var stream = File.OpenRead(manifestPath);
+    var manifest = DreamcastFixtureManifest.Read(stream);
+    var artifactDirectory = ResolveRepoPath(repoRoot, artifactDirectoryOverride ?? manifest.ArtifactDirectory);
+    var results = new List<DreamcastFixtureCheckResult>();
+
+    foreach (var fixture in manifest.Fixtures)
+    {
+        var artifactPath = Path.Combine(artifactDirectory, fixture.Artifact);
+        if (!File.Exists(artifactPath))
+        {
+            results.Add(new DreamcastFixtureCheckResult(
+                fixture.Name,
+                artifactPath,
+                Summary: null,
+                Failures: [$"missing artifact: {artifactPath}"]));
+            continue;
+        }
+
+        results.Add(DreamcastFixtureRunner.Run(fixture, artifactPath));
+    }
+
+    if (emitJson)
+    {
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            WriteIndented = true
+        };
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+        Console.WriteLine(JsonSerializer.Serialize(results.Select(FixtureReport.FromResult).ToArray(), jsonOptions));
+    }
+    else
+    {
+        foreach (var result in results)
+        {
+            Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
+            if (result.Summary is not null)
+            {
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}");
+            }
+
+            foreach (var failure in result.Failures)
+            {
+                Console.WriteLine($"  {failure}");
+            }
+        }
+
+        Console.WriteLine($"Fixtures: {results.Count(result => result.Passed)}/{results.Count} passed");
+    }
+
+    return results.All(result => result.Passed) ? 0 : 1;
+}
+
 static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
 {
     var path = Path.GetFullPath(options.FramebufferDumpPath!);
@@ -183,11 +260,11 @@ static CliRunOptions ParseRunOptions(string[] args)
                 index++;
                 break;
             case "--controller-a" when index + 1 < args.Length:
-                controllerA = ParseControllerState(args[index + 1]);
+                controllerA = DreamcastControllerStateParser.ParseState(args[index + 1]);
                 index++;
                 break;
             case "--controller-a-script" when index + 1 < args.Length:
-                controllerAScript = ParseControllerScript(args[index + 1]);
+                controllerAScript = DreamcastControllerStateParser.ParseScript(args[index + 1]);
                 index++;
                 break;
             case "--dump-framebuffer" when index + 1 < args.Length:
@@ -235,132 +312,6 @@ static (int Width, int Height) ParseFramebufferSize(string text)
     return (width, height);
 }
 
-static DreamcastControllerScript ParseControllerScript(string text)
-{
-    var frames = new List<DreamcastControllerScriptFrame>();
-    foreach (var rawFrame in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-    {
-        var separator = rawFrame.IndexOf(':');
-        if (separator <= 0)
-        {
-            throw new InvalidDataException("Controller script frames must use instruction:state syntax.");
-        }
-
-        if (!ulong.TryParse(rawFrame[..separator], out var instruction))
-        {
-            throw new InvalidDataException($"Invalid controller script instruction: {rawFrame[..separator]}");
-        }
-
-        frames.Add(new DreamcastControllerScriptFrame(instruction, ParseControllerState(rawFrame[(separator + 1)..])));
-    }
-
-    return new DreamcastControllerScript(frames.OrderBy(frame => frame.FromInstruction).ToArray());
-}
-
-static DreamcastControllerState ParseControllerState(string text)
-{
-    var buttons = DreamcastControllerButtons.None;
-    byte leftTrigger = 0;
-    byte rightTrigger = 0;
-    sbyte joyX = 0;
-    sbyte joyY = 0;
-    sbyte joy2X = 0;
-    sbyte joy2Y = 0;
-
-    foreach (var rawToken in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-    {
-        var token = rawToken.Trim();
-        var equals = token.IndexOf('=');
-        if (equals < 0)
-        {
-            buttons |= ParseButton(token);
-            continue;
-        }
-
-        var key = token[..equals].Trim().ToLowerInvariant();
-        var value = token[(equals + 1)..].Trim();
-        switch (key)
-        {
-            case "buttons":
-                foreach (var button in value.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                {
-                    buttons |= ParseButton(button);
-                }
-                break;
-            case "ltrig":
-            case "lt":
-                leftTrigger = ParseByte(value, key);
-                break;
-            case "rtrig":
-            case "rt":
-                rightTrigger = ParseByte(value, key);
-                break;
-            case "joyx":
-                joyX = ParseAxis(value, key);
-                break;
-            case "joyy":
-                joyY = ParseAxis(value, key);
-                break;
-            case "joy2x":
-                joy2X = ParseAxis(value, key);
-                break;
-            case "joy2y":
-                joy2Y = ParseAxis(value, key);
-                break;
-            default:
-                throw new InvalidDataException($"Unknown controller field: {key}");
-        }
-    }
-
-    return new DreamcastControllerState(buttons, leftTrigger, rightTrigger, joyX, joyY, joy2X, joy2Y);
-}
-
-static DreamcastControllerButtons ParseButton(string text)
-{
-    var normalized = text.Replace("-", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
-    return normalized switch
-    {
-        "a" => DreamcastControllerButtons.A,
-        "b" => DreamcastControllerButtons.B,
-        "c" => DreamcastControllerButtons.C,
-        "d" => DreamcastControllerButtons.D,
-        "x" => DreamcastControllerButtons.X,
-        "y" => DreamcastControllerButtons.Y,
-        "z" => DreamcastControllerButtons.Z,
-        "start" => DreamcastControllerButtons.Start,
-        "up" or "dpadup" => DreamcastControllerButtons.DPadUp,
-        "down" or "dpaddown" => DreamcastControllerButtons.DPadDown,
-        "left" or "dpadleft" => DreamcastControllerButtons.DPadLeft,
-        "right" or "dpadright" => DreamcastControllerButtons.DPadRight,
-        "dpad2up" => DreamcastControllerButtons.DPad2Up,
-        "dpad2down" => DreamcastControllerButtons.DPad2Down,
-        "dpad2left" => DreamcastControllerButtons.DPad2Left,
-        "dpad2right" => DreamcastControllerButtons.DPad2Right,
-        "none" => DreamcastControllerButtons.None,
-        _ => throw new InvalidDataException($"Unknown controller button: {text}")
-    };
-}
-
-static byte ParseByte(string text, string key)
-{
-    if (!byte.TryParse(text, out var value))
-    {
-        throw new InvalidDataException($"{key} must be between 0 and 255.");
-    }
-
-    return value;
-}
-
-static sbyte ParseAxis(string text, string key)
-{
-    if (!int.TryParse(text, out var parsed) || parsed is < -128 or > 127)
-    {
-        throw new InvalidDataException($"{key} must be between -128 and 127.");
-    }
-
-    return (sbyte)parsed;
-}
-
 static string FormatController(DreamcastControllerState state) =>
     $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
@@ -374,11 +325,33 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--json]");
+    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller script: --controller-a-script \"0:none;200000:start,a\"");
     Console.WriteLine("    Framebuffer dumps currently use RGB565.");
 }
+
+static string? FindRepoRoot(string startPath)
+{
+    var directory = File.Exists(startPath)
+        ? Directory.GetParent(startPath)
+        : new DirectoryInfo(startPath);
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "dcSharp.slnx")))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    return null;
+}
+
+static string ResolveRepoPath(string repoRoot, string path) =>
+    Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(repoRoot, path));
 
 internal sealed record CliRunOptions(
     DreamcastRunOptions Emulation,
@@ -386,3 +359,23 @@ internal sealed record CliRunOptions(
     string? FramebufferDumpPath,
     int FramebufferWidth,
     int FramebufferHeight);
+
+internal sealed record FixtureReport(
+    string Name,
+    bool Passed,
+    DreamcastStopReason? StopReason,
+    ulong? InstructionsExecuted,
+    int? SerialBytes,
+    ulong? VideoNonZeroBytes,
+    IReadOnlyList<string> Failures)
+{
+    public static FixtureReport FromResult(DreamcastFixtureCheckResult result) =>
+        new(
+            result.Name,
+            result.Passed,
+            result.Summary?.StopReason,
+            result.Summary?.InstructionsExecuted,
+            result.Summary?.SerialBytes,
+            result.Summary?.Video.NonZeroBytes,
+            result.Failures);
+}

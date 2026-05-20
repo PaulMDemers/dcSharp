@@ -48,6 +48,12 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --trace-tail 40
 ```
 
+Run every manifest-listed KOS fixture and validate the expected stop reason, serial output, and video samples:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
+```
+
 The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank-interval 0` to disable the current synthetic VBlank source while debugging timing-sensitive behavior.
 
 Dump the current RGB565 framebuffer snapshot to PNG:
@@ -90,6 +96,7 @@ Current state:
 - The SH-4 TMU slice includes TSTR, TCOR/TCNT countdown, TCR underflow/interrupt bits, and IPRA priority lookup; the timer fixture now wakes from `thd_sleep()`.
 - PVR VRAM is backed for the 32-bit and 64-bit apertures, and run summaries include a checksum, non-zero byte count, first changed offset, and RGB565 samples.
 - The CLI can dump the current RGB565 VRAM snapshot to a PNG file for quick visual fixture checks.
+- KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.

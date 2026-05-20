@@ -1,160 +1,58 @@
-using DcSharp.Core.Dreamcast.Input;
-using DcSharp.Core.Execution;
-using DcSharp.Core.Media;
+using DcSharp.Core.Fixtures;
 
 namespace DcSharp.Tests;
 
 public class DreamcastKosFixtureTests
 {
-    [Fact]
-    public void MinimalKosFixtureReachesMainAndFirmwareExit()
+    public static IEnumerable<object[]> KosFixtures()
     {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_minimal.elf", out var stream))
-        {
-            return;
-        }
+        var repoRoot = FindRepoRoot();
+        using var stream = File.OpenRead(Path.Combine(repoRoot, "fixtures", "kos.json"));
+        var manifest = DreamcastFixtureManifest.Read(stream);
 
-        using (stream)
+        foreach (var fixture in manifest.Fixtures)
         {
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 20_000_000, TraceTailLength: 8));
-            var summary = DreamcastRunSummary.FromResult(result);
-
-            Assert.Equal(DreamcastStopReason.FirmwareExit, summary.StopReason);
-            Assert.Contains("dcSharp minimal KallistiOS probe", summary.SerialText);
+            yield return [manifest.ArtifactDirectory, fixture];
         }
     }
 
-    [Fact]
-    public void DefaultKosFixtureReachesMainAndProgramExit()
+    [Theory]
+    [MemberData(nameof(KosFixtures))]
+    public void KosFixtureMatchesManifest(string artifactDirectory, DreamcastFixtureDefinition fixture)
     {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_probe.elf", out var stream))
+        if (!ShouldRunKosFixtures())
         {
             return;
         }
 
-        using (stream)
-        {
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 60_000_000, TraceTailLength: 8));
-            var summary = DreamcastRunSummary.FromResult(result);
-
-            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
-            Assert.Contains("dcSharp KallistiOS probe", summary.SerialText);
-            Assert.Contains("arch: exit return code 0", summary.SerialText);
-        }
-    }
-
-    [Fact]
-    public void TimerKosFixtureSleepsAndProgramExits()
-    {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_timer.elf", out var stream))
+        var repoRoot = FindRepoRoot();
+        var artifactPath = Path.Combine(repoRoot, artifactDirectory, fixture.Artifact);
+        if (!File.Exists(artifactPath))
         {
             return;
         }
 
-        using (stream)
-        {
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 60_000_000, TraceTailLength: 8));
-            var summary = DreamcastRunSummary.FromResult(result);
+        var result = DreamcastFixtureRunner.Run(fixture, artifactPath);
 
-            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
-            Assert.Contains("dcSharp timer tick 1 elapsed", summary.SerialText);
-            Assert.Contains("dcSharp KallistiOS timer probe done", summary.SerialText);
-        }
-    }
-
-    [Fact]
-    public void MapleControllerKosFixtureReadsNeutralController()
-    {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_maple_controller.elf", out var stream))
-        {
-            return;
-        }
-
-        using (stream)
-        {
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 60_000_000, TraceTailLength: 8));
-            var summary = DreamcastRunSummary.FromResult(result);
-
-            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
-            Assert.Contains("dcSharp Virtual Controller", summary.SerialText);
-            Assert.Contains("dcSharp Maple controller probe: buttons=0x00000000 joy=(0,0) triggers=(0,0)", summary.SerialText);
-        }
-    }
-
-    [Fact]
-    public void MapleControllerKosFixtureReadsScriptedButtons()
-    {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_maple_controller.elf", out var stream))
-        {
-            return;
-        }
-
-        using (stream)
-        {
-            var options = new DreamcastRunOptions(
-                InstructionLimit: 60_000_000,
-                TraceTailLength: 8,
-                ControllerA: new DreamcastControllerState(
-                    Buttons: DreamcastControllerButtons.Start | DreamcastControllerButtons.A,
-                    LeftTrigger: 40,
-                    RightTrigger: 80,
-                    JoyX: -12,
-                    JoyY: 13));
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), options);
-            var summary = DreamcastRunSummary.FromResult(result, options);
-
-            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
-            Assert.Contains("dcSharp Maple controller probe: buttons=0x0000000c joy=(-12,13) triggers=(40,80)", summary.SerialText);
-        }
-    }
-
-    [Fact]
-    public void FramebufferKosFixtureWritesVramPattern()
-    {
-        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_framebuffer.elf", out var stream))
-        {
-            return;
-        }
-
-        using (stream)
-        {
-            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 70_000_000, TraceTailLength: 8));
-            var summary = DreamcastRunSummary.FromResult(result);
-
-            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
-            Assert.Contains("dcSharp framebuffer probe", summary.SerialText);
-            Assert.Contains("origin=0xf800", summary.SerialText);
-            Assert.True(summary.Video.NonZeroBytes > 0);
-            Assert.Equal("0xF800", Assert.Single(summary.Video.Samples, sample => sample.Name == "origin").Rgb565Hex);
-            Assert.Equal("0xFFFF", Assert.Single(summary.Video.Samples, sample => sample.Name == "pixel_160_120_320x240").Rgb565Hex);
-        }
+        Assert.True(result.Passed, string.Join(Environment.NewLine, result.Failures));
     }
 
     private static bool ShouldRunKosFixtures() =>
         string.Equals(Environment.GetEnvironmentVariable("DCSHARP_RUN_KOS_FIXTURES"), "1", StringComparison.Ordinal);
 
-    private static bool TryOpenArtifact(string fileName, out FileStream stream)
+    private static string FindRepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "dcSharp.slnx")))
+        while (directory is not null)
         {
+            if (File.Exists(Path.Combine(directory.FullName, "dcSharp.slnx")))
+            {
+                return directory.FullName;
+            }
+
             directory = directory.Parent;
         }
 
-        if (directory is null)
-        {
-            stream = null!;
-            return false;
-        }
-
-        var path = Path.Combine(directory.FullName, "artifacts", "kos", fileName);
-        if (!File.Exists(path))
-        {
-            stream = null!;
-            return false;
-        }
-
-        stream = File.OpenRead(path);
-        return true;
+        throw new DirectoryNotFoundException("Could not find repository root.");
     }
 }

@@ -1,0 +1,87 @@
+{
+  "artifactDirectory": "artifacts/kos",
+  "fixtures": [
+    {
+      "name": "minimal",
+      "sample": "samples/kos/minimal",
+      "artifact": "dcsharp_minimal.elf",
+      "instructions": 20000000,
+      "traceTail": 8,
+      "expectedStopReason": "FirmwareExit",
+      "serialContains": [
+        "dcSharp minimal KallistiOS probe"
+      ]
+    },
+    {
+      "name": "hello",
+      "sample": "samples/kos/hello",
+      "artifact": "dcsharp_probe.elf",
+      "instructions": 60000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp KallistiOS probe",
+        "arch: exit return code 0"
+      ]
+    },
+    {
+      "name": "timer",
+      "sample": "samples/kos/timer",
+      "artifact": "dcsharp_timer.elf",
+      "instructions": 60000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp timer tick 1 elapsed",
+        "dcSharp KallistiOS timer probe done"
+      ]
+    },
+    {
+      "name": "maple_controller_neutral",
+      "sample": "samples/kos/maple_controller",
+      "artifact": "dcsharp_maple_controller.elf",
+      "instructions": 60000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp Virtual Controller",
+        "dcSharp Maple controller probe: buttons=0x00000000 joy=(0,0) triggers=(0,0)"
+      ]
+    },
+    {
+      "name": "maple_controller_scripted",
+      "sample": "samples/kos/maple_controller",
+      "artifact": "dcsharp_maple_controller.elf",
+      "instructions": 60000000,
+      "traceTail": 8,
+      "controllerA": "start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80",
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp Maple controller probe: buttons=0x0000000c joy=(-12,13) triggers=(40,80)"
+      ]
+    },
+    {
+      "name": "framebuffer",
+      "sample": "samples/kos/framebuffer",
+      "artifact": "dcsharp_framebuffer.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp framebuffer probe",
+        "origin=0xf800"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_160_120_320x240",
+          "rgb565": "0xFFFF"
+        }
+      ]
+    }
+  ]
+}
