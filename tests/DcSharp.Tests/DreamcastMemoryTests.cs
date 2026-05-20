@@ -142,12 +142,32 @@ public class DreamcastMemoryTests
         Assert.Contains(snapshot.RegisterAccesses, access => access.Name == "AICA_CH0_CONTROL" && access.ValueHex == "0x0000C000");
         var channel = Assert.Single(snapshot.Channels);
         Assert.Equal(0, channel.Channel);
+        Assert.Equal("Pcm16", channel.SampleFormat);
+        Assert.False(channel.LoopEnabled);
+        Assert.Equal(0x1234u, channel.SampleAddress);
         Assert.True(channel.KeyOn);
         Assert.True(channel.KeyOnExecute);
+        Assert.True(channel.Active);
         Assert.Equal(0x1234u, channel.SampleAddressLow);
         Assert.Equal(0x1AC0u, channel.Pitch);
         Assert.Equal(0x0F, channel.Pan);
         Assert.Equal(0x40, channel.Volume);
+    }
+
+    [Theory]
+    [InlineData(0x0000_0080u, "Pcm8", false)]
+    [InlineData(0x0000_0100u, "Adpcm", false)]
+    [InlineData(0x0000_0380u, "AdpcmLongStream", true)]
+    public void AudioSnapshotDecodesAicaSampleFormatAndLoop(uint controlBits, string expectedFormat, bool expectedLoop)
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0000, controlBits);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+
+        Assert.Equal(expectedFormat, channel.SampleFormat);
+        Assert.Equal(expectedLoop, channel.LoopEnabled);
     }
 
     [Fact]

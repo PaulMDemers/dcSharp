@@ -1060,10 +1060,17 @@ public sealed class DreamcastMemory
             var pitch = ReadAicaChannelRegister(channel, 0x18);
             var pan = (byte)(ReadAicaChannelRegister(channel, 0x24) & 0xFF);
             var volume = (byte)((ReadAicaChannelRegister(channel, 0x28) >> 8) & 0xFF);
+            var sampleAddress = ((control & 0x7Fu) << 16) | (sampleLow & 0xFFFFu);
+            var keyOn = (control & 0x4000) != 0;
+            var keyOnExecute = (control & 0x8000) != 0;
             return new DreamcastAicaChannelSnapshot(
                 channel,
                 control,
                 $"0x{control:X8}",
+                AicaSampleFormatName((control >> 7) & 0x3),
+                (control & 0x0200) != 0,
+                sampleAddress,
+                $"0x{sampleAddress:X8}",
                 sampleLow,
                 $"0x{sampleLow:X8}",
                 loopStart,
@@ -1074,10 +1081,20 @@ public sealed class DreamcastMemory
                 $"0x{pitch:X8}",
                 pan,
                 volume,
-                (control & 0x4000) != 0,
-                (control & 0x8000) != 0);
+                keyOn && keyOnExecute,
+                keyOn,
+                keyOnExecute);
         }).ToArray();
     }
+
+    private static string AicaSampleFormatName(uint mode) => mode switch
+    {
+        0 => "Pcm16",
+        1 => "Pcm8",
+        2 => "Adpcm",
+        3 => "AdpcmLongStream",
+        _ => "Unknown"
+    };
 
     private uint ReadAicaChannelRegister(int channel, uint channelOffset) =>
         aicaRegisters.GetValueOrDefault(AicaRegisterBase + ((uint)channel * 0x80u) + (channelOffset & 0xFFFF_FFFCu));

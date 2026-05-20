@@ -112,7 +112,7 @@ Current state:
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
-- AICA register writes and sound RAM changes are captured without producing host audio yet.
+- AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, and controller script changes.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.

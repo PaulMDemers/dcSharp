@@ -49,7 +49,7 @@
 - Dump the current RGB565 framebuffer snapshot to PNG for visual fixture checks. Done.
 - Add PVR command logging before a full renderer. Started: named PVR register accesses and TA command writes are captured in video summaries.
 - Classify TA command writes before a full renderer. Started with first-word command kind and list type decoding.
-- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, and touched channel snapshots are captured in audio summaries.
+- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
 
 ## Milestone 6: Media And Broader Compatibility
 

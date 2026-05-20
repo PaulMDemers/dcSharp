@@ -26,6 +26,10 @@ public sealed record DreamcastAicaChannelSnapshot(
     int Channel,
     uint Control,
     string ControlHex,
+    string SampleFormat,
+    bool LoopEnabled,
+    uint SampleAddress,
+    string SampleAddressHex,
     uint SampleAddressLow,
     string SampleAddressLowHex,
     uint LoopStart,
@@ -36,5 +40,6 @@ public sealed record DreamcastAicaChannelSnapshot(
     string PitchHex,
     byte Pan,
     byte Volume,
+    bool Active,
     bool KeyOn,
     bool KeyOnExecute);

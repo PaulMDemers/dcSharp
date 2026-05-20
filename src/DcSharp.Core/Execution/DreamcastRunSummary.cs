@@ -277,7 +277,8 @@ public sealed record DreamcastAudioSummary(
     string Fnv1A32Hex,
     int RegisterAccessCount,
     IReadOnlyList<DreamcastAicaRegisterAccessSummary> RecentRegisterAccesses,
-    IReadOnlyList<DreamcastAicaChannelSummary> Channels)
+    IReadOnlyList<DreamcastAicaChannelSummary> Channels,
+    int ActiveChannelCount)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -287,7 +288,8 @@ public sealed record DreamcastAudioSummary(
             snapshot.Fnv1A32Hex,
             snapshot.RegisterAccesses.Count,
             snapshot.RegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaRegisterAccessSummary.FromAccess).ToArray(),
-            snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray());
+            snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray(),
+            snapshot.Channels.Count(channel => channel.Active));
 }
 
 public sealed record DreamcastAicaRegisterAccessSummary(
@@ -310,6 +312,10 @@ public sealed record DreamcastAicaChannelSummary(
     int Channel,
     uint Control,
     string ControlHex,
+    string SampleFormat,
+    bool LoopEnabled,
+    uint SampleAddress,
+    string SampleAddressHex,
     uint SampleAddressLow,
     string SampleAddressLowHex,
     uint LoopStart,
@@ -320,6 +326,7 @@ public sealed record DreamcastAicaChannelSummary(
     string PitchHex,
     byte Pan,
     byte Volume,
+    bool Active,
     bool KeyOn,
     bool KeyOnExecute)
 {
@@ -328,6 +335,10 @@ public sealed record DreamcastAicaChannelSummary(
             channel.Channel,
             channel.Control,
             channel.ControlHex,
+            channel.SampleFormat,
+            channel.LoopEnabled,
+            channel.SampleAddress,
+            channel.SampleAddressHex,
             channel.SampleAddressLow,
             channel.SampleAddressLowHex,
             channel.LoopStart,
@@ -338,6 +349,7 @@ public sealed record DreamcastAicaChannelSummary(
             channel.PitchHex,
             channel.Pan,
             channel.Volume,
+            channel.Active,
             channel.KeyOn,
             channel.KeyOnExecute);
 }

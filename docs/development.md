@@ -78,6 +78,8 @@ Run summaries also include scheduler diagnostics for synthetic VBlank events, ha
 
 PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
 
+AICA channel summaries decode sample format, loop enable, sample address, key-on state, and active channel count while remaining silence-safe.
+
 ## Tests
 
 Run normal tests:
