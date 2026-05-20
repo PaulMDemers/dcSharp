@@ -47,6 +47,7 @@ public sealed class DreamcastFixtureDefinition
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
     public int? MinAicaRegisterAccesses { get; set; }
+    public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
     internal void Validate()
@@ -77,4 +78,10 @@ public sealed class DreamcastFixtureVideoSampleExpectation
 {
     public string Name { get; set; } = string.Empty;
     public string Rgb565 { get; set; } = string.Empty;
+}
+
+public sealed class DreamcastFixturePvrTaCommandExpectation
+{
+    public string Kind { get; set; } = string.Empty;
+    public int MinCount { get; set; } = 1;
 }

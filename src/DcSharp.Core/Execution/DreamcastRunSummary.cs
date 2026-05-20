@@ -202,7 +202,8 @@ public sealed record DreamcastVideoSummary(
     int PvrRegisterAccessCount,
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrTaCommandWriteCount,
-    IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites)
+    IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
+    IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -221,7 +222,12 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisterAccesses.Count,
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
-            snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray());
+            snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
+            snapshot.PvrTaCommandWrites
+                .GroupBy(write => write.Kind, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
+                .ToArray());
 }
 
 public sealed record DreamcastVideoSampleSummary(
@@ -250,13 +256,19 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
     uint Address,
     string AddressHex,
     string Region,
+    string Kind,
+    int? ListType,
+    string? ListTypeName,
+    bool EndOfStrip,
     int Size,
     uint Value,
     string ValueHex)
 {
     public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
-        new(write.Address, write.AddressHex, write.Region, write.Size, write.Value, write.ValueHex);
+        new(write.Address, write.AddressHex, write.Region, write.Kind, write.ListType, write.ListTypeName, write.EndOfStrip, write.Size, write.Value, write.ValueHex);
 }
+
+public sealed record DreamcastPvrTaCommandKindSummary(string Kind, int Count);
 
 public sealed record DreamcastAudioSummary(
     int AudioRamBytes,

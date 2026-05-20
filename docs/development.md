@@ -76,6 +76,8 @@ Generated framebuffer, trace, and device logs belong under `artifacts/` and stay
 
 Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement, and controller-script state changes.
 
+PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
+
 ## Tests
 
 Run normal tests:

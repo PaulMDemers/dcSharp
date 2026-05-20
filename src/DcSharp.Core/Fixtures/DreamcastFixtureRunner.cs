@@ -77,6 +77,15 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected at least {minAicaRegisterAccesses} AICA register accesses, got {summary.Audio.RegisterAccessCount}");
         }
 
+        foreach (var expected in fixture.PvrTaCommands)
+        {
+            var count = summary.Video.PvrTaCommandKinds.SingleOrDefault(kind => string.Equals(kind.Kind, expected.Kind, StringComparison.Ordinal))?.Count ?? 0;
+            if (count < expected.MinCount)
+            {
+                failures.Add($"expected at least {expected.MinCount} PVR TA {expected.Kind} commands, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.VideoSamples)
         {
             var sample = summary.Video.Samples.SingleOrDefault(sample => string.Equals(sample.Name, expected.Name, StringComparison.Ordinal));

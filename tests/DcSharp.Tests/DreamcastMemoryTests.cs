@@ -110,12 +110,15 @@ public class DreamcastMemoryTests
             write =>
             {
                 Assert.Equal("TA_INPUT", write.Region);
+                Assert.Equal("PolygonHeader", write.Kind);
+                Assert.Equal("OpaquePolygon", write.ListTypeName);
                 Assert.Equal("0x10000000", write.AddressHex);
                 Assert.Equal("0x80840000", write.ValueHex);
             },
             write =>
             {
                 Assert.Equal("TA_YUV_CONV", write.Region);
+                Assert.Equal("YuvConverterData", write.Kind);
                 Assert.Equal("0x10800000", write.AddressHex);
             });
     }

@@ -96,7 +96,21 @@
         "ta_init=0x80000000"
       ],
       "minPvrRegisterAccesses": 7,
-      "minPvrTaCommandWrites": 3
+      "minPvrTaCommandWrites": 3,
+      "pvrTaCommands": [
+        {
+          "kind": "PolygonHeader",
+          "minCount": 1
+        },
+        {
+          "kind": "Vertex",
+          "minCount": 1
+        },
+        {
+          "kind": "YuvConverterData",
+          "minCount": 1
+        }
+      ]
     },
     {
       "name": "aica_registers",

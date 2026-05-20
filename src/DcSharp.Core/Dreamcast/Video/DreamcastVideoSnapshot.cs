@@ -36,6 +36,10 @@ public sealed record DreamcastPvrTaCommandWrite(
     uint Address,
     string AddressHex,
     string Region,
+    string Kind,
+    int? ListType,
+    string? ListTypeName,
+    bool EndOfStrip,
     int Size,
     uint Value,
     string ValueHex);

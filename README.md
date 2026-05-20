@@ -111,7 +111,7 @@ Current state:
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
-- PVR register and TA command writes are captured in the video summary with SDK-aligned register names.
+- PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
 - AICA register writes and sound RAM changes are captured without producing host audio yet.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, and controller script changes.
 - SCIF serial writes are captured and printed by the CLI.

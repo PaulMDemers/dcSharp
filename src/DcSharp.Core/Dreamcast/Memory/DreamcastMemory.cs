@@ -873,7 +873,18 @@ public sealed class DreamcastMemory
         }
 
         var value = ToValue(data);
-        pvrTaCommandWrites.Add(new DreamcastPvrTaCommandWrite(address, $"0x{address:X8}", region, data.Length, value, $"0x{value:X8}"));
+        var command = DreamcastPvrTaCommandDecoder.Decode(region, value);
+        pvrTaCommandWrites.Add(new DreamcastPvrTaCommandWrite(
+            address,
+            $"0x{address:X8}",
+            region,
+            command.Kind,
+            command.ListType,
+            command.ListTypeName,
+            command.EndOfStrip,
+            data.Length,
+            value,
+            $"0x{value:X8}"));
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
         return true;
     }

@@ -148,7 +148,8 @@ static void RunElf(string path, string[] args)
 
     foreach (var write in result.Video.PvrTaCommandWrites.TakeLast(8))
     {
-        Console.WriteLine($"  PVR TA {write.Region}: addr={write.AddressHex}, size={write.Size}, value={write.ValueHex}");
+        var listText = write.ListTypeName is null ? string.Empty : $", list={write.ListTypeName}";
+        Console.WriteLine($"  PVR TA {write.Kind}: region={write.Region}, addr={write.AddressHex}, size={write.Size}, value={write.ValueHex}{listText}");
     }
 
     foreach (var access in result.Audio.RegisterAccesses.TakeLast(8))
