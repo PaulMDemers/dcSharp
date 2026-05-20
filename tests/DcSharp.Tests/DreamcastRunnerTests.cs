@@ -69,6 +69,9 @@ public class DreamcastRunnerTests
         Assert.Equal(2, summary.TraceTail.Count);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
         Assert.Equal(result.Scheduler.VBlankEventsRaised, summary.Scheduler.VBlankEventsRaised);
+        Assert.Equal(result.Scheduler.HardwareAdvanceTicks, summary.Scheduler.HardwareAdvanceTicks);
+        Assert.Equal(result.Scheduler.HardwareAdvanceBatches, summary.Scheduler.HardwareAdvanceBatches);
+        Assert.Equal(result.Scheduler.MaxHardwareAdvanceBatch, summary.Scheduler.MaxHardwareAdvanceBatch);
     }
 
     [Fact]

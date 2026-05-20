@@ -241,7 +241,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}");
             }
 
             foreach (var failure in result.Failures)
@@ -579,6 +579,10 @@ internal sealed record FixtureReport(
     int? PvrTaCommandWriteCount,
     int? AicaRegisterAccessCount,
     ulong? VBlankEventsRaised,
+    ulong? HardwareAdvanceTicks,
+    ulong? HardwareAdvanceBatches,
+    ulong? MaxHardwareAdvanceBatch,
+    ulong? ControllerScriptChanges,
     IReadOnlyList<string> Failures)
 {
     public static FixtureReport FromResult(DreamcastFixtureCheckResult result) =>
@@ -593,5 +597,9 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Scheduler.VBlankEventsRaised,
+            result.Summary?.Scheduler.HardwareAdvanceTicks,
+            result.Summary?.Scheduler.HardwareAdvanceBatches,
+            result.Summary?.Scheduler.MaxHardwareAdvanceBatch,
+            result.Summary?.Scheduler.ControllerScriptChanges,
             result.Failures);
 }

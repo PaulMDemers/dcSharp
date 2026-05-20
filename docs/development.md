@@ -68,7 +68,7 @@ Useful run options:
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
-The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
+The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Fixture text and JSON reports include scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, text and JSON summaries include nearest function names for stop PCs and trace-tail entries.
 
