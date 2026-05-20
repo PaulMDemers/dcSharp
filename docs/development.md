@@ -27,6 +27,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
+wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 ```
 
 Generated ELF files are copied to `artifacts/kos/`, which is intentionally ignored by git.
@@ -78,6 +79,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
+- `dcsharp_framebuffer.elf`: writes a 320x240 RGB565 quadrant pattern into VRAM, exposes non-zero VRAM diagnostics, shuts down, and reports `ProgramExit`.
 
 ## Commit Hygiene
 

@@ -89,6 +89,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
     Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
+    Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
@@ -101,6 +102,11 @@ static void RunElf(string path, string[] args)
     foreach (var access in result.DeviceAccesses.TakeLast(8))
     {
         Console.WriteLine($"  {access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+    }
+
+    foreach (var sample in result.Video.Samples.Where(sample => sample.Rgb565 != 0).Take(8))
+    {
+        Console.WriteLine($"  Video sample {sample.Name}: offset={sample.OffsetHex}, rgb565={sample.Rgb565Hex}");
     }
 
     if (result.TraceTail.Count > 0)

@@ -108,6 +108,28 @@ public class DreamcastKosFixtureTests
         }
     }
 
+    [Fact]
+    public void FramebufferKosFixtureWritesVramPattern()
+    {
+        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_framebuffer.elf", out var stream))
+        {
+            return;
+        }
+
+        using (stream)
+        {
+            var result = new DreamcastRunner().Run(ElfFile.Read(stream), new DreamcastRunOptions(InstructionLimit: 70_000_000, TraceTailLength: 8));
+            var summary = DreamcastRunSummary.FromResult(result);
+
+            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
+            Assert.Contains("dcSharp framebuffer probe", summary.SerialText);
+            Assert.Contains("origin=0xf800", summary.SerialText);
+            Assert.True(summary.Video.NonZeroBytes > 0);
+            Assert.Equal("0xF800", Assert.Single(summary.Video.Samples, sample => sample.Name == "origin").Rgb565Hex);
+            Assert.Equal("0xFFFF", Assert.Single(summary.Video.Samples, sample => sample.Name == "pixel_160_120_320x240").Rgb565Hex);
+        }
+    }
+
     private static bool ShouldRunKosFixtures() =>
         string.Equals(Environment.GetEnvironmentVariable("DCSHARP_RUN_KOS_FIXTURES"), "1", StringComparison.Ordinal);
 

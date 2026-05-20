@@ -1,5 +1,6 @@
 using DcSharp.Core.Dreamcast;
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Video;
 using System.Text;
 
 namespace DcSharp.Core.Dreamcast.Memory;
@@ -12,6 +13,9 @@ public sealed class DreamcastMemory
     private const uint PhysicalMask = 0x1FFF_FFFF;
     private const uint SystemRamPhysicalBase = 0x0C00_0000;
     private const uint SystemRamMirrorBytes = 32 * 1024 * 1024;
+    private const uint PvrVram64PhysicalBase = 0x0400_0000;
+    private const uint PvrVram32PhysicalBase = 0x0500_0000;
+    private const int PvrVramByteCount = 8 * 1024 * 1024;
     private const uint P4Base = 0xE000_0000;
     private const uint ExternalRegisterBase = 0x005F_0000;
     private const uint ExternalRegisterLimit = 0x0060_0000;
@@ -49,6 +53,7 @@ public sealed class DreamcastMemory
     private const ushort AsicEventMapleDma = 0x000C;
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
+    private readonly byte[] pvrVram = new byte[PvrVramByteCount];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly List<MemoryAccess> deviceAccesses = [];
@@ -61,6 +66,7 @@ public sealed class DreamcastMemory
     }
 
     public int SystemRamBytes => systemRam.Length;
+    public int PvrVramBytes => pvrVram.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
     public DreamcastControllerState ControllerA
@@ -120,6 +126,32 @@ public sealed class DreamcastMemory
         return true;
     }
 
+    public bool TryGetPvrVramOffset(uint address, int length, out int offset)
+    {
+        offset = 0;
+
+        if (length < 0)
+        {
+            return false;
+        }
+
+        var physical = TranslateAddress(address);
+        if (physical >= PvrVram32PhysicalBase && physical < PvrVram32PhysicalBase + PvrVramByteCount)
+        {
+            offset = (int)(physical - PvrVram32PhysicalBase);
+        }
+        else if (physical >= PvrVram64PhysicalBase && physical < PvrVram64PhysicalBase + PvrVramByteCount)
+        {
+            offset = (int)(physical - PvrVram64PhysicalBase);
+        }
+        else
+        {
+            return false;
+        }
+
+        return offset + length <= pvrVram.Length;
+    }
+
     public void Write(uint address, ReadOnlySpan<byte> data)
     {
         if (IsP4Address(address))
@@ -131,6 +163,12 @@ public sealed class DreamcastMemory
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             WriteExternal(address, externalAddress, data);
+            return;
+        }
+
+        if (TryGetPvrVramOffset(address, data.Length, out var vramOffset))
+        {
+            data.CopyTo(pvrVram.AsSpan(vramOffset));
             return;
         }
 
@@ -176,6 +214,11 @@ public sealed class DreamcastMemory
             return (byte)(ReadExternal(address, externalAddress, 1) & 0xFF);
         }
 
+        if (TryGetPvrVramOffset(address, 1, out var vramOffset))
+        {
+            return pvrVram[vramOffset];
+        }
+
         if (!TryGetSystemRamOffset(address, 1, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 1, 0));
@@ -197,6 +240,11 @@ public sealed class DreamcastMemory
             return (ushort)(ReadExternal(address, externalAddress, 2) & 0xFFFF);
         }
 
+        if (TryGetPvrVramOffset(address, 2, out var vramOffset))
+        {
+            return (ushort)(pvrVram[vramOffset] | (pvrVram[vramOffset + 1] << 8));
+        }
+
         if (!TryGetSystemRamOffset(address, 2, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 2, 0));
@@ -216,6 +264,14 @@ public sealed class DreamcastMemory
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             return ReadExternal(address, externalAddress, 4);
+        }
+
+        if (TryGetPvrVramOffset(address, 4, out var vramOffset))
+        {
+            return (uint)(pvrVram[vramOffset]
+                | (pvrVram[vramOffset + 1] << 8)
+                | (pvrVram[vramOffset + 2] << 16)
+                | (pvrVram[vramOffset + 3] << 24));
         }
 
         if (!TryGetSystemRamOffset(address, 4, out var offset))
@@ -262,6 +318,58 @@ public sealed class DreamcastMemory
         ];
 
         Write(address, bytes);
+    }
+
+    public DreamcastVideoSnapshot CreateVideoSnapshot()
+    {
+        ulong nonZeroBytes = 0;
+        uint? firstNonZeroOffset = null;
+        const uint fnvPrime = 16_777_619;
+        var hash = 2_166_136_261u;
+
+        for (var index = 0; index < pvrVram.Length; index++)
+        {
+            var value = pvrVram[index];
+            if (value != 0)
+            {
+                nonZeroBytes++;
+                firstNonZeroOffset ??= (uint)index;
+            }
+
+            hash ^= value;
+            hash *= fnvPrime;
+        }
+
+        return new DreamcastVideoSnapshot(
+            pvrVram.Length,
+            nonZeroBytes,
+            hash,
+            $"0x{hash:X8}",
+            firstNonZeroOffset,
+            firstNonZeroOffset is { } offset ? $"0x{offset:X8}" : null,
+            CreateVideoSamples());
+    }
+
+    private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
+    {
+        (string Name, uint Offset)[] offsets =
+        [
+            ("origin", 0),
+            ("pixel_1_0", 2),
+            ("pixel_2_0", 4),
+            ("pixel_160_120_320x240", (120u * 320u + 160u) * 2u),
+            ("pixel_319_239_320x240", (239u * 320u + 319u) * 2u),
+            ("pixel_320_240_640x480", (240u * 640u + 320u) * 2u)
+        ];
+
+        return offsets
+            .Where(sample => sample.Offset + 1 < pvrVram.Length)
+            .Select(sample =>
+            {
+                var value = (ushort)(pvrVram[sample.Offset] | (pvrVram[sample.Offset + 1] << 8));
+                return new DreamcastVideoSample(sample.Name, sample.Offset, $"0x{sample.Offset:X8}", value, $"0x{value:X4}");
+            })
+            .ToArray();
     }
 
     private static bool IsP4Address(uint address) => address >= P4Base;

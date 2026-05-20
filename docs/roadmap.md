@@ -41,7 +41,7 @@
 
 ## Milestone 5: Video And Audio Bring-Up
 
-- Start with framebuffer/register visibility.
+- Start with framebuffer/register visibility. Started: PVR VRAM apertures are backed and `samples/kos/framebuffer` writes a RGB565 pattern with run-summary samples.
 - Add PVR command logging before a full renderer.
 - Add silence-safe AICA register/channel tracking before audible output.
 

@@ -1,6 +1,7 @@
 using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Video;
 using System.Text;
 
 namespace DcSharp.Core.Execution;
@@ -25,7 +26,8 @@ public sealed record DreamcastRunSummary(
     int SerialBytes,
     string SerialText,
     IReadOnlyList<DreamcastTraceSummary> TraceTail,
-    DreamcastControllerSummary ControllerA)
+    DreamcastControllerSummary ControllerA,
+    DreamcastVideoSummary Video)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
@@ -57,7 +59,8 @@ public sealed record DreamcastRunSummary(
             result.SerialOutput.Count,
             Encoding.ASCII.GetString(result.SerialOutput.ToArray()),
             result.TraceTail.Select(DreamcastTraceSummary.FromStep).ToArray(),
-            DreamcastControllerSummary.FromState(controllerA));
+            DreamcastControllerSummary.FromState(controllerA),
+            DreamcastVideoSummary.FromSnapshot(result.Video));
     }
 
     private static string Hex32(uint value) => $"0x{value:X8}";
@@ -150,3 +153,35 @@ public sealed record DreamcastControllerSummary(
             state.Joy2X,
             state.Joy2Y);
 }
+
+public sealed record DreamcastVideoSummary(
+    int VramBytes,
+    ulong NonZeroBytes,
+    uint Fnv1A32,
+    string Fnv1A32Hex,
+    uint? FirstNonZeroOffset,
+    string? FirstNonZeroOffsetHex,
+    IReadOnlyList<DreamcastVideoSampleSummary> Samples)
+{
+    public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot) =>
+        new(
+            snapshot.VramBytes,
+            snapshot.NonZeroBytes,
+            snapshot.Fnv1A32,
+            snapshot.Fnv1A32Hex,
+            snapshot.FirstNonZeroOffset,
+            snapshot.FirstNonZeroOffsetHex,
+            snapshot.Samples.Select(sample => new DreamcastVideoSampleSummary(
+                sample.Name,
+                sample.Offset,
+                sample.OffsetHex,
+                sample.Rgb565,
+                sample.Rgb565Hex)).ToArray());
+}
+
+public sealed record DreamcastVideoSampleSummary(
+    string Name,
+    uint Offset,
+    string OffsetHex,
+    ushort Rgb565,
+    string Rgb565Hex);

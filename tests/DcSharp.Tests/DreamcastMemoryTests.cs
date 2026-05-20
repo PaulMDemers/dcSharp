@@ -39,6 +39,35 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void MapsPvrVramThroughThirtyTwoBitAperture()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt16(0xA500_0000, 0xF800);
+        memory.WriteUInt16(0x0500_0002, 0x07E0);
+
+        Assert.Equal(0xF800, memory.ReadUInt16(0x0500_0000));
+        Assert.Equal(0x07E0, memory.ReadUInt16(0xA500_0002));
+    }
+
+    [Fact]
+    public void VideoSnapshotReportsVramChanges()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt16(0xA500_0000, 0xF800);
+        memory.WriteUInt16(0xA500_0002, 0x07E0);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.Equal(memory.PvrVramBytes, snapshot.VramBytes);
+        Assert.Equal(3UL, snapshot.NonZeroBytes);
+        Assert.Equal(1u, snapshot.FirstNonZeroOffset);
+        Assert.Equal("0xF800", Assert.Single(snapshot.Samples, sample => sample.Name == "origin").Rgb565Hex);
+        Assert.NotEqual("0x00000000", snapshot.Fnv1A32Hex);
+    }
+
+    [Fact]
     public void TimerCounterUnderflowSetsControlFlag()
     {
         var memory = new DreamcastMemory();
