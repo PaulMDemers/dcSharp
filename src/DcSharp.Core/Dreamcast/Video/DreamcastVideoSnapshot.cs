@@ -7,7 +7,8 @@ public sealed record DreamcastVideoSnapshot(
     string Fnv1A32Hex,
     uint? FirstNonZeroOffset,
     string? FirstNonZeroOffsetHex,
-    IReadOnlyList<DreamcastVideoSample> Samples);
+    IReadOnlyList<DreamcastVideoSample> Samples,
+    byte[] Vram);
 
 public sealed record DreamcastVideoSample(
     string Name,

@@ -50,6 +50,12 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.el
 
 The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank-interval 0` to disable the current synthetic VBlank source while debugging timing-sensitive behavior.
 
+Dump the current RGB565 framebuffer snapshot to PNG:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240
+```
+
 Use `--controller-a` to script the virtual controller on Maple port A:
 
 ```bash
@@ -83,6 +89,7 @@ Current state:
 - The external ASIC/Maple slice includes stateful event registers, periodic VBlank events, Maple DMA completion, one virtual neutral controller on port A, and IRQ entry through KOS's normal interrupt vector.
 - The SH-4 TMU slice includes TSTR, TCOR/TCNT countdown, TCR underflow/interrupt bits, and IPRA priority lookup; the timer fixture now wakes from `thd_sleep()`.
 - PVR VRAM is backed for the 32-bit and 64-bit apertures, and run summaries include a checksum, non-zero byte count, first changed offset, and RGB565 samples.
+- The CLI can dump the current RGB565 VRAM snapshot to a PNG file for quick visual fixture checks.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
@@ -93,7 +100,6 @@ Next targets:
 
 - Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
 - Add focused KOS fixtures for timer callbacks and PVR command logging.
-- Add a PNG dump path for the current RGB565 framebuffer.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 

@@ -1,5 +1,6 @@
 using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
@@ -62,6 +63,11 @@ static void RunElf(string path, string[] args)
     var elf = ElfFile.Read(stream);
     var options = ParseRunOptions(args);
     var result = new DreamcastRunner().Run(elf, options.Emulation);
+
+    if (options.FramebufferDumpPath is not null)
+    {
+        DumpFramebuffer(result, options);
+    }
 
     if (options.EmitJson)
     {
@@ -131,6 +137,19 @@ static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions o
     Console.WriteLine(JsonSerializer.Serialize(summary, jsonOptions));
 }
 
+static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
+{
+    var path = Path.GetFullPath(options.FramebufferDumpPath!);
+    var directory = Path.GetDirectoryName(path);
+    if (!string.IsNullOrEmpty(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    using var stream = File.Create(path);
+    DreamcastFramebufferPngWriter.WriteRgb565Png(stream, result.Video.Vram, options.FramebufferWidth, options.FramebufferHeight);
+}
+
 static CliRunOptions ParseRunOptions(string[] args)
 {
     ulong instructionLimit = 1_000;
@@ -139,6 +158,9 @@ static CliRunOptions ParseRunOptions(string[] args)
     var emitJson = false;
     var controllerA = DreamcastControllerState.Neutral;
     DreamcastControllerScript? controllerAScript = null;
+    string? framebufferDumpPath = null;
+    var framebufferWidth = 320;
+    var framebufferHeight = 240;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -168,6 +190,17 @@ static CliRunOptions ParseRunOptions(string[] args)
                 controllerAScript = ParseControllerScript(args[index + 1]);
                 index++;
                 break;
+            case "--dump-framebuffer" when index + 1 < args.Length:
+                framebufferDumpPath = args[index + 1];
+                index++;
+                break;
+            case "--framebuffer-size" when index + 1 < args.Length:
+                (framebufferWidth, framebufferHeight) = ParseFramebufferSize(args[index + 1]);
+                index++;
+                break;
+            case "--pixel-format" when index + 1 < args.Length && string.Equals(args[index + 1], "rgb565", StringComparison.OrdinalIgnoreCase):
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -183,7 +216,23 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--trace-tail must be zero or greater.");
     }
 
-    return new CliRunOptions(new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript), emitJson);
+    return new CliRunOptions(
+        new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript),
+        emitJson,
+        framebufferDumpPath,
+        framebufferWidth,
+        framebufferHeight);
+}
+
+static (int Width, int Height) ParseFramebufferSize(string text)
+{
+    var parts = text.Split('x', 2, StringSplitOptions.TrimEntries);
+    if (parts.Length != 2 || !int.TryParse(parts[0], out var width) || !int.TryParse(parts[1], out var height) || width <= 0 || height <= 0)
+    {
+        throw new InvalidDataException("--framebuffer-size must use WIDTHxHEIGHT, for example 320x240.");
+    }
+
+    return (width, height);
 }
 
 static DreamcastControllerScript ParseControllerScript(string text)
@@ -324,10 +373,16 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller script: --controller-a-script \"0:none;200000:start,a\"");
+    Console.WriteLine("    Framebuffer dumps currently use RGB565.");
 }
 
-internal sealed record CliRunOptions(DreamcastRunOptions Emulation, bool EmitJson);
+internal sealed record CliRunOptions(
+    DreamcastRunOptions Emulation,
+    bool EmitJson,
+    string? FramebufferDumpPath,
+    int FramebufferWidth,
+    int FramebufferHeight);

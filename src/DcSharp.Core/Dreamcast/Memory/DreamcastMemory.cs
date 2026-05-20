@@ -347,7 +347,8 @@ public sealed class DreamcastMemory
             $"0x{hash:X8}",
             firstNonZeroOffset,
             firstNonZeroOffset is { } offset ? $"0x{offset:X8}" : null,
-            CreateVideoSamples());
+            CreateVideoSamples(),
+            (byte[])pvrVram.Clone());
     }
 
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
