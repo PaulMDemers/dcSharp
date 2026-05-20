@@ -47,6 +47,9 @@ public sealed class DreamcastFixtureDefinition
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
     public int? MinAicaRegisterAccesses { get; set; }
+    public int? MinMapleTransfers { get; set; }
+    public int? MinMapleDeviceInfoTransfers { get; set; }
+    public int? MinMapleGetConditionTransfers { get; set; }
     public ulong? MinVblankEvents { get; set; }
     public ulong? MinHardwareAdvanceTicks { get; set; }
     public ulong? MinHardwareAdvanceBatches { get; set; }

@@ -69,7 +69,7 @@ Useful run options:
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
-The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Fixture text and JSON reports include scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
+The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, and `minMapleGetConditionTransfers`, plus scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, text and JSON summaries include nearest function names for stop PCs and trace-tail entries.
 

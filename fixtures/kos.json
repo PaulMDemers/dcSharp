@@ -46,7 +46,10 @@
       "serialContains": [
         "dcSharp Virtual Controller",
         "dcSharp Maple controller probe: buttons=0x00000000 joy=(0,0) triggers=(0,0)"
-      ]
+      ],
+      "minMapleTransfers": 7,
+      "minMapleDeviceInfoTransfers": 4,
+      "minMapleGetConditionTransfers": 3
     },
     {
       "name": "maple_controller_scripted",
@@ -58,7 +61,10 @@
       "expectedStopReason": "ProgramExit",
       "serialContains": [
         "dcSharp Maple controller probe: buttons=0x0000000c joy=(-12,13) triggers=(40,80)"
-      ]
+      ],
+      "minMapleTransfers": 7,
+      "minMapleDeviceInfoTransfers": 4,
+      "minMapleGetConditionTransfers": 3
     },
     {
       "name": "maple_controller_script_transition",
@@ -72,7 +78,10 @@
         "dcSharp Maple controller script probe first: buttons=0x00000000 joy=(0,0) triggers=(0,0)",
         "dcSharp Maple controller script probe second: buttons=0x0000000c joy=(-12,13) triggers=(40,80)"
       ],
-      "minControllerScriptChanges": 1
+      "minControllerScriptChanges": 1,
+      "minMapleTransfers": 63,
+      "minMapleDeviceInfoTransfers": 4,
+      "minMapleGetConditionTransfers": 28
     },
     {
       "name": "framebuffer",
