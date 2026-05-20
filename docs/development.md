@@ -1,0 +1,80 @@
+# dcSharp Development Runbook
+
+This project is currently optimized around legal KallistiOS fixtures, deterministic CLI runs, and small emulator slices that can be regression-tested.
+
+## Toolchain
+
+KallistiOS is installed in WSL:
+
+```bash
+~/kos
+~/kos-ports
+~/sh-elf
+```
+
+Verify the SDK:
+
+```bash
+wsl -e bash tools/kos/verify-kos.sh
+```
+
+## Build Fixtures
+
+Build individual KOS samples:
+
+```bash
+wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
+wsl -e bash tools/kos/build-sample.sh samples/kos/hello
+wsl -e bash tools/kos/build-sample.sh samples/kos/timer
+```
+
+Generated ELF files are copied to `artifacts/kos/`, which is intentionally ignored by git.
+
+## Run Fixtures
+
+Text summary:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_probe.elf --instructions 50000000 --trace-tail 40
+```
+
+JSON summary:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --instructions 50000000 --trace-tail 40 --json
+```
+
+Useful run options:
+
+- `--instructions <count>` sets the execution budget.
+- `--trace-tail <count>` controls how many final SH-4 steps are retained.
+- `--vblank-interval <instructions>` controls the current synthetic VBlank cadence.
+- `--vblank-interval 0` disables synthetic VBlank.
+- `--json` or `--summary-json` emits structured output for scripts and regression checks.
+
+## Tests
+
+Run normal tests:
+
+```powershell
+dotnet test dcSharp.slnx
+```
+
+Run long KOS fixture checks:
+
+```powershell
+$env:DCSHARP_RUN_KOS_FIXTURES='1'
+dotnet test dcSharp.slnx --filter DreamcastKosFixtureTests
+```
+
+The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`.
+
+## Current Fixture Expectations
+
+- `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
+- `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
+- `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
+
+## Commit Hygiene
+
+Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
