@@ -70,7 +70,7 @@ Current state:
 
 Next targets:
 
-- Replace per-instruction TMU advancement and coarse VBlank scheduling with a central event scheduler.
+- Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
 - Add focused KOS fixtures for timer callbacks, Maple controller polling, framebuffer writes, and PVR command logging.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 

@@ -35,7 +35,8 @@
 
 - Add scheduler clock and interrupt controller basics. Started with periodic VBlank, ASIC event masks, SH-4 external interrupt entry, TMU countdown/reload, and IPRA priority lookup.
 - Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()` and now completes.
-- Replace per-instruction TMU advancement and the coarse instruction-count VBlank pulse with scheduler-driven events.
+- Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
+- Improve the scheduler to coalesce timer advancement and expose event diagnostics.
 - Add frame/input scripts once Maple data affects guest behavior.
 
 ## Milestone 5: Video And Audio Bring-Up

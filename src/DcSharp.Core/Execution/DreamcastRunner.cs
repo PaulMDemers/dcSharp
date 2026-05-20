@@ -18,18 +18,14 @@ public sealed class DreamcastRunner
         FirmwareStubs.Install(memory);
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
         var cpu = new Sh4Cpu(memory, load.EntryPoint, firmwareTrap.TryHandle);
+        var scheduler = new DreamcastEventScheduler(memory, options);
         var traceTail = new Queue<Sh4StepResult>();
 
         try
         {
             while (cpu.State.InstructionsExecuted < options.InstructionLimit)
             {
-                if (options.VBlankInterval > 0 && cpu.State.InstructionsExecuted != 0 && cpu.State.InstructionsExecuted % options.VBlankInterval == 0)
-                {
-                    memory.RaiseVBlankBegin();
-                }
-
-                memory.AdvanceHardware(1);
+                scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 var step = cpu.Step();
                 if (options.TraceTailLength > 0)
                 {
