@@ -20,6 +20,12 @@ wsl -e bash tools/kos/verify-kos.sh
 
 ## Build Fixtures
 
+Build every sample referenced by `fixtures/kos.json`:
+
+```bash
+wsl -e bash tools/kos/build-fixtures.sh
+```
+
 Build individual KOS samples:
 
 ```bash

@@ -18,8 +18,17 @@ make -C "$sample_dir" clean all
 
 artifact_dir="$repo_root/artifacts/kos"
 mkdir -p "$artifact_dir"
-find "$sample_dir" -maxdepth 1 -name '*.elf' -exec cp {} "$artifact_dir/" \;
+artifacts=()
+while IFS= read -r -d '' elf; do
+  artifact="$artifact_dir/$(basename "$elf")"
+  cp "$elf" "$artifact"
+  artifacts+=("$artifact")
+done < <(find "$sample_dir" -maxdepth 1 -name '*.elf' -print0)
+if [[ "${#artifacts[@]}" -eq 0 ]]; then
+  echo "No ELF artifacts produced by $sample_dir" >&2
+  exit 1
+fi
 make -C "$sample_dir" clean >/dev/null
 
 echo "Built KOS sample artifacts:"
-find "$artifact_dir" -maxdepth 1 -name '*.elf' -print
+printf '%s\n' "${artifacts[@]}"

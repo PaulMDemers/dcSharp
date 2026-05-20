@@ -39,6 +39,12 @@ wsl -e bash tools/kos/verify-kos.sh
 Build the legal Dreamcast probe fixtures:
 
 ```bash
+wsl -e bash tools/kos/build-fixtures.sh
+```
+
+Or build individual samples while iterating:
+
+```bash
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
 wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 dotnet run --project src/DcSharp.Cli -- inspect artifacts/kos/dcsharp_probe.elf
