@@ -37,7 +37,7 @@
 - Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()` and now completes; `samples/kos/maple_controller` detects a virtual controller and observes static scripted input.
 - Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
 - Improve the scheduler to coalesce timer advancement and expose event diagnostics.
-- Add frame/input scripts that vary Maple controller state over instruction time.
+- Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script`.
 
 ## Milestone 5: Video And Audio Bring-Up
 

@@ -12,6 +12,37 @@ public sealed record DreamcastControllerState(
     public static DreamcastControllerState Neutral { get; } = new();
 }
 
+public sealed record DreamcastControllerScript(IReadOnlyList<DreamcastControllerScriptFrame> Frames)
+{
+    public DreamcastControllerScript(params DreamcastControllerScriptFrame[] frames)
+        : this((IReadOnlyList<DreamcastControllerScriptFrame>)frames)
+    {
+    }
+
+    public DreamcastControllerState StateAt(ulong instruction)
+    {
+        if (Frames.Count == 0)
+        {
+            return DreamcastControllerState.Neutral;
+        }
+
+        var state = DreamcastControllerState.Neutral;
+        foreach (var frame in Frames.OrderBy(frame => frame.FromInstruction))
+        {
+            if (frame.FromInstruction > instruction)
+            {
+                return state;
+            }
+
+            state = frame.State;
+        }
+
+        return state;
+    }
+}
+
+public sealed record DreamcastControllerScriptFrame(ulong FromInstruction, DreamcastControllerState State);
+
 [Flags]
 public enum DreamcastControllerButtons : ushort
 {

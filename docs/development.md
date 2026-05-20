@@ -52,6 +52,7 @@ Useful run options:
 - `--vblank-interval <instructions>` controls the current synthetic VBlank cadence.
 - `--vblank-interval 0` disables synthetic VBlank.
 - `--controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80` scripts a static controller state for Maple port A.
+- `--controller-a-script "0:none;200000:start,a"` changes controller state at instruction-indexed boundaries.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
 ## Tests

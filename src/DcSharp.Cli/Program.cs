@@ -88,7 +88,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
-    Console.WriteLine($"Controller A: {FormatController(options.Emulation.ControllerA ?? DreamcastControllerState.Neutral)}");
+    Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
@@ -132,6 +132,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     ulong vblankInterval = 200_000;
     var emitJson = false;
     var controllerA = DreamcastControllerState.Neutral;
+    DreamcastControllerScript? controllerAScript = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -157,6 +158,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 controllerA = ParseControllerState(args[index + 1]);
                 index++;
                 break;
+            case "--controller-a-script" when index + 1 < args.Length:
+                controllerAScript = ParseControllerScript(args[index + 1]);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -172,7 +177,29 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--trace-tail must be zero or greater.");
     }
 
-    return new CliRunOptions(new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA), emitJson);
+    return new CliRunOptions(new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA, controllerAScript), emitJson);
+}
+
+static DreamcastControllerScript ParseControllerScript(string text)
+{
+    var frames = new List<DreamcastControllerScriptFrame>();
+    foreach (var rawFrame in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var separator = rawFrame.IndexOf(':');
+        if (separator <= 0)
+        {
+            throw new InvalidDataException("Controller script frames must use instruction:state syntax.");
+        }
+
+        if (!ulong.TryParse(rawFrame[..separator], out var instruction))
+        {
+            throw new InvalidDataException($"Invalid controller script instruction: {rawFrame[..separator]}");
+        }
+
+        frames.Add(new DreamcastControllerScriptFrame(instruction, ParseControllerState(rawFrame[(separator + 1)..])));
+    }
+
+    return new DreamcastControllerScript(frames.OrderBy(frame => frame.FromInstruction).ToArray());
 }
 
 static DreamcastControllerState ParseControllerState(string text)
@@ -282,13 +309,19 @@ static sbyte ParseAxis(string text, string key)
 static string FormatController(DreamcastControllerState state) =>
     $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
+static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
+    options.ControllerAScript?.StateAt(instructionsExecuted)
+    ?? options.ControllerA
+    ?? DreamcastControllerState.Neutral;
+
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
+    Console.WriteLine("    Example controller script: --controller-a-script \"0:none;200000:start,a\"");
 }
 
 internal sealed record CliRunOptions(DreamcastRunOptions Emulation, bool EmitJson);

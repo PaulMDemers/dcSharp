@@ -53,6 +53,12 @@ Use `--controller-a` to script the virtual controller on Maple port A:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80
 ```
 
+Use `--controller-a-script` for instruction-indexed controller changes:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a-script "0:none;1:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+```
+
 Use `--json` or `--summary-json` to emit a machine-readable run summary:
 
 ```bash
@@ -82,7 +88,7 @@ Next targets:
 
 - Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
 - Add focused KOS fixtures for timer callbacks, framebuffer writes, and PVR command logging.
-- Add frame/input scripts that vary controller state over time instead of holding one static state for the whole run.
+- Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 
 ## Development Bias

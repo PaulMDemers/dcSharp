@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Execution;
 
 namespace DcSharp.Tests;
@@ -53,5 +54,22 @@ public class DreamcastEventSchedulerTests
         scheduler.AdvanceBeforeInstruction(2);
 
         Assert.Equal(0x0100, memory.ReadUInt16(0xFFD8_001C));
+    }
+
+    [Fact]
+    public void AppliesControllerScriptAtInstructionBoundary()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(
+            VBlankInterval: 0,
+            ControllerAScript: new DreamcastControllerScript(
+                new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start)))));
+
+        scheduler.AdvanceBeforeInstruction(4);
+        Assert.Equal(DreamcastControllerButtons.None, memory.ControllerA.Buttons);
+
+        scheduler.AdvanceBeforeInstruction(5);
+        Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
     }
 }

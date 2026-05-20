@@ -53,7 +53,7 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<byte> serialOutput = [];
-    private readonly DreamcastControllerState controllerA;
+    private DreamcastControllerState controllerA;
 
     public DreamcastMemory(DreamcastControllerState? controllerA = null)
     {
@@ -63,6 +63,11 @@ public sealed class DreamcastMemory
     public int SystemRamBytes => systemRam.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
+    public DreamcastControllerState ControllerA
+    {
+        get => controllerA;
+        set => controllerA = value;
+    }
 
     public static uint TranslateAddress(uint address)
     {

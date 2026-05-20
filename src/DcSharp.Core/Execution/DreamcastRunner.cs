@@ -85,7 +85,8 @@ public sealed record DreamcastRunOptions(
     ulong InstructionLimit = 1_000,
     int TraceTailLength = 16,
     ulong VBlankInterval = 200_000,
-    DreamcastControllerState? ControllerA = null);
+    DreamcastControllerState? ControllerA = null,
+    DreamcastControllerScript? ControllerAScript = null);
 
 public sealed record DreamcastRunResult(
     ElfLoadResult Load,

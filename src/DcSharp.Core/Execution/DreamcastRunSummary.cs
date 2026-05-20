@@ -30,7 +30,9 @@ public sealed record DreamcastRunSummary(
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var controllerA = options?.ControllerA ?? DreamcastControllerState.Neutral;
+        var controllerA = options?.ControllerAScript?.StateAt(result.Cpu.InstructionsExecuted)
+            ?? options?.ControllerA
+            ?? DreamcastControllerState.Neutral;
 
         return new DreamcastRunSummary(
             result.StopReason,
