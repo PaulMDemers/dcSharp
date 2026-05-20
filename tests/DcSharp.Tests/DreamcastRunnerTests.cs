@@ -1,5 +1,8 @@
+using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
+using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
 using System.Text;
 
@@ -49,6 +52,34 @@ public class DreamcastRunnerTests
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
+    }
+
+    [Fact]
+    public void StructuredRunSummaryIncludesNearestSymbols()
+    {
+        var symbol = new ElfSymbol("main", 0x8C01_0000, 8, 0x12, 0, 1);
+        var load = new ElfLoadResult(
+            EntryPoint: 0x8C01_0000,
+            TranslatedEntryPoint: 0x0C01_0000,
+            LoadedSegments: [new LoadedSegment(0, 0x8C01_0000, 0x0C01_0000, 8, 8, 5, 32)],
+            Symbols: [symbol]);
+        var result = new DreamcastRunResult(
+            load,
+            new Sh4StateSnapshot(new uint[16], 0x8C01_0008, 0, 0, 0, 0, 0, 4),
+            [new Sh4StepResult(0x8C01_0004, 0x0009, "nop")],
+            [],
+            [],
+            new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], []),
+            DreamcastStopReason.UnsupportedInstruction,
+            "unsupported",
+            0x8C01_0006,
+            0xFFFF);
+
+        var summary = DreamcastRunSummary.FromResult(result);
+
+        Assert.Equal(1, summary.Load.SymbolCount);
+        Assert.Equal("main+0x6", summary.StopSymbol?.Display);
+        Assert.Equal("main+0x4", Assert.Single(summary.TraceTail).Symbol?.Display);
     }
 
     [Fact]

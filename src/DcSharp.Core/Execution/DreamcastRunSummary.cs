@@ -2,6 +2,7 @@ using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Dreamcast.Video;
+using DcSharp.Core.Media;
 using System.Text;
 
 namespace DcSharp.Core.Execution;
@@ -20,6 +21,7 @@ public sealed record DreamcastRunSummary(
     string? StopPcHex,
     ushort? StopOpcode,
     string? StopOpcodeHex,
+    DreamcastSymbolSummary? StopSymbol,
     DreamcastLoadSummary Load,
     int DeviceAccessCount,
     IReadOnlyList<DreamcastMemoryAccessSummary> RecentDeviceAccesses,
@@ -50,6 +52,7 @@ public sealed record DreamcastRunSummary(
             result.StopPc is { } stopPc ? Hex32(stopPc) : null,
             result.StopOpcode,
             result.StopOpcode is { } stopOpcode ? Hex16(stopOpcode) : null,
+            result.StopPc is { } symbolPc ? DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(symbolPc), symbolPc) : null,
             DreamcastLoadSummary.FromResult(result),
             result.DeviceAccesses.Count,
             result.DeviceAccesses
@@ -58,7 +61,7 @@ public sealed record DreamcastRunSummary(
                 .ToArray(),
             result.SerialOutput.Count,
             Encoding.ASCII.GetString(result.SerialOutput.ToArray()),
-            result.TraceTail.Select(DreamcastTraceSummary.FromStep).ToArray(),
+            result.TraceTail.Select(step => DreamcastTraceSummary.FromStep(step, result.Load.FindNearestSymbol(step.Pc))).ToArray(),
             DreamcastControllerSummary.FromState(controllerA),
             DreamcastVideoSummary.FromSnapshot(result.Video));
     }
@@ -74,7 +77,8 @@ public sealed record DreamcastLoadSummary(
     string TranslatedEntryPointHex,
     uint LoadedBytes,
     uint ReservedBytes,
-    IReadOnlyList<DreamcastLoadedSegmentSummary> Segments)
+    IReadOnlyList<DreamcastLoadedSegmentSummary> Segments,
+    int SymbolCount)
 {
     public static DreamcastLoadSummary FromResult(DreamcastRunResult result) =>
         new(
@@ -94,7 +98,8 @@ public sealed record DreamcastLoadSummary(
                 segment.MemorySize,
                 segment.Flags,
                 $"0x{segment.Flags:X}",
-                segment.Alignment)).ToArray());
+                segment.Alignment)).ToArray(),
+            result.Load.Symbols.Count);
 }
 
 public sealed record DreamcastLoadedSegmentSummary(
@@ -126,10 +131,37 @@ public sealed record DreamcastTraceSummary(
     string PcHex,
     ushort Opcode,
     string OpcodeHex,
-    string Trace)
+    string Trace,
+    DreamcastSymbolSummary? Symbol)
 {
-    public static DreamcastTraceSummary FromStep(Sh4StepResult step) =>
-        new(step.Pc, $"0x{step.Pc:X8}", step.Opcode, $"0x{step.Opcode:X4}", step.Trace);
+    public static DreamcastTraceSummary FromStep(Sh4StepResult step, ElfSymbol? symbol = null) =>
+        new(step.Pc, $"0x{step.Pc:X8}", step.Opcode, $"0x{step.Opcode:X4}", step.Trace, DreamcastSymbolSummary.FromSymbol(symbol, step.Pc));
+}
+
+public sealed record DreamcastSymbolSummary(
+    string Name,
+    uint Address,
+    string AddressHex,
+    uint Offset,
+    string OffsetHex,
+    string Display)
+{
+    public static DreamcastSymbolSummary? FromSymbol(ElfSymbol? symbol, uint pc)
+    {
+        if (symbol is null)
+        {
+            return null;
+        }
+
+        var offset = pc >= symbol.Value ? pc - symbol.Value : 0;
+        return new DreamcastSymbolSummary(
+            symbol.Name,
+            symbol.Value,
+            $"0x{symbol.Value:X8}",
+            offset,
+            $"0x{offset:X}",
+            offset == 0 ? symbol.Name : $"{symbol.Name}+0x{offset:X}");
+    }
 }
 
 public sealed record DreamcastControllerSummary(

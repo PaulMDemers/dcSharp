@@ -97,6 +97,15 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
+    if (result.StopPc is { } stopPc)
+    {
+        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(stopPc), stopPc);
+        if (symbol is not null)
+        {
+            Console.WriteLine($"Stop symbol: {symbol.Display} ({symbol.AddressHex})");
+        }
+    }
+
     Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
@@ -123,7 +132,9 @@ static void RunElf(string path, string[] args)
         Console.WriteLine("Trace tail:");
         foreach (var step in result.TraceTail)
         {
-            Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
+            var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
+            var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
+            Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
         }
     }
 }

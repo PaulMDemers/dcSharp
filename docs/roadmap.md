@@ -30,6 +30,7 @@
 - Capture `printf` or serial-like output through an explicit diagnostic channel. Done: SCIF transmit writes are captured as serial bytes.
 - Emit a run summary with final PC, executed instructions, memory faults, serial output, trace tail, and device accesses. Done for text and JSON CLI output.
 - Current KOS probe frontier: default KOS init reaches `main()`, prints both probe messages, runs shutdown, and stops as `ProgramExit`.
+- Symbolize stop PCs and trace-tail entries from ELF symbol tables when available. Done.
 
 ## Milestone 4: Timers, Interrupts, And Maple Probe
 

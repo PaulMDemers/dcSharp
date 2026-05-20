@@ -45,6 +45,7 @@ public sealed class DreamcastElfLoader
         return new ElfLoadResult(
             elf.EntryPoint,
             DreamcastMemory.TranslateAddress(elf.EntryPoint),
-            loadedSegments);
+            loadedSegments,
+            elf.Symbols);
     }
 }
