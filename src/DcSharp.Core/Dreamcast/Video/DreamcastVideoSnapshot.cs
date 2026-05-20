@@ -1,3 +1,5 @@
+using DcSharp.Core.Dreamcast.Memory;
+
 namespace DcSharp.Core.Dreamcast.Video;
 
 public sealed record DreamcastVideoSnapshot(
@@ -8,6 +10,8 @@ public sealed record DreamcastVideoSnapshot(
     uint? FirstNonZeroOffset,
     string? FirstNonZeroOffsetHex,
     IReadOnlyList<DreamcastVideoSample> Samples,
+    IReadOnlyList<DreamcastPvrRegisterAccess> PvrRegisterAccesses,
+    IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites,
     byte[] Vram);
 
 public sealed record DreamcastVideoSample(
@@ -16,3 +20,22 @@ public sealed record DreamcastVideoSample(
     string OffsetHex,
     ushort Rgb565,
     string Rgb565Hex);
+
+public sealed record DreamcastPvrRegisterAccess(
+    MemoryAccessKind Kind,
+    uint Address,
+    string AddressHex,
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    int Size,
+    uint Value,
+    string ValueHex);
+
+public sealed record DreamcastPvrTaCommandWrite(
+    uint Address,
+    string AddressHex,
+    string Region,
+    int Size,
+    uint Value,
+    string ValueHex);

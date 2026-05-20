@@ -16,6 +16,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/timer`: default KOS fixture that exercises `timer_ms_gettime64()` and `thd_sleep()`.
   - `samples/kos/maple_controller`: default KOS fixture that polls a virtual neutral controller.
   - `samples/kos/framebuffer`: default KOS fixture that writes a RGB565 quadrant pattern to VRAM.
+  - `samples/kos/pvr_registers`: default KOS fixture that writes named PVR registers and TA command apertures.
 - Generated artifacts: `artifacts/` (ignored)
 
 KallistiOS is installed in WSL using the prebuilt GCC 15.1.0/KOS 2.2.1 toolchain layout:
@@ -46,6 +47,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_pvr_registers.elf --instructions 70000000 --trace-tail 40
 ```
 
 Run every manifest-listed KOS fixture and validate the expected stop reason, serial output, and video samples:
@@ -105,6 +108,7 @@ Current state:
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
+- PVR register and TA command writes are captured in the video summary with SDK-aligned register names.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
@@ -114,7 +118,7 @@ Current state:
 Next targets:
 
 - Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
-- Add focused KOS fixtures for timer callbacks and PVR command logging.
+- Add focused KOS fixtures for timer callbacks.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 

@@ -46,7 +46,7 @@
 
 - Start with framebuffer/register visibility. Started: PVR VRAM apertures are backed and `samples/kos/framebuffer` writes a RGB565 pattern with run-summary samples.
 - Dump the current RGB565 framebuffer snapshot to PNG for visual fixture checks. Done.
-- Add PVR command logging before a full renderer.
+- Add PVR command logging before a full renderer. Started: named PVR register accesses and TA command writes are captured in video summaries.
 - Add silence-safe AICA register/channel tracking before audible output.
 
 ## Milestone 6: Media And Broader Compatibility

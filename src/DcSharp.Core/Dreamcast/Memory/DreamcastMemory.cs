@@ -19,6 +19,12 @@ public sealed class DreamcastMemory
     private const uint P4Base = 0xE000_0000;
     private const uint ExternalRegisterBase = 0x005F_0000;
     private const uint ExternalRegisterLimit = 0x0060_0000;
+    private const uint PvrRegisterBase = 0x005F_8000;
+    private const uint PvrRegisterLimit = 0x005F_A000;
+    private const uint PvrTaInputBase = 0x1000_0000;
+    private const uint PvrTaInputLimit = 0x1080_0000;
+    private const uint PvrTaYuvBase = 0x1080_0000;
+    private const uint PvrTaYuvLimit = 0x1100_0000;
     private const uint ScifStatus = 0xFFE8_0010;
     private const uint ScifTransmitData = 0xFFE8_000C;
     private const uint InterruptPriorityA = 0xFFD0_0004;
@@ -57,6 +63,8 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly List<MemoryAccess> deviceAccesses = [];
+    private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
+    private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly List<byte> serialOutput = [];
     private DreamcastControllerState controllerA;
 
@@ -163,6 +171,11 @@ public sealed class DreamcastMemory
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             WriteExternal(address, externalAddress, data);
+            return;
+        }
+
+        if (TryWritePvrTa(address, data))
+        {
             return;
         }
 
@@ -348,6 +361,8 @@ public sealed class DreamcastMemory
             firstNonZeroOffset,
             firstNonZeroOffset is { } offset ? $"0x{offset:X8}" : null,
             CreateVideoSamples(),
+            pvrRegisterAccesses.ToArray(),
+            pvrTaCommandWrites.ToArray(),
             (byte[])pvrVram.Clone());
     }
 
@@ -463,6 +478,7 @@ public sealed class DreamcastMemory
         };
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, originalAddress, size, masked));
+        LogPvrRegisterAccess(MemoryAccessKind.Read, originalAddress, externalAddress, size, masked);
         return masked;
     }
 
@@ -494,6 +510,7 @@ public sealed class DreamcastMemory
 
         externalRegisters[aligned] = stored;
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, originalAddress, data.Length, value));
+        LogPvrRegisterAccess(MemoryAccessKind.Write, originalAddress, aligned, data.Length, value);
 
         if (aligned == MapleState && data.Length == 4 && (value & MapleStateDma) != 0)
         {
@@ -730,6 +747,124 @@ public sealed class DreamcastMemory
         1 => data[0],
         2 => (uint)(data[0] | (data[1] << 8)),
         _ => (uint)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24))
+    };
+
+    private bool TryWritePvrTa(uint address, ReadOnlySpan<byte> data)
+    {
+        var physical = TranslateAddress(address);
+        var region = physical switch
+        {
+            >= PvrTaInputBase and < PvrTaInputLimit => "TA_INPUT",
+            >= PvrTaYuvBase and < PvrTaYuvLimit => "TA_YUV_CONV",
+            _ => null
+        };
+
+        if (region is null)
+        {
+            return false;
+        }
+
+        if (data.Length is not (1 or 2 or 4))
+        {
+            throw new MemoryMapException($"Unsupported PVR TA write size: {data.Length}");
+        }
+
+        var value = ToValue(data);
+        pvrTaCommandWrites.Add(new DreamcastPvrTaCommandWrite(address, $"0x{address:X8}", region, data.Length, value, $"0x{value:X8}"));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
+        return true;
+    }
+
+    private void LogPvrRegisterAccess(MemoryAccessKind kind, uint originalAddress, uint externalAddress, int size, uint value)
+    {
+        if (externalAddress < PvrRegisterBase || externalAddress >= PvrRegisterLimit)
+        {
+            return;
+        }
+
+        var offset = externalAddress - PvrRegisterBase;
+        pvrRegisterAccesses.Add(new DreamcastPvrRegisterAccess(
+            kind,
+            originalAddress,
+            $"0x{originalAddress:X8}",
+            offset,
+            $"0x{offset:X4}",
+            PvrRegisterName(offset),
+            size,
+            value,
+            $"0x{value:X8}"));
+    }
+
+    private static string PvrRegisterName(uint offset) => offset switch
+    {
+        0x0000 => "PVR_ID",
+        0x0004 => "PVR_REVISION",
+        0x0008 => "PVR_RESET",
+        0x0014 => "PVR_ISP_START",
+        0x0018 => "PVR_UNK_0018",
+        0x0020 => "PVR_ISP_VERTBUF_ADDR",
+        0x002C => "PVR_ISP_TILEMAT_ADDR",
+        0x0030 => "PVR_SPANSORT_CFG",
+        0x0040 => "PVR_BORDER_COLOR",
+        0x0044 => "PVR_FB_CFG_1",
+        0x0048 => "PVR_FB_CFG_2",
+        0x004C => "PVR_RENDER_MODULO",
+        0x0050 => "PVR_FB_ADDR",
+        0x0054 => "PVR_FB_IL_ADDR",
+        0x005C => "PVR_FB_SIZE",
+        0x0060 => "PVR_RENDER_ADDR",
+        0x0064 => "PVR_RENDER_ADDR_2",
+        0x0068 => "PVR_PCLIP_X",
+        0x006C => "PVR_PCLIP_Y",
+        0x0074 => "PVR_CHEAP_SHADOW",
+        0x0078 => "PVR_OBJECT_CLIP",
+        0x007C => "PVR_UNK_007C",
+        0x0080 => "PVR_UNK_0080",
+        0x0084 => "PVR_TEXTURE_CLIP",
+        0x0088 => "PVR_BGPLANE_Z",
+        0x008C => "PVR_BGPLANE_CFG",
+        0x0098 => "PVR_UNK_0098",
+        0x00A0 => "PVR_UNK_00A0",
+        0x00A8 => "PVR_UNK_00A8",
+        0x00B0 => "PVR_FOG_TABLE_COLOR",
+        0x00B4 => "PVR_FOG_VERTEX_COLOR",
+        0x00B8 => "PVR_FOG_DENSITY",
+        0x00BC => "PVR_COLOR_CLAMP_MAX",
+        0x00C0 => "PVR_COLOR_CLAMP_MIN",
+        0x00C4 => "PVR_GUN_POS",
+        0x00C8 => "PVR_HPOS_IRQ",
+        0x00CC => "PVR_VPOS_IRQ",
+        0x00D0 => "PVR_IL_CFG",
+        0x00D4 => "PVR_BORDER_X",
+        0x00D8 => "PVR_SCAN_CLK",
+        0x00DC => "PVR_BORDER_Y",
+        0x00E4 => "PVR_TEXTURE_MODULO",
+        0x00E8 => "PVR_VIDEO_CFG",
+        0x00EC => "PVR_BITMAP_X",
+        0x00F0 => "PVR_BITMAP_Y",
+        0x00F4 => "PVR_SCALER_CFG",
+        0x0108 => "PVR_PALETTE_CFG",
+        0x010C => "PVR_SYNC_STATUS",
+        0x0110 => "PVR_UNK_0110",
+        0x0114 => "PVR_UNK_0114",
+        0x0118 => "PVR_UNK_0118",
+        0x0124 => "PVR_TA_OPB_START",
+        0x0128 => "PVR_TA_VERTBUF_START",
+        0x012C => "PVR_TA_OPB_END",
+        0x0130 => "PVR_TA_VERTBUF_END",
+        0x0134 => "PVR_TA_OPB_POS",
+        0x0138 => "PVR_TA_VERTBUF_POS",
+        0x013C => "PVR_TILEMAT_CFG",
+        0x0140 => "PVR_OPB_CFG",
+        0x0144 => "PVR_TA_INIT",
+        0x0148 => "PVR_YUV_ADDR",
+        0x014C => "PVR_YUV_CFG",
+        0x0150 => "PVR_YUV_STAT",
+        0x0160 => "PVR_UNK_0160",
+        0x0164 => "PVR_TA_OPB_INIT",
+        >= 0x0200 and < 0x0200 + 0x200 => "PVR_FOG_TABLE",
+        >= 0x1000 and < 0x1000 + 0x400 => "PVR_PALETTE_TABLE",
+        _ => $"PVR_REG_{offset:X4}"
     };
 
     private static void WriteUInt16(Span<byte> bytes, int offset, ushort value)

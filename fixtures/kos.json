@@ -82,6 +82,21 @@
           "rgb565": "0xFFFF"
         }
       ]
+    },
+    {
+      "name": "pvr_registers",
+      "sample": "samples/kos/pvr_registers",
+      "artifact": "dcsharp_pvr_registers.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR register probe",
+        "fb_cfg=0x00800000",
+        "ta_init=0x80000000"
+      ],
+      "minPvrRegisterAccesses": 7,
+      "minPvrTaCommandWrites": 3
     }
   ]
 }

@@ -193,9 +193,13 @@ public sealed record DreamcastVideoSummary(
     string Fnv1A32Hex,
     uint? FirstNonZeroOffset,
     string? FirstNonZeroOffsetHex,
-    IReadOnlyList<DreamcastVideoSampleSummary> Samples)
+    IReadOnlyList<DreamcastVideoSampleSummary> Samples,
+    int PvrRegisterAccessCount,
+    IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
+    int PvrTaCommandWriteCount,
+    IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites)
 {
-    public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot) =>
+    public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 16) =>
         new(
             snapshot.VramBytes,
             snapshot.NonZeroBytes,
@@ -208,7 +212,11 @@ public sealed record DreamcastVideoSummary(
                 sample.Offset,
                 sample.OffsetHex,
                 sample.Rgb565,
-                sample.Rgb565Hex)).ToArray());
+                sample.Rgb565Hex)).ToArray(),
+            snapshot.PvrRegisterAccesses.Count,
+            snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
+            snapshot.PvrTaCommandWrites.Count,
+            snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray());
 }
 
 public sealed record DreamcastVideoSampleSummary(
@@ -217,3 +225,30 @@ public sealed record DreamcastVideoSampleSummary(
     string OffsetHex,
     ushort Rgb565,
     string Rgb565Hex);
+
+public sealed record DreamcastPvrRegisterAccessSummary(
+    MemoryAccessKind Kind,
+    uint Address,
+    string AddressHex,
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    int Size,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrRegisterAccessSummary FromAccess(DreamcastPvrRegisterAccess access) =>
+        new(access.Kind, access.Address, access.AddressHex, access.Offset, access.OffsetHex, access.Name, access.Size, access.Value, access.ValueHex);
+}
+
+public sealed record DreamcastPvrTaCommandWriteSummary(
+    uint Address,
+    string AddressHex,
+    string Region,
+    int Size,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
+        new(write.Address, write.AddressHex, write.Region, write.Size, write.Value, write.ValueHex);
+}

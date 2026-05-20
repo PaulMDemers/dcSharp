@@ -13,7 +13,11 @@ public sealed record ElfLoadResult(
 
     public ElfSymbol? FindNearestSymbol(uint address)
     {
-        var virtualAddress = ToComparableVirtualAddress(address);
+        if (!TryGetComparableVirtualAddress(address, out var virtualAddress))
+        {
+            return null;
+        }
+
         return Symbols
             .Where(symbol => symbol.IsFunction && symbol.Value <= virtualAddress)
             .OrderByDescending(symbol => symbol.Contains(virtualAddress))
@@ -21,17 +25,25 @@ public sealed record ElfLoadResult(
             .FirstOrDefault();
     }
 
-    private uint ToComparableVirtualAddress(uint address)
+    private bool TryGetComparableVirtualAddress(uint address, out uint virtualAddress)
     {
         foreach (var segment in LoadedSegments)
         {
             if (address >= segment.PhysicalAddress && (ulong)address < (ulong)segment.PhysicalAddress + segment.MemorySize)
             {
-                return segment.VirtualAddress + (address - segment.PhysicalAddress);
+                virtualAddress = segment.VirtualAddress + (address - segment.PhysicalAddress);
+                return true;
+            }
+
+            if (address >= segment.VirtualAddress && (ulong)address < (ulong)segment.VirtualAddress + segment.MemorySize)
+            {
+                virtualAddress = address;
+                return true;
             }
         }
 
-        return address;
+        virtualAddress = 0;
+        return false;
     }
 }
 

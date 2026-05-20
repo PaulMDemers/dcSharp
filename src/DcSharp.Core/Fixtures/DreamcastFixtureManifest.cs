@@ -44,6 +44,8 @@ public sealed class DreamcastFixtureDefinition
     public DreamcastStopReason ExpectedStopReason { get; set; }
     public List<string> SerialContains { get; set; } = [];
     public bool RequireVideoNonZero { get; set; }
+    public int? MinPvrRegisterAccesses { get; set; }
+    public int? MinPvrTaCommandWrites { get; set; }
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
     internal void Validate()

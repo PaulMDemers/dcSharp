@@ -68,6 +68,59 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void VideoSnapshotReportsNamedPvrRegisterAccesses()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_8044, 0x0080_0000);
+        var readBack = memory.ReadUInt32(0xA05F_8044);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.Equal(0x0080_0000u, readBack);
+        Assert.Collection(
+            snapshot.PvrRegisterAccesses,
+            access =>
+            {
+                Assert.Equal(MemoryAccessKind.Write, access.Kind);
+                Assert.Equal("PVR_FB_CFG_1", access.Name);
+                Assert.Equal("0x0044", access.OffsetHex);
+                Assert.Equal("0x00800000", access.ValueHex);
+            },
+            access =>
+            {
+                Assert.Equal(MemoryAccessKind.Read, access.Kind);
+                Assert.Equal("PVR_FB_CFG_1", access.Name);
+                Assert.Equal("0x00800000", access.ValueHex);
+            });
+    }
+
+    [Fact]
+    public void VideoSnapshotReportsPvrTaCommandWrites()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x1000_0000, 0x8084_0000);
+        memory.WriteUInt32(0x1080_0000, 0x0000_0001);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.Collection(
+            snapshot.PvrTaCommandWrites,
+            write =>
+            {
+                Assert.Equal("TA_INPUT", write.Region);
+                Assert.Equal("0x10000000", write.AddressHex);
+                Assert.Equal("0x80840000", write.ValueHex);
+            },
+            write =>
+            {
+                Assert.Equal("TA_YUV_CONV", write.Region);
+                Assert.Equal("0x10800000", write.AddressHex);
+            });
+    }
+
+    [Fact]
     public void TimerCounterUnderflowSetsControlFlag()
     {
         var memory = new DreamcastMemory();
