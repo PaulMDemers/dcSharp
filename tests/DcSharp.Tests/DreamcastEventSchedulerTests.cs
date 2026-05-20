@@ -121,4 +121,47 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(DreamcastControllerButtons.B, memory.GetController(0x40)?.Buttons);
         Assert.Equal(1UL, scheduler.CreateSnapshot().ControllerScriptChanges);
     }
+
+    [Fact]
+    public void AdvancesSleepingHardwareToNextTimerInterrupt()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 0));
+
+        memory.WriteUInt32(0xFFD8_0008, 5);
+        memory.WriteUInt32(0xFFD8_000C, 5);
+        memory.WriteUInt16(0xFFD8_0010, 0x20);
+        memory.WriteUInt16(0xFFD0_0004, 0xF000);
+        memory.Write(0xFFD8_0004, [0x01]);
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.AdvanceAfterSleep());
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(6UL, snapshot.HardwareAdvanceTicks);
+        Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
+        Assert.Equal(5UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out _));
+        Assert.Equal(0x0400u, eventCode);
+    }
+
+    [Fact]
+    public void AdvancesSleepingHardwareToEnabledVBlankInterrupt()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 5));
+        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.AdvanceAfterSleep());
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(5UL, snapshot.HardwareAdvanceTicks);
+        Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
+        Assert.Equal(4UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out _));
+        Assert.Equal(0x0320u, eventCode);
+    }
 }

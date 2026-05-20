@@ -52,11 +52,32 @@ public sealed class DreamcastEventScheduler
         AdvanceHardwareThrough(instructionsExecuted);
     }
 
+    public bool AdvanceAfterSleep()
+    {
+        var nextTimerInterrupt = memory.TicksUntilNextTimerInterrupt();
+        var nextVblank = vblankInterval == 0 || !memory.IsVBlankBeginInterruptEnabled() ? null : TicksUntilNextVBlank();
+        var ticks = MinNonZero(nextTimerInterrupt, nextVblank);
+        if (ticks is null or 0)
+        {
+            return false;
+        }
+
+        var targetTicks = SaturatingAdd(hardwareAdvanceTicks, ticks.Value);
+        RaiseDueVBlankEvents(targetTicks);
+        AdvanceHardwareTo(targetTicks);
+        return true;
+    }
+
     private void AdvanceHardwareThrough(ulong instructionsExecuted)
     {
         var targetTicks = instructionsExecuted == ulong.MaxValue
             ? ulong.MaxValue
             : instructionsExecuted + 1;
+        AdvanceHardwareTo(targetTicks);
+    }
+
+    private void AdvanceHardwareTo(ulong targetTicks)
+    {
         if (targetTicks <= hardwareAdvanceTicks)
         {
             return;
@@ -67,6 +88,31 @@ public sealed class DreamcastEventScheduler
         hardwareAdvanceTicks = targetTicks;
         hardwareAdvanceBatches++;
         maxHardwareAdvanceBatch = Math.Max(maxHardwareAdvanceBatch, batch);
+    }
+
+    private ulong? TicksUntilNextVBlank()
+    {
+        if (nextVblankInstruction <= hardwareAdvanceTicks)
+        {
+            return 0;
+        }
+
+        return nextVblankInstruction - hardwareAdvanceTicks;
+    }
+
+    private static ulong? MinNonZero(ulong? left, ulong? right) =>
+        (left, right) switch
+        {
+            ({ } leftValue, { } rightValue) => Math.Min(leftValue, rightValue),
+            ({ } leftValue, null) => leftValue,
+            (null, { } rightValue) => rightValue,
+            _ => null
+        };
+
+    private static ulong SaturatingAdd(ulong left, ulong right)
+    {
+        var result = left + right;
+        return result < left ? ulong.MaxValue : result;
     }
 
     private void ApplyInputScripts(ulong instructionsExecuted)

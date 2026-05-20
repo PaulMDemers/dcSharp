@@ -543,6 +543,9 @@ public sealed class DreamcastMemory
 
     public void RaiseVBlankBegin() => RaiseAsicEvent(AsicEventPvrVBlankBegin);
 
+    public bool IsVBlankBeginInterruptEnabled() =>
+        (externalRegisters.GetValueOrDefault(AsicIrq9A) & (1u << AsicEventPvrVBlankBegin)) != 0;
+
     public bool TryGetPendingExternalInterrupt(out uint eventCode, out int level)
     {
         if (TryGetPendingTimerInterrupt(out eventCode, out level))
@@ -575,6 +578,36 @@ public sealed class DreamcastMemory
         eventCode = 0;
         level = 0;
         return false;
+    }
+
+    public ulong? TicksUntilNextTimerInterrupt()
+    {
+        ulong? ticks = null;
+        for (var channel = 0; channel < 3; channel++)
+        {
+            var control = p4Registers.GetValueOrDefault(TimerControlAddress(channel));
+            if ((control & TimerUnderflowInterruptEnable) == 0 || TimerInterruptPriority(channel) == 0)
+            {
+                continue;
+            }
+
+            if ((control & TimerUnderflow) != 0)
+            {
+                return 0;
+            }
+
+            var startMask = 1u << channel;
+            if ((p4Registers.GetValueOrDefault(TimerStart) & startMask) == 0)
+            {
+                continue;
+            }
+
+            var counter = p4Registers.GetValueOrDefault(TimerCounterAddress(channel));
+            var channelTicks = (ulong)counter + 1;
+            ticks = ticks is { } existing ? Math.Min(existing, channelTicks) : channelTicks;
+        }
+
+        return ticks;
     }
 
     private bool TryGetPendingTimerInterrupt(out uint eventCode, out int level)

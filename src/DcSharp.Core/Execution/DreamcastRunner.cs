@@ -31,6 +31,11 @@ public sealed class DreamcastRunner
             {
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 var step = cpu.Step();
+                if (step.Trace == "sleep")
+                {
+                    scheduler.AdvanceAfterSleep();
+                }
+
                 if (options.TraceCapture is { } traceCapture && traceLog.Count < traceCapture.Limit && traceCapture.ShouldCapture(step))
                 {
                     traceLog.Add(step);

@@ -372,6 +372,26 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void TicksUntilNextTimerInterruptUsesRunningCounter()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xFFD8_0008, 5);
+        memory.WriteUInt32(0xFFD8_000C, 5);
+        memory.WriteUInt16(0xFFD8_0010, 0x20);
+        memory.WriteUInt16(0xFFD0_0004, 0xF000);
+        memory.Write(0xFFD8_0004, [0x01]);
+
+        Assert.Equal(6UL, memory.TicksUntilNextTimerInterrupt());
+
+        memory.AdvanceHardware(6);
+
+        Assert.Equal(0UL, memory.TicksUntilNextTimerInterrupt());
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(15, level);
+    }
+
+    [Fact]
     public void MapleDmaGetConditionForUnconfiguredPortBWritesNoResponse()
     {
         var memory = new DreamcastMemory();

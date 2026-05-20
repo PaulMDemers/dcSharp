@@ -43,7 +43,7 @@
 - Expose Maple DMA command/response diagnostics in run summaries. Done.
 - Expose aggregate device-access domain and access-kind diagnostics in run summaries. Done.
 - Add fixture expectations for aggregate device-domain access counts. Done.
-- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls; CPU event skipping can now build on the same hardware batch path.
+- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls and SH-4 `sleep` waits; broader idle-loop detection can now build on the same hardware batch path.
 - Add frame/input scripts that vary Maple controller state over instruction time. Started with generic `--controller address:state` and `--controller-script address:script` mapping, compatibility A0/B0 shorthands, optional B0 controller configuration, and a raw Maple condition transition fixture.
 
 ## Milestone 5: Video And Audio Bring-Up
