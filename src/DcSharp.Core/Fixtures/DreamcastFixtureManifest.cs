@@ -47,6 +47,11 @@ public sealed class DreamcastFixtureDefinition
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
     public int? MinAicaRegisterAccesses { get; set; }
+    public ulong? MinVblankEvents { get; set; }
+    public ulong? MinHardwareAdvanceTicks { get; set; }
+    public ulong? MinHardwareAdvanceBatches { get; set; }
+    public ulong? MaxHardwareAdvanceBatch { get; set; }
+    public ulong? MinControllerScriptChanges { get; set; }
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
