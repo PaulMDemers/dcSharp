@@ -74,6 +74,8 @@ KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, tex
 
 Generated framebuffer, trace, and device logs belong under `artifacts/` and stay out of git.
 
+Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement, and controller-script state changes.
+
 ## Tests
 
 Run normal tests:

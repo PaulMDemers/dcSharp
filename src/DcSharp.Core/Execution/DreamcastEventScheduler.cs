@@ -9,6 +9,10 @@ public sealed class DreamcastEventScheduler
     private readonly ulong vblankInterval;
     private readonly DreamcastControllerScript? controllerAScript;
     private ulong nextVblankInstruction;
+    private ulong vblankEventsRaised;
+    private ulong hardwareAdvanceTicks;
+    private ulong controllerScriptChanges;
+    private DreamcastControllerState lastControllerA;
 
     public DreamcastEventScheduler(DreamcastMemory memory, DreamcastRunOptions options)
     {
@@ -19,20 +23,37 @@ public sealed class DreamcastEventScheduler
         vblankInterval = options.VBlankInterval;
         controllerAScript = options.ControllerAScript;
         nextVblankInstruction = vblankInterval;
+        lastControllerA = memory.ControllerA;
     }
+
+    public DreamcastSchedulerSnapshot CreateSnapshot() =>
+        new(
+            vblankInterval,
+            nextVblankInstruction,
+            vblankEventsRaised,
+            hardwareAdvanceTicks,
+            controllerScriptChanges);
 
     public void AdvanceBeforeInstruction(ulong instructionsExecuted)
     {
         ApplyInputScripts(instructionsExecuted);
         RaiseDueVBlankEvents(instructionsExecuted);
         memory.AdvanceHardware(1);
+        hardwareAdvanceTicks++;
     }
 
     private void ApplyInputScripts(ulong instructionsExecuted)
     {
         if (controllerAScript is not null)
         {
-            memory.ControllerA = controllerAScript.StateAt(instructionsExecuted);
+            var state = controllerAScript.StateAt(instructionsExecuted);
+            if (state != lastControllerA)
+            {
+                controllerScriptChanges++;
+                lastControllerA = state;
+            }
+
+            memory.ControllerA = state;
         }
     }
 
@@ -46,7 +67,15 @@ public sealed class DreamcastEventScheduler
         while (instructionsExecuted >= nextVblankInstruction)
         {
             memory.RaiseVBlankBegin();
+            vblankEventsRaised++;
             nextVblankInstruction += vblankInterval;
         }
     }
 }
+
+public sealed record DreamcastSchedulerSnapshot(
+    ulong VBlankInterval,
+    ulong NextVBlankInstruction,
+    ulong VBlankEventsRaised,
+    ulong HardwareAdvanceTicks,
+    ulong ControllerScriptChanges);

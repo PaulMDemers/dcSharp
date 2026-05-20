@@ -121,6 +121,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
     Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, ramNonZero={result.Audio.NonZeroBytes}");
+    Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
@@ -239,7 +240,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}");
             }
 
             foreach (var failure in result.Failures)
@@ -545,6 +546,7 @@ internal sealed record FixtureReport(
     int? PvrRegisterAccessCount,
     int? PvrTaCommandWriteCount,
     int? AicaRegisterAccessCount,
+    ulong? VBlankEventsRaised,
     IReadOnlyList<string> Failures)
 {
     public static FixtureReport FromResult(DreamcastFixtureCheckResult result) =>
@@ -558,5 +560,6 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrRegisterAccessCount,
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Audio.RegisterAccessCount,
+            result.Summary?.Scheduler.VBlankEventsRaised,
             result.Failures);
 }

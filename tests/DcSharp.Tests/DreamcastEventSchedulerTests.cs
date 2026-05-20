@@ -24,6 +24,8 @@ public class DreamcastEventSchedulerTests
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
         Assert.Equal(0x0320u, eventCode);
         Assert.Equal(9, level);
+        Assert.Equal(1UL, scheduler.CreateSnapshot().VBlankEventsRaised);
+        Assert.Equal(6UL, scheduler.CreateSnapshot().NextVBlankInstruction);
     }
 
     [Fact]
@@ -36,6 +38,7 @@ public class DreamcastEventSchedulerTests
         scheduler.AdvanceBeforeInstruction(200_000);
 
         Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+        Assert.Equal(0UL, scheduler.CreateSnapshot().VBlankEventsRaised);
     }
 
     [Fact]
@@ -54,6 +57,7 @@ public class DreamcastEventSchedulerTests
         scheduler.AdvanceBeforeInstruction(2);
 
         Assert.Equal(0x0100, memory.ReadUInt16(0xFFD8_001C));
+        Assert.Equal(3UL, scheduler.CreateSnapshot().HardwareAdvanceTicks);
     }
 
     [Fact]
@@ -71,5 +75,6 @@ public class DreamcastEventSchedulerTests
 
         scheduler.AdvanceBeforeInstruction(5);
         Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
+        Assert.Equal(1UL, scheduler.CreateSnapshot().ControllerScriptChanges);
     }
 }

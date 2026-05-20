@@ -31,7 +31,8 @@ public sealed record DreamcastRunSummary(
     IReadOnlyList<DreamcastTraceSummary> TraceTail,
     DreamcastControllerSummary ControllerA,
     DreamcastVideoSummary Video,
-    DreamcastAudioSummary Audio)
+    DreamcastAudioSummary Audio,
+    DreamcastSchedulerSummary Scheduler)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
@@ -66,7 +67,8 @@ public sealed record DreamcastRunSummary(
             result.TraceTail.Select(step => DreamcastTraceSummary.FromStep(step, result.Load.FindNearestSymbol(step.Pc))).ToArray(),
             DreamcastControllerSummary.FromState(controllerA),
             DreamcastVideoSummary.FromSnapshot(result.Video),
-            DreamcastAudioSummary.FromSnapshot(result.Audio));
+            DreamcastAudioSummary.FromSnapshot(result.Audio),
+            DreamcastSchedulerSummary.FromSnapshot(result.Scheduler));
     }
 
     private static string Hex32(uint value) => $"0x{value:X8}";
@@ -326,4 +328,20 @@ public sealed record DreamcastAicaChannelSummary(
             channel.Volume,
             channel.KeyOn,
             channel.KeyOnExecute);
+}
+
+public sealed record DreamcastSchedulerSummary(
+    ulong VBlankInterval,
+    ulong NextVBlankInstruction,
+    ulong VBlankEventsRaised,
+    ulong HardwareAdvanceTicks,
+    ulong ControllerScriptChanges)
+{
+    public static DreamcastSchedulerSummary FromSnapshot(DreamcastSchedulerSnapshot snapshot) =>
+        new(
+            snapshot.VBlankInterval,
+            snapshot.NextVBlankInstruction,
+            snapshot.VBlankEventsRaised,
+            snapshot.HardwareAdvanceTicks,
+            snapshot.ControllerScriptChanges);
 }

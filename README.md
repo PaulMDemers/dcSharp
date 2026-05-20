@@ -113,6 +113,7 @@ Current state:
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names.
 - AICA register writes and sound RAM changes are captured without producing host audio yet.
+- Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, and controller script changes.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
@@ -121,7 +122,7 @@ Current state:
 
 Next targets:
 
-- Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
+- Improve the central event scheduler so it can coalesce timer advancement.
 - Add focused KOS fixtures for timer callbacks.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.

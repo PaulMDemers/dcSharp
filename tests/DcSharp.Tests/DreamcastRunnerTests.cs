@@ -68,6 +68,7 @@ public class DreamcastRunnerTests
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
+        Assert.Equal(result.Scheduler.VBlankEventsRaised, summary.Scheduler.VBlankEventsRaised);
     }
 
     [Fact]
@@ -88,6 +89,7 @@ public class DreamcastRunnerTests
             [],
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], []),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
             0x8C01_0006,
