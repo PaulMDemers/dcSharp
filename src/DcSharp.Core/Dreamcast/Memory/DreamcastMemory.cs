@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast;
+using DcSharp.Core.Dreamcast.Input;
 using System.Text;
 
 namespace DcSharp.Core.Dreamcast.Memory;
@@ -52,6 +53,12 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<byte> serialOutput = [];
+    private readonly DreamcastControllerState controllerA;
+
+    public DreamcastMemory(DreamcastControllerState? controllerA = null)
+    {
+        this.controllerA = controllerA ?? DreamcastControllerState.Neutral;
+    }
 
     public int SystemRamBytes => systemRam.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
@@ -471,8 +478,13 @@ public sealed class DreamcastMemory
         response[2] = MaplePortAUnit0Address;
         response[3] = 3;
         WriteUInt32(response, 4, MapleFunctionController);
-        WriteUInt32(response, 8, 0x0000_FFFF);
-        WriteUInt32(response, 12, 0x8080_8080);
+        WriteUInt16(response, 8, (ushort)~(ushort)controllerA.Buttons);
+        response[10] = controllerA.RightTrigger;
+        response[11] = controllerA.LeftTrigger;
+        response[12] = ToUnsignedAxis(controllerA.JoyX);
+        response[13] = ToUnsignedAxis(controllerA.JoyY);
+        response[14] = ToUnsignedAxis(controllerA.Joy2X);
+        response[15] = ToUnsignedAxis(controllerA.Joy2Y);
         Write(receiveBuffer, response);
     }
 
@@ -625,6 +637,8 @@ public sealed class DreamcastMemory
         var bytes = Encoding.ASCII.GetBytes(value);
         bytes.AsSpan(0, Math.Min(bytes.Length, target.Length)).CopyTo(target);
     }
+
+    private static byte ToUnsignedAxis(sbyte value) => (byte)(value + 128);
 }
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);

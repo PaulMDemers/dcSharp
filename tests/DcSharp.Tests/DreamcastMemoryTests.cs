@@ -1,3 +1,4 @@
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 
 namespace DcSharp.Tests;
@@ -120,6 +121,35 @@ public class DreamcastMemoryTests
         Assert.Equal(0x0100_0000u, memory.ReadUInt32(0x8C03_0004));
         Assert.Equal(0x0000_FFFFu, memory.ReadUInt32(0x8C03_0008));
         Assert.Equal(0x8080_8080u, memory.ReadUInt32(0x8C03_000C));
+    }
+
+    [Fact]
+    public void MapleDmaGetConditionWritesConfiguredControllerState()
+    {
+        var memory = new DreamcastMemory(new DreamcastControllerState(
+            Buttons: DreamcastControllerButtons.Start | DreamcastControllerButtons.A,
+            LeftTrigger: 40,
+            RightTrigger: 80,
+            JoyX: -12,
+            JoyY: 13,
+            Joy2X: -2,
+            Joy2Y: 3));
+        memory.WriteUInt32(0x8C02_0000, 0x8000_0001);
+        memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
+        memory.WriteUInt32(0x8C02_0008, 0x0100_2009);
+        memory.WriteUInt32(0x8C02_000C, 0x0100_0000);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(8, memory.ReadByte(0x8C03_0000));
+        Assert.Equal(0xFFF3, memory.ReadUInt16(0x8C03_0008));
+        Assert.Equal(80, memory.ReadByte(0x8C03_000A));
+        Assert.Equal(40, memory.ReadByte(0x8C03_000B));
+        Assert.Equal(116, memory.ReadByte(0x8C03_000C));
+        Assert.Equal(141, memory.ReadByte(0x8C03_000D));
+        Assert.Equal(126, memory.ReadByte(0x8C03_000E));
+        Assert.Equal(131, memory.ReadByte(0x8C03_000F));
     }
 
     [Fact]

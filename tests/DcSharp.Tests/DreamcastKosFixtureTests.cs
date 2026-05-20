@@ -1,3 +1,4 @@
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Media;
 
@@ -77,6 +78,33 @@ public class DreamcastKosFixtureTests
             Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
             Assert.Contains("dcSharp Virtual Controller", summary.SerialText);
             Assert.Contains("dcSharp Maple controller probe: buttons=0x00000000 joy=(0,0) triggers=(0,0)", summary.SerialText);
+        }
+    }
+
+    [Fact]
+    public void MapleControllerKosFixtureReadsScriptedButtons()
+    {
+        if (!ShouldRunKosFixtures() || !TryOpenArtifact("dcsharp_maple_controller.elf", out var stream))
+        {
+            return;
+        }
+
+        using (stream)
+        {
+            var options = new DreamcastRunOptions(
+                InstructionLimit: 60_000_000,
+                TraceTailLength: 8,
+                ControllerA: new DreamcastControllerState(
+                    Buttons: DreamcastControllerButtons.Start | DreamcastControllerButtons.A,
+                    LeftTrigger: 40,
+                    RightTrigger: 80,
+                    JoyX: -12,
+                    JoyY: 13));
+            var result = new DreamcastRunner().Run(ElfFile.Read(stream), options);
+            var summary = DreamcastRunSummary.FromResult(result, options);
+
+            Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
+            Assert.Contains("dcSharp Maple controller probe: buttons=0x0000000c joy=(-12,13) triggers=(40,80)", summary.SerialText);
         }
     }
 

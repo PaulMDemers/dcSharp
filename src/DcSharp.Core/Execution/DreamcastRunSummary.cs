@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 using System.Text;
 
@@ -23,11 +24,13 @@ public sealed record DreamcastRunSummary(
     IReadOnlyList<DreamcastMemoryAccessSummary> RecentDeviceAccesses,
     int SerialBytes,
     string SerialText,
-    IReadOnlyList<DreamcastTraceSummary> TraceTail)
+    IReadOnlyList<DreamcastTraceSummary> TraceTail,
+    DreamcastControllerSummary ControllerA)
 {
-    public static DreamcastRunSummary FromResult(DreamcastRunResult result, int recentDeviceAccessCount = 16)
+    public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
         ArgumentNullException.ThrowIfNull(result);
+        var controllerA = options?.ControllerA ?? DreamcastControllerState.Neutral;
 
         return new DreamcastRunSummary(
             result.StopReason,
@@ -51,7 +54,8 @@ public sealed record DreamcastRunSummary(
                 .ToArray(),
             result.SerialOutput.Count,
             Encoding.ASCII.GetString(result.SerialOutput.ToArray()),
-            result.TraceTail.Select(DreamcastTraceSummary.FromStep).ToArray());
+            result.TraceTail.Select(DreamcastTraceSummary.FromStep).ToArray(),
+            DreamcastControllerSummary.FromState(controllerA));
     }
 
     private static string Hex32(uint value) => $"0x{value:X8}";
@@ -121,4 +125,26 @@ public sealed record DreamcastTraceSummary(
 {
     public static DreamcastTraceSummary FromStep(Sh4StepResult step) =>
         new(step.Pc, $"0x{step.Pc:X8}", step.Opcode, $"0x{step.Opcode:X4}", step.Trace);
+}
+
+public sealed record DreamcastControllerSummary(
+    DreamcastControllerButtons Buttons,
+    string ButtonsText,
+    byte LeftTrigger,
+    byte RightTrigger,
+    sbyte JoyX,
+    sbyte JoyY,
+    sbyte Joy2X,
+    sbyte Joy2Y)
+{
+    public static DreamcastControllerSummary FromState(DreamcastControllerState state) =>
+        new(
+            state.Buttons,
+            state.Buttons.ToString(),
+            state.LeftTrigger,
+            state.RightTrigger,
+            state.JoyX,
+            state.JoyY,
+            state.Joy2X,
+            state.Joy2Y);
 }

@@ -1,3 +1,4 @@
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Media;
 using System.Text;
@@ -47,6 +48,23 @@ public class DreamcastRunnerTests
         Assert.Contains("arch: exit return code", summary.SerialText);
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
+    }
+
+    [Fact]
+    public void SummaryIncludesConfiguredControllerState()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));
+        var options = new DreamcastRunOptions(
+            InstructionLimit: 1,
+            TraceTailLength: 0,
+            ControllerA: new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start | DreamcastControllerButtons.A, LeftTrigger: 7));
+
+        var result = new DreamcastRunner().Run(elf, options);
+
+        var summary = DreamcastRunSummary.FromResult(result, options);
+
+        Assert.Equal(DreamcastControllerButtons.Start | DreamcastControllerButtons.A, summary.ControllerA.Buttons);
+        Assert.Equal(7, summary.ControllerA.LeftTrigger);
     }
 
     private static byte[] CreateNopElf()

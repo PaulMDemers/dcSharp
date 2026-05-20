@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
@@ -13,7 +14,7 @@ public sealed class DreamcastRunner
         ArgumentNullException.ThrowIfNull(elf);
         ArgumentNullException.ThrowIfNull(options);
 
-        var memory = new DreamcastMemory();
+        var memory = new DreamcastMemory(options.ControllerA);
         var load = new DreamcastElfLoader().Load(elf, memory);
         FirmwareStubs.Install(memory);
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
@@ -80,7 +81,11 @@ public sealed class DreamcastRunner
         address >= start && (ulong)address < (ulong)start + length;
 }
 
-public sealed record DreamcastRunOptions(ulong InstructionLimit = 1_000, int TraceTailLength = 16, ulong VBlankInterval = 200_000);
+public sealed record DreamcastRunOptions(
+    ulong InstructionLimit = 1_000,
+    int TraceTailLength = 16,
+    ulong VBlankInterval = 200_000,
+    DreamcastControllerState? ControllerA = null);
 
 public sealed record DreamcastRunResult(
     ElfLoadResult Load,

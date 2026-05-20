@@ -47,6 +47,12 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controll
 
 The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank-interval 0` to disable the current synthetic VBlank source while debugging timing-sensitive behavior.
 
+Use `--controller-a` to script the virtual controller on Maple port A:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80
+```
+
 Use `--json` or `--summary-json` to emit a machine-readable run summary:
 
 ```bash
@@ -69,13 +75,14 @@ Current state:
 - The SH-4 TMU slice includes TSTR, TCOR/TCNT countdown, TCR underflow/interrupt bits, and IPRA priority lookup; the timer fixture now wakes from `thd_sleep()`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
-- The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral controller state.
+- The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
 
 Next targets:
 
 - Improve the central event scheduler so it can coalesce timer advancement and report scheduled event diagnostics.
 - Add focused KOS fixtures for timer callbacks, framebuffer writes, and PVR command logging.
+- Add frame/input scripts that vary controller state over time instead of holding one static state for the whole run.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 
 ## Development Bias

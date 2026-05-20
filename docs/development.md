@@ -51,6 +51,7 @@ Useful run options:
 - `--trace-tail <count>` controls how many final SH-4 steps are retained.
 - `--vblank-interval <instructions>` controls the current synthetic VBlank cadence.
 - `--vblank-interval 0` disables synthetic VBlank.
+- `--controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80` scripts a static controller state for Maple port A.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
 ## Tests
@@ -75,7 +76,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
-- `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral input state, shuts down, and reports `ProgramExit`.
+- `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
 
 ## Commit Hygiene
 

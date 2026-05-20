@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
@@ -64,7 +65,7 @@ static void RunElf(string path, string[] args)
 
     if (options.EmitJson)
     {
-        WriteJsonRunSummary(result);
+        WriteJsonRunSummary(result, options.Emulation);
         return;
     }
 
@@ -87,6 +88,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
+    Console.WriteLine($"Controller A: {FormatController(options.Emulation.ControllerA ?? DreamcastControllerState.Neutral)}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
@@ -111,9 +113,9 @@ static void RunElf(string path, string[] args)
     }
 }
 
-static void WriteJsonRunSummary(DreamcastRunResult result)
+static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions options)
 {
-    var summary = DreamcastRunSummary.FromResult(result);
+    var summary = DreamcastRunSummary.FromResult(result, options);
     var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -129,6 +131,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     var traceTail = 16;
     ulong vblankInterval = 200_000;
     var emitJson = false;
+    var controllerA = DreamcastControllerState.Neutral;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -150,6 +153,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 vblankInterval = parsedVblankInterval;
                 index++;
                 break;
+            case "--controller-a" when index + 1 < args.Length:
+                controllerA = ParseControllerState(args[index + 1]);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -165,15 +172,123 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--trace-tail must be zero or greater.");
     }
 
-    return new CliRunOptions(new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval), emitJson);
+    return new CliRunOptions(new DreamcastRunOptions(instructionLimit, traceTail, vblankInterval, controllerA), emitJson);
 }
+
+static DreamcastControllerState ParseControllerState(string text)
+{
+    var buttons = DreamcastControllerButtons.None;
+    byte leftTrigger = 0;
+    byte rightTrigger = 0;
+    sbyte joyX = 0;
+    sbyte joyY = 0;
+    sbyte joy2X = 0;
+    sbyte joy2Y = 0;
+
+    foreach (var rawToken in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var token = rawToken.Trim();
+        var equals = token.IndexOf('=');
+        if (equals < 0)
+        {
+            buttons |= ParseButton(token);
+            continue;
+        }
+
+        var key = token[..equals].Trim().ToLowerInvariant();
+        var value = token[(equals + 1)..].Trim();
+        switch (key)
+        {
+            case "buttons":
+                foreach (var button in value.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    buttons |= ParseButton(button);
+                }
+                break;
+            case "ltrig":
+            case "lt":
+                leftTrigger = ParseByte(value, key);
+                break;
+            case "rtrig":
+            case "rt":
+                rightTrigger = ParseByte(value, key);
+                break;
+            case "joyx":
+                joyX = ParseAxis(value, key);
+                break;
+            case "joyy":
+                joyY = ParseAxis(value, key);
+                break;
+            case "joy2x":
+                joy2X = ParseAxis(value, key);
+                break;
+            case "joy2y":
+                joy2Y = ParseAxis(value, key);
+                break;
+            default:
+                throw new InvalidDataException($"Unknown controller field: {key}");
+        }
+    }
+
+    return new DreamcastControllerState(buttons, leftTrigger, rightTrigger, joyX, joyY, joy2X, joy2Y);
+}
+
+static DreamcastControllerButtons ParseButton(string text)
+{
+    var normalized = text.Replace("-", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+    return normalized switch
+    {
+        "a" => DreamcastControllerButtons.A,
+        "b" => DreamcastControllerButtons.B,
+        "c" => DreamcastControllerButtons.C,
+        "d" => DreamcastControllerButtons.D,
+        "x" => DreamcastControllerButtons.X,
+        "y" => DreamcastControllerButtons.Y,
+        "z" => DreamcastControllerButtons.Z,
+        "start" => DreamcastControllerButtons.Start,
+        "up" or "dpadup" => DreamcastControllerButtons.DPadUp,
+        "down" or "dpaddown" => DreamcastControllerButtons.DPadDown,
+        "left" or "dpadleft" => DreamcastControllerButtons.DPadLeft,
+        "right" or "dpadright" => DreamcastControllerButtons.DPadRight,
+        "dpad2up" => DreamcastControllerButtons.DPad2Up,
+        "dpad2down" => DreamcastControllerButtons.DPad2Down,
+        "dpad2left" => DreamcastControllerButtons.DPad2Left,
+        "dpad2right" => DreamcastControllerButtons.DPad2Right,
+        "none" => DreamcastControllerButtons.None,
+        _ => throw new InvalidDataException($"Unknown controller button: {text}")
+    };
+}
+
+static byte ParseByte(string text, string key)
+{
+    if (!byte.TryParse(text, out var value))
+    {
+        throw new InvalidDataException($"{key} must be between 0 and 255.");
+    }
+
+    return value;
+}
+
+static sbyte ParseAxis(string text, string key)
+{
+    if (!int.TryParse(text, out var parsed) || parsed is < -128 or > 127)
+    {
+        throw new InvalidDataException($"{key} must be between -128 and 127.");
+    }
+
+    return (sbyte)parsed;
+}
+
+static string FormatController(DreamcastControllerState state) =>
+    $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
+    Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
 }
 
 internal sealed record CliRunOptions(DreamcastRunOptions Emulation, bool EmitJson);
