@@ -11,6 +11,8 @@ public sealed class DreamcastEventScheduler
     private ulong nextVblankInstruction;
     private ulong vblankEventsRaised;
     private ulong hardwareAdvanceTicks;
+    private ulong hardwareAdvanceBatches;
+    private ulong maxHardwareAdvanceBatch;
     private ulong controllerScriptChanges;
     private DreamcastControllerState lastControllerA;
 
@@ -32,14 +34,32 @@ public sealed class DreamcastEventScheduler
             nextVblankInstruction,
             vblankEventsRaised,
             hardwareAdvanceTicks,
+            hardwareAdvanceBatches,
+            maxHardwareAdvanceBatch,
             controllerScriptChanges);
 
     public void AdvanceBeforeInstruction(ulong instructionsExecuted)
     {
         ApplyInputScripts(instructionsExecuted);
         RaiseDueVBlankEvents(instructionsExecuted);
-        memory.AdvanceHardware(1);
-        hardwareAdvanceTicks++;
+        AdvanceHardwareThrough(instructionsExecuted);
+    }
+
+    private void AdvanceHardwareThrough(ulong instructionsExecuted)
+    {
+        var targetTicks = instructionsExecuted == ulong.MaxValue
+            ? ulong.MaxValue
+            : instructionsExecuted + 1;
+        if (targetTicks <= hardwareAdvanceTicks)
+        {
+            return;
+        }
+
+        var batch = targetTicks - hardwareAdvanceTicks;
+        memory.AdvanceHardware(batch);
+        hardwareAdvanceTicks = targetTicks;
+        hardwareAdvanceBatches++;
+        maxHardwareAdvanceBatch = Math.Max(maxHardwareAdvanceBatch, batch);
     }
 
     private void ApplyInputScripts(ulong instructionsExecuted)
@@ -78,4 +98,6 @@ public sealed record DreamcastSchedulerSnapshot(
     ulong NextVBlankInstruction,
     ulong VBlankEventsRaised,
     ulong HardwareAdvanceTicks,
+    ulong HardwareAdvanceBatches,
+    ulong MaxHardwareAdvanceBatch,
     ulong ControllerScriptChanges);

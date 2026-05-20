@@ -40,7 +40,7 @@
 - Keep KOS fixture expectations in a manifest and run them through a shared CLI/test validator. Done.
 - Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
 - Expose scheduler event diagnostics in run summaries. Done.
-- Improve the scheduler to coalesce timer advancement.
+- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls; CPU event skipping can now build on the same hardware batch path.
 - Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script`.
 
 ## Milestone 5: Video And Audio Bring-Up

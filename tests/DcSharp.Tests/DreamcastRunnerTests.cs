@@ -89,7 +89,7 @@ public class DreamcastRunnerTests
             [],
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], []),
-            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
             0x8C01_0006,

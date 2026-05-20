@@ -360,6 +360,8 @@ public sealed record DreamcastSchedulerSummary(
     ulong NextVBlankInstruction,
     ulong VBlankEventsRaised,
     ulong HardwareAdvanceTicks,
+    ulong HardwareAdvanceBatches,
+    ulong MaxHardwareAdvanceBatch,
     ulong ControllerScriptChanges)
 {
     public static DreamcastSchedulerSummary FromSnapshot(DreamcastSchedulerSnapshot snapshot) =>
@@ -368,5 +370,7 @@ public sealed record DreamcastSchedulerSummary(
             snapshot.NextVBlankInstruction,
             snapshot.VBlankEventsRaised,
             snapshot.HardwareAdvanceTicks,
+            snapshot.HardwareAdvanceBatches,
+            snapshot.MaxHardwareAdvanceBatch,
             snapshot.ControllerScriptChanges);
 }

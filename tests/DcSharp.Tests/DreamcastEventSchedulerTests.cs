@@ -58,6 +58,29 @@ public class DreamcastEventSchedulerTests
 
         Assert.Equal(0x0100, memory.ReadUInt16(0xFFD8_001C));
         Assert.Equal(3UL, scheduler.CreateSnapshot().HardwareAdvanceTicks);
+        Assert.Equal(3UL, scheduler.CreateSnapshot().HardwareAdvanceBatches);
+        Assert.Equal(1UL, scheduler.CreateSnapshot().MaxHardwareAdvanceBatch);
+    }
+
+    [Fact]
+    public void CoalescesHardwareTimerAdvancementWhenInstructionCountSkipsAhead()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 0));
+
+        memory.WriteUInt32(0xFFD8_0014, 5);
+        memory.WriteUInt32(0xFFD8_0018, 5);
+        memory.WriteUInt16(0xFFD8_001C, 0);
+        memory.Write(0xFFD8_0004, [0x02]);
+
+        scheduler.AdvanceBeforeInstruction(0);
+        scheduler.AdvanceBeforeInstruction(5);
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(0x0100, memory.ReadUInt16(0xFFD8_001C));
+        Assert.Equal(6UL, snapshot.HardwareAdvanceTicks);
+        Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
+        Assert.Equal(5UL, snapshot.MaxHardwareAdvanceBatch);
     }
 
     [Fact]
