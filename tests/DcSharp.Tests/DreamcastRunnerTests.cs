@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
@@ -86,6 +87,7 @@ public class DreamcastRunnerTests
             [],
             [],
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], []),
+            new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], []),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
             0x8C01_0006,

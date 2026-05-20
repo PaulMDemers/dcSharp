@@ -120,6 +120,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
+    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, ramNonZero={result.Audio.NonZeroBytes}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
@@ -147,6 +148,12 @@ static void RunElf(string path, string[] args)
     foreach (var write in result.Video.PvrTaCommandWrites.TakeLast(8))
     {
         Console.WriteLine($"  PVR TA {write.Region}: addr={write.AddressHex}, size={write.Size}, value={write.ValueHex}");
+    }
+
+    foreach (var access in result.Audio.RegisterAccesses.TakeLast(8))
+    {
+        var channel = access.Channel is { } index ? $", channel={index}" : string.Empty;
+        Console.WriteLine($"  AICA {access.Kind} {access.Name}: addr={access.AddressHex}{channel}, value={access.ValueHex}");
     }
 
     if (result.TraceTail.Count > 0)
@@ -232,7 +239,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}");
             }
 
             foreach (var failure in result.Failures)
@@ -537,6 +544,7 @@ internal sealed record FixtureReport(
     ulong? VideoNonZeroBytes,
     int? PvrRegisterAccessCount,
     int? PvrTaCommandWriteCount,
+    int? AicaRegisterAccessCount,
     IReadOnlyList<string> Failures)
 {
     public static FixtureReport FromResult(DreamcastFixtureCheckResult result) =>
@@ -549,5 +557,6 @@ internal sealed record FixtureReport(
             result.Summary?.Video.NonZeroBytes,
             result.Summary?.Video.PvrRegisterAccessCount,
             result.Summary?.Video.PvrTaCommandWriteCount,
+            result.Summary?.Audio.RegisterAccessCount,
             result.Failures);
 }

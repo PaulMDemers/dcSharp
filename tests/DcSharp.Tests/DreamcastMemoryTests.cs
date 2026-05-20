@@ -121,6 +121,44 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsAicaRegisterAndChannelState()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0000, 0x0000_C000);
+        memory.WriteUInt32(0xA070_0004, 0x0000_1234);
+        memory.WriteUInt32(0xA070_0008, 0x0000_0008);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0040);
+        memory.WriteUInt32(0xA070_0018, 0x0000_1AC0);
+        memory.Write(0xA070_0024, [0x0F]);
+        memory.Write(0xA070_0029, [0x40]);
+
+        var snapshot = memory.CreateAudioSnapshot();
+
+        Assert.True(snapshot.RegisterAccesses.Count >= 7);
+        Assert.Contains(snapshot.RegisterAccesses, access => access.Name == "AICA_CH0_CONTROL" && access.ValueHex == "0x0000C000");
+        var channel = Assert.Single(snapshot.Channels);
+        Assert.Equal(0, channel.Channel);
+        Assert.True(channel.KeyOn);
+        Assert.True(channel.KeyOnExecute);
+        Assert.Equal(0x1234u, channel.SampleAddressLow);
+        Assert.Equal(0x1AC0u, channel.Pitch);
+        Assert.Equal(0x0F, channel.Pan);
+        Assert.Equal(0x40, channel.Volume);
+    }
+
+    [Fact]
+    public void MapsAicaSoundRam()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.Write(0xA080_0000, [0x12, 0x34, 0x56, 0x78]);
+
+        Assert.Equal(0x7856_3412u, memory.ReadUInt32(0x0080_0000));
+        Assert.Equal(4UL, memory.CreateAudioSnapshot().NonZeroBytes);
+    }
+
+    [Fact]
     public void TimerCounterUnderflowSetsControlFlag()
     {
         var memory = new DreamcastMemory();

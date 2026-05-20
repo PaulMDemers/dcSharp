@@ -29,6 +29,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
+wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 ```
 
 Generated ELF files are copied to `artifacts/kos/`, which is intentionally ignored by git.
@@ -98,6 +99,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
 - `dcsharp_framebuffer.elf`: writes a 320x240 RGB565 quadrant pattern into VRAM, exposes non-zero VRAM diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
+- `dcsharp_aica_registers.elf`: writes AICA channel/global registers and sound RAM, exposes silent audio diagnostics, shuts down, and reports `ProgramExit`.
 
 ## Commit Hygiene
 

@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Dreamcast.Video;
@@ -29,7 +30,8 @@ public sealed record DreamcastRunSummary(
     string SerialText,
     IReadOnlyList<DreamcastTraceSummary> TraceTail,
     DreamcastControllerSummary ControllerA,
-    DreamcastVideoSummary Video)
+    DreamcastVideoSummary Video,
+    DreamcastAudioSummary Audio)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
@@ -63,7 +65,8 @@ public sealed record DreamcastRunSummary(
             Encoding.ASCII.GetString(result.SerialOutput.ToArray()),
             result.TraceTail.Select(step => DreamcastTraceSummary.FromStep(step, result.Load.FindNearestSymbol(step.Pc))).ToArray(),
             DreamcastControllerSummary.FromState(controllerA),
-            DreamcastVideoSummary.FromSnapshot(result.Video));
+            DreamcastVideoSummary.FromSnapshot(result.Video),
+            DreamcastAudioSummary.FromSnapshot(result.Audio));
     }
 
     private static string Hex32(uint value) => $"0x{value:X8}";
@@ -251,4 +254,76 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
 {
     public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
         new(write.Address, write.AddressHex, write.Region, write.Size, write.Value, write.ValueHex);
+}
+
+public sealed record DreamcastAudioSummary(
+    int AudioRamBytes,
+    ulong NonZeroBytes,
+    uint Fnv1A32,
+    string Fnv1A32Hex,
+    int RegisterAccessCount,
+    IReadOnlyList<DreamcastAicaRegisterAccessSummary> RecentRegisterAccesses,
+    IReadOnlyList<DreamcastAicaChannelSummary> Channels)
+{
+    public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
+        new(
+            snapshot.AudioRamBytes,
+            snapshot.NonZeroBytes,
+            snapshot.Fnv1A32,
+            snapshot.Fnv1A32Hex,
+            snapshot.RegisterAccesses.Count,
+            snapshot.RegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaRegisterAccessSummary.FromAccess).ToArray(),
+            snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray());
+}
+
+public sealed record DreamcastAicaRegisterAccessSummary(
+    MemoryAccessKind Kind,
+    uint Address,
+    string AddressHex,
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    int? Channel,
+    int Size,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastAicaRegisterAccessSummary FromAccess(DreamcastAicaRegisterAccess access) =>
+        new(access.Kind, access.Address, access.AddressHex, access.Offset, access.OffsetHex, access.Name, access.Channel, access.Size, access.Value, access.ValueHex);
+}
+
+public sealed record DreamcastAicaChannelSummary(
+    int Channel,
+    uint Control,
+    string ControlHex,
+    uint SampleAddressLow,
+    string SampleAddressLowHex,
+    uint LoopStart,
+    string LoopStartHex,
+    uint LoopEnd,
+    string LoopEndHex,
+    uint Pitch,
+    string PitchHex,
+    byte Pan,
+    byte Volume,
+    bool KeyOn,
+    bool KeyOnExecute)
+{
+    public static DreamcastAicaChannelSummary FromChannel(DreamcastAicaChannelSnapshot channel) =>
+        new(
+            channel.Channel,
+            channel.Control,
+            channel.ControlHex,
+            channel.SampleAddressLow,
+            channel.SampleAddressLowHex,
+            channel.LoopStart,
+            channel.LoopStartHex,
+            channel.LoopEnd,
+            channel.LoopEndHex,
+            channel.Pitch,
+            channel.PitchHex,
+            channel.Pan,
+            channel.Volume,
+            channel.KeyOn,
+            channel.KeyOnExecute);
 }

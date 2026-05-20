@@ -46,6 +46,7 @@ public sealed class DreamcastFixtureDefinition
     public bool RequireVideoNonZero { get; set; }
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
+    public int? MinAicaRegisterAccesses { get; set; }
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
     internal void Validate()

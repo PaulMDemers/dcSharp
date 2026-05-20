@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast;
+using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
 using System.Text;
@@ -25,6 +26,10 @@ public sealed class DreamcastMemory
     private const uint PvrTaInputLimit = 0x1080_0000;
     private const uint PvrTaYuvBase = 0x1080_0000;
     private const uint PvrTaYuvLimit = 0x1100_0000;
+    private const uint AicaRegisterBase = 0x0070_0000;
+    private const uint AicaRegisterLimit = 0x0071_0000;
+    private const uint AicaRamBase = 0x0080_0000;
+    private const uint AicaRamBytes = 2 * 1024 * 1024;
     private const uint ScifStatus = 0xFFE8_0010;
     private const uint ScifTransmitData = 0xFFE8_000C;
     private const uint InterruptPriorityA = 0xFFD0_0004;
@@ -60,11 +65,14 @@ public sealed class DreamcastMemory
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
     private readonly byte[] pvrVram = new byte[PvrVramByteCount];
+    private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
+    private readonly Dictionary<uint, uint> aicaRegisters = [];
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
+    private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<byte> serialOutput = [];
     private DreamcastControllerState controllerA;
 
@@ -179,6 +187,18 @@ public sealed class DreamcastMemory
             return;
         }
 
+        if (TryTranslateAicaRegister(address, out var aicaAddress))
+        {
+            WriteAicaRegister(address, aicaAddress, data);
+            return;
+        }
+
+        if (TryGetAicaRamOffset(address, data.Length, out var aicaOffset))
+        {
+            data.CopyTo(aicaRam.AsSpan(aicaOffset));
+            return;
+        }
+
         if (TryGetPvrVramOffset(address, data.Length, out var vramOffset))
         {
             data.CopyTo(pvrVram.AsSpan(vramOffset));
@@ -232,6 +252,16 @@ public sealed class DreamcastMemory
             return pvrVram[vramOffset];
         }
 
+        if (TryTranslateAicaRegister(address, out var aicaAddress))
+        {
+            return (byte)(ReadAicaRegister(address, aicaAddress, 1) & 0xFF);
+        }
+
+        if (TryGetAicaRamOffset(address, 1, out var aicaOffset))
+        {
+            return aicaRam[aicaOffset];
+        }
+
         if (!TryGetSystemRamOffset(address, 1, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 1, 0));
@@ -256,6 +286,16 @@ public sealed class DreamcastMemory
         if (TryGetPvrVramOffset(address, 2, out var vramOffset))
         {
             return (ushort)(pvrVram[vramOffset] | (pvrVram[vramOffset + 1] << 8));
+        }
+
+        if (TryTranslateAicaRegister(address, out var aicaAddress))
+        {
+            return (ushort)(ReadAicaRegister(address, aicaAddress, 2) & 0xFFFF);
+        }
+
+        if (TryGetAicaRamOffset(address, 2, out var aicaOffset))
+        {
+            return (ushort)(aicaRam[aicaOffset] | (aicaRam[aicaOffset + 1] << 8));
         }
 
         if (!TryGetSystemRamOffset(address, 2, out var offset))
@@ -285,6 +325,19 @@ public sealed class DreamcastMemory
                 | (pvrVram[vramOffset + 1] << 8)
                 | (pvrVram[vramOffset + 2] << 16)
                 | (pvrVram[vramOffset + 3] << 24));
+        }
+
+        if (TryTranslateAicaRegister(address, out var aicaAddress))
+        {
+            return ReadAicaRegister(address, aicaAddress, 4);
+        }
+
+        if (TryGetAicaRamOffset(address, 4, out var aicaOffset))
+        {
+            return (uint)(aicaRam[aicaOffset]
+                | (aicaRam[aicaOffset + 1] << 8)
+                | (aicaRam[aicaOffset + 2] << 16)
+                | (aicaRam[aicaOffset + 3] << 24));
         }
 
         if (!TryGetSystemRamOffset(address, 4, out var offset))
@@ -366,6 +419,32 @@ public sealed class DreamcastMemory
             (byte[])pvrVram.Clone());
     }
 
+    public DreamcastAudioSnapshot CreateAudioSnapshot()
+    {
+        ulong nonZeroBytes = 0;
+        const uint fnvPrime = 16_777_619;
+        var hash = 2_166_136_261u;
+
+        foreach (var value in aicaRam)
+        {
+            if (value != 0)
+            {
+                nonZeroBytes++;
+            }
+
+            hash ^= value;
+            hash *= fnvPrime;
+        }
+
+        return new DreamcastAudioSnapshot(
+            aicaRam.Length,
+            nonZeroBytes,
+            hash,
+            $"0x{hash:X8}",
+            aicaRegisterAccesses.ToArray(),
+            CreateAicaChannelSnapshots());
+    }
+
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
     {
         (string Name, uint Offset)[] offsets =
@@ -394,6 +473,30 @@ public sealed class DreamcastMemory
     {
         externalAddress = TranslateAddress(address);
         return externalAddress >= ExternalRegisterBase && externalAddress < ExternalRegisterLimit;
+    }
+
+    private static bool TryTranslateAicaRegister(uint address, out uint aicaAddress)
+    {
+        aicaAddress = TranslateAddress(address);
+        return aicaAddress >= AicaRegisterBase && aicaAddress < AicaRegisterLimit;
+    }
+
+    private bool TryGetAicaRamOffset(uint address, int length, out int offset)
+    {
+        offset = 0;
+        if (length < 0)
+        {
+            return false;
+        }
+
+        var physical = TranslateAddress(address);
+        if (physical < AicaRamBase || physical >= AicaRamBase + AicaRamBytes)
+        {
+            return false;
+        }
+
+        offset = (int)(physical - AicaRamBase);
+        return offset + length <= aicaRam.Length;
     }
 
     public void RaiseVBlankBegin() => RaiseAsicEvent(AsicEventPvrVBlankBegin);
@@ -866,6 +969,150 @@ public sealed class DreamcastMemory
         >= 0x1000 and < 0x1000 + 0x400 => "PVR_PALETTE_TABLE",
         _ => $"PVR_REG_{offset:X4}"
     };
+
+    private uint ReadAicaRegister(uint originalAddress, uint aicaAddress, int size)
+    {
+        var aligned = aicaAddress & 0xFFFF_FFFCu;
+        var value = aicaRegisters.GetValueOrDefault(aligned);
+        var shift = (int)((aicaAddress & 0x3) * 8);
+        var shifted = value >> shift;
+        var masked = size switch
+        {
+            1 => shifted & 0xFF,
+            2 => shifted & 0xFFFF,
+            4 => value,
+            _ => throw new MemoryMapException($"Unsupported AICA register read size: {size}")
+        };
+
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, originalAddress, size, masked));
+        LogAicaRegisterAccess(MemoryAccessKind.Read, originalAddress, aicaAddress, size, masked);
+        return masked;
+    }
+
+    private void WriteAicaRegister(uint originalAddress, uint aicaAddress, ReadOnlySpan<byte> data)
+    {
+        if (data.Length is not (1 or 2 or 4))
+        {
+            throw new MemoryMapException($"Unsupported AICA register write size: {data.Length}");
+        }
+
+        var aligned = aicaAddress & 0xFFFF_FFFCu;
+        var shift = (int)((aicaAddress & 0x3) * 8);
+        var mask = data.Length switch
+        {
+            1 => 0xFFu << shift,
+            2 => 0xFFFFu << shift,
+            4 => 0xFFFF_FFFFu,
+            _ => 0u
+        };
+        var value = ToValue(data);
+        var existing = aicaRegisters.GetValueOrDefault(aligned);
+        aicaRegisters[aligned] = (existing & ~mask) | ((value << shift) & mask);
+
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, originalAddress, data.Length, value));
+        LogAicaRegisterAccess(MemoryAccessKind.Write, originalAddress, aicaAddress, data.Length, value);
+    }
+
+    private void LogAicaRegisterAccess(MemoryAccessKind kind, uint originalAddress, uint aicaAddress, int size, uint value)
+    {
+        var offset = aicaAddress - AicaRegisterBase;
+        var channel = TryGetAicaChannel(offset, out var channelIndex, out var channelOffset) ? channelIndex : (int?)null;
+        aicaRegisterAccesses.Add(new DreamcastAicaRegisterAccess(
+            kind,
+            originalAddress,
+            $"0x{originalAddress:X8}",
+            offset,
+            $"0x{offset:X4}",
+            AicaRegisterName(offset),
+            channel,
+            size,
+            value,
+            $"0x{value:X8}"));
+    }
+
+    private IReadOnlyList<DreamcastAicaChannelSnapshot> CreateAicaChannelSnapshots()
+    {
+        var channels = aicaRegisterAccesses
+            .Select(access => access.Channel)
+            .Where(channel => channel is not null)
+            .Select(channel => channel!.Value)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        return channels.Select(channel =>
+        {
+            var control = ReadAicaChannelRegister(channel, 0x00);
+            var sampleLow = ReadAicaChannelRegister(channel, 0x04);
+            var loopStart = ReadAicaChannelRegister(channel, 0x08);
+            var loopEnd = ReadAicaChannelRegister(channel, 0x0C);
+            var pitch = ReadAicaChannelRegister(channel, 0x18);
+            var pan = (byte)(ReadAicaChannelRegister(channel, 0x24) & 0xFF);
+            var volume = (byte)((ReadAicaChannelRegister(channel, 0x28) >> 8) & 0xFF);
+            return new DreamcastAicaChannelSnapshot(
+                channel,
+                control,
+                $"0x{control:X8}",
+                sampleLow,
+                $"0x{sampleLow:X8}",
+                loopStart,
+                $"0x{loopStart:X8}",
+                loopEnd,
+                $"0x{loopEnd:X8}",
+                pitch,
+                $"0x{pitch:X8}",
+                pan,
+                volume,
+                (control & 0x4000) != 0,
+                (control & 0x8000) != 0);
+        }).ToArray();
+    }
+
+    private uint ReadAicaChannelRegister(int channel, uint channelOffset) =>
+        aicaRegisters.GetValueOrDefault(AicaRegisterBase + ((uint)channel * 0x80u) + (channelOffset & 0xFFFF_FFFCu));
+
+    private static bool TryGetAicaChannel(uint offset, out int channel, out uint channelOffset)
+    {
+        if (offset < 0x2000)
+        {
+            channel = (int)(offset / 0x80);
+            channelOffset = offset % 0x80;
+            return channel is >= 0 and < 64;
+        }
+
+        channel = 0;
+        channelOffset = 0;
+        return false;
+    }
+
+    private static string AicaRegisterName(uint offset)
+    {
+        if (TryGetAicaChannel(offset, out var channel, out var channelOffset))
+        {
+            var field = channelOffset switch
+            {
+                0x00 => "CONTROL",
+                0x04 => "SAMPLE_ADDR_LOW",
+                0x08 => "LOOP_START",
+                0x0C => "LOOP_END",
+                0x10 => "ENVELOPE",
+                0x14 => "ENVELOPE_RELATED",
+                0x18 => "PITCH",
+                0x24 => "PAN_SEND",
+                0x28 => "VOLUME_LPF",
+                _ => $"REG_{channelOffset:X2}"
+            };
+            return $"AICA_CH{channel}_{field}";
+        }
+
+        return offset switch
+        {
+            0x2800 => "AICA_MASTER_VOLUME",
+            0x280D => "AICA_MONITOR_CHANNEL",
+            0x2814 => "AICA_MONITOR_POSITION",
+            _ => $"AICA_REG_{offset:X4}"
+        };
+    }
 
     private static void WriteUInt16(Span<byte> bytes, int offset, ushort value)
     {
