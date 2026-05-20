@@ -61,6 +61,20 @@
       ]
     },
     {
+      "name": "maple_controller_script_transition",
+      "sample": "samples/kos/maple_controller_script",
+      "artifact": "dcsharp_maple_controller_script.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "controllerAScript": "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80",
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp Maple controller script probe first: buttons=0x00000000 joy=(0,0) triggers=(0,0)",
+        "dcSharp Maple controller script probe second: buttons=0x0000000c joy=(-12,13) triggers=(40,80)"
+      ],
+      "minControllerScriptChanges": 1
+    },
+    {
       "name": "framebuffer",
       "sample": "samples/kos/framebuffer",
       "artifact": "dcsharp_framebuffer.elf",

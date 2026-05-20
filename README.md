@@ -15,6 +15,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/minimal`: minimal init fixture that reaches `main()` and exits via the firmware-exit trap.
   - `samples/kos/timer`: default KOS fixture that exercises `timer_ms_gettime64()` and `thd_sleep()`.
   - `samples/kos/maple_controller`: default KOS fixture that polls a virtual neutral controller.
+  - `samples/kos/maple_controller_script`: raw Maple condition fixture that observes an instruction-indexed controller transition.
   - `samples/kos/framebuffer`: default KOS fixture that writes a RGB565 quadrant pattern to VRAM.
   - `samples/kos/pvr_registers`: default KOS fixture that writes named PVR registers and TA command apertures.
   - `samples/kos/aica_registers`: default KOS fixture that writes AICA channel/global registers and sound RAM.
@@ -46,6 +47,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --instructions 50000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-a-script "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
@@ -83,7 +86,7 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controll
 Use `--controller-a-script` for instruction-indexed controller changes:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --controller-a-script "0:none;1:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-a-script "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 ```
 
 Use `--json` or `--summary-json` to emit a machine-readable run summary:
@@ -117,7 +120,7 @@ Current state:
 - Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
-- The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
+- The Maple controller fixtures see `dcSharp Virtual Controller`, read neutral or scripted controller state, and validate an instruction-indexed transition across two raw Maple condition reads.
 - The framebuffer fixture writes a 320x240 RGB565 pattern and exposes it through VRAM diagnostics.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
 
@@ -125,7 +128,7 @@ Next targets:
 
 - Use the coalesced hardware advancement path to support broader scheduler event batching without losing timer determinism.
 - Add focused KOS fixtures for timer callbacks.
-- Build richer frame/input script formats around the instruction-indexed controller script model.
+- Build richer frame/input script formats and multi-port support around the instruction-indexed controller script model.
 - Promote device diagnostics into structured summaries so regressions can be compared without scanning huge traces.
 
 ## Development Bias

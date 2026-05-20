@@ -27,6 +27,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
+wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
@@ -105,6 +106,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
+- `dcsharp_maple_controller_script.elf`: performs two raw Maple condition reads, observes a neutral first read and scripted second read, shuts down, and reports `ProgramExit`.
 - `dcsharp_framebuffer.elf`: writes a 320x240 RGB565 quadrant pattern into VRAM, exposes non-zero VRAM diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_aica_registers.elf`: writes AICA channel/global registers and sound RAM, exposes silent audio diagnostics, shuts down, and reports `ProgramExit`.

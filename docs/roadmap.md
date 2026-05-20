@@ -36,12 +36,12 @@
 ## Milestone 4: Timers, Interrupts, And Maple Probe
 
 - Add scheduler clock and interrupt controller basics. Started with periodic VBlank, ASIC event masks, SH-4 external interrupt entry, TMU countdown/reload, and IPRA priority lookup.
-- Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()` and now completes; `samples/kos/maple_controller` detects a virtual controller and observes static scripted input.
+- Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()` and now completes; `samples/kos/maple_controller` detects a virtual controller; `samples/kos/maple_controller_script` observes an instruction-indexed input transition.
 - Keep KOS fixture expectations in a manifest and run them through a shared CLI/test validator. Done.
 - Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
 - Expose scheduler event diagnostics in run summaries. Done.
 - Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls; CPU event skipping can now build on the same hardware batch path.
-- Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script`.
+- Add frame/input scripts that vary Maple controller state over instruction time. Started with `--controller-a-script` and covered by a raw Maple condition transition fixture.
 
 ## Milestone 5: Video And Audio Bring-Up
 
