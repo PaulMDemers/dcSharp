@@ -116,6 +116,7 @@ Current state:
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
 - AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
+- Maple DMA transfers are captured with command/response names, receive buffers, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.
 - Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.

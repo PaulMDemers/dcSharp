@@ -32,6 +32,7 @@ public sealed record DreamcastRunSummary(
     DreamcastControllerSummary ControllerA,
     DreamcastVideoSummary Video,
     DreamcastAudioSummary Audio,
+    DreamcastMapleSummary Maple,
     DreamcastSchedulerSummary Scheduler)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
@@ -68,6 +69,7 @@ public sealed record DreamcastRunSummary(
             DreamcastControllerSummary.FromState(controllerA),
             DreamcastVideoSummary.FromSnapshot(result.Video),
             DreamcastAudioSummary.FromSnapshot(result.Audio),
+            DreamcastMapleSummary.FromSnapshot(result.Maple),
             DreamcastSchedulerSummary.FromSnapshot(result.Scheduler));
     }
 
@@ -353,6 +355,54 @@ public sealed record DreamcastAicaChannelSummary(
             channel.Active,
             channel.KeyOn,
             channel.KeyOnExecute);
+}
+
+public sealed record DreamcastMapleSummary(
+    int TransferCount,
+    int DeviceInfoCount,
+    int GetConditionCount,
+    IReadOnlyList<DreamcastMapleDmaTransferSummary> RecentTransfers)
+{
+    public static DreamcastMapleSummary FromSnapshot(DreamcastMapleSnapshot snapshot, int recentCount = 16) =>
+        new(
+            snapshot.Transfers.Count,
+            snapshot.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo"),
+            snapshot.Transfers.Count(transfer => transfer.CommandName == "GetCondition"),
+            snapshot.Transfers.TakeLast(Math.Max(0, recentCount)).Select(DreamcastMapleDmaTransferSummary.FromTransfer).ToArray());
+}
+
+public sealed record DreamcastMapleDmaTransferSummary(
+    uint DescriptorAddress,
+    string DescriptorAddressHex,
+    uint Header,
+    string HeaderHex,
+    uint ReceiveBufferAddress,
+    string ReceiveBufferAddressHex,
+    byte Command,
+    string CommandName,
+    byte Destination,
+    string DestinationHex,
+    byte Response,
+    string ResponseName,
+    int ResponseBytes,
+    DreamcastControllerSummary? ControllerState)
+{
+    public static DreamcastMapleDmaTransferSummary FromTransfer(DreamcastMapleDmaTransfer transfer) =>
+        new(
+            transfer.DescriptorAddress,
+            transfer.DescriptorAddressHex,
+            transfer.Header,
+            transfer.HeaderHex,
+            transfer.ReceiveBufferAddress,
+            transfer.ReceiveBufferAddressHex,
+            transfer.Command,
+            transfer.CommandName,
+            transfer.Destination,
+            transfer.DestinationHex,
+            transfer.Response,
+            transfer.ResponseName,
+            transfer.ResponseBytes,
+            transfer.ControllerState is { } state ? DreamcastControllerSummary.FromState(state) : null);
 }
 
 public sealed record DreamcastSchedulerSummary(

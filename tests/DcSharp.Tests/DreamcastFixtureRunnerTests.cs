@@ -88,5 +88,6 @@ public class DreamcastFixtureRunnerTests
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
             new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], 0, [], 0, [], []),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", 0, [], [], 0),
+            new DreamcastMapleSummary(0, 0, 0, []),
             new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, controllerScriptChanges));
 }

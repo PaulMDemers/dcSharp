@@ -83,6 +83,8 @@ PVR TA writes are classified into diagnostic command kinds such as `PolygonHeade
 
 AICA channel summaries decode sample format, loop enable, sample address, key-on state, and active channel count while remaining silence-safe.
 
+Maple summaries capture DMA command/response names, receive buffers, response sizes, and decoded controller state for `GetCondition` responses.
+
 ## Tests
 
 Run normal tests:

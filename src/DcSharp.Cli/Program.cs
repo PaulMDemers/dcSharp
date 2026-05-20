@@ -121,6 +121,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
     Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}");
+    Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
@@ -156,6 +157,12 @@ static void RunElf(string path, string[] args)
     {
         var channel = access.Channel is { } index ? $", channel={index}" : string.Empty;
         Console.WriteLine($"  AICA {access.Kind} {access.Name}: addr={access.AddressHex}{channel}, value={access.ValueHex}");
+    }
+
+    foreach (var transfer in result.Maple.Transfers.TakeLast(8))
+    {
+        var state = transfer.ControllerState is { } controller ? $", state={FormatController(controller)}" : string.Empty;
+        Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationHex}, recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
     }
 
     if (result.TraceTail.Count > 0)
@@ -241,7 +248,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}");
             }
 
             foreach (var failure in result.Failures)
@@ -578,6 +585,9 @@ internal sealed record FixtureReport(
     int? PvrRegisterAccessCount,
     int? PvrTaCommandWriteCount,
     int? AicaRegisterAccessCount,
+    int? MapleTransferCount,
+    int? MapleDeviceInfoCount,
+    int? MapleGetConditionCount,
     ulong? VBlankEventsRaised,
     ulong? HardwareAdvanceTicks,
     ulong? HardwareAdvanceBatches,
@@ -596,6 +606,9 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrRegisterAccessCount,
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Audio.RegisterAccessCount,
+            result.Summary?.Maple.TransferCount,
+            result.Summary?.Maple.DeviceInfoCount,
+            result.Summary?.Maple.GetConditionCount,
             result.Summary?.Scheduler.VBlankEventsRaised,
             result.Summary?.Scheduler.HardwareAdvanceTicks,
             result.Summary?.Scheduler.HardwareAdvanceBatches,

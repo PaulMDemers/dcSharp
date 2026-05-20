@@ -245,6 +245,14 @@ public class DreamcastMemoryTests
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
         Assert.Equal(0x0320u, eventCode);
         Assert.Equal(9, level);
+
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        Assert.Equal("DeviceInfo", transfer.CommandName);
+        Assert.Equal("DeviceInfo", transfer.ResponseName);
+        Assert.Equal("0x8C020000", transfer.DescriptorAddressHex);
+        Assert.Equal("0x8C030000", transfer.ReceiveBufferAddressHex);
+        Assert.Equal(116, transfer.ResponseBytes);
+        Assert.Null(transfer.ControllerState);
     }
 
     [Fact]
@@ -264,6 +272,12 @@ public class DreamcastMemoryTests
         Assert.Equal(0x0100_0000u, memory.ReadUInt32(0x8C03_0004));
         Assert.Equal(0x0000_FFFFu, memory.ReadUInt32(0x8C03_0008));
         Assert.Equal(0x8080_8080u, memory.ReadUInt32(0x8C03_000C));
+
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        Assert.Equal("GetCondition", transfer.CommandName);
+        Assert.Equal("DataTransfer", transfer.ResponseName);
+        Assert.Equal(16, transfer.ResponseBytes);
+        Assert.Equal(DreamcastControllerButtons.None, transfer.ControllerState?.Buttons);
     }
 
     [Fact]
@@ -293,6 +307,13 @@ public class DreamcastMemoryTests
         Assert.Equal(141, memory.ReadByte(0x8C03_000D));
         Assert.Equal(126, memory.ReadByte(0x8C03_000E));
         Assert.Equal(131, memory.ReadByte(0x8C03_000F));
+
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        var state = Assert.IsType<DreamcastControllerState>(transfer.ControllerState);
+        Assert.Equal(DreamcastControllerButtons.Start | DreamcastControllerButtons.A, state.Buttons);
+        Assert.Equal(40, state.LeftTrigger);
+        Assert.Equal(80, state.RightTrigger);
+        Assert.Equal(-12, state.JoyX);
     }
 
     [Fact]
@@ -307,5 +328,9 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0xA05F_6C18, 1);
 
         Assert.Equal(0xFF, memory.ReadByte(0x8C03_0000));
+        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        Assert.Equal("DeviceInfo", transfer.CommandName);
+        Assert.Equal("None", transfer.ResponseName);
+        Assert.Equal(1, transfer.ResponseBytes);
     }
 }

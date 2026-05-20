@@ -73,6 +73,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
+    private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<byte> serialOutput = [];
     private DreamcastControllerState controllerA;
 
@@ -445,6 +446,9 @@ public sealed class DreamcastMemory
             CreateAicaChannelSnapshots());
     }
 
+    public DreamcastMapleSnapshot CreateMapleSnapshot() =>
+        new(mapleTransfers.ToArray());
+
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
     {
         (string Name, uint Offset)[] offsets =
@@ -660,7 +664,7 @@ public sealed class DreamcastMemory
 
             if (receiveBuffer != P1Base)
             {
-                WriteMapleResponse(receiveBuffer, command, destination);
+                mapleTransfers.Add(WriteMapleResponse(descriptor, header, receiveBuffer, command, destination));
             }
 
             descriptor += 12 + (length * 4);
@@ -671,24 +675,43 @@ public sealed class DreamcastMemory
         }
     }
 
-    private void WriteMapleResponse(uint receiveBuffer, byte command, byte destination)
+    private DreamcastMapleDmaTransfer WriteMapleResponse(uint descriptor, uint header, uint receiveBuffer, byte command, byte destination)
     {
+        byte[] response;
+        DreamcastControllerState? responseControllerState = null;
         if (destination == MaplePortAUnit0Address && command == MapleCommandDeviceInfo)
         {
-            WriteMapleControllerDeviceInfo(receiveBuffer);
-            return;
+            response = CreateMapleControllerDeviceInfoResponse();
         }
-
-        if (destination == MaplePortAUnit0Address && command == MapleCommandGetCondition)
+        else if (destination == MaplePortAUnit0Address && command == MapleCommandGetCondition)
         {
-            WriteMapleControllerCondition(receiveBuffer);
-            return;
+            responseControllerState = controllerA;
+            response = CreateMapleControllerConditionResponse();
+        }
+        else
+        {
+            response = [MapleResponseNone];
         }
 
-        Write(receiveBuffer, [MapleResponseNone]);
+        Write(receiveBuffer, response);
+        return new DreamcastMapleDmaTransfer(
+            descriptor,
+            $"0x{descriptor:X8}",
+            header,
+            $"0x{header:X8}",
+            receiveBuffer,
+            $"0x{receiveBuffer:X8}",
+            command,
+            MapleCommandName(command),
+            destination,
+            $"0x{destination:X2}",
+            response[0],
+            MapleResponseName(response[0]),
+            response.Length,
+            responseControllerState);
     }
 
-    private void WriteMapleControllerDeviceInfo(uint receiveBuffer)
+    private byte[] CreateMapleControllerDeviceInfoResponse()
     {
         var response = new byte[4 + 112];
         response[0] = MapleResponseDeviceInfo;
@@ -702,10 +725,10 @@ public sealed class DreamcastMemory
         WriteFixedAscii(response.AsSpan(52, 60), "Produced by or under license from dcSharp");
         WriteUInt16(response, 112, 0x01AE);
         WriteUInt16(response, 114, 0x01F4);
-        Write(receiveBuffer, response);
+        return response;
     }
 
-    private void WriteMapleControllerCondition(uint receiveBuffer)
+    private byte[] CreateMapleControllerConditionResponse()
     {
         var response = new byte[16];
         response[0] = MapleResponseDataTransfer;
@@ -719,8 +742,23 @@ public sealed class DreamcastMemory
         response[13] = ToUnsignedAxis(controllerA.JoyY);
         response[14] = ToUnsignedAxis(controllerA.Joy2X);
         response[15] = ToUnsignedAxis(controllerA.Joy2Y);
-        Write(receiveBuffer, response);
+        return response;
     }
+
+    private static string MapleCommandName(byte command) => command switch
+    {
+        MapleCommandDeviceInfo => "DeviceInfo",
+        MapleCommandGetCondition => "GetCondition",
+        _ => $"Command_{command:X2}"
+    };
+
+    private static string MapleResponseName(byte response) => response switch
+    {
+        MapleResponseNone => "None",
+        MapleResponseDeviceInfo => "DeviceInfo",
+        MapleResponseDataTransfer => "DataTransfer",
+        _ => $"Response_{response:X2}"
+    };
 
     private uint ReadP4(uint address, int size)
     {

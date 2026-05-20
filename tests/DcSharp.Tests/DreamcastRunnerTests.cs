@@ -1,6 +1,7 @@
 using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Loading;
@@ -72,6 +73,7 @@ public class DreamcastRunnerTests
         Assert.Equal(result.Scheduler.HardwareAdvanceTicks, summary.Scheduler.HardwareAdvanceTicks);
         Assert.Equal(result.Scheduler.HardwareAdvanceBatches, summary.Scheduler.HardwareAdvanceBatches);
         Assert.Equal(result.Scheduler.MaxHardwareAdvanceBatch, summary.Scheduler.MaxHardwareAdvanceBatch);
+        Assert.Equal(result.Maple.Transfers.Count, summary.Maple.TransferCount);
     }
 
     [Fact]
@@ -92,6 +94,7 @@ public class DreamcastRunnerTests
             [],
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], []),
+            new DreamcastMapleSnapshot([]),
             new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
