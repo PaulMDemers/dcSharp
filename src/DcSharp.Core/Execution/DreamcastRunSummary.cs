@@ -121,6 +121,7 @@ public sealed record DreamcastLoadedSegmentSummary(
 
 public sealed record DreamcastMemoryAccessSummary(
     MemoryAccessKind Kind,
+    string Domain,
     uint Address,
     string AddressHex,
     int Size,
@@ -128,7 +129,7 @@ public sealed record DreamcastMemoryAccessSummary(
     string ValueHex)
 {
     public static DreamcastMemoryAccessSummary FromAccess(MemoryAccess access) =>
-        new(access.Kind, access.Address, $"0x{access.Address:X8}", access.Size, access.Value, $"0x{access.Value:X8}");
+        new(access.Kind, DreamcastDeviceDomainClassifier.Classify(access), access.Address, $"0x{access.Address:X8}", access.Size, access.Value, $"0x{access.Value:X8}");
 }
 
 public sealed record DreamcastTraceSummary(

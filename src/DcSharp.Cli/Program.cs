@@ -294,9 +294,14 @@ static void DumpDeviceLog(DreamcastRunResult result, CliRunOptions options)
         accesses = accesses.Where(access => range.Contains(access.Address));
     }
 
+    if (options.DeviceDomain is { } domain)
+    {
+        accesses = accesses.Where(access => string.Equals(DreamcastDeviceDomainClassifier.Classify(access), domain, StringComparison.OrdinalIgnoreCase));
+    }
+
     foreach (var access in accesses)
     {
-        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+        writer.WriteLine($"{access.Kind}: domain={DreamcastDeviceDomainClassifier.Classify(access)}, addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
     }
 }
 
@@ -330,6 +335,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? deviceLogPath = null;
     MemoryAccessKind? deviceKind = null;
     AddressRange? deviceAddressRange = null;
+    string? deviceDomain = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -395,6 +401,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 deviceAddressRange = new AddressRange(start ?? 0, end ?? start ?? uint.MaxValue);
                 index++;
                 break;
+            case "--device-domain" when index + 1 < args.Length:
+                deviceDomain = ParseDeviceDomain(args[index + 1]);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -428,7 +438,8 @@ static CliRunOptions ParseRunOptions(string[] args)
         traceLogPath,
         deviceLogPath,
         deviceKind,
-        deviceAddressRange);
+        deviceAddressRange,
+        deviceDomain);
 }
 
 static (int Width, int Height) ParseFramebufferSize(string text)
@@ -480,6 +491,25 @@ static uint ParseAddress(string text)
     throw new InvalidDataException($"Invalid address: {text}");
 }
 
+static string ParseDeviceDomain(string text)
+{
+    var normalized = text.Trim().ToLowerInvariant();
+    return normalized switch
+    {
+        DreamcastDeviceDomainClassifier.Aica
+            or DreamcastDeviceDomainClassifier.Asic
+            or DreamcastDeviceDomainClassifier.Holly
+            or DreamcastDeviceDomainClassifier.Maple
+            or DreamcastDeviceDomainClassifier.Pvr
+            or DreamcastDeviceDomainClassifier.Scif
+            or DreamcastDeviceDomainClassifier.Sh4
+            or DreamcastDeviceDomainClassifier.Tmu
+            or DreamcastDeviceDomainClassifier.Unmapped
+            or DreamcastDeviceDomainClassifier.Other => normalized,
+        _ => throw new InvalidDataException($"Unknown device domain: {text}")
+    };
+}
+
 static string FormatController(DreamcastControllerState state) =>
     $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
@@ -492,7 +522,7 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-kind kind] [--device-address start-end] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller-a state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
@@ -530,7 +560,8 @@ internal sealed record CliRunOptions(
     string? TraceLogPath,
     string? DeviceLogPath,
     MemoryAccessKind? DeviceKind,
-    AddressRange? DeviceAddressRange);
+    AddressRange? DeviceAddressRange,
+    string? DeviceDomain);
 
 internal sealed record AddressRange(uint Start, uint End)
 {

@@ -65,7 +65,7 @@ Useful run options:
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
-- `--device-log artifacts/logs/devices.txt --device-kind Write --device-address 0xFFE8000C` writes filtered device accesses.
+- `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 
 The fixture manifest keeps sample paths, artifact names, instruction budgets, and expected serial/video checks together. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
@@ -75,6 +75,8 @@ KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, tex
 Generated framebuffer, trace, and device logs belong under `artifacts/` and stay out of git.
 
 Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement, and controller-script state changes.
+
+Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 
 PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
 

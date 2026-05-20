@@ -71,7 +71,7 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.el
 Capture narrow trace/device logs while keeping the normal run summary readable:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-kind Write --device-address 0xFFE8000C
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-domain scif --device-kind Write
 ```
 
 Use `--controller-a` to script the virtual controller on Maple port A:
@@ -114,6 +114,7 @@ Current state:
 - PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
 - AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, and controller script changes.
+- Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
 - The Maple controller fixture sees `dcSharp Virtual Controller` and reads neutral or scripted controller state.
