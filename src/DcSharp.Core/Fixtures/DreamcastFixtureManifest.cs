@@ -62,6 +62,7 @@ public sealed class DreamcastFixtureDefinition
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public Dictionary<string, string> PvrRegisters { get; set; } = [];
     public Dictionary<string, string> AicaRegisters { get; set; } = [];
+    public DreamcastFixtureAsicPendingInterruptExpectation? AsicPendingInterrupt { get; set; }
     public List<DreamcastFixtureAsicEventRegisterExpectation> AsicEventRegisters { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
@@ -113,6 +114,16 @@ public sealed class DreamcastFixtureAsicEventRegisterExpectation
     public string? PendingIrq9 { get; set; }
     public string? PendingIrqB { get; set; }
     public string? PendingIrqD { get; set; }
+}
+
+public sealed class DreamcastFixtureAsicPendingInterruptExpectation
+{
+    public string? EventCode { get; set; }
+    public int? Level { get; set; }
+    public string? LevelName { get; set; }
+    public string? RegisterName { get; set; }
+    public int? Bit { get; set; }
+    public string? BitMask { get; set; }
 }
 
 public sealed class DreamcastFixtureAicaChannelExpectation

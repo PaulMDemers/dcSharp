@@ -78,6 +78,7 @@ public class DreamcastFixtureRunnerTests
             MaxHardwareAdvanceBatch = 5,
             MinControllerScriptChanges = 1,
             RequireNoAsicPendingInterrupt = true,
+            AsicPendingInterrupt = null,
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
@@ -154,6 +155,15 @@ public class DreamcastFixtureRunnerTests
             MaxHardwareAdvanceBatch = 4,
             MinControllerScriptChanges = 2,
             RequireNoAsicPendingInterrupt = true,
+            AsicPendingInterrupt = new DreamcastFixtureAsicPendingInterruptExpectation
+            {
+                EventCode = "0x0360",
+                Level = 11,
+                LevelName = "IRQB",
+                RegisterName = "A",
+                Bit = 12,
+                BitMask = "0x00001000"
+            },
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
@@ -224,6 +234,11 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
         Assert.Contains("expected no pending ASIC interrupt, got 0x0320 level 9", failures);
+        Assert.Contains("ASIC pending interrupt event code expected 0x00000360, got 0x0320", failures);
+        Assert.Contains("ASIC pending interrupt level expected 11, got 9", failures);
+        Assert.Contains("ASIC pending interrupt level name expected IRQB, got IRQ9", failures);
+        Assert.Contains("ASIC pending interrupt bit expected 12, got 3", failures);
+        Assert.Contains("ASIC pending interrupt bit mask expected 0x00001000, got 0x00000008", failures);
         Assert.Contains("ASIC event register A ack expected 0x00000000, got 0x00000008", failures);
         Assert.Contains("missing ASIC event register: B", failures);
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);

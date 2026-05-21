@@ -140,6 +140,9 @@
         "aicaRegisters": {
           "$ref": "#/$defs/hexMap"
         },
+        "asicPendingInterrupt": {
+          "$ref": "#/$defs/asicPendingInterrupt"
+        },
         "asicEventRegisters": {
           "type": "array",
           "items": {
@@ -163,6 +166,42 @@
           "items": {
             "$ref": "#/$defs/videoSample"
           }
+        }
+      }
+    },
+    "asicPendingInterrupt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eventCode": {
+          "$ref": "#/$defs/hex32"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "levelName": {
+          "enum": [
+            "IRQ9",
+            "IRQB",
+            "IRQD"
+          ]
+        },
+        "registerName": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "bit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31
+        },
+        "bitMask": {
+          "$ref": "#/$defs/hex32"
         }
       }
     },

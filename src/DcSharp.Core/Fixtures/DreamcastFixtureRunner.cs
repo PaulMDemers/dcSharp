@@ -79,6 +79,24 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected no pending ASIC interrupt, got {summary.Asic.PendingEventCodeHex} level {summary.Asic.PendingLevel}");
         }
 
+        if (fixture.AsicPendingInterrupt is { } expectedPending)
+        {
+            var pending = summary.Asic.PendingInterrupt;
+            if (pending is null)
+            {
+                failures.Add("missing pending ASIC interrupt");
+            }
+            else
+            {
+                ValidateHex32(failures, "ASIC pending interrupt event code", expectedPending.EventCode, pending.EventCode, pending.EventCodeHex);
+                ValidateInt(failures, "ASIC pending interrupt level", expectedPending.Level, pending.Level);
+                ValidateString(failures, "ASIC pending interrupt level name", expectedPending.LevelName, pending.LevelName);
+                ValidateString(failures, "ASIC pending interrupt register", expectedPending.RegisterName, pending.RegisterName);
+                ValidateInt(failures, "ASIC pending interrupt bit", expectedPending.Bit, pending.Bit);
+                ValidateHex32(failures, "ASIC pending interrupt bit mask", expectedPending.BitMask, pending.BitMask, pending.BitMaskHex);
+            }
+        }
+
         if (fixture.MinPvrRegisterAccesses is { } minPvrRegisterAccesses && summary.Video.PvrRegisterAccessCount < minPvrRegisterAccesses)
         {
             failures.Add($"expected at least {minPvrRegisterAccesses} PVR register accesses, got {summary.Video.PvrRegisterAccessCount}");
@@ -285,6 +303,14 @@ public static class DreamcastFixtureRunner
     }
 
     private static void ValidateBool(List<string> failures, string label, bool? expected, bool actual)
+    {
+        if (expected is not null && actual != expected)
+        {
+            failures.Add($"{label} expected {expected}, got {actual}");
+        }
+    }
+
+    private static void ValidateInt(List<string> failures, string label, int? expected, int actual)
     {
         if (expected is not null && actual != expected)
         {
