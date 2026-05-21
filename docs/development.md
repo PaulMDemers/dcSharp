@@ -104,7 +104,7 @@ PVR summaries include current named register values plus recent register accesse
 
 AICA summaries include current named register values plus recent register accesses. Channel summaries decode sample format, loop enable, sample address, loop points, pitch, pan, volume, key-on state, and active channel count while remaining silence-safe.
 
-Maple summaries capture DMA command/response names, destination labels, receive buffers, response sizes, and decoded controller state for `GetCondition` responses.
+Maple summaries capture DMA command/response names, destination labels, receive buffers, response sizes, decoded controller state for `GetCondition` responses, and per-DMA descriptor traversal diagnostics including malformed chains that hit the descriptor guard.
 
 ## Tests
 

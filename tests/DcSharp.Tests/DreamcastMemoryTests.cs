@@ -1,5 +1,6 @@
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Execution;
 
 namespace DcSharp.Tests;
 
@@ -358,7 +359,15 @@ public class DreamcastMemoryTests
         Assert.Equal(0x0320u, eventCode);
         Assert.Equal(9, level);
 
-        var transfer = Assert.Single(memory.CreateMapleSnapshot().Transfers);
+        var snapshot = memory.CreateMapleSnapshot();
+        var batch = Assert.Single(snapshot.DmaBatches);
+        Assert.Equal("0x8C020000", batch.DescriptorAddressHex);
+        Assert.Equal(1, batch.DescriptorsScanned);
+        Assert.Equal(1, batch.TransferCount);
+        Assert.True(batch.Completed);
+        Assert.False(batch.HitDescriptorLimit);
+
+        var transfer = Assert.Single(snapshot.Transfers);
         Assert.Equal("DeviceInfo", transfer.CommandName);
         Assert.Equal("DeviceInfo", transfer.ResponseName);
         Assert.Equal("A0", transfer.DestinationName);
@@ -538,5 +547,40 @@ public class DreamcastMemoryTests
         Assert.Equal("DeviceInfo", transfer.CommandName);
         Assert.Equal("None", transfer.ResponseName);
         Assert.Equal(1, transfer.ResponseBytes);
+    }
+
+    [Fact]
+    public void MapleDmaRecordsDescriptorLimitWhenEndMarkerIsMissing()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xA05F_6930, 1u << 12);
+        memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
+
+        memory.WriteUInt32(0xA05F_6C18, 1);
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_6C18));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+
+        var snapshot = memory.CreateMapleSnapshot();
+        Assert.Empty(snapshot.Transfers);
+        var batch = Assert.Single(snapshot.DmaBatches);
+        Assert.Equal(0x8C02_0000u, batch.DescriptorAddress);
+        Assert.Equal("0x8C020000", batch.DescriptorAddressHex);
+        Assert.Equal(64, batch.DescriptorsScanned);
+        Assert.Equal(0, batch.TransferCount);
+        Assert.False(batch.Completed);
+        Assert.True(batch.HitDescriptorLimit);
+        Assert.Equal(0x8C02_02F4u, batch.LastDescriptorAddress);
+        Assert.Equal("0x8C0202F4", batch.LastDescriptorAddressHex);
+
+        var summary = DreamcastMapleSummary.FromSnapshot(snapshot);
+        Assert.Equal(1, summary.DmaBatchCount);
+        Assert.Equal(1, summary.DescriptorLimitHitCount);
+        Assert.Empty(summary.RecentTransfers);
+        var summaryBatch = Assert.Single(summary.RecentDmaBatches);
+        Assert.True(summaryBatch.HitDescriptorLimit);
+        Assert.False(summaryBatch.Completed);
     }
 }

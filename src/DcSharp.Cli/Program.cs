@@ -138,7 +138,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"AICA current: {string.Join(", ", currentAicaRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
-    Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}");
+    Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
         ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
@@ -184,6 +184,11 @@ static void RunElf(string path, string[] args)
     {
         var state = transfer.ControllerState is { } controller ? $", state={FormatController(controller)}" : string.Empty;
         Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationName} ({transfer.DestinationHex}), recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
+    }
+
+    foreach (var batch in result.Maple.DmaBatches.TakeLast(4))
+    {
+        Console.WriteLine($"  Maple DMA: start={batch.DescriptorAddressHex}, scanned={batch.DescriptorsScanned}, transfers={batch.TransferCount}, completed={batch.Completed}, descriptorLimit={batch.HitDescriptorLimit}, last={batch.LastDescriptorAddressHex}");
     }
 
     if (result.TraceTail.Count > 0)
@@ -304,7 +309,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}");
             }
 
             foreach (var failure in result.Failures)

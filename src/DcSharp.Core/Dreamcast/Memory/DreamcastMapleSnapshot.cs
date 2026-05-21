@@ -3,7 +3,24 @@ using DcSharp.Core.Dreamcast.Input;
 namespace DcSharp.Core.Dreamcast.Memory;
 
 public sealed record DreamcastMapleSnapshot(
-    IReadOnlyList<DreamcastMapleDmaTransfer> Transfers);
+    IReadOnlyList<DreamcastMapleDmaTransfer> Transfers,
+    IReadOnlyList<DreamcastMapleDmaBatch> DmaBatches)
+{
+    public DreamcastMapleSnapshot(IReadOnlyList<DreamcastMapleDmaTransfer> transfers)
+        : this(transfers, [])
+    {
+    }
+}
+
+public sealed record DreamcastMapleDmaBatch(
+    uint DescriptorAddress,
+    string DescriptorAddressHex,
+    int DescriptorsScanned,
+    int TransferCount,
+    bool Completed,
+    bool HitDescriptorLimit,
+    uint LastDescriptorAddress,
+    string LastDescriptorAddressHex);
 
 public sealed record DreamcastMapleDmaTransfer(
     uint DescriptorAddress,

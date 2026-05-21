@@ -42,7 +42,7 @@
 - Expose scheduler event diagnostics in run summaries. Done.
 - Expose ASIC event register and pending interrupt diagnostics in run summaries. Done, including decoded pending source register/bit and A/B/C event-bank ACK coverage.
 - Add fixture expectations for ASIC event state. Started: manifests can assert no pending ASIC interrupt plus ACK/mask/pending event registers.
-- Expose Maple DMA command/response diagnostics in run summaries. Done.
+- Expose Maple DMA command/response diagnostics in run summaries. Done, including per-DMA descriptor traversal and descriptor-limit diagnostics.
 - Expose aggregate device-access domain and access-kind diagnostics in run summaries. Done.
 - Add fixture expectations for aggregate device-domain access counts. Done.
 - Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls, SH-4 `sleep` waits, and side-effect-free self-branch waits; broader idle-loop detection can now build on the same hardware batch path.

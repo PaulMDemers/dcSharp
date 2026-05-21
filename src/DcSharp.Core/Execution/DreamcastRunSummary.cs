@@ -492,14 +492,51 @@ public sealed record DreamcastMapleSummary(
     int TransferCount,
     int DeviceInfoCount,
     int GetConditionCount,
+    int DmaBatchCount,
+    int DescriptorLimitHitCount,
+    IReadOnlyList<DreamcastMapleDmaBatchSummary> RecentDmaBatches,
     IReadOnlyList<DreamcastMapleDmaTransferSummary> RecentTransfers)
 {
+    public DreamcastMapleSummary(
+        int transferCount,
+        int deviceInfoCount,
+        int getConditionCount,
+        IReadOnlyList<DreamcastMapleDmaTransferSummary> recentTransfers)
+        : this(transferCount, deviceInfoCount, getConditionCount, 0, 0, [], recentTransfers)
+    {
+    }
+
     public static DreamcastMapleSummary FromSnapshot(DreamcastMapleSnapshot snapshot, int recentCount = 16) =>
         new(
             snapshot.Transfers.Count,
             snapshot.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo"),
             snapshot.Transfers.Count(transfer => transfer.CommandName == "GetCondition"),
+            snapshot.DmaBatches.Count,
+            snapshot.DmaBatches.Count(batch => batch.HitDescriptorLimit),
+            snapshot.DmaBatches.TakeLast(Math.Max(0, recentCount)).Select(DreamcastMapleDmaBatchSummary.FromBatch).ToArray(),
             snapshot.Transfers.TakeLast(Math.Max(0, recentCount)).Select(DreamcastMapleDmaTransferSummary.FromTransfer).ToArray());
+}
+
+public sealed record DreamcastMapleDmaBatchSummary(
+    uint DescriptorAddress,
+    string DescriptorAddressHex,
+    int DescriptorsScanned,
+    int TransferCount,
+    bool Completed,
+    bool HitDescriptorLimit,
+    uint LastDescriptorAddress,
+    string LastDescriptorAddressHex)
+{
+    public static DreamcastMapleDmaBatchSummary FromBatch(DreamcastMapleDmaBatch batch) =>
+        new(
+            batch.DescriptorAddress,
+            batch.DescriptorAddressHex,
+            batch.DescriptorsScanned,
+            batch.TransferCount,
+            batch.Completed,
+            batch.HitDescriptorLimit,
+            batch.LastDescriptorAddress,
+            batch.LastDescriptorAddressHex);
 }
 
 public sealed record DreamcastMapleDmaTransferSummary(

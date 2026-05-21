@@ -63,6 +63,7 @@ public sealed class DreamcastMemory
     public const byte MaplePortBUnit0Address = 0x40;
     private const uint MapleFunctionController = 0x0100_0000;
     private const uint MapleStandardControllerCapabilities = 0xFE06_0F00;
+    private const int MapleDmaDescriptorLimit = 64;
     private const ushort AsicEventPvrVBlankBegin = 0x0003;
     private const ushort AsicEventMapleDma = 0x000C;
 
@@ -77,6 +78,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
+    private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly List<byte> serialOutput = [];
 
@@ -489,7 +491,7 @@ public sealed class DreamcastMemory
     }
 
     public DreamcastMapleSnapshot CreateMapleSnapshot() =>
-        new(mapleTransfers.ToArray());
+        new(mapleTransfers.ToArray(), mapleDmaBatches.ToArray());
 
     public DreamcastAsicSnapshot CreateAsicSnapshot()
     {
@@ -818,18 +820,23 @@ public sealed class DreamcastMemory
         var dmaAddress = externalRegisters.GetValueOrDefault(MapleDmaAddress);
         if (dmaAddress != 0)
         {
-            WriteMapleResponses(dmaAddress);
+            mapleDmaBatches.Add(WriteMapleResponses(dmaAddress));
         }
 
         externalRegisters[MapleState] = 0;
         RaiseAsicEvent(AsicEventMapleDma);
     }
 
-    private void WriteMapleResponses(uint dmaAddress)
+    private DreamcastMapleDmaBatch WriteMapleResponses(uint dmaAddress)
     {
         var descriptor = dmaAddress | P1Base;
-        for (var frames = 0; frames < 64; frames++)
+        var startDescriptor = descriptor;
+        var lastDescriptor = descriptor;
+        var startTransferCount = mapleTransfers.Count;
+
+        for (var frames = 0; frames < MapleDmaDescriptorLimit; frames++)
         {
+            lastDescriptor = descriptor;
             var header = ReadUInt32(descriptor);
             var receiveBuffer = ReadUInt32(descriptor + 4) | P1Base;
             var commandWord = ReadUInt32(descriptor + 8);
@@ -845,10 +852,41 @@ public sealed class DreamcastMemory
             descriptor += 12 + (length * 4);
             if ((header & 0x8000_0000) != 0)
             {
-                return;
+                return CreateMapleDmaBatch(
+                    startDescriptor,
+                    frames + 1,
+                    mapleTransfers.Count - startTransferCount,
+                    completed: true,
+                    hitDescriptorLimit: false,
+                    lastDescriptor);
             }
         }
+
+        return CreateMapleDmaBatch(
+            startDescriptor,
+            MapleDmaDescriptorLimit,
+            mapleTransfers.Count - startTransferCount,
+            completed: false,
+            hitDescriptorLimit: true,
+            lastDescriptor);
     }
+
+    private static DreamcastMapleDmaBatch CreateMapleDmaBatch(
+        uint startDescriptor,
+        int descriptorsScanned,
+        int transferCount,
+        bool completed,
+        bool hitDescriptorLimit,
+        uint lastDescriptor) =>
+        new(
+            startDescriptor,
+            $"0x{startDescriptor:X8}",
+            descriptorsScanned,
+            transferCount,
+            completed,
+            hitDescriptorLimit,
+            lastDescriptor,
+            $"0x{lastDescriptor:X8}");
 
     private DreamcastMapleDmaTransfer WriteMapleResponse(uint descriptor, uint header, uint receiveBuffer, byte command, byte destination)
     {
