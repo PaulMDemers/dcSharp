@@ -206,6 +206,31 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCoalescesReadOnlyPollingLoopToControllerScriptBoundary()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateReadOnlyPollingLoopElf()));
+        var options = new DreamcastRunOptions(
+            InstructionLimit: 8,
+            TraceTailLength: 0,
+            VBlankInterval: 0,
+            ControllerAScript: new DreamcastControllerScript(
+                new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start))));
+
+        var result = new DreamcastRunner().Run(elf, options);
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(8UL, result.Cpu.InstructionsExecuted);
+        Assert.Equal(8UL, result.Scheduler.HardwareAdvanceTicks);
+        Assert.Equal(7UL, result.Scheduler.HardwareAdvanceBatches);
+        Assert.Equal(2UL, result.Scheduler.MaxHardwareAdvanceBatch);
+        Assert.Equal(1UL, result.Scheduler.ControllerScriptChanges);
+
+        var summary = DreamcastRunSummary.FromResult(result, options);
+        Assert.Equal(DreamcastControllerButtons.Start, summary.ControllerA.Buttons);
+    }
+
+    [Fact]
     public void DetectsSideEffectFreeIdleLoops()
     {
         var memory = new DreamcastMemory();
@@ -296,6 +321,16 @@ public class DreamcastRunnerTests
         Encoding.ASCII.GetBytes("\narch: exit return code 0\n\0").CopyTo(bytes, 0x2C);
 
         return CreateElfWithSegment(bytes);
+    }
+
+    private static byte[] CreateReadOnlyPollingLoopElf()
+    {
+        return CreateElfWithSegment(
+        [
+            0x00, 0x62, // mov.b @r0,r2
+            0x28, 0x22, // tst r2,r2
+            0xFC, 0x89  // bt 0x8C010000
+        ]);
     }
 
     private static byte[] CreateElfWithSegment(byte[] segmentBytes)
