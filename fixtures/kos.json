@@ -373,6 +373,39 @@
       }
     },
     {
+      "name": "vblank_idle",
+      "sample": "samples/kos/vblank_idle",
+      "artifact": "dcsharp_vblank_idle.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "vblankInterval": 50000,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp VBlank idle probe start",
+        "observed=0x00000008",
+        "before_clear=0x00000008",
+        "after_clear=0x00000000",
+        "irq9=0x00000000"
+      ],
+      "minVblankEvents": 1,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "minIdleVBlankWakes": 1,
+      "requireNoAsicPendingInterrupt": true,
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000008",
+          "irq9Mask": "0x00000000",
+          "pendingIrq9": "0x00000000"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "aica_registers",
       "sample": "samples/kos/aica_registers",
       "artifact": "dcsharp_aica_registers.elf",

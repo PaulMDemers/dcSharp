@@ -151,6 +151,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_asic_irqb.elf`: triggers a raw Maple DMA completion with ASIC IRQB enabled, leaves the decoded pending source observable, exits through the firmware-exit trap, and reports `FirmwareExit`.
 - `dcsharp_asic_events.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, observes the raw ACK bit, clears it, disables the mask, shuts down, and reports `ProgramExit`.
+- `dcsharp_vblank_idle.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, spins in a read-only ACK polling loop until synthetic VBlank, exposes idle VBlank wake diagnostics, clears the ACK bit, shuts down, and reports `ProgramExit`.
 - `dcsharp_aica_registers.elf`: writes AICA channel/global registers and sound RAM, exposes silent audio diagnostics, shuts down, and reports `ProgramExit`.
 
 ## Commit Hygiene
