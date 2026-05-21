@@ -113,6 +113,12 @@
         "minMapleGetConditionTransfers": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "minMapleDmaBatches": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "requireNoMapleDescriptorLimitHits": {
+          "type": "boolean"
+        },
         "minVblankEvents": {
           "$ref": "#/$defs/nonNegativeInteger"
         },

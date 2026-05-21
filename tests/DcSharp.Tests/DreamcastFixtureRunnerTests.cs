@@ -72,6 +72,8 @@ public class DreamcastFixtureRunnerTests
             MinMapleTransfers = 9,
             MinMapleDeviceInfoTransfers = 4,
             MinMapleGetConditionTransfers = 5,
+            MinMapleDmaBatches = 2,
+            RequireNoMapleDescriptorLimitHits = true,
             MinVblankEvents = 2,
             MinHardwareAdvanceTicks = 100,
             MinHardwareAdvanceBatches = 20,
@@ -130,6 +132,7 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
+            mapleDmaBatches: 2,
             asic: CreateAsicSummary(),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
@@ -149,6 +152,8 @@ public class DreamcastFixtureRunnerTests
             MinMapleTransfers = 10,
             MinMapleDeviceInfoTransfers = 5,
             MinMapleGetConditionTransfers = 6,
+            MinMapleDmaBatches = 2,
+            RequireNoMapleDescriptorLimitHits = true,
             MinVblankEvents = 3,
             MinHardwareAdvanceTicks = 101,
             MinHardwareAdvanceBatches = 21,
@@ -217,6 +222,8 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
+            mapleDmaBatches: 1,
+            mapleDescriptorLimitHits: 1,
             asic: CreateAsicSummary(pendingEventCode: 0x0320, pendingLevel: 9, ack: 0x00000008, irq9Mask: 0x00000008),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000E, "0x0000000E")],
@@ -232,6 +239,8 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 10 Maple transfers, got 9", failures);
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
+        Assert.Contains("expected at least 2 Maple DMA batches, got 1", failures);
+        Assert.Contains("expected no Maple descriptor-limit hits, got 1", failures);
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
         Assert.Contains("expected no pending ASIC interrupt, got 0x0320 level 9", failures);
         Assert.Contains("ASIC pending interrupt event code expected 0x00000360, got 0x0320", failures);
@@ -260,6 +269,8 @@ public class DreamcastFixtureRunnerTests
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
         int mapleGetConditionTransfers = 0,
+        int mapleDmaBatches = 0,
+        int mapleDescriptorLimitHits = 0,
         DreamcastAsicSummary? asic = null,
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
@@ -291,8 +302,28 @@ public class DreamcastFixtureRunnerTests
             asic ?? new DreamcastAsicSummary([], null, null, null, null),
             new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
-            new DreamcastMapleSummary(mapleTransfers, mapleDeviceInfoTransfers, mapleGetConditionTransfers, []),
+            new DreamcastMapleSummary(
+                mapleTransfers,
+                mapleDeviceInfoTransfers,
+                mapleGetConditionTransfers,
+                mapleDmaBatches,
+                mapleDescriptorLimitHits,
+                CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
+                []),
             new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, controllerScriptChanges));
+
+    private static IReadOnlyList<DreamcastMapleDmaBatchSummary> CreateMapleDmaBatches(int count, int descriptorLimitHits) =>
+        Enumerable.Range(0, count)
+            .Select(index => new DreamcastMapleDmaBatchSummary(
+                0x8C02_0000u + ((uint)index * 12u),
+                $"0x{0x8C02_0000u + ((uint)index * 12u):X8}",
+                1,
+                1,
+                index >= descriptorLimitHits,
+                index < descriptorLimitHits,
+                0x8C02_0000u + ((uint)index * 12u),
+                $"0x{0x8C02_0000u + ((uint)index * 12u):X8}"))
+            .ToArray();
 
     private static DreamcastAsicSummary CreateAsicSummary(
         uint? pendingEventCode = null,

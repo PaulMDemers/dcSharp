@@ -83,6 +83,8 @@
       "minMapleTransfers": 7,
       "minMapleDeviceInfoTransfers": 4,
       "minMapleGetConditionTransfers": 3,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "requireNoAsicPendingInterrupt": true,
       "asicEventRegisters": [
         {
@@ -115,6 +117,8 @@
       "minMapleTransfers": 7,
       "minMapleDeviceInfoTransfers": 4,
       "minMapleGetConditionTransfers": 3,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "minDeviceAccessDomains": {
         "maple": 1,
         "scif": 1
@@ -138,6 +142,8 @@
       "minMapleTransfers": 63,
       "minMapleDeviceInfoTransfers": 4,
       "minMapleGetConditionTransfers": 28,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "minDeviceAccessDomains": {
         "maple": 1,
         "scif": 1
@@ -157,6 +163,8 @@
       "minMapleTransfers": 9,
       "minMapleDeviceInfoTransfers": 5,
       "minMapleGetConditionTransfers": 4,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "minDeviceAccessDomains": {
         "maple": 1,
         "scif": 1
@@ -179,6 +187,8 @@
       "minMapleTransfers": 9,
       "minMapleDeviceInfoTransfers": 5,
       "minMapleGetConditionTransfers": 4,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "minDeviceAccessDomains": {
         "maple": 1,
         "scif": 1
@@ -300,6 +310,8 @@
       ],
       "minMapleTransfers": 1,
       "minMapleDeviceInfoTransfers": 1,
+      "minMapleDmaBatches": 1,
+      "requireNoMapleDescriptorLimitHits": true,
       "asicPendingInterrupt": {
         "eventCode": "0x0360",
         "level": 11,

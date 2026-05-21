@@ -54,6 +54,8 @@ public sealed class DreamcastFixtureDefinition
     public int? MinMapleTransfers { get; set; }
     public int? MinMapleDeviceInfoTransfers { get; set; }
     public int? MinMapleGetConditionTransfers { get; set; }
+    public int? MinMapleDmaBatches { get; set; }
+    public bool RequireNoMapleDescriptorLimitHits { get; set; }
     public ulong? MinVblankEvents { get; set; }
     public ulong? MinHardwareAdvanceTicks { get; set; }
     public ulong? MinHardwareAdvanceBatches { get; set; }

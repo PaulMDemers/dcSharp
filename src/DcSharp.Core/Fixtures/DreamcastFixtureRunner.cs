@@ -127,6 +127,16 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected at least {minMapleGetConditionTransfers} Maple GetCondition transfers, got {summary.Maple.GetConditionCount}");
         }
 
+        if (fixture.MinMapleDmaBatches is { } minMapleDmaBatches && summary.Maple.DmaBatchCount < minMapleDmaBatches)
+        {
+            failures.Add($"expected at least {minMapleDmaBatches} Maple DMA batches, got {summary.Maple.DmaBatchCount}");
+        }
+
+        if (fixture.RequireNoMapleDescriptorLimitHits && summary.Maple.DescriptorLimitHitCount != 0)
+        {
+            failures.Add($"expected no Maple descriptor-limit hits, got {summary.Maple.DescriptorLimitHitCount}");
+        }
+
         if (fixture.MinVblankEvents is { } minVblankEvents && summary.Scheduler.VBlankEventsRaised < minVblankEvents)
         {
             failures.Add($"expected at least {minVblankEvents} scheduler VBlank events, got {summary.Scheduler.VBlankEventsRaised}");
