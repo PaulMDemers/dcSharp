@@ -225,6 +225,7 @@ public sealed record DreamcastVideoSummary(
     uint? FirstNonZeroOffset,
     string? FirstNonZeroOffsetHex,
     IReadOnlyList<DreamcastVideoSampleSummary> Samples,
+    IReadOnlyList<DreamcastPvrRegisterValueSummary> PvrRegisters,
     int PvrRegisterAccessCount,
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrTaCommandWriteCount,
@@ -245,6 +246,7 @@ public sealed record DreamcastVideoSummary(
                 sample.OffsetHex,
                 sample.Rgb565,
                 sample.Rgb565Hex)).ToArray(),
+            snapshot.PvrRegisters.Select(DreamcastPvrRegisterValueSummary.FromRegister).ToArray(),
             snapshot.PvrRegisterAccesses.Count,
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
@@ -262,6 +264,17 @@ public sealed record DreamcastVideoSampleSummary(
     string OffsetHex,
     ushort Rgb565,
     string Rgb565Hex);
+
+public sealed record DreamcastPvrRegisterValueSummary(
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrRegisterValueSummary FromRegister(DreamcastPvrRegisterValue register) =>
+        new(register.Offset, register.OffsetHex, register.Name, register.Value, register.ValueHex);
+}
 
 public sealed record DreamcastPvrRegisterAccessSummary(
     MemoryAccessKind Kind,

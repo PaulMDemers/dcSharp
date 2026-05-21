@@ -95,7 +95,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
-            new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], []),
+            new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], []),
             new DreamcastMapleSnapshot([]),
             new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0),

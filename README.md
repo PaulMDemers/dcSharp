@@ -131,7 +131,7 @@ Current state:
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
-- PVR register and TA command writes are captured in the video summary with SDK-aligned register names and first-pass TA command classification.
+- Current PVR register values, PVR register writes, and TA command writes are captured in the video summary with SDK-aligned names and first-pass TA command classification.
 - AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.

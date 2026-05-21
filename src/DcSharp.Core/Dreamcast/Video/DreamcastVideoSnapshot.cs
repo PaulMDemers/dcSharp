@@ -10,6 +10,7 @@ public sealed record DreamcastVideoSnapshot(
     uint? FirstNonZeroOffset,
     string? FirstNonZeroOffsetHex,
     IReadOnlyList<DreamcastVideoSample> Samples,
+    IReadOnlyList<DreamcastPvrRegisterValue> PvrRegisters,
     IReadOnlyList<DreamcastPvrRegisterAccess> PvrRegisterAccesses,
     IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites,
     byte[] Vram);
@@ -20,6 +21,13 @@ public sealed record DreamcastVideoSample(
     string OffsetHex,
     ushort Rgb565,
     string Rgb565Hex);
+
+public sealed record DreamcastPvrRegisterValue(
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    uint Value,
+    string ValueHex);
 
 public sealed record DreamcastPvrRegisterAccess(
     MemoryAccessKind Kind,

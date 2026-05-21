@@ -453,6 +453,7 @@ public sealed class DreamcastMemory
             firstNonZeroOffset,
             firstNonZeroOffset is { } offset ? $"0x{offset:X8}" : null,
             CreateVideoSamples(),
+            CreatePvrRegisterValues(),
             pvrRegisterAccesses.ToArray(),
             pvrTaCommandWrites.ToArray(),
             (byte[])pvrVram.Clone());
@@ -508,6 +509,22 @@ public sealed class DreamcastMemory
             })
             .ToArray();
     }
+
+    private IReadOnlyList<DreamcastPvrRegisterValue> CreatePvrRegisterValues() =>
+        externalRegisters
+            .Where(entry => entry.Key >= PvrRegisterBase && entry.Key < PvrRegisterLimit)
+            .OrderBy(entry => entry.Key)
+            .Select(entry =>
+            {
+                var offset = entry.Key - PvrRegisterBase;
+                return new DreamcastPvrRegisterValue(
+                    offset,
+                    $"0x{offset:X4}",
+                    PvrRegisterName(offset),
+                    entry.Value,
+                    $"0x{entry.Value:X8}");
+            })
+            .ToArray();
 
     private static bool IsP4Address(uint address) => address >= P4Base;
 

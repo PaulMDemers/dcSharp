@@ -80,6 +80,10 @@ public class DreamcastFixtureRunnerTests
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
+            },
+            PvrRegisters =
+            {
+                ["PVR_FB_CFG_1"] = "0x00800005"
             }
         };
         var summary = CreateSummary(
@@ -91,7 +95,8 @@ public class DreamcastFixtureRunnerTests
             tmuDeviceAccesses: 3,
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
-            mapleGetConditionTransfers: 5);
+            mapleGetConditionTransfers: 5,
+            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")]);
 
         var failures = DreamcastFixtureRunner.Validate(fixture, summary);
 
@@ -115,6 +120,11 @@ public class DreamcastFixtureRunnerTests
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
+            },
+            PvrRegisters =
+            {
+                ["PVR_FB_CFG_1"] = "0x00800005",
+                ["PVR_FB_SIZE"] = "0x00177D3F"
             }
         };
         var summary = CreateSummary(
@@ -126,7 +136,8 @@ public class DreamcastFixtureRunnerTests
             tmuDeviceAccesses: 2,
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
-            mapleGetConditionTransfers: 5);
+            mapleGetConditionTransfers: 5,
+            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")]);
 
         var failures = DreamcastFixtureRunner.Validate(fixture, summary);
 
@@ -139,6 +150,8 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
+        Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
+        Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
     }
 
     private static DreamcastRunSummary CreateSummary(
@@ -150,7 +163,8 @@ public class DreamcastFixtureRunnerTests
         int tmuDeviceAccesses = 0,
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
-        int mapleGetConditionTransfers = 0) =>
+        int mapleGetConditionTransfers = 0,
+        IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null) =>
         new(
             DreamcastStopReason.ProgramExit,
             string.Empty,
@@ -175,7 +189,7 @@ public class DreamcastFixtureRunnerTests
             string.Empty,
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
-            new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], 0, [], 0, [], []),
+            new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", 0, [], [], 0),
             new DreamcastMapleSummary(mapleTransfers, mapleDeviceInfoTransfers, mapleGetConditionTransfers, []),
             new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, controllerScriptChanges));

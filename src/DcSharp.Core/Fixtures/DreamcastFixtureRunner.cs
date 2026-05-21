@@ -147,6 +147,22 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var (registerName, expectedValueText) in fixture.PvrRegisters)
+        {
+            var register = summary.Video.PvrRegisters.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
+            if (register is null)
+            {
+                failures.Add($"missing PVR register: {registerName}");
+                continue;
+            }
+
+            var expectedValue = ParseHex32(expectedValueText, registerName);
+            if (register.Value != expectedValue)
+            {
+                failures.Add($"PVR register {registerName} expected 0x{expectedValue:X8}, got {register.ValueHex}");
+            }
+        }
+
         foreach (var expected in fixture.VideoSamples)
         {
             var sample = summary.Video.Samples.SingleOrDefault(sample => string.Equals(sample.Name, expected.Name, StringComparison.Ordinal));
@@ -172,6 +188,17 @@ public static class DreamcastFixtureRunner
         if (!ushort.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsed))
         {
             throw new InvalidDataException($"Video sample '{sampleName}' has invalid RGB565 value '{text}'.");
+        }
+
+        return parsed;
+    }
+
+    private static uint ParseHex32(string text, string registerName)
+    {
+        var value = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
+        if (!uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsed))
+        {
+            throw new InvalidDataException($"PVR register '{registerName}' has invalid value '{text}'.");
         }
 
         return parsed;

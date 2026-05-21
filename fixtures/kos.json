@@ -211,6 +211,12 @@
       ],
       "requireVideoNonZero": true,
       "minPvrRegisterAccesses": 10,
+      "pvrRegisters": {
+        "PVR_FB_CFG_1": "0x00800005",
+        "PVR_FB_SIZE": "0x00177D3F",
+        "PVR_BITMAP_X": "0x000000AC",
+        "PVR_BITMAP_Y": "0x00280028"
+      },
       "videoSamples": [
         {
           "name": "origin",
