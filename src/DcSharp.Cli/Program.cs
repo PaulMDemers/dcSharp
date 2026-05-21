@@ -203,6 +203,7 @@ static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions o
 static int RunFixtures(string manifestPath, string[] args)
 {
     var emitJson = false;
+    var validateOnly = false;
     string? artifactDirectoryOverride = null;
     string? reportJsonPath = null;
     for (var index = 0; index < args.Length; index++)
@@ -212,6 +213,9 @@ static int RunFixtures(string manifestPath, string[] args)
             case "--json":
             case "--summary-json":
                 emitJson = true;
+                break;
+            case "--validate-only":
+                validateOnly = true;
                 break;
             case "--artifacts" when index + 1 < args.Length:
                 artifactDirectoryOverride = args[index + 1];
@@ -230,6 +234,36 @@ static int RunFixtures(string manifestPath, string[] args)
     using var stream = File.OpenRead(manifestPath);
     var manifest = DreamcastFixtureManifest.Read(stream);
     var artifactDirectory = ResolveRepoPath(repoRoot, artifactDirectoryOverride ?? manifest.ArtifactDirectory);
+    if (validateOnly)
+    {
+        var validationReport = new FixtureManifestValidationReport(
+            Path.GetFullPath(manifestPath),
+            artifactDirectory,
+            manifest.Fixtures.Count,
+            manifest.Fixtures.Select(fixture => fixture.Name).ToArray());
+        var validationJson = SerializeJson(validationReport);
+        if (reportJsonPath is not null)
+        {
+            WriteTextFile(reportJsonPath, validationJson);
+        }
+
+        if (emitJson)
+        {
+            Console.WriteLine(validationJson);
+        }
+        else
+        {
+            Console.WriteLine($"Manifest OK: {validationReport.FixtureCount} fixtures");
+            Console.WriteLine($"Artifacts: {validationReport.ArtifactDirectory}");
+            if (reportJsonPath is not null)
+            {
+                Console.WriteLine($"Report JSON: {Path.GetFullPath(reportJsonPath)}");
+            }
+        }
+
+        return 0;
+    }
+
     var results = new List<DreamcastFixtureCheckResult>();
 
     foreach (var fixture in manifest.Fixtures)
@@ -601,7 +635,7 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
-    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--report-json path] [--json]");
+    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller map entry: --controller b0:b,ltrig=7");
@@ -688,3 +722,9 @@ internal sealed record FixtureReport(
             result.Summary?.Scheduler.ControllerScriptChanges,
             result.Failures);
 }
+
+internal sealed record FixtureManifestValidationReport(
+    string ManifestPath,
+    string ArtifactDirectory,
+    int FixtureCount,
+    IReadOnlyList<string> FixtureNames);

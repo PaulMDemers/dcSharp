@@ -61,6 +61,7 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer.elf --in
 Manifest regression run:
 
 ```bash
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --validate-only
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 ```
@@ -80,6 +81,7 @@ Useful run options:
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
+- `fixtures --validate-only` parses and validates a fixture manifest without requiring built ELF artifacts.
 - `fixtures --report-json artifacts/reports/kos-fixtures.json` writes a structured fixture report while keeping the text summary on stdout.
 
 The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, and `minMapleGetConditionTransfers`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
