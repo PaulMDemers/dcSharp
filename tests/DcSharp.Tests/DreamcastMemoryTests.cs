@@ -229,6 +229,28 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AsicSnapshotReportsEventRegistersAndPendingIrq()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6920, 1u << 12);
+        memory.RaiseVBlankBegin();
+
+        var snapshot = memory.CreateAsicSnapshot();
+
+        Assert.Equal(0x0320u, snapshot.PendingEventCode);
+        Assert.Equal("0x0320", snapshot.PendingEventCodeHex);
+        Assert.Equal(9, snapshot.PendingLevel);
+        var registerA = Assert.Single(snapshot.EventRegisters, register => register.Name == "A");
+        Assert.Equal(1u << 3, registerA.Ack);
+        Assert.Equal(1u << 3, registerA.Irq9Mask);
+        Assert.Equal(1u << 12, registerA.IrqBMask);
+        Assert.Equal(1u << 3, registerA.PendingIrq9);
+        Assert.Equal(0u, registerA.PendingIrqB);
+    }
+
+    [Fact]
     public void MapleDmaDevInfoWritesControllerResponseAndRaisesEvent()
     {
         var memory = new DreamcastMemory();

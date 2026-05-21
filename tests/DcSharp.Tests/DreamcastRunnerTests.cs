@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
@@ -71,6 +72,7 @@ public class DreamcastRunnerTests
         Assert.Contains(summary.DeviceAccessKinds, kind => kind.Kind == MemoryAccessKind.Write && kind.Count == result.DeviceAccesses.Count);
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
+        Assert.Equal(result.Asic.PendingEventCodeHex, summary.Asic.PendingEventCodeHex);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
         Assert.Equal(result.Scheduler.VBlankEventsRaised, summary.Scheduler.VBlankEventsRaised);
         Assert.Equal(result.Scheduler.HardwareAdvanceTicks, summary.Scheduler.HardwareAdvanceTicks);
@@ -95,6 +97,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            new DreamcastAsicSnapshot([], null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], []),
             new DreamcastMapleSnapshot([]),

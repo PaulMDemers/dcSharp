@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast;
+using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
@@ -489,6 +490,47 @@ public sealed class DreamcastMemory
     public DreamcastMapleSnapshot CreateMapleSnapshot() =>
         new(mapleTransfers.ToArray());
 
+    public DreamcastAsicSnapshot CreateAsicSnapshot()
+    {
+        var registers = Enumerable.Range(0, 3)
+            .Select(index =>
+            {
+                var offset = (uint)index * 4u;
+                var ack = externalRegisters.GetValueOrDefault(AsicAckA + offset);
+                var irq9 = externalRegisters.GetValueOrDefault(AsicIrq9A + offset);
+                var irqB = externalRegisters.GetValueOrDefault(AsicIrqBA + offset);
+                var irqD = externalRegisters.GetValueOrDefault(AsicIrqDA + offset);
+                var pendingIrq9 = ack & irq9;
+                var pendingIrqB = ack & irqB;
+                var pendingIrqD = ack & irqD;
+                return new DreamcastAsicEventRegisterSnapshot(
+                    index,
+                    AsicEventRegisterName(index),
+                    ack,
+                    $"0x{ack:X8}",
+                    irq9,
+                    $"0x{irq9:X8}",
+                    irqB,
+                    $"0x{irqB:X8}",
+                    irqD,
+                    $"0x{irqD:X8}",
+                    pendingIrq9,
+                    $"0x{pendingIrq9:X8}",
+                    pendingIrqB,
+                    $"0x{pendingIrqB:X8}",
+                    pendingIrqD,
+                    $"0x{pendingIrqD:X8}");
+            })
+            .ToArray();
+
+        var hasPending = TryGetPendingAsicInterrupt(out var eventCode, out var level);
+        return new DreamcastAsicSnapshot(
+            registers,
+            hasPending ? eventCode : null,
+            hasPending ? $"0x{eventCode:X4}" : null,
+            hasPending ? level : null);
+    }
+
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
     {
         (string Name, uint Offset)[] offsets =
@@ -571,26 +613,40 @@ public sealed class DreamcastMemory
             return true;
         }
 
-        var pendingA = externalRegisters.GetValueOrDefault(AsicAckA);
-        if (pendingA != 0 && (pendingA & externalRegisters.GetValueOrDefault(AsicIrqDA)) != 0)
-        {
-            eventCode = 0x03A0;
-            level = 13;
-            return true;
-        }
+        return TryGetPendingAsicInterrupt(out eventCode, out level);
+    }
 
-        if (pendingA != 0 && (pendingA & externalRegisters.GetValueOrDefault(AsicIrqBA)) != 0)
+    private bool TryGetPendingAsicInterrupt(out uint eventCode, out int level)
+    {
+        for (var index = 0u; index < 3; index++)
         {
-            eventCode = 0x0360;
-            level = 11;
-            return true;
-        }
+            var offset = index * 4u;
+            var pending = externalRegisters.GetValueOrDefault(AsicAckA + offset);
+            if (pending == 0)
+            {
+                continue;
+            }
 
-        if (pendingA != 0 && (pendingA & externalRegisters.GetValueOrDefault(AsicIrq9A)) != 0)
-        {
-            eventCode = 0x0320;
-            level = 9;
-            return true;
+            if ((pending & externalRegisters.GetValueOrDefault(AsicIrqDA + offset)) != 0)
+            {
+                eventCode = 0x03A0;
+                level = 13;
+                return true;
+            }
+
+            if ((pending & externalRegisters.GetValueOrDefault(AsicIrqBA + offset)) != 0)
+            {
+                eventCode = 0x0360;
+                level = 11;
+                return true;
+            }
+
+            if ((pending & externalRegisters.GetValueOrDefault(AsicIrq9A + offset)) != 0)
+            {
+                eventCode = 0x0320;
+                level = 9;
+                return true;
+            }
         }
 
         eventCode = 0;
@@ -726,6 +782,14 @@ public sealed class DreamcastMemory
         var address = AsicAckA + (eventRegister * 4);
         externalRegisters[address] = externalRegisters.GetValueOrDefault(address) | (1u << eventBit);
     }
+
+    private static string AsicEventRegisterName(int index) => index switch
+    {
+        0 => "A",
+        1 => "B",
+        2 => "C",
+        _ => $"#{index}"
+    };
 
     private void CompleteMapleDma()
     {

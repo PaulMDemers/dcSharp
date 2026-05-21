@@ -1,4 +1,5 @@
 using DcSharp.Core.Cpu;
+using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
@@ -32,6 +33,7 @@ public sealed record DreamcastRunSummary(
     string SerialText,
     IReadOnlyList<DreamcastTraceSummary> TraceTail,
     DreamcastControllerSummary ControllerA,
+    DreamcastAsicSummary Asic,
     DreamcastVideoSummary Video,
     DreamcastAudioSummary Audio,
     DreamcastMapleSummary Maple,
@@ -81,6 +83,7 @@ public sealed record DreamcastRunSummary(
             Encoding.ASCII.GetString(result.SerialOutput.ToArray()),
             result.TraceTail.Select(step => DreamcastTraceSummary.FromStep(step, result.Load.FindNearestSymbol(step.Pc))).ToArray(),
             DreamcastControllerSummary.FromState(controllerA),
+            DreamcastAsicSummary.FromSnapshot(result.Asic),
             DreamcastVideoSummary.FromSnapshot(result.Video),
             DreamcastAudioSummary.FromSnapshot(result.Audio),
             DreamcastMapleSummary.FromSnapshot(result.Maple),
@@ -215,6 +218,58 @@ public sealed record DreamcastControllerSummary(
             state.JoyY,
             state.Joy2X,
             state.Joy2Y);
+}
+
+public sealed record DreamcastAsicSummary(
+    IReadOnlyList<DreamcastAsicEventRegisterSummary> EventRegisters,
+    uint? PendingEventCode,
+    string? PendingEventCodeHex,
+    int? PendingLevel)
+{
+    public static DreamcastAsicSummary FromSnapshot(DreamcastAsicSnapshot snapshot) =>
+        new(
+            snapshot.EventRegisters.Select(DreamcastAsicEventRegisterSummary.FromRegister).ToArray(),
+            snapshot.PendingEventCode,
+            snapshot.PendingEventCodeHex,
+            snapshot.PendingLevel);
+}
+
+public sealed record DreamcastAsicEventRegisterSummary(
+    int Index,
+    string Name,
+    uint Ack,
+    string AckHex,
+    uint Irq9Mask,
+    string Irq9MaskHex,
+    uint IrqBMask,
+    string IrqBMaskHex,
+    uint IrqDMask,
+    string IrqDMaskHex,
+    uint PendingIrq9,
+    string PendingIrq9Hex,
+    uint PendingIrqB,
+    string PendingIrqBHex,
+    uint PendingIrqD,
+    string PendingIrqDHex)
+{
+    public static DreamcastAsicEventRegisterSummary FromRegister(DreamcastAsicEventRegisterSnapshot register) =>
+        new(
+            register.Index,
+            register.Name,
+            register.Ack,
+            register.AckHex,
+            register.Irq9Mask,
+            register.Irq9MaskHex,
+            register.IrqBMask,
+            register.IrqBMaskHex,
+            register.IrqDMask,
+            register.IrqDMaskHex,
+            register.PendingIrq9,
+            register.PendingIrq9Hex,
+            register.PendingIrqB,
+            register.PendingIrqBHex,
+            register.PendingIrqD,
+            register.PendingIrqDHex);
 }
 
 public sealed record DreamcastVideoSummary(
