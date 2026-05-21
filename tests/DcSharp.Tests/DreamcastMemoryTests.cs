@@ -273,6 +273,48 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AsicEventBanksReportAndClearIndependently()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_6924, 1u << 5);
+        memory.WriteUInt32(0xA05F_6938, 1u << 7);
+        memory.RaiseAsicEventForDiagnostics(0x0105);
+        memory.RaiseAsicEventForDiagnostics(0x0207);
+
+        var snapshot = memory.CreateAsicSnapshot();
+
+        Assert.Equal("IRQB", snapshot.PendingInterrupt?.LevelName);
+        Assert.Equal("B", snapshot.PendingInterrupt?.RegisterName);
+        Assert.Equal(5, snapshot.PendingInterrupt?.Bit);
+        Assert.Equal(0x0360u, snapshot.PendingEventCode);
+        var registerA = Assert.Single(snapshot.EventRegisters, register => register.Name == "A");
+        var registerB = Assert.Single(snapshot.EventRegisters, register => register.Name == "B");
+        var registerC = Assert.Single(snapshot.EventRegisters, register => register.Name == "C");
+        Assert.Equal(0u, registerA.Ack);
+        Assert.Equal(1u << 5, registerB.Ack);
+        Assert.Equal(1u << 5, registerB.PendingIrqB);
+        Assert.Equal(1u << 7, registerC.Ack);
+        Assert.Equal(1u << 7, registerC.PendingIrq9);
+
+        memory.WriteUInt32(0xA05F_6904, 1u << 5);
+        snapshot = memory.CreateAsicSnapshot();
+
+        Assert.Equal("IRQ9", snapshot.PendingInterrupt?.LevelName);
+        Assert.Equal("C", snapshot.PendingInterrupt?.RegisterName);
+        Assert.Equal(7, snapshot.PendingInterrupt?.Bit);
+        registerB = Assert.Single(snapshot.EventRegisters, register => register.Name == "B");
+        registerC = Assert.Single(snapshot.EventRegisters, register => register.Name == "C");
+        Assert.Equal(0u, registerB.Ack);
+        Assert.Equal(1u << 7, registerC.Ack);
+
+        memory.WriteUInt32(0xA05F_6908, 1u << 7);
+
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+        Assert.Null(memory.CreateAsicSnapshot().PendingInterrupt);
+    }
+
+    [Fact]
     public void ExternalInterruptPriorityPrefersHigherOfTimerAndAsic()
     {
         var memory = new DreamcastMemory();

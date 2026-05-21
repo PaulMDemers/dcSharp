@@ -605,6 +605,8 @@ public sealed class DreamcastMemory
 
     public void RaiseVBlankBegin() => RaiseAsicEvent(AsicEventPvrVBlankBegin);
 
+    internal void RaiseAsicEventForDiagnostics(ushort code) => RaiseAsicEvent(code);
+
     public bool IsVBlankBeginInterruptEnabled() =>
         (externalRegisters.GetValueOrDefault(AsicIrq9A) & (1u << AsicEventPvrVBlankBegin)) != 0;
 
@@ -775,7 +777,7 @@ public sealed class DreamcastMemory
         var existing = externalRegisters.GetValueOrDefault(aligned);
         var stored = (existing & ~mask) | ((value << shift) & mask);
 
-        if (aligned is AsicAckA or AsicAckA + 4 or AsicAckA + 8 && data.Length == 4)
+        if ((aligned is AsicAckA or AsicAckA + 4 or AsicAckA + 8) && data.Length == 4)
         {
             stored = existing & ~value;
         }

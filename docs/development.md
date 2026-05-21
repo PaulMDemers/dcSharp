@@ -98,7 +98,7 @@ Run summaries also include scheduler diagnostics for synthetic VBlank events, ha
 
 Structured run summaries include aggregate device-access counts by domain and access kind, plus recent device accesses. Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 
-ASIC summaries include current event ACK registers, IRQ9/IRQB/IRQD masks, per-level pending masks, and the currently deliverable ASIC interrupt event/level/source bit.
+ASIC summaries include current event ACK registers, IRQ9/IRQB/IRQD masks, per-level pending masks, and the currently deliverable ASIC interrupt event/level/source bit. Unit tests cover A/B/C event-bank source decoding and independent ACK clearing.
 
 PVR summaries include current named register values plus recent register accesses. PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
 
