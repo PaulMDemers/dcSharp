@@ -137,6 +137,12 @@ Or run the same fast local check plus the full CLI fixture manifest:
 .\tools\check.ps1 -KosFixtures
 ```
 
+Use `-FixtureFilter <name>` with `-KosFixtures` to run only matching CLI fixtures after the fast checks:
+
+```powershell
+.\tools\check.ps1 -KosFixtures -FixtureFilter input_idle
+```
+
 The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`. The test suite and CLI runner both read `fixtures/kos.json`.
 
 ## Current Fixture Expectations

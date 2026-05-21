@@ -1,5 +1,6 @@
 param(
-    [switch]$KosFixtures
+    [switch]$KosFixtures,
+    [string]$FixtureFilter
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,7 +14,12 @@ try {
     dotnet test dcSharp.slnx
 
     if ($KosFixtures) {
-        dotnet run --project src\DcSharp.Cli -- fixtures fixtures\kos.json
+        $fixtureArgs = @('run', '--project', 'src\DcSharp.Cli', '--', 'fixtures', 'fixtures\kos.json')
+        if (-not [string]::IsNullOrWhiteSpace($FixtureFilter)) {
+            $fixtureArgs += @('--filter', $FixtureFilter)
+        }
+
+        dotnet @fixtureArgs
     }
 }
 finally {
