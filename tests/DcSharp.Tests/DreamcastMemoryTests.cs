@@ -242,12 +242,59 @@ public class DreamcastMemoryTests
         Assert.Equal(0x0320u, snapshot.PendingEventCode);
         Assert.Equal("0x0320", snapshot.PendingEventCodeHex);
         Assert.Equal(9, snapshot.PendingLevel);
+        Assert.NotNull(snapshot.PendingInterrupt);
+        Assert.Equal("IRQ9", snapshot.PendingInterrupt.LevelName);
+        Assert.Equal(0, snapshot.PendingInterrupt.RegisterIndex);
+        Assert.Equal("A", snapshot.PendingInterrupt.RegisterName);
+        Assert.Equal(3, snapshot.PendingInterrupt.Bit);
+        Assert.Equal("0x00000008", snapshot.PendingInterrupt.BitMaskHex);
         var registerA = Assert.Single(snapshot.EventRegisters, register => register.Name == "A");
         Assert.Equal(1u << 3, registerA.Ack);
         Assert.Equal(1u << 3, registerA.Irq9Mask);
         Assert.Equal(1u << 12, registerA.IrqBMask);
         Assert.Equal(1u << 3, registerA.PendingIrq9);
         Assert.Equal(0u, registerA.PendingIrqB);
+    }
+
+    [Fact]
+    public void AsicInterruptPriorityPrefersIrqDThenIrqBThenIrq9()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6920, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x03A0u, eventCode);
+        Assert.Equal(13, level);
+        Assert.Equal("IRQD", memory.CreateAsicSnapshot().PendingInterrupt?.LevelName);
+    }
+
+    [Fact]
+    public void ExternalInterruptPriorityPrefersHigherOfTimerAndAsic()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+        memory.WriteUInt16(0xFFD0_0004, 8 << 12);
+        memory.WriteUInt32(0xFFD8_0008, 1);
+        memory.WriteUInt32(0xFFD8_000C, 1);
+        memory.WriteUInt16(0xFFD8_0010, 0x0020);
+        memory.Write(0xFFD8_0004, [0x01]);
+
+        memory.AdvanceHardware(2);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+
+        memory.WriteUInt16(0xFFD0_0004, 15 << 12);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out eventCode, out level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(15, level);
     }
 
     [Fact]

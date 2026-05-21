@@ -4,7 +4,19 @@ public sealed record DreamcastAsicSnapshot(
     IReadOnlyList<DreamcastAsicEventRegisterSnapshot> EventRegisters,
     uint? PendingEventCode,
     string? PendingEventCodeHex,
-    int? PendingLevel);
+    int? PendingLevel,
+    DreamcastAsicPendingInterruptSnapshot? PendingInterrupt);
+
+public sealed record DreamcastAsicPendingInterruptSnapshot(
+    uint EventCode,
+    string EventCodeHex,
+    int Level,
+    string LevelName,
+    int RegisterIndex,
+    string RegisterName,
+    int Bit,
+    uint BitMask,
+    string BitMaskHex);
 
 public sealed record DreamcastAsicEventRegisterSnapshot(
     int Index,

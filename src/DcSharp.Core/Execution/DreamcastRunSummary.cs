@@ -224,14 +224,40 @@ public sealed record DreamcastAsicSummary(
     IReadOnlyList<DreamcastAsicEventRegisterSummary> EventRegisters,
     uint? PendingEventCode,
     string? PendingEventCodeHex,
-    int? PendingLevel)
+    int? PendingLevel,
+    DreamcastAsicPendingInterruptSummary? PendingInterrupt)
 {
     public static DreamcastAsicSummary FromSnapshot(DreamcastAsicSnapshot snapshot) =>
         new(
             snapshot.EventRegisters.Select(DreamcastAsicEventRegisterSummary.FromRegister).ToArray(),
             snapshot.PendingEventCode,
             snapshot.PendingEventCodeHex,
-            snapshot.PendingLevel);
+            snapshot.PendingLevel,
+            snapshot.PendingInterrupt is { } pending ? DreamcastAsicPendingInterruptSummary.FromInterrupt(pending) : null);
+}
+
+public sealed record DreamcastAsicPendingInterruptSummary(
+    uint EventCode,
+    string EventCodeHex,
+    int Level,
+    string LevelName,
+    int RegisterIndex,
+    string RegisterName,
+    int Bit,
+    uint BitMask,
+    string BitMaskHex)
+{
+    public static DreamcastAsicPendingInterruptSummary FromInterrupt(DreamcastAsicPendingInterruptSnapshot interrupt) =>
+        new(
+            interrupt.EventCode,
+            interrupt.EventCodeHex,
+            interrupt.Level,
+            interrupt.LevelName,
+            interrupt.RegisterIndex,
+            interrupt.RegisterName,
+            interrupt.Bit,
+            interrupt.BitMask,
+            interrupt.BitMaskHex);
 }
 
 public sealed record DreamcastAsicEventRegisterSummary(

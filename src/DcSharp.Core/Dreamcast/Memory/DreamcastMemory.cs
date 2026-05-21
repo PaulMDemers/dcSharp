@@ -3,6 +3,7 @@ using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
+using System.Numerics;
 using System.Text;
 
 namespace DcSharp.Core.Dreamcast.Memory;
@@ -523,12 +524,13 @@ public sealed class DreamcastMemory
             })
             .ToArray();
 
-        var hasPending = TryGetPendingAsicInterrupt(out var eventCode, out var level);
+        var pendingInterrupt = TryGetPendingAsicInterrupt(out var pending) ? pending : null;
         return new DreamcastAsicSnapshot(
             registers,
-            hasPending ? eventCode : null,
-            hasPending ? $"0x{eventCode:X4}" : null,
-            hasPending ? level : null);
+            pendingInterrupt?.EventCode,
+            pendingInterrupt?.EventCodeHex,
+            pendingInterrupt?.Level,
+            pendingInterrupt);
     }
 
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
@@ -608,49 +610,67 @@ public sealed class DreamcastMemory
 
     public bool TryGetPendingExternalInterrupt(out uint eventCode, out int level)
     {
-        if (TryGetPendingTimerInterrupt(out eventCode, out level))
+        var hasTimer = TryGetPendingTimerInterrupt(out var timerEventCode, out var timerLevel);
+        var hasAsic = TryGetPendingAsicInterrupt(out var asicPending);
+        if (hasTimer && (!hasAsic || timerLevel >= asicPending.Level))
+        {
+            eventCode = timerEventCode;
+            level = timerLevel;
+            return true;
+        }
+
+        if (hasAsic)
+        {
+            eventCode = asicPending.EventCode;
+            level = asicPending.Level;
+            return true;
+        }
+
+        eventCode = 0;
+        level = 0;
+        return false;
+    }
+
+    private bool TryGetPendingAsicInterrupt(out DreamcastAsicPendingInterruptSnapshot pendingInterrupt)
+    {
+        if (TryGetPendingAsicInterruptAtLevel(AsicIrqDA, 0x03A0, 13, "IRQD", out pendingInterrupt)
+            || TryGetPendingAsicInterruptAtLevel(AsicIrqBA, 0x0360, 11, "IRQB", out pendingInterrupt)
+            || TryGetPendingAsicInterruptAtLevel(AsicIrq9A, 0x0320, 9, "IRQ9", out pendingInterrupt))
         {
             return true;
         }
 
-        return TryGetPendingAsicInterrupt(out eventCode, out level);
+        pendingInterrupt = null!;
+        return false;
     }
 
-    private bool TryGetPendingAsicInterrupt(out uint eventCode, out int level)
+    private bool TryGetPendingAsicInterruptAtLevel(uint maskBase, uint eventCode, int level, string levelName, out DreamcastAsicPendingInterruptSnapshot pendingInterrupt)
     {
         for (var index = 0u; index < 3; index++)
         {
             var offset = index * 4u;
-            var pending = externalRegisters.GetValueOrDefault(AsicAckA + offset);
+            var pending = externalRegisters.GetValueOrDefault(AsicAckA + offset) & externalRegisters.GetValueOrDefault(maskBase + offset);
             if (pending == 0)
             {
                 continue;
             }
 
-            if ((pending & externalRegisters.GetValueOrDefault(AsicIrqDA + offset)) != 0)
-            {
-                eventCode = 0x03A0;
-                level = 13;
-                return true;
-            }
-
-            if ((pending & externalRegisters.GetValueOrDefault(AsicIrqBA + offset)) != 0)
-            {
-                eventCode = 0x0360;
-                level = 11;
-                return true;
-            }
-
-            if ((pending & externalRegisters.GetValueOrDefault(AsicIrq9A + offset)) != 0)
-            {
-                eventCode = 0x0320;
-                level = 9;
-                return true;
-            }
+            var bit = BitOperations.TrailingZeroCount(pending);
+            var bitMask = 1u << bit;
+            pendingInterrupt = new DreamcastAsicPendingInterruptSnapshot(
+                eventCode,
+                $"0x{eventCode:X4}",
+                level,
+                levelName,
+                (int)index,
+                AsicEventRegisterName((int)index),
+                bit,
+                bitMask,
+                $"0x{bitMask:X8}");
+            return true;
         }
 
-        eventCode = 0;
-        level = 0;
+        pendingInterrupt = null!;
         return false;
     }
 

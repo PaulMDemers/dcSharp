@@ -140,7 +140,10 @@ static void RunElf(string path, string[] args)
 
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
-    Console.WriteLine($"ASIC: pending={result.Asic.PendingEventCodeHex ?? "none"}, level={result.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}");
+    var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
+        ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
+        : string.Empty;
+    Console.WriteLine($"ASIC: pending={result.Asic.PendingEventCodeHex ?? "none"}, level={result.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}{asicSource}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 

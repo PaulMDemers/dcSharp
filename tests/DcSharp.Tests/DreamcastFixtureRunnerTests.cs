@@ -273,7 +273,7 @@ public class DreamcastFixtureRunnerTests
             string.Empty,
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
-            asic ?? new DreamcastAsicSummary([], null, null, null),
+            asic ?? new DreamcastAsicSummary([], null, null, null, null),
             new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(mapleTransfers, mapleDeviceInfoTransfers, mapleGetConditionTransfers, []),
@@ -306,7 +306,10 @@ public class DreamcastFixtureRunnerTests
             ],
             pendingEventCode,
             pendingEventCode is { } code ? $"0x{code:X4}" : null,
-            pendingLevel);
+            pendingLevel,
+            pendingEventCode is { } sourceCode && pendingLevel is { } sourceLevel
+                ? new DreamcastAsicPendingInterruptSummary(sourceCode, $"0x{sourceCode:X4}", sourceLevel, "IRQ9", 0, "A", 3, 0x00000008, "0x00000008")
+                : null);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(
         int channel = 0,
