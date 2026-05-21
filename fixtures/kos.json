@@ -157,6 +157,36 @@
       }
     },
     {
+      "name": "input_idle",
+      "sample": "samples/kos/input_idle",
+      "artifact": "dcsharp_input_idle.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "controllerScripts": {
+        "a0": "0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+      },
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp input idle probe start",
+        "dcSharp input idle probe first: buttons=0x00000000 joy=(0,0) triggers=(0,0)",
+        "dcSharp input idle probe second: buttons=0x0000000c joy=(-12,13) triggers=(40,80)"
+      ],
+      "minIdleAdvanceTicks": 3000000,
+      "minIdleAdvanceBatches": 1,
+      "maxIdleAdvanceBatch": 200000,
+      "minIdleInputWakes": 1,
+      "minControllerScriptChanges": 1,
+      "minMapleTransfers": 40,
+      "minMapleDeviceInfoTransfers": 20,
+      "minMapleGetConditionTransfers": 18,
+      "minMapleDmaBatches": 20,
+      "requireNoMapleDescriptorLimitHits": true,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "maple_controller_b_absent",
       "sample": "samples/kos/maple_controller_b",
       "artifact": "dcsharp_maple_controller_b.elf",
