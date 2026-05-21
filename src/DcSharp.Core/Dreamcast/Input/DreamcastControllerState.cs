@@ -39,6 +39,22 @@ public sealed record DreamcastControllerScript(IReadOnlyList<DreamcastController
 
         return state;
     }
+
+    public ulong? NextFrameInstructionAfter(ulong instruction)
+    {
+        ulong? next = null;
+        foreach (var frame in Frames)
+        {
+            if (frame.FromInstruction <= instruction)
+            {
+                continue;
+            }
+
+            next = next is { } existing ? Math.Min(existing, frame.FromInstruction) : frame.FromInstruction;
+        }
+
+        return next;
+    }
 }
 
 public sealed record DreamcastControllerScriptFrame(ulong FromInstruction, DreamcastControllerState State);

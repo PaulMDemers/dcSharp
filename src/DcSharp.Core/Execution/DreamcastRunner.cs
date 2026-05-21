@@ -34,7 +34,7 @@ public sealed class DreamcastRunner
                 var step = cpu.Step();
                 if (step.Trace == "sleep" || IsSideEffectFreeIdleLoop(step, memory))
                 {
-                    scheduler.AdvanceAfterSleep();
+                    scheduler.AdvanceAfterIdle();
                 }
                 else if (options.TraceCapture is null)
                 {
@@ -108,8 +108,35 @@ public sealed class DreamcastRunner
             return memory.ReadInstructionUInt16(step.Pc + 2) == 0x0009;
         }
 
-        return step.Opcode is 0x89FE or 0x8BFE
-            && step.Trace.EndsWith($"0x{step.Pc:X8} ; taken", StringComparison.Ordinal);
+        if ((step.Opcode & 0xFF00) is 0x8900 or 0x8B00
+            && step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            && TryGetImmediateBranchTarget(step, out var target)
+            && target <= step.Pc)
+        {
+            for (var pc = target; pc < step.Pc; pc += 2)
+            {
+                if (memory.ReadInstructionUInt16(pc) != 0x0009)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetImmediateBranchTarget(Sh4StepResult step, out uint target)
+    {
+        target = 0;
+        if ((step.Opcode & 0xFF00) is not (0x8900 or 0x8B00))
+        {
+            return false;
+        }
+
+        target = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        return true;
     }
 }
 

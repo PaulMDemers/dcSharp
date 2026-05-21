@@ -42,8 +42,9 @@ public sealed record DreamcastRunSummary(
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var controllerA = ControllerScriptFromMap(options, 0x20)?.StateAt(result.Cpu.InstructionsExecuted)
-            ?? options?.ControllerAScript?.StateAt(result.Cpu.InstructionsExecuted)
+        var controllerInstruction = Math.Max(result.Cpu.InstructionsExecuted, result.Scheduler.HardwareAdvanceTicks);
+        var controllerA = ControllerScriptFromMap(options, 0x20)?.StateAt(controllerInstruction)
+            ?? options?.ControllerAScript?.StateAt(controllerInstruction)
             ?? ControllerFromMap(options, 0x20)
             ?? options?.ControllerA
             ?? DreamcastControllerState.Neutral;

@@ -53,22 +53,30 @@ public sealed class DreamcastEventScheduler
 
     public void AdvanceBeforeInstruction(ulong instructionsExecuted)
     {
-        ApplyInputScripts(instructionsExecuted);
-        RaiseDueVBlankEvents(instructionsExecuted);
+        var effectiveTicks = Math.Max(instructionsExecuted, hardwareAdvanceTicks);
+        ApplyInputScripts(effectiveTicks);
+        RaiseDueVBlankEvents(effectiveTicks);
         AdvanceHardwareThrough(instructionsExecuted);
     }
 
     public bool AdvanceAfterSleep()
     {
+        return AdvanceAfterIdle();
+    }
+
+    public bool AdvanceAfterIdle()
+    {
         var nextTimerInterrupt = memory.TicksUntilNextTimerInterrupt();
         var nextVblank = vblankInterval == 0 || !memory.IsVBlankBeginInterruptEnabled() ? null : TicksUntilNextVBlank();
-        var ticks = MinNonZero(nextTimerInterrupt, nextVblank);
+        var nextInputChange = TicksUntilNextInputScriptChange();
+        var ticks = MinNonZero(nextTimerInterrupt, nextVblank, nextInputChange);
         if (ticks is null or 0)
         {
             return false;
         }
 
         var targetTicks = SaturatingAdd(hardwareAdvanceTicks, ticks.Value);
+        ApplyInputScripts(targetTicks);
         RaiseDueVBlankEvents(targetTicks);
         AdvanceHardwareTo(targetTicks);
         return true;
@@ -118,14 +126,41 @@ public sealed class DreamcastEventScheduler
         return nextVblankInstruction - hardwareAdvanceTicks;
     }
 
-    private static ulong? MinNonZero(ulong? left, ulong? right) =>
-        (left, right) switch
+    private ulong? TicksUntilNextInputScriptChange()
+    {
+        ulong? ticks = null;
+        foreach (var script in controllerScripts.Values)
         {
-            ({ } leftValue, { } rightValue) => Math.Min(leftValue, rightValue),
-            ({ } leftValue, null) => leftValue,
-            (null, { } rightValue) => rightValue,
-            _ => null
-        };
+            var nextChange = script.NextFrameInstructionAfter(hardwareAdvanceTicks);
+            if (nextChange is null)
+            {
+                continue;
+            }
+
+            var scriptTicks = nextChange <= hardwareAdvanceTicks
+                ? 0
+                : nextChange.Value - hardwareAdvanceTicks;
+            ticks = ticks is { } existing ? Math.Min(existing, scriptTicks) : scriptTicks;
+        }
+
+        return ticks;
+    }
+
+    private static ulong? MinNonZero(params ulong?[] values)
+    {
+        ulong? min = null;
+        foreach (var value in values)
+        {
+            if (value is null)
+            {
+                continue;
+            }
+
+            min = min is { } existing ? Math.Min(existing, value.Value) : value.Value;
+        }
+
+        return min;
+    }
 
     private static ulong SaturatingAdd(ulong left, ulong right)
     {

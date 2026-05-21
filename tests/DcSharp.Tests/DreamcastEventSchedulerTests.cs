@@ -166,6 +166,33 @@ public class DreamcastEventSchedulerTests
     }
 
     [Fact]
+    public void AdvancesIdleHardwareToNextControllerScriptChange()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(
+            VBlankInterval: 0,
+            ControllerAScript: new DreamcastControllerScript(
+                new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start)))));
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.AdvanceAfterIdle());
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(5UL, snapshot.HardwareAdvanceTicks);
+        Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
+        Assert.Equal(4UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.Equal(1UL, snapshot.ControllerScriptChanges);
+        Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
+
+        scheduler.AdvanceBeforeInstruction(1);
+
+        Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
+        Assert.Equal(1UL, scheduler.CreateSnapshot().ControllerScriptChanges);
+    }
+
+    [Fact]
     public void RecordsCpuFastForwardBatches()
     {
         var memory = new DreamcastMemory();

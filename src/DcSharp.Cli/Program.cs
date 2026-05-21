@@ -117,8 +117,9 @@ static void RunElf(string path, string[] args)
         }
     }
 
-    Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, result.Cpu.InstructionsExecuted))}");
-    if (EffectiveController(options.Emulation, 0x40, result.Cpu.InstructionsExecuted) is { } controllerB)
+    var controllerInstruction = EffectiveControllerInstruction(result);
+    Console.WriteLine($"Controller A: {FormatController(EffectiveControllerA(options.Emulation, controllerInstruction))}");
+    if (EffectiveController(options.Emulation, 0x40, controllerInstruction) is { } controllerB)
     {
         Console.WriteLine($"Controller B: {FormatController(controllerB)}");
     }
@@ -631,6 +632,9 @@ static string FormatController(DreamcastControllerState state) =>
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
+
+static ulong EffectiveControllerInstruction(DreamcastRunResult result) =>
+    Math.Max(result.Cpu.InstructionsExecuted, result.Scheduler.HardwareAdvanceTicks);
 
 static DreamcastControllerState? EffectiveController(DreamcastRunOptions options, byte address, ulong instructionsExecuted) =>
     options.ControllerScripts?.GetValueOrDefault(address)?.StateAt(instructionsExecuted)

@@ -151,6 +151,40 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void SummaryUsesAdvancedSchedulerTicksForControllerScriptState()
+    {
+        var load = new ElfLoadResult(
+            EntryPoint: 0x8C01_0000,
+            TranslatedEntryPoint: 0x0C01_0000,
+            LoadedSegments: [],
+            Symbols: []);
+        var result = new DreamcastRunResult(
+            load,
+            new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
+            [],
+            [],
+            [],
+            new DreamcastAsicSnapshot([], null, null, null, null),
+            new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
+            new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], []),
+            new DreamcastMapleSnapshot([]),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 5, 1, 5, 0, 0, 0, 1),
+            DreamcastStopReason.InstructionLimit,
+            "limit",
+            null,
+            null);
+        var options = new DreamcastRunOptions(
+            ControllerAScript: new DreamcastControllerScript(
+                new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start))));
+
+        var summary = DreamcastRunSummary.FromResult(result, options);
+
+        Assert.Equal(DreamcastControllerButtons.Start, summary.ControllerA.Buttons);
+    }
+
+    [Fact]
     public void SummaryUsesMappedControllerScriptStateAtStopInstruction()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));
@@ -177,10 +211,14 @@ public class DreamcastRunnerTests
         var memory = new DreamcastMemory();
         memory.WriteUInt16(0x8C01_0000, 0xAFFE);
         memory.WriteUInt16(0x8C01_0002, 0x0009);
+        memory.WriteUInt16(0x8C01_0010, 0x0009);
+        memory.WriteUInt16(0x8C01_0012, 0x0009);
+        memory.WriteUInt16(0x8C01_0014, 0x89FC);
 
         Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0000, 0xAFFE, "bra 0x8C010000"), memory));
         Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0004, 0x89FE, "bt 0x8C010004 ; taken"), memory));
         Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0008, 0x8BFE, "bf 0x8C010008 ; taken"), memory));
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0014, 0x89FC, "bt 0x8C010010 ; taken"), memory));
         Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_000C, 0x8BFE, "bf ; not taken"), memory));
     }
 
@@ -192,6 +230,17 @@ public class DreamcastRunnerTests
         memory.WriteUInt16(0x8C01_0002, 0xE001);
 
         Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0000, 0xAFFE, "bra 0x8C010000"), memory));
+    }
+
+    [Fact]
+    public void RejectsBackwardConditionalLoopWhenBodyHasSideEffects()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt16(0x8C01_0010, 0x0009);
+        memory.WriteUInt16(0x8C01_0012, 0xE001);
+        memory.WriteUInt16(0x8C01_0014, 0x89FC);
+
+        Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0014, 0x89FC, "bt 0x8C010010 ; taken"), memory));
     }
 
     private static byte[] CreateNopElf()
