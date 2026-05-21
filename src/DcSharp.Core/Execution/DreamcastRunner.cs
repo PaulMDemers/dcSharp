@@ -115,12 +115,54 @@ public sealed class DreamcastRunner
         {
             for (var pc = target; pc < step.Pc; pc += 2)
             {
-                if (memory.ReadInstructionUInt16(pc) != 0x0009)
+                if (!IsReadOnlyIdleLoopBodyInstruction(memory.ReadInstructionUInt16(pc)))
                 {
                     return false;
                 }
             }
 
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsReadOnlyIdleLoopBodyInstruction(ushort opcode)
+    {
+        if (opcode == 0x0009)
+        {
+            return true;
+        }
+
+        var highNibble = opcode >> 12;
+        var lowNibble = opcode & 0xF;
+        if (highNibble == 0x6)
+        {
+            return lowNibble is 0x0 or 0x1 or 0x2 or 0x3 or 0xC or 0xD;
+        }
+
+        if (highNibble == 0x3)
+        {
+            return lowNibble is 0x0 or 0x2 or 0x3 or 0x6 or 0x7;
+        }
+
+        if (highNibble == 0x2)
+        {
+            return lowNibble == 0x8;
+        }
+
+        if (highNibble == 0x4)
+        {
+            return (opcode & 0x00FF) is 0x0011 or 0x0015;
+        }
+
+        if ((opcode & 0xFF00) is 0x8400 or 0x8500 or 0x8800 or 0xC800 or 0xC900)
+        {
+            return true;
+        }
+
+        if (highNibble == 0x0 && lowNibble is 0xC or 0xD or 0xE)
+        {
             return true;
         }
 

@@ -223,6 +223,23 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void DetectsReadOnlyPollingIdleLoops()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt16(0x8C01_0020, 0x6200); // mov.b @r0,r2
+        memory.WriteUInt16(0x8C01_0022, 0x622C); // extu.b r2,r2
+        memory.WriteUInt16(0x8C01_0024, 0xC802); // tst #0x02,r0
+        memory.WriteUInt16(0x8C01_0026, 0x8BFB); // bf 0x8C010020
+        memory.WriteUInt16(0x8C01_0030, 0x8401); // mov.b @(0x1,r0),r0
+        memory.WriteUInt16(0x8C01_0032, 0xC9F0); // and #0xF0,r0
+        memory.WriteUInt16(0x8C01_0034, 0x8800); // cmp/eq #0,r0
+        memory.WriteUInt16(0x8C01_0036, 0x89FB); // bt 0x8C010030
+
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0026, 0x8BFB, "bf 0x8C010020 ; taken"), memory));
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0036, 0x89FB, "bt 0x8C010030 ; taken"), memory));
+    }
+
+    [Fact]
     public void RejectsBranchToSelfWhenDelaySlotHasSideEffects()
     {
         var memory = new DreamcastMemory();
@@ -239,8 +256,12 @@ public class DreamcastRunnerTests
         memory.WriteUInt16(0x8C01_0010, 0x0009);
         memory.WriteUInt16(0x8C01_0012, 0xE001);
         memory.WriteUInt16(0x8C01_0014, 0x89FC);
+        memory.WriteUInt16(0x8C01_0020, 0x0009);
+        memory.WriteUInt16(0x8C01_0022, 0x2100);
+        memory.WriteUInt16(0x8C01_0024, 0x8BFC);
 
         Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0014, 0x89FC, "bt 0x8C010010 ; taken"), memory));
+        Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0024, 0x8BFC, "bf 0x8C010020 ; taken"), memory));
     }
 
     private static byte[] CreateNopElf()

@@ -45,7 +45,7 @@
 - Expose Maple DMA command/response diagnostics in run summaries. Done, including per-DMA descriptor traversal and descriptor-limit diagnostics.
 - Expose aggregate device-access domain and access-kind diagnostics in run summaries. Done.
 - Add fixture expectations for aggregate device-domain access counts. Done.
-- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls, SH-4 `sleep` waits, side-effect-free self-branch waits, narrow all-`nop` interruptible `bt`/`bf` waits, controller-script wake boundaries, and masked `dt`/`bf/s` counted-delay loops; broader MMIO polling-loop detection can now build on the same hardware batch path.
+- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls, SH-4 `sleep` waits, side-effect-free self-branch waits, narrow read-only interruptible `bt`/`bf` polling waits, controller-script wake boundaries, and masked `dt`/`bf/s` counted-delay loops; broader MMIO polling-loop detection can now build on the same hardware batch path.
 - Add frame/input scripts that vary Maple controller state over instruction time. Started with generic `--controller address:state` and `--controller-script address:script` mapping, compatibility A0/B0 shorthands, optional B0 controller configuration, and a raw Maple condition transition fixture.
 
 ## Milestone 5: Video And Audio Bring-Up
