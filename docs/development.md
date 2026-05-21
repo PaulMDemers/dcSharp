@@ -37,6 +37,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
+wsl -e bash tools/kos/build-sample.sh samples/kos/video_mode
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 ```
@@ -124,6 +125,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_maple_controller_script.elf`: performs two raw Maple condition reads, observes a neutral first read and scripted second read, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller_b.elf`: probes raw B0 Maple device-info and condition responses, covers absent B0 and configured B0 state, shuts down, and reports `ProgramExit`.
 - `dcsharp_framebuffer.elf`: writes a 320x240 RGB565 quadrant pattern into VRAM, exposes non-zero VRAM diagnostics, shuts down, and reports `ProgramExit`.
+- `dcsharp_video_mode.elf`: sets 640x480 RGB565 video mode, writes sentinel VRAM pixels, exposes PVR/video diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_aica_registers.elf`: writes AICA channel/global registers and sound RAM, exposes silent audio diagnostics, shuts down, and reports `ProgramExit`.
 

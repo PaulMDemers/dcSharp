@@ -19,6 +19,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/maple_controller_script`: raw Maple condition fixture that observes an instruction-indexed controller transition.
   - `samples/kos/maple_controller_b`: raw Maple fixture that probes optional B0 controller presence and state.
   - `samples/kos/framebuffer`: default KOS fixture that writes a RGB565 quadrant pattern to VRAM.
+  - `samples/kos/video_mode`: default KOS fixture that sets 640x480 RGB565 mode and writes sentinel pixels.
   - `samples/kos/pvr_registers`: default KOS fixture that writes named PVR registers and TA command apertures.
   - `samples/kos/aica_registers`: default KOS fixture that writes AICA channel/global registers and sound RAM.
 - Generated artifacts: `artifacts/` (ignored)
@@ -63,6 +64,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller "b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/video_mode
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_video_mode.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_pvr_registers.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers

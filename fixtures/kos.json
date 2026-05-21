@@ -198,6 +198,43 @@
       }
     },
     {
+      "name": "video_mode",
+      "sample": "samples/kos/video_mode",
+      "artifact": "dcsharp_video_mode.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp video mode probe",
+        "origin=0x001f",
+        "center=0xffff"
+      ],
+      "requireVideoNonZero": true,
+      "minPvrRegisterAccesses": 10,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x001F"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_2_0",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_320_240_640x480",
+          "rgb565": "0xFFFF"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "pvr_registers",
       "sample": "samples/kos/pvr_registers",
       "artifact": "dcsharp_pvr_registers.elf",
