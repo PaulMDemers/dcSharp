@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\DcSharp.Cli\DcSharp.Cli.csproj" />
     <ProjectReference Include="..\..\src\DcSharp.Core\DcSharp.Core.csproj" />
   </ItemGroup>
 

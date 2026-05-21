@@ -248,15 +248,14 @@ static int RunFixtures(string manifestPath, string[] args)
     var repoRoot = FindRepoRoot(Path.GetFullPath(manifestPath)) ?? Directory.GetCurrentDirectory();
     using var stream = File.OpenRead(manifestPath);
     var manifest = DreamcastFixtureManifest.Read(stream);
-    var fixtures = FilterFixtures(manifest.Fixtures, fixtureFilter);
+    var fixtures = CliFixtureSelection.FilterFixtures(manifest.Fixtures, fixtureFilter);
     var artifactDirectory = ResolveRepoPath(repoRoot, artifactDirectoryOverride ?? manifest.ArtifactDirectory);
     if (validateOnly)
     {
-        var validationReport = new FixtureManifestValidationReport(
+        var validationReport = CliFixtureSelection.CreateValidationReport(
             Path.GetFullPath(manifestPath),
             artifactDirectory,
-            fixtures.Count,
-            fixtures.Select(fixture => fixture.Name).ToArray());
+            fixtures);
         var validationJson = SerializeJson(validationReport);
         if (reportJsonPath is not null)
         {
@@ -334,27 +333,6 @@ static int RunFixtures(string manifestPath, string[] args)
     }
 
     return results.All(result => result.Passed) ? 0 : 1;
-}
-
-static IReadOnlyList<DreamcastFixtureDefinition> FilterFixtures(
-    IReadOnlyList<DreamcastFixtureDefinition> fixtures,
-    string? filter)
-{
-    if (string.IsNullOrWhiteSpace(filter))
-    {
-        return fixtures;
-    }
-
-    var matched = fixtures
-        .Where(fixture => fixture.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
-        .ToArray();
-
-    if (matched.Length == 0)
-    {
-        throw new InvalidDataException($"No fixtures match filter: {filter}");
-    }
-
-    return matched;
 }
 
 static string SerializeJson<T>(T value)
