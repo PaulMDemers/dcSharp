@@ -10,7 +10,12 @@
       "expectedStopReason": "FirmwareExit",
       "serialContains": [
         "dcSharp minimal KallistiOS probe"
-      ]
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "pvr": 1,
+        "scif": 1
+      }
     },
     {
       "name": "hello",
@@ -22,7 +27,13 @@
       "serialContains": [
         "dcSharp KallistiOS probe",
         "arch: exit return code 0"
-      ]
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "maple": 1,
+        "pvr": 1,
+        "scif": 1
+      }
     },
     {
       "name": "timer",
@@ -34,7 +45,11 @@
       "serialContains": [
         "dcSharp timer tick 1 elapsed",
         "dcSharp KallistiOS timer probe done"
-      ]
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1,
+        "tmu": 1
+      }
     },
     {
       "name": "timer_callback",
@@ -66,7 +81,11 @@
       ],
       "minMapleTransfers": 7,
       "minMapleDeviceInfoTransfers": 4,
-      "minMapleGetConditionTransfers": 3
+      "minMapleGetConditionTransfers": 3,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
     },
     {
       "name": "maple_controller_scripted",
@@ -81,7 +100,11 @@
       ],
       "minMapleTransfers": 7,
       "minMapleDeviceInfoTransfers": 4,
-      "minMapleGetConditionTransfers": 3
+      "minMapleGetConditionTransfers": 3,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
     },
     {
       "name": "maple_controller_script_transition",
@@ -100,7 +123,11 @@
       "minControllerScriptChanges": 1,
       "minMapleTransfers": 63,
       "minMapleDeviceInfoTransfers": 4,
-      "minMapleGetConditionTransfers": 28
+      "minMapleGetConditionTransfers": 28,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
     },
     {
       "name": "maple_controller_b_absent",
@@ -115,7 +142,11 @@
       ],
       "minMapleTransfers": 9,
       "minMapleDeviceInfoTransfers": 5,
-      "minMapleGetConditionTransfers": 4
+      "minMapleGetConditionTransfers": 4,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
     },
     {
       "name": "maple_controller_b_configured",
@@ -133,7 +164,11 @@
       ],
       "minMapleTransfers": 9,
       "minMapleDeviceInfoTransfers": 5,
-      "minMapleGetConditionTransfers": 4
+      "minMapleGetConditionTransfers": 4,
+      "minDeviceAccessDomains": {
+        "maple": 1,
+        "scif": 1
+      }
     },
     {
       "name": "framebuffer",
@@ -156,7 +191,11 @@
           "name": "pixel_160_120_320x240",
           "rgb565": "0xFFFF"
         }
-      ]
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
     },
     {
       "name": "pvr_registers",
@@ -185,7 +224,11 @@
           "kind": "YuvConverterData",
           "minCount": 1
         }
-      ]
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
     },
     {
       "name": "aica_registers",
@@ -199,7 +242,11 @@
         "ctrl=0x0000c000",
         "pitch=0x00001ac0"
       ],
-      "minAicaRegisterAccesses": 8
+      "minAicaRegisterAccesses": 8,
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "scif": 1
+      }
     }
   ]
 }
