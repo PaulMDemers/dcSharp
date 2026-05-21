@@ -22,6 +22,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/framebuffer`: default KOS fixture that writes a RGB565 quadrant pattern to VRAM.
   - `samples/kos/video_mode`: default KOS fixture that sets 640x480 RGB565 mode and writes sentinel pixels.
   - `samples/kos/pvr_registers`: default KOS fixture that writes named PVR registers and TA command apertures.
+  - `samples/kos/pvr_polygon`: default KOS fixture that writes a minimal opaque polygon-style TA command sequence.
   - `samples/kos/asic_irqb`: minimal KOS fixture that leaves a Maple DMA ASIC IRQB source pending.
   - `samples/kos/asic_events`: default KOS fixture that observes and clears an ASIC VBlank event latch.
   - `samples/kos/vblank_idle`: default KOS fixture that waits for a synthetic VBlank through a read-only idle polling loop.
@@ -74,6 +75,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/video_mode
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_video_mode.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_pvr_registers.elf --instructions 70000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_polygon
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_pvr_polygon.elf --instructions 70000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/asic_irqb
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_asic_irqb.elf --instructions 30000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/asic_events
