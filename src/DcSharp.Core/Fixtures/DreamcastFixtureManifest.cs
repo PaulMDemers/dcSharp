@@ -60,6 +60,12 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MinHardwareAdvanceTicks { get; set; }
     public ulong? MinHardwareAdvanceBatches { get; set; }
     public ulong? MaxHardwareAdvanceBatch { get; set; }
+    public ulong? MinIdleAdvanceTicks { get; set; }
+    public ulong? MinIdleAdvanceBatches { get; set; }
+    public ulong? MaxIdleAdvanceBatch { get; set; }
+    public ulong? MinIdleTimerWakes { get; set; }
+    public ulong? MinIdleVBlankWakes { get; set; }
+    public ulong? MinIdleInputWakes { get; set; }
     public ulong? MinCpuFastForwardInstructions { get; set; }
     public ulong? MinCpuFastForwardBatches { get; set; }
     public ulong? MaxCpuFastForwardBatch { get; set; }

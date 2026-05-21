@@ -78,6 +78,12 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 100,
             MinHardwareAdvanceBatches = 20,
             MaxHardwareAdvanceBatch = 5,
+            MinIdleAdvanceTicks = 10,
+            MinIdleAdvanceBatches = 2,
+            MaxIdleAdvanceBatch = 7,
+            MinIdleTimerWakes = 1,
+            MinIdleVBlankWakes = 1,
+            MinIdleInputWakes = 1,
             MinCpuFastForwardInstructions = 10,
             MinCpuFastForwardBatches = 2,
             MaxCpuFastForwardBatch = 7,
@@ -130,6 +136,12 @@ public class DreamcastFixtureRunnerTests
             hardwareTicks: 100,
             hardwareBatches: 20,
             maxHardwareBatch: 5,
+            idleAdvanceTicks: 10,
+            idleAdvanceBatches: 2,
+            maxIdleAdvanceBatch: 7,
+            idleTimerWakeCount: 1,
+            idleVBlankWakeCount: 1,
+            idleInputWakeCount: 1,
             cpuFastForwardInstructions: 10,
             cpuFastForwardBatches: 2,
             maxCpuFastForwardBatch: 7,
@@ -164,6 +176,12 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 101,
             MinHardwareAdvanceBatches = 21,
             MaxHardwareAdvanceBatch = 4,
+            MinIdleAdvanceTicks = 11,
+            MinIdleAdvanceBatches = 3,
+            MaxIdleAdvanceBatch = 6,
+            MinIdleTimerWakes = 2,
+            MinIdleVBlankWakes = 2,
+            MinIdleInputWakes = 2,
             MinCpuFastForwardInstructions = 11,
             MinCpuFastForwardBatches = 3,
             MaxCpuFastForwardBatch = 6,
@@ -226,6 +244,12 @@ public class DreamcastFixtureRunnerTests
             hardwareTicks: 100,
             hardwareBatches: 20,
             maxHardwareBatch: 5,
+            idleAdvanceTicks: 10,
+            idleAdvanceBatches: 2,
+            maxIdleAdvanceBatch: 7,
+            idleTimerWakeCount: 1,
+            idleVBlankWakeCount: 1,
+            idleInputWakeCount: 1,
             cpuFastForwardInstructions: 10,
             cpuFastForwardBatches: 2,
             maxCpuFastForwardBatch: 7,
@@ -247,6 +271,12 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 101 hardware advance ticks, got 100", failures);
         Assert.Contains("expected at least 21 hardware advance batches, got 20", failures);
         Assert.Contains("expected max hardware advance batch at most 4, got 5", failures);
+        Assert.Contains("expected at least 11 idle advance ticks, got 10", failures);
+        Assert.Contains("expected at least 3 idle advance batches, got 2", failures);
+        Assert.Contains("expected max idle advance batch at most 6, got 7", failures);
+        Assert.Contains("expected at least 2 idle timer wakes, got 1", failures);
+        Assert.Contains("expected at least 2 idle VBlank wakes, got 1", failures);
+        Assert.Contains("expected at least 2 idle input wakes, got 1", failures);
         Assert.Contains("expected at least 11 CPU fast-forwarded instructions, got 10", failures);
         Assert.Contains("expected at least 3 CPU fast-forward batches, got 2", failures);
         Assert.Contains("expected max CPU fast-forward batch at most 6, got 7", failures);
@@ -280,6 +310,12 @@ public class DreamcastFixtureRunnerTests
         ulong hardwareBatches,
         ulong maxHardwareBatch,
         ulong controllerScriptChanges,
+        ulong idleAdvanceTicks = 0,
+        ulong idleAdvanceBatches = 0,
+        ulong maxIdleAdvanceBatch = 0,
+        ulong idleTimerWakeCount = 0,
+        ulong idleVBlankWakeCount = 0,
+        ulong idleInputWakeCount = 0,
         ulong cpuFastForwardInstructions = 0,
         ulong cpuFastForwardBatches = 0,
         ulong maxCpuFastForwardBatch = 0,
@@ -335,12 +371,12 @@ public class DreamcastFixtureRunnerTests
                 hardwareTicks,
                 hardwareBatches,
                 maxHardwareBatch,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
+                idleAdvanceTicks,
+                idleAdvanceBatches,
+                maxIdleAdvanceBatch,
+                idleTimerWakeCount,
+                idleVBlankWakeCount,
+                idleInputWakeCount,
                 cpuFastForwardInstructions,
                 cpuFastForwardBatches,
                 maxCpuFastForwardBatch,

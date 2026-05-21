@@ -131,6 +131,24 @@
         "maxHardwareAdvanceBatch": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "minIdleAdvanceTicks": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "minIdleAdvanceBatches": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "maxIdleAdvanceBatch": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "minIdleTimerWakes": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "minIdleVBlankWakes": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "minIdleInputWakes": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
         "minCpuFastForwardInstructions": {
           "$ref": "#/$defs/nonNegativeInteger"
         },

@@ -46,6 +46,10 @@
       "instructions": 60000000,
       "traceTail": 8,
       "expectedStopReason": "ProgramExit",
+      "minIdleAdvanceTicks": 700000,
+      "minIdleAdvanceBatches": 1,
+      "maxIdleAdvanceBatch": 200000,
+      "minIdleTimerWakes": 1,
       "serialContains": [
         "dcSharp timer tick 1 elapsed",
         "dcSharp KallistiOS timer probe done"

@@ -157,6 +157,36 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected max hardware advance batch at most {maxHardwareAdvanceBatch}, got {summary.Scheduler.MaxHardwareAdvanceBatch}");
         }
 
+        if (fixture.MinIdleAdvanceTicks is { } minIdleAdvanceTicks && summary.Scheduler.IdleAdvanceTicks < minIdleAdvanceTicks)
+        {
+            failures.Add($"expected at least {minIdleAdvanceTicks} idle advance ticks, got {summary.Scheduler.IdleAdvanceTicks}");
+        }
+
+        if (fixture.MinIdleAdvanceBatches is { } minIdleAdvanceBatches && summary.Scheduler.IdleAdvanceBatches < minIdleAdvanceBatches)
+        {
+            failures.Add($"expected at least {minIdleAdvanceBatches} idle advance batches, got {summary.Scheduler.IdleAdvanceBatches}");
+        }
+
+        if (fixture.MaxIdleAdvanceBatch is { } maxIdleAdvanceBatch && summary.Scheduler.MaxIdleAdvanceBatch > maxIdleAdvanceBatch)
+        {
+            failures.Add($"expected max idle advance batch at most {maxIdleAdvanceBatch}, got {summary.Scheduler.MaxIdleAdvanceBatch}");
+        }
+
+        if (fixture.MinIdleTimerWakes is { } minIdleTimerWakes && summary.Scheduler.IdleTimerWakeCount < minIdleTimerWakes)
+        {
+            failures.Add($"expected at least {minIdleTimerWakes} idle timer wakes, got {summary.Scheduler.IdleTimerWakeCount}");
+        }
+
+        if (fixture.MinIdleVBlankWakes is { } minIdleVBlankWakes && summary.Scheduler.IdleVBlankWakeCount < minIdleVBlankWakes)
+        {
+            failures.Add($"expected at least {minIdleVBlankWakes} idle VBlank wakes, got {summary.Scheduler.IdleVBlankWakeCount}");
+        }
+
+        if (fixture.MinIdleInputWakes is { } minIdleInputWakes && summary.Scheduler.IdleInputWakeCount < minIdleInputWakes)
+        {
+            failures.Add($"expected at least {minIdleInputWakes} idle input wakes, got {summary.Scheduler.IdleInputWakeCount}");
+        }
+
         if (fixture.MinCpuFastForwardInstructions is { } minCpuFastForwardInstructions && summary.Scheduler.CpuFastForwardInstructions < minCpuFastForwardInstructions)
         {
             failures.Add($"expected at least {minCpuFastForwardInstructions} CPU fast-forwarded instructions, got {summary.Scheduler.CpuFastForwardInstructions}");
