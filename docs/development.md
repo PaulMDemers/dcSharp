@@ -116,6 +116,8 @@ Run the fast local check, including fixture-manifest validation and the unit sui
 .\tools\check.ps1
 ```
 
+GitHub CI runs the same fast path on `windows-latest`: restore, build, fixture-manifest validation, and the unit suite. It does not build KallistiOS samples or require generated ELF artifacts.
+
 Run long KOS fixture checks:
 
 ```powershell
