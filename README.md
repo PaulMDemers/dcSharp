@@ -119,6 +119,12 @@ $env:DCSHARP_RUN_KOS_FIXTURES='1'
 dotnet test dcSharp.slnx
 ```
 
+For the usual fast local check:
+
+```powershell
+.\tools\check.ps1
+```
+
 Current state:
 
 - ELF loading maps KOS-built SH-4 binaries into Dreamcast RAM.

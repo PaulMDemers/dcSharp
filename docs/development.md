@@ -110,11 +110,23 @@ Run normal tests:
 dotnet test dcSharp.slnx
 ```
 
+Run the fast local check, including fixture-manifest validation and the unit suite:
+
+```powershell
+.\tools\check.ps1
+```
+
 Run long KOS fixture checks:
 
 ```powershell
 $env:DCSHARP_RUN_KOS_FIXTURES='1'
 dotnet test dcSharp.slnx --filter DreamcastKosFixtureTests
+```
+
+Or run the same fast local check plus the full CLI fixture manifest:
+
+```powershell
+.\tools\check.ps1 -KosFixtures
 ```
 
 The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`. The test suite and CLI runner both read `fixtures/kos.json`.
