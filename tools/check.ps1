@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 Push-Location $repoRoot
 try {
+    git diff --check
     dotnet run --project src\DcSharp.Cli -- fixtures fixtures\kos.json --validate-only
     dotnet test dcSharp.slnx
 

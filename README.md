@@ -119,7 +119,7 @@ $env:DCSHARP_RUN_KOS_FIXTURES='1'
 dotnet test dcSharp.slnx
 ```
 
-For the usual fast local check:
+For the usual fast local check, including whitespace diff checks, fixture-manifest validation, and the unit suite:
 
 ```powershell
 .\tools\check.ps1

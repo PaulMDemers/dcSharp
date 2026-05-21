@@ -110,7 +110,7 @@ Run normal tests:
 dotnet test dcSharp.slnx
 ```
 
-Run the fast local check, including fixture-manifest validation and the unit suite:
+Run the fast local check, including whitespace diff checks, fixture-manifest validation, and the unit suite:
 
 ```powershell
 .\tools\check.ps1
