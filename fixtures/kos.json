@@ -1,4 +1,5 @@
 {
+  "$schema": "./kos.schema.json",
   "artifactDirectory": "artifacts/kos",
   "fixtures": [
     {

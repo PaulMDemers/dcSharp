@@ -84,6 +84,8 @@ Useful run options:
 
 The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, and `minMapleGetConditionTransfers`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
+`fixtures/kos.json` declares the local `fixtures/kos.schema.json` schema for editor validation and autocomplete. Keep the schema in sync whenever a new manifest field becomes part of the supported fixture contract.
+
 KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, text and JSON summaries include nearest function names for stop PCs and trace-tail entries.
 
 Generated framebuffer, trace, and device logs belong under `artifacts/` and stay out of git.

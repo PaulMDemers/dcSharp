@@ -72,7 +72,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_aica_registers.elf --instructions 70000000 --trace-tail 40
 ```
 
-Run every manifest-listed KOS fixture and validate the expected stop reason, serial output, and video samples:
+Run every manifest-listed KOS fixture and validate the expected stop reason, serial output, and device/video/audio expectations. The manifest declares `fixtures/kos.schema.json` for editor validation:
 
 ```bash
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
