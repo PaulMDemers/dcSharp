@@ -66,6 +66,54 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsMaskedCountedIdleLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009); // nop
+        WriteInstruction(memory, 0x8C01_0002, 0x4110); // dt r1
+        WriteInstruction(memory, 0x8C01_0004, 0x8FFC); // bf/s 0x8C010000
+        WriteInstruction(memory, 0x8C01_0006, 0x72FF); // add #-1,r2
+        WriteInstruction(memory, 0x8C01_0008, 0x0009); // fallthrough
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Sr = 0xF0;
+        cpu.State.R[1] = 3;
+        cpu.State.R[2] = 10;
+
+        cpu.Step();
+        cpu.Step();
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardCountedIdleLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(9UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[1]);
+        Assert.Equal(7u, cpu.State.R[2]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C01_0008u, cpu.State.Pc);
+        Assert.Equal(12UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C01_0002, 0x4110);
+        WriteInstruction(memory, 0x8C01_0004, 0x8FFC);
+        WriteInstruction(memory, 0x8C01_0006, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[1] = 3;
+
+        cpu.Step();
+        cpu.Step();
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardCountedIdleLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C01_0006u, cpu.State.Pc);
+        Assert.Equal(3UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void ExecutesDisplacementWordStoreFromR0()
     {
         var memory = new DreamcastMemory();

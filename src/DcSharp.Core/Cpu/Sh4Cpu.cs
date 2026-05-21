@@ -40,6 +40,108 @@ public sealed class Sh4Cpu
         return new Sh4StepResult(pc, opcode, trace);
     }
 
+    internal bool TryFastForwardCountedIdleLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((State.Sr & Sh4State.SrBlockBit) == 0 && ((State.Sr >> 4) & 0xF) != 0xF)
+        {
+            return false;
+        }
+
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (delayedBranchTarget != branchTarget || State.Pc != step.Pc + 2 || branchTarget >= step.Pc)
+        {
+            return false;
+        }
+
+        var byteDistance = step.Pc - branchTarget;
+        if ((byteDistance & 1) != 0)
+        {
+            return false;
+        }
+
+        var dtPc = step.Pc - 2;
+        var dtOpcode = memory.ReadInstructionUInt16(dtPc);
+        if ((dtOpcode & 0xF0FF) != 0x4010)
+        {
+            return false;
+        }
+
+        for (var pc = branchTarget; pc < dtPc; pc += 2)
+        {
+            if (memory.ReadInstructionUInt16(pc) != 0x0009)
+            {
+                return false;
+            }
+        }
+
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (remainingIterations == 0)
+        {
+            return false;
+        }
+
+        var bodyInstructionCount = byteDistance / 2;
+        if (!TryComputeSkippedInstructions(remainingIterations, bodyInstructionCount, out skippedInstructions)
+            || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var delaySlotOpcode = memory.ReadInstructionUInt16(step.Pc + 2);
+        if (!TryApplyRepeatedDelaySlot(delaySlotOpcode, (ulong)remainingIterations + 1))
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        State.R[counterRegister] = 0;
+        State.T = true;
+        State.Pc = step.Pc + 4;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        var perIteration = (ulong)bodyInstructionCount + 2;
+        if (perIteration != 0 && remainingIterations > (ulong.MaxValue - 1) / perIteration)
+        {
+            return false;
+        }
+
+        skippedInstructions = 1 + ((ulong)remainingIterations * perIteration);
+        return true;
+    }
+
+    private bool TryApplyRepeatedDelaySlot(ushort opcode, ulong executions)
+    {
+        if (opcode == 0x0009)
+        {
+            return true;
+        }
+
+        if ((opcode & 0xF000) == 0x7000)
+        {
+            var register = (opcode >> 8) & 0xF;
+            var delta = unchecked((uint)(int)(sbyte)(opcode & 0xFF));
+            State.R[register] = unchecked(State.R[register] + (uint)((ulong)delta * executions));
+            return true;
+        }
+
+        return false;
+    }
+
     private bool TryAcceptExternalInterrupt(uint pc, out string trace)
     {
         trace = string.Empty;
