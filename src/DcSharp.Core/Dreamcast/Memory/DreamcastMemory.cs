@@ -47,9 +47,9 @@ public sealed class DreamcastMemory
     private const uint TimerUnderflow = 0x0100;
     private const uint TimerUnderflowInterruptEnable = 0x0020;
     private const uint AsicAckA = 0x005F_6900;
-    private const uint AsicIrq9A = 0x005F_6910;
+    private const uint AsicIrqDA = 0x005F_6910;
     private const uint AsicIrqBA = 0x005F_6920;
-    private const uint AsicIrqDA = 0x005F_6930;
+    private const uint AsicIrq9A = 0x005F_6930;
     private const uint MapleDmaAddress = 0x005F_6C04;
     private const uint MapleState = 0x005F_6C18;
     private const uint MapleStateDma = 1;

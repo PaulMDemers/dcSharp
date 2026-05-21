@@ -455,7 +455,7 @@ public class Sh4CpuTests
     {
         var memory = new DreamcastMemory();
         WriteInstruction(memory, 0x8C01_0000, 0x0009);
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
         memory.RaiseVBlankBegin();
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Vbr = 0x8C02_0000;

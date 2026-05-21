@@ -10,7 +10,7 @@ public class DreamcastEventSchedulerTests
     public void RaisesVBlankAtConfiguredInstructionBoundary()
     {
         var memory = new DreamcastMemory();
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
         var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 3));
 
         scheduler.AdvanceBeforeInstruction(0);
@@ -32,7 +32,7 @@ public class DreamcastEventSchedulerTests
     public void CanDisableSyntheticVBlank()
     {
         var memory = new DreamcastMemory();
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
         var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 0));
 
         scheduler.AdvanceBeforeInstruction(200_000);
@@ -151,7 +151,7 @@ public class DreamcastEventSchedulerTests
     {
         var memory = new DreamcastMemory();
         var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 5));
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
 
         scheduler.AdvanceBeforeInstruction(0);
 

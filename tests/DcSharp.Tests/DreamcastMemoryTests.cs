@@ -220,7 +220,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
         memory.RaiseVBlankBegin();
 
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
@@ -233,7 +233,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
-        memory.WriteUInt32(0xA05F_6910, 1u << 3);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
         memory.WriteUInt32(0xA05F_6920, 1u << 12);
         memory.RaiseVBlankBegin();
 
@@ -257,7 +257,7 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0x8C02_0000, 0x8000_0000);
         memory.WriteUInt32(0x8C02_0004, 0x0C03_0000);
         memory.WriteUInt32(0x8C02_0008, 0x0000_2001);
-        memory.WriteUInt32(0xA05F_6910, 1u << 12);
+        memory.WriteUInt32(0xA05F_6930, 1u << 12);
         memory.WriteUInt32(0xA05F_6C04, 0x0C02_0000);
 
         memory.WriteUInt32(0xA05F_6C18, 1);
