@@ -31,7 +31,7 @@ public sealed class DreamcastRunner
             {
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 var step = cpu.Step();
-                if (step.Trace == "sleep")
+                if (step.Trace == "sleep" || IsSideEffectFreeIdleLoop(step, memory))
                 {
                     scheduler.AdvanceAfterSleep();
                 }
@@ -92,6 +92,17 @@ public sealed class DreamcastRunner
 
     private static bool Contains(uint start, uint length, uint address) =>
         address >= start && (ulong)address < (ulong)start + length;
+
+    internal static bool IsSideEffectFreeIdleLoop(Sh4StepResult step, DreamcastMemory memory)
+    {
+        if (step.Opcode == 0xAFFE)
+        {
+            return memory.ReadInstructionUInt16(step.Pc + 2) == 0x0009;
+        }
+
+        return step.Opcode is 0x89FE or 0x8BFE
+            && step.Trace.EndsWith($"0x{step.Pc:X8} ; taken", StringComparison.Ordinal);
+    }
 }
 
 public sealed record DreamcastRunOptions(

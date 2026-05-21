@@ -87,7 +87,7 @@ KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, tex
 
 Generated framebuffer, trace, and device logs belong under `artifacts/` and stay out of git.
 
-Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement ticks, coalesced hardware batches, max hardware batch size, and controller-script state changes. The runner currently uses this batching after SH-4 `sleep` instructions to advance hardware directly to the next known timer or VBlank interrupt.
+Run summaries also include scheduler diagnostics for synthetic VBlank events, hardware advancement ticks, coalesced hardware batches, max hardware batch size, and controller-script state changes. The runner currently uses this batching after SH-4 `sleep` instructions and side-effect-free self-branch waits to advance hardware directly to the next known timer or VBlank interrupt.
 
 Structured run summaries include aggregate device-access counts by domain and access kind, plus recent device accesses. Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 

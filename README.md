@@ -133,6 +133,7 @@ Current state:
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.
 - SH-4 `sleep` advances hardware directly to the next known timer/VBlank interrupt while preserving normal interrupt entry.
+- Side-effect-free self-branch waits can use the same hardware batching path.
 - Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
@@ -142,7 +143,7 @@ Current state:
 
 Next targets:
 
-- Extend event batching beyond explicit `sleep` waits as more idle-loop patterns become visible.
+- Extend event batching beyond simple self-branch waits as more idle-loop patterns become visible.
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Add more fixture expectations around device-domain access counts.

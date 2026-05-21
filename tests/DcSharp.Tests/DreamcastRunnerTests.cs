@@ -167,6 +167,29 @@ public class DreamcastRunnerTests
         Assert.Equal(DreamcastControllerButtons.Start, summary.ControllerA.Buttons);
     }
 
+    [Fact]
+    public void DetectsSideEffectFreeIdleLoops()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt16(0x8C01_0000, 0xAFFE);
+        memory.WriteUInt16(0x8C01_0002, 0x0009);
+
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0000, 0xAFFE, "bra 0x8C010000"), memory));
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0004, 0x89FE, "bt 0x8C010004 ; taken"), memory));
+        Assert.True(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0008, 0x8BFE, "bf 0x8C010008 ; taken"), memory));
+        Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_000C, 0x8BFE, "bf ; not taken"), memory));
+    }
+
+    [Fact]
+    public void RejectsBranchToSelfWhenDelaySlotHasSideEffects()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt16(0x8C01_0000, 0xAFFE);
+        memory.WriteUInt16(0x8C01_0002, 0xE001);
+
+        Assert.False(DreamcastRunner.IsSideEffectFreeIdleLoop(new Sh4StepResult(0x8C01_0000, 0xAFFE, "bra 0x8C010000"), memory));
+    }
+
     private static byte[] CreateNopElf()
     {
         return CreateElfWithSegment(
