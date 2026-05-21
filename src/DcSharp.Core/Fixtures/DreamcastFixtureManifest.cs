@@ -112,6 +112,10 @@ public sealed class DreamcastFixtureVideoSampleExpectation
 public sealed class DreamcastFixturePvrTaCommandExpectation
 {
     public string Kind { get; set; } = string.Empty;
+    public string? Region { get; set; }
+    public string? ListTypeName { get; set; }
+    public bool? EndOfStrip { get; set; }
+    public string? Value { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

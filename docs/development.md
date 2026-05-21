@@ -102,7 +102,7 @@ Structured run summaries include aggregate device-access counts by domain and ac
 
 ASIC summaries include current event ACK registers, IRQ9/IRQB/IRQD masks, per-level pending masks, and the currently deliverable ASIC interrupt event/level/source bit. Unit tests cover A/B/C event-bank source decoding and independent ACK clearing.
 
-PVR summaries include current named register values plus recent register accesses. PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
+PVR summaries include current named register values plus recent register accesses. PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`. Fixture `pvrTaCommands` entries can assert minimum counts by kind alone or add filters for `region`, `listTypeName`, `endOfStrip`, and exact command `value`.
 
 AICA summaries include current named register values plus recent register accesses. Channel summaries decode sample format, loop enable, sample address, loop points, pitch, pan, volume, key-on state, and active channel count while remaining silence-safe.
 

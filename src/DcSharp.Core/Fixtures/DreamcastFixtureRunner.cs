@@ -218,10 +218,12 @@ public static class DreamcastFixtureRunner
 
         foreach (var expected in fixture.PvrTaCommands)
         {
-            var count = summary.Video.PvrTaCommandKinds.SingleOrDefault(kind => string.Equals(kind.Kind, expected.Kind, StringComparison.Ordinal))?.Count ?? 0;
+            var count = HasDetailedPvrTaFilters(expected)
+                ? CountDetailedPvrTaCommands(summary, expected)
+                : summary.Video.PvrTaCommandKinds.SingleOrDefault(kind => string.Equals(kind.Kind, expected.Kind, StringComparison.Ordinal))?.Count ?? 0;
             if (count < expected.MinCount)
             {
-                failures.Add($"expected at least {expected.MinCount} PVR TA {expected.Kind} commands, got {count}");
+                failures.Add($"expected at least {expected.MinCount} PVR TA {DescribePvrTaExpectation(expected)} commands, got {count}");
             }
         }
 
@@ -371,6 +373,49 @@ public static class DreamcastFixtureRunner
         {
             failures.Add($"{label} expected {expected}, got {actual}");
         }
+    }
+
+    private static bool HasDetailedPvrTaFilters(DreamcastFixturePvrTaCommandExpectation expected) =>
+        expected.Region is not null
+        || expected.ListTypeName is not null
+        || expected.EndOfStrip is not null
+        || expected.Value is not null;
+
+    private static int CountDetailedPvrTaCommands(DreamcastRunSummary summary, DreamcastFixturePvrTaCommandExpectation expected)
+    {
+        uint? expectedValue = expected.Value is null ? null : ParseHex32(expected.Value, $"PVR TA {expected.Kind} value");
+        return summary.Video.RecentPvrTaCommandWrites.Count(write =>
+            string.Equals(write.Kind, expected.Kind, StringComparison.Ordinal)
+            && (expected.Region is null || string.Equals(write.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(write.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expected.EndOfStrip is null || write.EndOfStrip == expected.EndOfStrip)
+            && (expectedValue is null || write.Value == expectedValue));
+    }
+
+    private static string DescribePvrTaExpectation(DreamcastFixturePvrTaCommandExpectation expected)
+    {
+        var details = new List<string> { expected.Kind };
+        if (expected.Region is not null)
+        {
+            details.Add($"region={expected.Region}");
+        }
+
+        if (expected.ListTypeName is not null)
+        {
+            details.Add($"list={expected.ListTypeName}");
+        }
+
+        if (expected.EndOfStrip is not null)
+        {
+            details.Add($"endOfStrip={expected.EndOfStrip}");
+        }
+
+        if (expected.Value is not null)
+        {
+            details.Add($"value={expected.Value}");
+        }
+
+        return string.Join(" ", details);
     }
 
     private static uint ParseHex32(string text, string description)

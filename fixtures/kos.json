@@ -314,18 +314,36 @@
         "ta_init=0x80000000"
       ],
       "minPvrRegisterAccesses": 7,
-      "minPvrTaCommandWrites": 3,
+      "minPvrTaCommandWrites": 4,
       "pvrTaCommands": [
         {
           "kind": "PolygonHeader",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0x80840000",
           "minCount": 1
         },
         {
           "kind": "Vertex",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xE0000000",
+          "minCount": 1
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
           "minCount": 1
         },
         {
           "kind": "YuvConverterData",
+          "region": "TA_YUV_CONV",
+          "value": "0x00000001",
           "minCount": 1
         }
       ],

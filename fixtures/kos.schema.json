@@ -339,6 +339,20 @@
           "type": "string",
           "minLength": 1
         },
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endOfStrip": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/hex32"
+        },
         "minCount": {
           "type": "integer",
           "minimum": 1

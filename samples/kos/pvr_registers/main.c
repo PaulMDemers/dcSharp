@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
 
     DCSHARP_PVR_TA_INPUT = 0x80840000u;
     DCSHARP_PVR_TA_INPUT = 0xe0000000u;
+    DCSHARP_PVR_TA_INPUT = 0xf0000000u;
     DCSHARP_PVR_TA_YUV = 0x00000001u;
 
     printf("dcSharp PVR register probe: fb_cfg=0x%08lx fb_size=0x%08lx ta_init=0x%08lx\n",

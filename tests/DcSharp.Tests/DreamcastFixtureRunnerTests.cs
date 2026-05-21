@@ -108,6 +108,17 @@ public class DreamcastFixtureRunnerTests
             {
                 ["PVR_FB_CFG_1"] = "0x00800005"
             },
+            PvrTaCommands =
+            [
+                new DreamcastFixturePvrTaCommandExpectation
+                {
+                    Kind = "PolygonHeader",
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    EndOfStrip = false,
+                    Value = "0x80840000"
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F"
@@ -153,6 +164,20 @@ public class DreamcastFixtureRunnerTests
             mapleDmaBatches: 2,
             asic: CreateAsicSummary(),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
+            pvrTaCommandWrites:
+            [
+                new DreamcastPvrTaCommandWriteSummary(
+                    0x1000_0000,
+                    "0x10000000",
+                    "TA_INPUT",
+                    "PolygonHeader",
+                    0,
+                    "OpaquePolygon",
+                    false,
+                    4,
+                    0x8084_0000,
+                    "0x80840000")
+            ],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
             aicaChannels: [CreateAudioChannel()]);
 
@@ -219,6 +244,17 @@ public class DreamcastFixtureRunnerTests
                 ["PVR_FB_CFG_1"] = "0x00800005",
                 ["PVR_FB_SIZE"] = "0x00177D3F"
             },
+            PvrTaCommands =
+            [
+                new DreamcastFixturePvrTaCommandExpectation
+                {
+                    Kind = "PolygonHeader",
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    EndOfStrip = false,
+                    Value = "0x80840001"
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F",
@@ -262,6 +298,20 @@ public class DreamcastFixtureRunnerTests
             mapleDescriptorLimitHits: 1,
             asic: CreateAsicSummary(pendingEventCode: 0x0320, pendingLevel: 9, ack: 0x00000008, irq9Mask: 0x00000008),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")],
+            pvrTaCommandWrites:
+            [
+                new DreamcastPvrTaCommandWriteSummary(
+                    0x1000_0000,
+                    "0x10000000",
+                    "TA_INPUT",
+                    "PolygonHeader",
+                    0,
+                    "OpaquePolygon",
+                    false,
+                    4,
+                    0x8084_0000,
+                    "0x80840000")
+            ],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000E, "0x0000000E")],
             aicaChannels: [CreateAudioChannel(pitch: 0x00001ABF, volume: 63)]);
 
@@ -297,6 +347,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing ASIC event register: B", failures);
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
+        Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
@@ -327,6 +378,7 @@ public class DreamcastFixtureRunnerTests
         int mapleDescriptorLimitHits = 0,
         DreamcastAsicSummary? asic = null,
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
+        IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
         IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null) =>
         new(
@@ -354,7 +406,7 @@ public class DreamcastFixtureRunnerTests
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
             asic ?? new DreamcastAsicSummary([], null, null, null, null),
-            new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
+            CreateVideoSummary(pvrRegisters, pvrTaCommandWrites),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(
                 mapleTransfers,
@@ -381,6 +433,31 @@ public class DreamcastFixtureRunnerTests
                 cpuFastForwardBatches,
                 maxCpuFastForwardBatch,
                 controllerScriptChanges));
+
+    private static DreamcastVideoSummary CreateVideoSummary(
+        IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters,
+        IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites)
+    {
+        var taWrites = pvrTaCommandWrites ?? [];
+        return new DreamcastVideoSummary(
+            0,
+            0,
+            0,
+            "0x00000000",
+            null,
+            null,
+            [],
+            pvrRegisters ?? [],
+            0,
+            [],
+            taWrites.Count,
+            taWrites,
+            taWrites
+                .GroupBy(write => write.Kind, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
+                .ToArray());
+    }
 
     private static IReadOnlyList<DreamcastMapleDmaBatchSummary> CreateMapleDmaBatches(int count, int descriptorLimitHits) =>
         Enumerable.Range(0, count)
