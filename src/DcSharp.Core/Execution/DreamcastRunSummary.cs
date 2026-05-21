@@ -582,6 +582,9 @@ public sealed record DreamcastSchedulerSummary(
     ulong HardwareAdvanceTicks,
     ulong HardwareAdvanceBatches,
     ulong MaxHardwareAdvanceBatch,
+    ulong CpuFastForwardInstructions,
+    ulong CpuFastForwardBatches,
+    ulong MaxCpuFastForwardBatch,
     ulong ControllerScriptChanges)
 {
     public static DreamcastSchedulerSummary FromSnapshot(DreamcastSchedulerSnapshot snapshot) =>
@@ -592,5 +595,8 @@ public sealed record DreamcastSchedulerSummary(
             snapshot.HardwareAdvanceTicks,
             snapshot.HardwareAdvanceBatches,
             snapshot.MaxHardwareAdvanceBatch,
+            snapshot.CpuFastForwardInstructions,
+            snapshot.CpuFastForwardBatches,
+            snapshot.MaxCpuFastForwardBatch,
             snapshot.ControllerScriptChanges);
 }

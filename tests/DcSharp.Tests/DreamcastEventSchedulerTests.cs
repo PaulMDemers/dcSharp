@@ -164,4 +164,19 @@ public class DreamcastEventSchedulerTests
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out _));
         Assert.Equal(0x0320u, eventCode);
     }
+
+    [Fact]
+    public void RecordsCpuFastForwardBatches()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 0));
+
+        scheduler.RecordCpuFastForward(5);
+        scheduler.RecordCpuFastForward(3);
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(8UL, snapshot.CpuFastForwardInstructions);
+        Assert.Equal(2UL, snapshot.CpuFastForwardBatches);
+        Assert.Equal(5UL, snapshot.MaxCpuFastForwardBatch);
+    }
 }

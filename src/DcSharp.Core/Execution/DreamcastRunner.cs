@@ -38,7 +38,10 @@ public sealed class DreamcastRunner
                 }
                 else if (options.TraceCapture is null)
                 {
-                    cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out _);
+                    if (cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))
+                    {
+                        scheduler.RecordCpuFastForward(skippedInstructions);
+                    }
                 }
 
                 if (options.TraceCapture is { } traceCapture && traceLog.Count < traceCapture.Limit && traceCapture.ShouldCapture(step))

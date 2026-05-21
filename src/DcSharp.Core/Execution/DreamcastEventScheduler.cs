@@ -14,6 +14,9 @@ public sealed class DreamcastEventScheduler
     private ulong hardwareAdvanceTicks;
     private ulong hardwareAdvanceBatches;
     private ulong maxHardwareAdvanceBatch;
+    private ulong cpuFastForwardInstructions;
+    private ulong cpuFastForwardBatches;
+    private ulong maxCpuFastForwardBatch;
     private ulong controllerScriptChanges;
 
     public DreamcastEventScheduler(DreamcastMemory memory, DreamcastRunOptions options)
@@ -43,6 +46,9 @@ public sealed class DreamcastEventScheduler
             hardwareAdvanceTicks,
             hardwareAdvanceBatches,
             maxHardwareAdvanceBatch,
+            cpuFastForwardInstructions,
+            cpuFastForwardBatches,
+            maxCpuFastForwardBatch,
             controllerScriptChanges);
 
     public void AdvanceBeforeInstruction(ulong instructionsExecuted)
@@ -66,6 +72,18 @@ public sealed class DreamcastEventScheduler
         RaiseDueVBlankEvents(targetTicks);
         AdvanceHardwareTo(targetTicks);
         return true;
+    }
+
+    public void RecordCpuFastForward(ulong instructions)
+    {
+        if (instructions == 0)
+        {
+            return;
+        }
+
+        cpuFastForwardInstructions += instructions;
+        cpuFastForwardBatches++;
+        maxCpuFastForwardBatch = Math.Max(maxCpuFastForwardBatch, instructions);
     }
 
     private void AdvanceHardwareThrough(ulong instructionsExecuted)
@@ -164,4 +182,7 @@ public sealed record DreamcastSchedulerSnapshot(
     ulong HardwareAdvanceTicks,
     ulong HardwareAdvanceBatches,
     ulong MaxHardwareAdvanceBatch,
+    ulong CpuFastForwardInstructions,
+    ulong CpuFastForwardBatches,
+    ulong MaxCpuFastForwardBatch,
     ulong ControllerScriptChanges);

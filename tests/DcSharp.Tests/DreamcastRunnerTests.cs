@@ -78,6 +78,7 @@ public class DreamcastRunnerTests
         Assert.Equal(result.Scheduler.HardwareAdvanceTicks, summary.Scheduler.HardwareAdvanceTicks);
         Assert.Equal(result.Scheduler.HardwareAdvanceBatches, summary.Scheduler.HardwareAdvanceBatches);
         Assert.Equal(result.Scheduler.MaxHardwareAdvanceBatch, summary.Scheduler.MaxHardwareAdvanceBatch);
+        Assert.Equal(result.Scheduler.CpuFastForwardInstructions, summary.Scheduler.CpuFastForwardInstructions);
         Assert.Equal(result.Maple.Transfers.Count, summary.Maple.TransferCount);
     }
 
@@ -101,7 +102,7 @@ public class DreamcastRunnerTests
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], []),
             new DreamcastMapleSnapshot([]),
-            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
             0x8C01_0006,
