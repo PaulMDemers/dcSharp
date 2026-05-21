@@ -77,10 +77,21 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceBatches = 20,
             MaxHardwareAdvanceBatch = 5,
             MinControllerScriptChanges = 1,
+            RequireNoAsicPendingInterrupt = true,
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
             },
+            AsicEventRegisters =
+            [
+                new DreamcastFixtureAsicEventRegisterExpectation
+                {
+                    Name = "A",
+                    Ack = "0x00000000",
+                    Irq9Mask = "0x00000008",
+                    PendingIrq9 = "0x00000000"
+                }
+            ],
             PvrRegisters =
             {
                 ["PVR_FB_CFG_1"] = "0x00800005"
@@ -118,6 +129,7 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
+            asic: CreateAsicSummary(),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
             aicaChannels: [CreateAudioChannel()]);
@@ -141,10 +153,25 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceBatches = 21,
             MaxHardwareAdvanceBatch = 4,
             MinControllerScriptChanges = 2,
+            RequireNoAsicPendingInterrupt = true,
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
             },
+            AsicEventRegisters =
+            [
+                new DreamcastFixtureAsicEventRegisterExpectation
+                {
+                    Name = "A",
+                    Ack = "0x00000000",
+                    Irq9Mask = "0x00000008"
+                },
+                new DreamcastFixtureAsicEventRegisterExpectation
+                {
+                    Name = "B",
+                    Ack = "0x00000000"
+                }
+            ],
             PvrRegisters =
             {
                 ["PVR_FB_CFG_1"] = "0x00800005",
@@ -180,6 +207,7 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
+            asic: CreateAsicSummary(pendingEventCode: 0x0320, pendingLevel: 9, ack: 0x00000008, irq9Mask: 0x00000008),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000E, "0x0000000E")],
             aicaChannels: [CreateAudioChannel(pitch: 0x00001ABF, volume: 63)]);
@@ -195,6 +223,9 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
+        Assert.Contains("expected no pending ASIC interrupt, got 0x0320 level 9", failures);
+        Assert.Contains("ASIC event register A ack expected 0x00000000, got 0x00000008", failures);
+        Assert.Contains("missing ASIC event register: B", failures);
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
@@ -214,6 +245,7 @@ public class DreamcastFixtureRunnerTests
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
         int mapleGetConditionTransfers = 0,
+        DreamcastAsicSummary? asic = null,
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
         IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null) =>
@@ -241,11 +273,40 @@ public class DreamcastFixtureRunnerTests
             string.Empty,
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
-            new DreamcastAsicSummary([], null, null, null),
+            asic ?? new DreamcastAsicSummary([], null, null, null),
             new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(mapleTransfers, mapleDeviceInfoTransfers, mapleGetConditionTransfers, []),
             new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, controllerScriptChanges));
+
+    private static DreamcastAsicSummary CreateAsicSummary(
+        uint? pendingEventCode = null,
+        int? pendingLevel = null,
+        uint ack = 0,
+        uint irq9Mask = 0x00000008) =>
+        new(
+            [
+                new DreamcastAsicEventRegisterSummary(
+                    0,
+                    "A",
+                    ack,
+                    $"0x{ack:X8}",
+                    irq9Mask,
+                    $"0x{irq9Mask:X8}",
+                    0,
+                    "0x00000000",
+                    0,
+                    "0x00000000",
+                    ack & irq9Mask,
+                    $"0x{ack & irq9Mask:X8}",
+                    0,
+                    "0x00000000",
+                    0,
+                    "0x00000000")
+            ],
+            pendingEventCode,
+            pendingEventCode is { } code ? $"0x{code:X4}" : null,
+            pendingLevel);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(
         int channel = 0,

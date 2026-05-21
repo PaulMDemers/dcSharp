@@ -41,6 +41,7 @@
 - Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
 - Expose scheduler event diagnostics in run summaries. Done.
 - Expose ASIC event register and pending interrupt diagnostics in run summaries. Done.
+- Add fixture expectations for ASIC event state. Started: manifests can assert no pending ASIC interrupt plus ACK/mask/pending event registers.
 - Expose Maple DMA command/response diagnostics in run summaries. Done.
 - Expose aggregate device-access domain and access-kind diagnostics in run summaries. Done.
 - Add fixture expectations for aggregate device-domain access counts. Done.

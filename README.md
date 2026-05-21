@@ -135,6 +135,7 @@ Current state:
 - PVR VRAM is backed for the 32-bit and 64-bit apertures, and run summaries include a checksum, non-zero byte count, first changed offset, and RGB565 samples.
 - The CLI can dump the current RGB565 VRAM snapshot to a PNG file for quick visual fixture checks.
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
+- Fixture manifests can assert ASIC pending interrupt state and event ACK/mask registers.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.

@@ -47,6 +47,7 @@ public sealed class DreamcastFixtureDefinition
     public DreamcastStopReason ExpectedStopReason { get; set; }
     public List<string> SerialContains { get; set; } = [];
     public bool RequireVideoNonZero { get; set; }
+    public bool RequireNoAsicPendingInterrupt { get; set; }
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
     public int? MinAicaRegisterAccesses { get; set; }
@@ -61,6 +62,7 @@ public sealed class DreamcastFixtureDefinition
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public Dictionary<string, string> PvrRegisters { get; set; } = [];
     public Dictionary<string, string> AicaRegisters { get; set; } = [];
+    public List<DreamcastFixtureAsicEventRegisterExpectation> AsicEventRegisters { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
@@ -99,6 +101,18 @@ public sealed class DreamcastFixturePvrTaCommandExpectation
 {
     public string Kind { get; set; } = string.Empty;
     public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixtureAsicEventRegisterExpectation
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Ack { get; set; }
+    public string? Irq9Mask { get; set; }
+    public string? IrqBMask { get; set; }
+    public string? IrqDMask { get; set; }
+    public string? PendingIrq9 { get; set; }
+    public string? PendingIrqB { get; set; }
+    public string? PendingIrqD { get; set; }
 }
 
 public sealed class DreamcastFixtureAicaChannelExpectation

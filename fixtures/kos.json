@@ -83,6 +83,19 @@
       "minMapleTransfers": 7,
       "minMapleDeviceInfoTransfers": 4,
       "minMapleGetConditionTransfers": 3,
+      "requireNoAsicPendingInterrupt": true,
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000008",
+          "irq9Mask": "0x00000000",
+          "irqBMask": "0x00000000",
+          "irqDMask": "0x00000000",
+          "pendingIrq9": "0x00000000",
+          "pendingIrqB": "0x00000000",
+          "pendingIrqD": "0x00000000"
+        }
+      ],
       "minDeviceAccessDomains": {
         "maple": 1,
         "scif": 1

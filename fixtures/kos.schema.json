@@ -92,6 +92,9 @@
         "requireVideoNonZero": {
           "type": "boolean"
         },
+        "requireNoAsicPendingInterrupt": {
+          "type": "boolean"
+        },
         "minPvrRegisterAccesses": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
@@ -137,6 +140,12 @@
         "aicaRegisters": {
           "$ref": "#/$defs/hexMap"
         },
+        "asicEventRegisters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/asicEventRegister"
+          }
+        },
         "aicaChannels": {
           "type": "array",
           "items": {
@@ -154,6 +163,43 @@
           "items": {
             "$ref": "#/$defs/videoSample"
           }
+        }
+      }
+    },
+    "asicEventRegister": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "ack": {
+          "$ref": "#/$defs/hex32"
+        },
+        "irq9Mask": {
+          "$ref": "#/$defs/hex32"
+        },
+        "irqBMask": {
+          "$ref": "#/$defs/hex32"
+        },
+        "irqDMask": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pendingIrq9": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pendingIrqB": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pendingIrqD": {
+          "$ref": "#/$defs/hex32"
         }
       }
     },

@@ -74,6 +74,11 @@ public static class DreamcastFixtureRunner
             failures.Add("expected non-zero video VRAM");
         }
 
+        if (fixture.RequireNoAsicPendingInterrupt && summary.Asic.PendingEventCode is not null)
+        {
+            failures.Add($"expected no pending ASIC interrupt, got {summary.Asic.PendingEventCodeHex} level {summary.Asic.PendingLevel}");
+        }
+
         if (fixture.MinPvrRegisterAccesses is { } minPvrRegisterAccesses && summary.Video.PvrRegisterAccessCount < minPvrRegisterAccesses)
         {
             failures.Add($"expected at least {minPvrRegisterAccesses} PVR register accesses, got {summary.Video.PvrRegisterAccessCount}");
@@ -161,6 +166,24 @@ public static class DreamcastFixtureRunner
             {
                 failures.Add($"PVR register {registerName} expected 0x{expectedValue:X8}, got {register.ValueHex}");
             }
+        }
+
+        foreach (var expected in fixture.AsicEventRegisters)
+        {
+            var register = summary.Asic.EventRegisters.SingleOrDefault(register => string.Equals(register.Name, expected.Name, StringComparison.Ordinal));
+            if (register is null)
+            {
+                failures.Add($"missing ASIC event register: {expected.Name}");
+                continue;
+            }
+
+            ValidateHex32(failures, $"ASIC event register {expected.Name} ack", expected.Ack, register.Ack, register.AckHex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} IRQ9 mask", expected.Irq9Mask, register.Irq9Mask, register.Irq9MaskHex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} IRQB mask", expected.IrqBMask, register.IrqBMask, register.IrqBMaskHex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} IRQD mask", expected.IrqDMask, register.IrqDMask, register.IrqDMaskHex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQ9", expected.PendingIrq9, register.PendingIrq9, register.PendingIrq9Hex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQB", expected.PendingIrqB, register.PendingIrqB, register.PendingIrqBHex);
+            ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQD", expected.PendingIrqD, register.PendingIrqD, register.PendingIrqDHex);
         }
 
         foreach (var (registerName, expectedValueText) in fixture.AicaRegisters)
