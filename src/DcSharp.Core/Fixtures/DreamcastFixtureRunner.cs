@@ -163,6 +163,28 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.AicaChannels)
+        {
+            var channel = summary.Audio.Channels.SingleOrDefault(channel => channel.Channel == expected.Channel);
+            if (channel is null)
+            {
+                failures.Add($"missing AICA channel: {expected.Channel}");
+                continue;
+            }
+
+            ValidateHex32(failures, $"AICA channel {expected.Channel} control", expected.Control, channel.Control, channel.ControlHex);
+            ValidateString(failures, $"AICA channel {expected.Channel} sample format", expected.SampleFormat, channel.SampleFormat);
+            ValidateHex32(failures, $"AICA channel {expected.Channel} sample address", expected.SampleAddress, channel.SampleAddress, channel.SampleAddressHex);
+            ValidateHex32(failures, $"AICA channel {expected.Channel} loop start", expected.LoopStart, channel.LoopStart, channel.LoopStartHex);
+            ValidateHex32(failures, $"AICA channel {expected.Channel} loop end", expected.LoopEnd, channel.LoopEnd, channel.LoopEndHex);
+            ValidateHex32(failures, $"AICA channel {expected.Channel} pitch", expected.Pitch, channel.Pitch, channel.PitchHex);
+            ValidateByte(failures, $"AICA channel {expected.Channel} pan", expected.Pan, channel.Pan);
+            ValidateByte(failures, $"AICA channel {expected.Channel} volume", expected.Volume, channel.Volume);
+            ValidateBool(failures, $"AICA channel {expected.Channel} active", expected.Active, channel.Active);
+            ValidateBool(failures, $"AICA channel {expected.Channel} keyOn", expected.KeyOn, channel.KeyOn);
+            ValidateBool(failures, $"AICA channel {expected.Channel} keyOnExecute", expected.KeyOnExecute, channel.KeyOnExecute);
+        }
+
         foreach (var expected in fixture.VideoSamples)
         {
             var sample = summary.Video.Samples.SingleOrDefault(sample => string.Equals(sample.Name, expected.Name, StringComparison.Ordinal));
@@ -193,12 +215,50 @@ public static class DreamcastFixtureRunner
         return parsed;
     }
 
-    private static uint ParseHex32(string text, string registerName)
+    private static void ValidateHex32(List<string> failures, string label, string? expectedText, uint actual, string actualHex)
+    {
+        if (expectedText is null)
+        {
+            return;
+        }
+
+        var expected = ParseHex32(expectedText, label);
+        if (actual != expected)
+        {
+            failures.Add($"{label} expected 0x{expected:X8}, got {actualHex}");
+        }
+    }
+
+    private static void ValidateString(List<string> failures, string label, string? expected, string actual)
+    {
+        if (expected is not null && !string.Equals(actual, expected, StringComparison.Ordinal))
+        {
+            failures.Add($"{label} expected {expected}, got {actual}");
+        }
+    }
+
+    private static void ValidateByte(List<string> failures, string label, byte? expected, byte actual)
+    {
+        if (expected is not null && actual != expected)
+        {
+            failures.Add($"{label} expected {expected}, got {actual}");
+        }
+    }
+
+    private static void ValidateBool(List<string> failures, string label, bool? expected, bool actual)
+    {
+        if (expected is not null && actual != expected)
+        {
+            failures.Add($"{label} expected {expected}, got {actual}");
+        }
+    }
+
+    private static uint ParseHex32(string text, string description)
     {
         var value = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
         if (!uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new InvalidDataException($"PVR register '{registerName}' has invalid value '{text}'.");
+            throw new InvalidDataException($"{description} has invalid hex value '{text}'.");
         }
 
         return parsed;

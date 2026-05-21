@@ -84,7 +84,25 @@ public class DreamcastFixtureRunnerTests
             PvrRegisters =
             {
                 ["PVR_FB_CFG_1"] = "0x00800005"
-            }
+            },
+            AicaChannels =
+            [
+                new DreamcastFixtureAicaChannelExpectation
+                {
+                    Channel = 0,
+                    Control = "0x00008000",
+                    SampleFormat = "Pcm16",
+                    SampleAddress = "0x00001234",
+                    LoopStart = "0x00000008",
+                    LoopEnd = "0x00000040",
+                    Pitch = "0x00001AC0",
+                    Pan = 15,
+                    Volume = 64,
+                    Active = false,
+                    KeyOn = false,
+                    KeyOnExecute = true
+                }
+            ]
         };
         var summary = CreateSummary(
             vblankEvents: 2,
@@ -96,7 +114,8 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
-            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")]);
+            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
+            aicaChannels: [CreateAudioChannel()]);
 
         var failures = DreamcastFixtureRunner.Validate(fixture, summary);
 
@@ -125,7 +144,21 @@ public class DreamcastFixtureRunnerTests
             {
                 ["PVR_FB_CFG_1"] = "0x00800005",
                 ["PVR_FB_SIZE"] = "0x00177D3F"
-            }
+            },
+            AicaChannels =
+            [
+                new DreamcastFixtureAicaChannelExpectation
+                {
+                    Channel = 0,
+                    Pitch = "0x00001AC0",
+                    Volume = 64
+                },
+                new DreamcastFixtureAicaChannelExpectation
+                {
+                    Channel = 1,
+                    Control = "0x00008000"
+                }
+            ]
         };
         var summary = CreateSummary(
             vblankEvents: 2,
@@ -137,7 +170,8 @@ public class DreamcastFixtureRunnerTests
             mapleTransfers: 9,
             mapleDeviceInfoTransfers: 4,
             mapleGetConditionTransfers: 5,
-            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")]);
+            pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")],
+            aicaChannels: [CreateAudioChannel(pitch: 0x00001ABF, volume: 63)]);
 
         var failures = DreamcastFixtureRunner.Validate(fixture, summary);
 
@@ -152,6 +186,9 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
+        Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
+        Assert.Contains("AICA channel 0 volume expected 64, got 63", failures);
+        Assert.Contains("missing AICA channel: 1", failures);
     }
 
     private static DreamcastRunSummary CreateSummary(
@@ -164,7 +201,8 @@ public class DreamcastFixtureRunnerTests
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
         int mapleGetConditionTransfers = 0,
-        IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null) =>
+        IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
+        IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null) =>
         new(
             DreamcastStopReason.ProgramExit,
             string.Empty,
@@ -190,7 +228,42 @@ public class DreamcastFixtureRunnerTests
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
             new DreamcastVideoSummary(0, 0, 0, "0x00000000", null, null, [], pvrRegisters ?? [], 0, [], 0, [], []),
-            new DreamcastAudioSummary(0, 0, 0, "0x00000000", 0, [], [], 0),
+            new DreamcastAudioSummary(0, 0, 0, "0x00000000", 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(mapleTransfers, mapleDeviceInfoTransfers, mapleGetConditionTransfers, []),
             new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, controllerScriptChanges));
+
+    private static DreamcastAicaChannelSummary CreateAudioChannel(
+        int channel = 0,
+        uint control = 0x00008000,
+        string sampleFormat = "Pcm16",
+        uint sampleAddress = 0x00001234,
+        uint loopStart = 0x00000008,
+        uint loopEnd = 0x00000040,
+        uint pitch = 0x00001AC0,
+        byte pan = 15,
+        byte volume = 64,
+        bool active = false,
+        bool keyOn = false,
+        bool keyOnExecute = true) =>
+        new(
+            channel,
+            control,
+            $"0x{control:X8}",
+            sampleFormat,
+            false,
+            sampleAddress,
+            $"0x{sampleAddress:X8}",
+            sampleAddress,
+            $"0x{sampleAddress:X8}",
+            loopStart,
+            $"0x{loopStart:X8}",
+            loopEnd,
+            $"0x{loopEnd:X8}",
+            pitch,
+            $"0x{pitch:X8}",
+            pan,
+            volume,
+            active,
+            keyOn,
+            keyOnExecute);
 }

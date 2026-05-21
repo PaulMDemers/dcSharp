@@ -60,6 +60,7 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MinControllerScriptChanges { get; set; }
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public Dictionary<string, string> PvrRegisters { get; set; } = [];
+    public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
@@ -97,4 +98,20 @@ public sealed class DreamcastFixturePvrTaCommandExpectation
 {
     public string Kind { get; set; } = string.Empty;
     public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixtureAicaChannelExpectation
+{
+    public int Channel { get; set; }
+    public string? Control { get; set; }
+    public string? SampleFormat { get; set; }
+    public string? SampleAddress { get; set; }
+    public string? LoopStart { get; set; }
+    public string? LoopEnd { get; set; }
+    public string? Pitch { get; set; }
+    public byte? Pan { get; set; }
+    public byte? Volume { get; set; }
+    public bool? Active { get; set; }
+    public bool? KeyOn { get; set; }
+    public bool? KeyOnExecute { get; set; }
 }

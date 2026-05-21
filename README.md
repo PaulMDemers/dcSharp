@@ -132,7 +132,7 @@ Current state:
 - The CLI can write bounded, PC-filtered trace logs and filtered device-access logs for focused debugging.
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
 - Current PVR register values, PVR register writes, and TA command writes are captured in the video summary with SDK-aligned names and first-pass TA command classification.
-- AICA register writes, sound RAM changes, and decoded channel state are captured without producing host audio yet.
+- AICA register writes, sound RAM changes, and decoded channel state are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.
 - SH-4 `sleep` advances hardware directly to the next known timer/VBlank interrupt while preserving normal interrupt entry.

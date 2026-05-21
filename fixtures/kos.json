@@ -286,6 +286,22 @@
         "pitch=0x00001ac0"
       ],
       "minAicaRegisterAccesses": 8,
+      "aicaChannels": [
+        {
+          "channel": 0,
+          "control": "0x00008000",
+          "sampleFormat": "Pcm16",
+          "sampleAddress": "0x00001234",
+          "loopStart": "0x00000008",
+          "loopEnd": "0x00000040",
+          "pitch": "0x00001AC0",
+          "pan": 15,
+          "volume": 64,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true
+        }
+      ],
       "minDeviceAccessDomains": {
         "aica": 1,
         "scif": 1
