@@ -60,6 +60,9 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MinHardwareAdvanceTicks { get; set; }
     public ulong? MinHardwareAdvanceBatches { get; set; }
     public ulong? MaxHardwareAdvanceBatch { get; set; }
+    public ulong? MinCpuFastForwardInstructions { get; set; }
+    public ulong? MinCpuFastForwardBatches { get; set; }
+    public ulong? MaxCpuFastForwardBatch { get; set; }
     public ulong? MinControllerScriptChanges { get; set; }
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public Dictionary<string, string> PvrRegisters { get; set; } = [];

@@ -131,6 +131,15 @@
         "maxHardwareAdvanceBatch": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "minCpuFastForwardInstructions": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "minCpuFastForwardBatches": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "maxCpuFastForwardBatch": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
         "minControllerScriptChanges": {
           "$ref": "#/$defs/nonNegativeInteger"
         },

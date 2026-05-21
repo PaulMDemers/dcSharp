@@ -157,6 +157,21 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected max hardware advance batch at most {maxHardwareAdvanceBatch}, got {summary.Scheduler.MaxHardwareAdvanceBatch}");
         }
 
+        if (fixture.MinCpuFastForwardInstructions is { } minCpuFastForwardInstructions && summary.Scheduler.CpuFastForwardInstructions < minCpuFastForwardInstructions)
+        {
+            failures.Add($"expected at least {minCpuFastForwardInstructions} CPU fast-forwarded instructions, got {summary.Scheduler.CpuFastForwardInstructions}");
+        }
+
+        if (fixture.MinCpuFastForwardBatches is { } minCpuFastForwardBatches && summary.Scheduler.CpuFastForwardBatches < minCpuFastForwardBatches)
+        {
+            failures.Add($"expected at least {minCpuFastForwardBatches} CPU fast-forward batches, got {summary.Scheduler.CpuFastForwardBatches}");
+        }
+
+        if (fixture.MaxCpuFastForwardBatch is { } maxCpuFastForwardBatch && summary.Scheduler.MaxCpuFastForwardBatch > maxCpuFastForwardBatch)
+        {
+            failures.Add($"expected max CPU fast-forward batch at most {maxCpuFastForwardBatch}, got {summary.Scheduler.MaxCpuFastForwardBatch}");
+        }
+
         if (fixture.MinControllerScriptChanges is { } minControllerScriptChanges && summary.Scheduler.ControllerScriptChanges < minControllerScriptChanges)
         {
             failures.Add($"expected at least {minControllerScriptChanges} controller script changes, got {summary.Scheduler.ControllerScriptChanges}");

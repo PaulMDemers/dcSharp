@@ -78,6 +78,9 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 100,
             MinHardwareAdvanceBatches = 20,
             MaxHardwareAdvanceBatch = 5,
+            MinCpuFastForwardInstructions = 10,
+            MinCpuFastForwardBatches = 2,
+            MaxCpuFastForwardBatch = 7,
             MinControllerScriptChanges = 1,
             RequireNoAsicPendingInterrupt = true,
             AsicPendingInterrupt = null,
@@ -127,6 +130,9 @@ public class DreamcastFixtureRunnerTests
             hardwareTicks: 100,
             hardwareBatches: 20,
             maxHardwareBatch: 5,
+            cpuFastForwardInstructions: 10,
+            cpuFastForwardBatches: 2,
+            maxCpuFastForwardBatch: 7,
             controllerScriptChanges: 1,
             tmuDeviceAccesses: 3,
             mapleTransfers: 9,
@@ -158,6 +164,9 @@ public class DreamcastFixtureRunnerTests
             MinHardwareAdvanceTicks = 101,
             MinHardwareAdvanceBatches = 21,
             MaxHardwareAdvanceBatch = 4,
+            MinCpuFastForwardInstructions = 11,
+            MinCpuFastForwardBatches = 3,
+            MaxCpuFastForwardBatch = 6,
             MinControllerScriptChanges = 2,
             RequireNoAsicPendingInterrupt = true,
             AsicPendingInterrupt = new DreamcastFixtureAsicPendingInterruptExpectation
@@ -217,6 +226,9 @@ public class DreamcastFixtureRunnerTests
             hardwareTicks: 100,
             hardwareBatches: 20,
             maxHardwareBatch: 5,
+            cpuFastForwardInstructions: 10,
+            cpuFastForwardBatches: 2,
+            maxCpuFastForwardBatch: 7,
             controllerScriptChanges: 1,
             tmuDeviceAccesses: 2,
             mapleTransfers: 9,
@@ -235,6 +247,9 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 101 hardware advance ticks, got 100", failures);
         Assert.Contains("expected at least 21 hardware advance batches, got 20", failures);
         Assert.Contains("expected max hardware advance batch at most 4, got 5", failures);
+        Assert.Contains("expected at least 11 CPU fast-forwarded instructions, got 10", failures);
+        Assert.Contains("expected at least 3 CPU fast-forward batches, got 2", failures);
+        Assert.Contains("expected max CPU fast-forward batch at most 6, got 7", failures);
         Assert.Contains("expected at least 2 controller script changes, got 1", failures);
         Assert.Contains("expected at least 10 Maple transfers, got 9", failures);
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
@@ -265,6 +280,9 @@ public class DreamcastFixtureRunnerTests
         ulong hardwareBatches,
         ulong maxHardwareBatch,
         ulong controllerScriptChanges,
+        ulong cpuFastForwardInstructions = 0,
+        ulong cpuFastForwardBatches = 0,
+        ulong maxCpuFastForwardBatch = 0,
         int tmuDeviceAccesses = 0,
         int mapleTransfers = 0,
         int mapleDeviceInfoTransfers = 0,
@@ -310,7 +328,17 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            new DreamcastSchedulerSummary(0, 0, vblankEvents, hardwareTicks, hardwareBatches, maxHardwareBatch, 0, 0, 0, controllerScriptChanges));
+            new DreamcastSchedulerSummary(
+                0,
+                0,
+                vblankEvents,
+                hardwareTicks,
+                hardwareBatches,
+                maxHardwareBatch,
+                cpuFastForwardInstructions,
+                cpuFastForwardBatches,
+                maxCpuFastForwardBatch,
+                controllerScriptChanges));
 
     private static IReadOnlyList<DreamcastMapleDmaBatchSummary> CreateMapleDmaBatches(int count, int descriptorLimitHits) =>
         Enumerable.Range(0, count)
