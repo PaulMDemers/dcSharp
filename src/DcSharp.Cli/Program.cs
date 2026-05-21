@@ -140,7 +140,7 @@ static void RunElf(string path, string[] args)
     }
 
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");
-    Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, cpuFastForward={result.Scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={result.Scheduler.CpuFastForwardBatches}, maxCpuFastForward={result.Scheduler.MaxCpuFastForwardBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
+    Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, idleTicks={result.Scheduler.IdleAdvanceTicks}, idleBatches={result.Scheduler.IdleAdvanceBatches}, maxIdleBatch={result.Scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{result.Scheduler.IdleTimerWakeCount}/vblank:{result.Scheduler.IdleVBlankWakeCount}/input:{result.Scheduler.IdleInputWakeCount}, cpuFastForward={result.Scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={result.Scheduler.CpuFastForwardBatches}, maxCpuFastForward={result.Scheduler.MaxCpuFastForwardBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
         ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
         : string.Empty;
@@ -310,7 +310,7 @@ static int RunFixtures(string manifestPath, string[] args)
             Console.WriteLine($"{(result.Passed ? "PASS" : "FAIL")} {result.Name}");
             if (result.Summary is not null)
             {
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}, cpuFastForward={result.Summary.Scheduler.CpuFastForwardInstructions}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={result.Summary.Scheduler.VBlankEventsRaised}, schedulerTicks={result.Summary.Scheduler.HardwareAdvanceTicks}, schedulerBatches={result.Summary.Scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={result.Summary.Scheduler.MaxHardwareAdvanceBatch}, idleTicks={result.Summary.Scheduler.IdleAdvanceTicks}, idleBatches={result.Summary.Scheduler.IdleAdvanceBatches}, cpuFastForward={result.Summary.Scheduler.CpuFastForwardInstructions}");
             }
 
             foreach (var failure in result.Failures)
@@ -713,6 +713,12 @@ internal sealed record FixtureReport(
     ulong? HardwareAdvanceTicks,
     ulong? HardwareAdvanceBatches,
     ulong? MaxHardwareAdvanceBatch,
+    ulong? IdleAdvanceTicks,
+    ulong? IdleAdvanceBatches,
+    ulong? MaxIdleAdvanceBatch,
+    ulong? IdleTimerWakeCount,
+    ulong? IdleVBlankWakeCount,
+    ulong? IdleInputWakeCount,
     ulong? CpuFastForwardInstructions,
     ulong? CpuFastForwardBatches,
     ulong? MaxCpuFastForwardBatch,
@@ -739,6 +745,12 @@ internal sealed record FixtureReport(
             result.Summary?.Scheduler.HardwareAdvanceTicks,
             result.Summary?.Scheduler.HardwareAdvanceBatches,
             result.Summary?.Scheduler.MaxHardwareAdvanceBatch,
+            result.Summary?.Scheduler.IdleAdvanceTicks,
+            result.Summary?.Scheduler.IdleAdvanceBatches,
+            result.Summary?.Scheduler.MaxIdleAdvanceBatch,
+            result.Summary?.Scheduler.IdleTimerWakeCount,
+            result.Summary?.Scheduler.IdleVBlankWakeCount,
+            result.Summary?.Scheduler.IdleInputWakeCount,
             result.Summary?.Scheduler.CpuFastForwardInstructions,
             result.Summary?.Scheduler.CpuFastForwardBatches,
             result.Summary?.Scheduler.MaxCpuFastForwardBatch,

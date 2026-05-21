@@ -102,7 +102,7 @@ public class DreamcastRunnerTests
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], []),
             new DreamcastMapleSnapshot([]),
-            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             DreamcastStopReason.UnsupportedInstruction,
             "unsupported",
             0x8C01_0006,
@@ -169,7 +169,7 @@ public class DreamcastRunnerTests
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], []),
             new DreamcastMapleSnapshot([]),
-            new DreamcastSchedulerSnapshot(0, 0, 0, 5, 1, 5, 0, 0, 0, 1),
+            new DreamcastSchedulerSnapshot(0, 0, 0, 5, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             DreamcastStopReason.InstructionLimit,
             "limit",
             null,
@@ -224,6 +224,10 @@ public class DreamcastRunnerTests
         Assert.Equal(8UL, result.Scheduler.HardwareAdvanceTicks);
         Assert.Equal(7UL, result.Scheduler.HardwareAdvanceBatches);
         Assert.Equal(2UL, result.Scheduler.MaxHardwareAdvanceBatch);
+        Assert.Equal(2UL, result.Scheduler.IdleAdvanceTicks);
+        Assert.Equal(1UL, result.Scheduler.IdleAdvanceBatches);
+        Assert.Equal(2UL, result.Scheduler.MaxIdleAdvanceBatch);
+        Assert.Equal(1UL, result.Scheduler.IdleInputWakeCount);
         Assert.Equal(1UL, result.Scheduler.ControllerScriptChanges);
 
         var summary = DreamcastRunSummary.FromResult(result, options);

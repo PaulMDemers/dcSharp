@@ -14,6 +14,12 @@ public sealed class DreamcastEventScheduler
     private ulong hardwareAdvanceTicks;
     private ulong hardwareAdvanceBatches;
     private ulong maxHardwareAdvanceBatch;
+    private ulong idleAdvanceTicks;
+    private ulong idleAdvanceBatches;
+    private ulong maxIdleAdvanceBatch;
+    private ulong idleTimerWakeCount;
+    private ulong idleVBlankWakeCount;
+    private ulong idleInputWakeCount;
     private ulong cpuFastForwardInstructions;
     private ulong cpuFastForwardBatches;
     private ulong maxCpuFastForwardBatch;
@@ -46,6 +52,12 @@ public sealed class DreamcastEventScheduler
             hardwareAdvanceTicks,
             hardwareAdvanceBatches,
             maxHardwareAdvanceBatch,
+            idleAdvanceTicks,
+            idleAdvanceBatches,
+            maxIdleAdvanceBatch,
+            idleTimerWakeCount,
+            idleVBlankWakeCount,
+            idleInputWakeCount,
             cpuFastForwardInstructions,
             cpuFastForwardBatches,
             maxCpuFastForwardBatch,
@@ -76,6 +88,7 @@ public sealed class DreamcastEventScheduler
         }
 
         var targetTicks = SaturatingAdd(hardwareAdvanceTicks, ticks.Value);
+        RecordIdleAdvance(ticks.Value, nextTimerInterrupt, nextVblank, nextInputChange);
         ApplyInputScripts(targetTicks);
         RaiseDueVBlankEvents(targetTicks);
         AdvanceHardwareTo(targetTicks);
@@ -92,6 +105,28 @@ public sealed class DreamcastEventScheduler
         cpuFastForwardInstructions += instructions;
         cpuFastForwardBatches++;
         maxCpuFastForwardBatch = Math.Max(maxCpuFastForwardBatch, instructions);
+    }
+
+    private void RecordIdleAdvance(ulong ticks, ulong? nextTimerInterrupt, ulong? nextVblank, ulong? nextInputChange)
+    {
+        idleAdvanceTicks += ticks;
+        idleAdvanceBatches++;
+        maxIdleAdvanceBatch = Math.Max(maxIdleAdvanceBatch, ticks);
+
+        if (nextTimerInterrupt == ticks)
+        {
+            idleTimerWakeCount++;
+        }
+
+        if (nextVblank == ticks)
+        {
+            idleVBlankWakeCount++;
+        }
+
+        if (nextInputChange == ticks)
+        {
+            idleInputWakeCount++;
+        }
     }
 
     private void AdvanceHardwareThrough(ulong instructionsExecuted)
@@ -217,6 +252,12 @@ public sealed record DreamcastSchedulerSnapshot(
     ulong HardwareAdvanceTicks,
     ulong HardwareAdvanceBatches,
     ulong MaxHardwareAdvanceBatch,
+    ulong IdleAdvanceTicks,
+    ulong IdleAdvanceBatches,
+    ulong MaxIdleAdvanceBatch,
+    ulong IdleTimerWakeCount,
+    ulong IdleVBlankWakeCount,
+    ulong IdleInputWakeCount,
     ulong CpuFastForwardInstructions,
     ulong CpuFastForwardBatches,
     ulong MaxCpuFastForwardBatch,

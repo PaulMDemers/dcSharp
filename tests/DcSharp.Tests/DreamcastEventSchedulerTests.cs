@@ -142,6 +142,12 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(6UL, snapshot.HardwareAdvanceTicks);
         Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
         Assert.Equal(5UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.Equal(5UL, snapshot.IdleAdvanceTicks);
+        Assert.Equal(1UL, snapshot.IdleAdvanceBatches);
+        Assert.Equal(5UL, snapshot.MaxIdleAdvanceBatch);
+        Assert.Equal(1UL, snapshot.IdleTimerWakeCount);
+        Assert.Equal(0UL, snapshot.IdleVBlankWakeCount);
+        Assert.Equal(0UL, snapshot.IdleInputWakeCount);
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out _));
         Assert.Equal(0x0400u, eventCode);
     }
@@ -161,6 +167,12 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(5UL, snapshot.HardwareAdvanceTicks);
         Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
         Assert.Equal(4UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.Equal(4UL, snapshot.IdleAdvanceTicks);
+        Assert.Equal(1UL, snapshot.IdleAdvanceBatches);
+        Assert.Equal(4UL, snapshot.MaxIdleAdvanceBatch);
+        Assert.Equal(0UL, snapshot.IdleTimerWakeCount);
+        Assert.Equal(1UL, snapshot.IdleVBlankWakeCount);
+        Assert.Equal(0UL, snapshot.IdleInputWakeCount);
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out _));
         Assert.Equal(0x0320u, eventCode);
     }
@@ -183,6 +195,12 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(5UL, snapshot.HardwareAdvanceTicks);
         Assert.Equal(2UL, snapshot.HardwareAdvanceBatches);
         Assert.Equal(4UL, snapshot.MaxHardwareAdvanceBatch);
+        Assert.Equal(4UL, snapshot.IdleAdvanceTicks);
+        Assert.Equal(1UL, snapshot.IdleAdvanceBatches);
+        Assert.Equal(4UL, snapshot.MaxIdleAdvanceBatch);
+        Assert.Equal(0UL, snapshot.IdleTimerWakeCount);
+        Assert.Equal(0UL, snapshot.IdleVBlankWakeCount);
+        Assert.Equal(1UL, snapshot.IdleInputWakeCount);
         Assert.Equal(1UL, snapshot.ControllerScriptChanges);
         Assert.Equal(DreamcastControllerButtons.Start, memory.ControllerA.Buttons);
 
