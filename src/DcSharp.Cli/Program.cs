@@ -216,6 +216,7 @@ static int RunFixtures(string manifestPath, string[] args)
     var validateOnly = false;
     string? artifactDirectoryOverride = null;
     string? reportJsonPath = null;
+    string? fixtureFilter = null;
     for (var index = 0; index < args.Length; index++)
     {
         switch (args[index])
@@ -235,6 +236,10 @@ static int RunFixtures(string manifestPath, string[] args)
                 reportJsonPath = args[index + 1];
                 index++;
                 break;
+            case "--filter" when index + 1 < args.Length:
+                fixtureFilter = args[index + 1];
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid fixtures option: {args[index]}");
         }
@@ -243,14 +248,15 @@ static int RunFixtures(string manifestPath, string[] args)
     var repoRoot = FindRepoRoot(Path.GetFullPath(manifestPath)) ?? Directory.GetCurrentDirectory();
     using var stream = File.OpenRead(manifestPath);
     var manifest = DreamcastFixtureManifest.Read(stream);
+    var fixtures = FilterFixtures(manifest.Fixtures, fixtureFilter);
     var artifactDirectory = ResolveRepoPath(repoRoot, artifactDirectoryOverride ?? manifest.ArtifactDirectory);
     if (validateOnly)
     {
         var validationReport = new FixtureManifestValidationReport(
             Path.GetFullPath(manifestPath),
             artifactDirectory,
-            manifest.Fixtures.Count,
-            manifest.Fixtures.Select(fixture => fixture.Name).ToArray());
+            fixtures.Count,
+            fixtures.Select(fixture => fixture.Name).ToArray());
         var validationJson = SerializeJson(validationReport);
         if (reportJsonPath is not null)
         {
@@ -276,7 +282,7 @@ static int RunFixtures(string manifestPath, string[] args)
 
     var results = new List<DreamcastFixtureCheckResult>();
 
-    foreach (var fixture in manifest.Fixtures)
+    foreach (var fixture in fixtures)
     {
         var artifactPath = Path.Combine(artifactDirectory, fixture.Artifact);
         if (!File.Exists(artifactPath))
@@ -328,6 +334,27 @@ static int RunFixtures(string manifestPath, string[] args)
     }
 
     return results.All(result => result.Passed) ? 0 : 1;
+}
+
+static IReadOnlyList<DreamcastFixtureDefinition> FilterFixtures(
+    IReadOnlyList<DreamcastFixtureDefinition> fixtures,
+    string? filter)
+{
+    if (string.IsNullOrWhiteSpace(filter))
+    {
+        return fixtures;
+    }
+
+    var matched = fixtures
+        .Where(fixture => fixture.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+
+    if (matched.Length == 0)
+    {
+        throw new InvalidDataException($"No fixtures match filter: {filter}");
+    }
+
+    return matched;
 }
 
 static string SerializeJson<T>(T value)
@@ -649,7 +676,7 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
-    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--report-json path] [--validate-only] [--json]");
+    Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller map entry: --controller b0:b,ltrig=7");

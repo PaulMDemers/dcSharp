@@ -83,6 +83,7 @@ Run every manifest-listed KOS fixture and validate the expected stop reason, ser
 ```bash
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --validate-only
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --filter input_idle
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 ```
 

@@ -65,6 +65,7 @@ Manifest regression run:
 ```bash
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --validate-only
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
+dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --filter input_idle
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 ```
 
@@ -84,6 +85,7 @@ Useful run options:
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 - `fixtures --validate-only` parses and validates a fixture manifest without requiring built ELF artifacts.
+- `fixtures --filter <name>` runs or validates only fixtures whose names contain the filter text.
 - `fixtures --report-json artifacts/reports/kos-fixtures.json` writes a structured fixture report while keeping the text summary on stdout.
 
 The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, idle advance, idle wake, CPU fast-forward, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, `minMapleGetConditionTransfers`, `minMapleDmaBatches`, and `requireNoMapleDescriptorLimitHits`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, `minIdleAdvanceTicks`, `minIdleAdvanceBatches`, `maxIdleAdvanceBatch`, `minIdleTimerWakes`, `minIdleVBlankWakes`, `minIdleInputWakes`, `minCpuFastForwardInstructions`, `minCpuFastForwardBatches`, `maxCpuFastForwardBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, ASIC expectations with `requireNoAsicPendingInterrupt`, `asicPendingInterrupt`, and `asicEventRegisters`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
