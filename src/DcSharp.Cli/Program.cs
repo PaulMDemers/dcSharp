@@ -126,6 +126,12 @@ static void RunElf(string path, string[] args)
 
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
+    var pvrTaLists = DreamcastVideoSummary.FromSnapshot(result.Video).PvrTaLists;
+    if (pvrTaLists.Count > 0)
+    {
+        Console.WriteLine($"PVR TA lists: {string.Join(", ", pvrTaLists.Select(list => $"{list.Region}:{list.ListTypeName ?? "none"} commands={list.CommandCount} headers={list.PolygonHeaderCount} vertices={list.VertexCount} ends={list.VertexEndOfStripCount}"))}");
+    }
+
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentPvrRegisters.Length > 0)
     {

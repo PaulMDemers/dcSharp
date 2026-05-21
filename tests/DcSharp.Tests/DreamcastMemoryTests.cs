@@ -125,6 +125,42 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void VideoSummaryGroupsPvrTaWritesByRegionAndList()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x1000_0000, 0x8084_0000);
+        memory.WriteUInt32(0x1000_0000, 0xE000_0000);
+        memory.WriteUInt32(0x1000_0000, 0xF000_0000);
+        memory.WriteUInt32(0x1080_0000, 0x0000_0001);
+
+        var summary = DreamcastVideoSummary.FromSnapshot(memory.CreateVideoSnapshot());
+
+        Assert.Collection(
+            summary.PvrTaLists,
+            list =>
+            {
+                Assert.Equal("TA_INPUT", list.Region);
+                Assert.Equal(0, list.ListType);
+                Assert.Equal("OpaquePolygon", list.ListTypeName);
+                Assert.Equal(3, list.CommandCount);
+                Assert.Equal(1, list.PolygonHeaderCount);
+                Assert.Equal(1, list.VertexCount);
+                Assert.Equal(1, list.VertexEndOfStripCount);
+            },
+            list =>
+            {
+                Assert.Equal("TA_YUV_CONV", list.Region);
+                Assert.Null(list.ListType);
+                Assert.Null(list.ListTypeName);
+                Assert.Equal(1, list.CommandCount);
+                Assert.Equal(0, list.PolygonHeaderCount);
+                Assert.Equal(0, list.VertexCount);
+                Assert.Equal(0, list.VertexEndOfStripCount);
+            });
+    }
+
+    [Fact]
     public void AudioSnapshotReportsAicaRegisterAndChannelState()
     {
         var memory = new DreamcastMemory();

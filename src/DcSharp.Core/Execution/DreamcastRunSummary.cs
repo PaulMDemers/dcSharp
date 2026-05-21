@@ -312,6 +312,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
+    IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 16) =>
@@ -333,6 +334,20 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
+            snapshot.PvrTaCommandWrites
+                .GroupBy(write => new PvrTaListKey(write.Region, write.ListType, write.ListTypeName))
+                .OrderBy(group => group.Key.Region, StringComparer.Ordinal)
+                .ThenBy(group => group.Key.ListType ?? int.MaxValue)
+                .ThenBy(group => group.Key.ListTypeName ?? string.Empty, StringComparer.Ordinal)
+                .Select(group => new DreamcastPvrTaListSummary(
+                    group.Key.Region,
+                    group.Key.ListType,
+                    group.Key.ListTypeName,
+                    group.Count(),
+                    group.Count(write => string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal)),
+                    group.Count(write => string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)),
+                    group.Count(write => string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))))
+                .ToArray(),
             snapshot.PvrTaCommandWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -389,7 +404,18 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
         new(write.Address, write.AddressHex, write.Region, write.Kind, write.ListType, write.ListTypeName, write.EndOfStrip, write.Size, write.Value, write.ValueHex);
 }
 
+public sealed record DreamcastPvrTaListSummary(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    int CommandCount,
+    int PolygonHeaderCount,
+    int VertexCount,
+    int VertexEndOfStripCount);
+
 public sealed record DreamcastPvrTaCommandKindSummary(string Kind, int Count);
+
+internal sealed record PvrTaListKey(string Region, int? ListType, string? ListTypeName);
 
 public sealed record DreamcastAudioSummary(
     int AudioRamBytes,

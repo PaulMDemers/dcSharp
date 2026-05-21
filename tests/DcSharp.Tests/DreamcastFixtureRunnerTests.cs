@@ -452,12 +452,29 @@ public class DreamcastFixtureRunnerTests
             [],
             taWrites.Count,
             taWrites,
+            CreatePvrTaLists(taWrites),
             taWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
                 .ToArray());
     }
+
+    private static IReadOnlyList<DreamcastPvrTaListSummary> CreatePvrTaLists(IReadOnlyList<DreamcastPvrTaCommandWriteSummary> taWrites) =>
+        taWrites
+            .GroupBy(write => new { write.Region, write.ListType, write.ListTypeName })
+            .OrderBy(group => group.Key.Region, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.ListType ?? int.MaxValue)
+            .ThenBy(group => group.Key.ListTypeName ?? string.Empty, StringComparer.Ordinal)
+            .Select(group => new DreamcastPvrTaListSummary(
+                group.Key.Region,
+                group.Key.ListType,
+                group.Key.ListTypeName,
+                group.Count(),
+                group.Count(write => string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal)),
+                group.Count(write => string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)),
+                group.Count(write => string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))))
+            .ToArray();
 
     private static IReadOnlyList<DreamcastMapleDmaBatchSummary> CreateMapleDmaBatches(int count, int descriptorLimitHits) =>
         Enumerable.Range(0, count)
