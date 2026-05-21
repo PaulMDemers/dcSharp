@@ -36,8 +36,8 @@
 ## Milestone 4: Timers, Interrupts, And Maple Probe
 
 - Add scheduler clock and interrupt controller basics. Started with periodic VBlank, ASIC event masks, SH-4 external interrupt entry, TMU countdown/reload, and IPRA priority lookup.
-- Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()`; `samples/kos/timer_callback` chains the TMU0 primary timer callback; `samples/kos/asic_irqb` leaves a Maple DMA IRQB source pending; `samples/kos/asic_events` observes and clears an ASIC VBlank event latch; `samples/kos/maple_controller` detects a virtual controller; `samples/kos/maple_controller_script` observes an instruction-indexed input transition; `samples/kos/maple_controller_b` covers absent/configured B0 behavior.
-- Keep KOS fixture expectations in a manifest and run them through a shared CLI/test validator. Done.
+- Build KOS fixtures for timer callbacks and controller polling. Started: `samples/kos/timer` uses `timer_ms_gettime64()` and `thd_sleep()`; `samples/kos/timer_callback` chains the TMU0 primary timer callback; `samples/kos/asic_irqb` leaves a Maple DMA IRQB source pending; `samples/kos/asic_events` observes and clears an ASIC VBlank event latch; `samples/kos/vblank_idle` observes an idle wake on synthetic VBlank; `samples/kos/maple_controller` detects a virtual controller; `samples/kos/maple_controller_script` observes an instruction-indexed input transition; `samples/kos/input_idle` observes an idle wake on an input-script change; `samples/kos/maple_controller_b` covers absent/configured B0 behavior.
+- Keep KOS fixture expectations in a manifest and run them through a shared CLI/test validator. Done, including fixture filtering for targeted CLI and `tools/check.ps1` runs.
 - Centralize TMU advancement and the synthetic VBlank pulse in `DreamcastEventScheduler`. Done.
 - Expose scheduler event diagnostics in run summaries. Done.
 - Expose ASIC event register and pending interrupt diagnostics in run summaries. Done, including decoded pending source register/bit and A/B/C event-bank ACK coverage.
@@ -45,8 +45,8 @@
 - Expose Maple DMA command/response diagnostics in run summaries. Done, including per-DMA descriptor traversal and descriptor-limit diagnostics.
 - Expose aggregate device-access domain and access-kind diagnostics in run summaries. Done.
 - Add fixture expectations for aggregate device-domain access counts. Done.
-- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls, SH-4 `sleep` waits, side-effect-free self-branch waits, narrow read-only interruptible `bt`/`bf` polling waits, controller-script wake boundaries, and masked `dt`/`bf/s` counted-delay loops; broader MMIO polling-loop detection can now build on the same hardware batch path.
-- Add frame/input scripts that vary Maple controller state over instruction time. Started with generic `--controller address:state` and `--controller-script address:script` mapping, compatibility A0/B0 shorthands, optional B0 controller configuration, and a raw Maple condition transition fixture.
+- Improve the scheduler to coalesce timer advancement. Done for skipped instruction-count calls, SH-4 `sleep` waits, side-effect-free self-branch waits, narrow read-only interruptible `bt`/`bf` polling waits, controller-script wake boundaries, and masked `dt`/`bf/s` counted-delay loops. Live fixtures now pin timer, VBlank, and input idle-wake reasons.
+- Add frame/input scripts that vary Maple controller state over instruction time. Started with generic `--controller address:state` and `--controller-script address:script` mapping, compatibility A0/B0 shorthands, optional B0 controller configuration, raw Maple condition transition fixtures, and an input-idle wake fixture.
 
 ## Milestone 5: Video And Audio Bring-Up
 

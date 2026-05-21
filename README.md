@@ -17,12 +17,14 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/timer_callback`: default KOS fixture that chains a TMU0 primary timer callback.
   - `samples/kos/maple_controller`: default KOS fixture that polls a virtual neutral controller.
   - `samples/kos/maple_controller_script`: raw Maple condition fixture that observes an instruction-indexed controller transition.
+  - `samples/kos/input_idle`: raw Maple fixture that observes a scripted input transition across idle sleeps.
   - `samples/kos/maple_controller_b`: raw Maple fixture that probes optional B0 controller presence and state.
   - `samples/kos/framebuffer`: default KOS fixture that writes a RGB565 quadrant pattern to VRAM.
   - `samples/kos/video_mode`: default KOS fixture that sets 640x480 RGB565 mode and writes sentinel pixels.
   - `samples/kos/pvr_registers`: default KOS fixture that writes named PVR registers and TA command apertures.
   - `samples/kos/asic_irqb`: minimal KOS fixture that leaves a Maple DMA ASIC IRQB source pending.
   - `samples/kos/asic_events`: default KOS fixture that observes and clears an ASIC VBlank event latch.
+  - `samples/kos/vblank_idle`: default KOS fixture that waits for a synthetic VBlank through a read-only idle polling loop.
   - `samples/kos/aica_registers`: default KOS fixture that writes AICA channel/global registers and sound RAM.
 - Generated artifacts: `artifacts/` (ignored)
 
@@ -62,6 +64,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller.elf --instructions 60000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_script
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_script.elf --instructions 70000000 --controller-script "a0:0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
+wsl -e bash tools/kos/build-sample.sh samples/kos/input_idle
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_input_idle.elf --instructions 70000000 --controller-script "a0:0:none;15000000:start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80"
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller_b
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_maple_controller_b.elf --instructions 70000000 --controller "b0:b,ltrig=7,rtrig=9,joyx=12,joyy=-13"
 wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
@@ -74,6 +78,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/asic_irqb
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_asic_irqb.elf --instructions 30000000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/asic_events
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_asic_events.elf --instructions 70000000 --trace-tail 40
+wsl -e bash tools/kos/build-sample.sh samples/kos/vblank_idle
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_vblank_idle.elf --instructions 70000000 --vblank-interval 50000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_aica_registers.elf --instructions 70000000 --trace-tail 40
 ```
@@ -132,6 +138,12 @@ For the usual fast local check, including whitespace diff checks, fixture-manife
 .\tools\check.ps1
 ```
 
+Run the fast check plus one matching KOS fixture while iterating:
+
+```powershell
+.\tools\check.ps1 -KosFixtures -FixtureFilter input_idle
+```
+
 Current state:
 
 - ELF loading maps KOS-built SH-4 binaries into Dreamcast RAM.
@@ -150,22 +162,22 @@ Current state:
 - Current PVR register values, PVR register writes, and TA command writes are captured in the video summary with SDK-aligned names and first-pass TA command classification.
 - Current AICA register values, register writes, sound RAM changes, and decoded channel state are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
-- Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, and controller script changes.
-- SH-4 `sleep` advances hardware directly to the next known timer/VBlank interrupt while preserving normal interrupt entry.
-- Side-effect-free self-branch waits can use the same hardware batching path.
+- Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, idle advance batches, idle wake reasons, CPU fast-forward batches, and controller script changes.
+- SH-4 `sleep`, side-effect-free self-branch waits, narrow read-only polling loops, controller-script wake boundaries, and masked counted idle loops use scheduler batching where the current fixtures expose safe patterns.
 - Device logs can be filtered by named domains such as `pvr`, `aica`, `maple`, `scif`, `tmu`, and `unmapped`.
 - SCIF serial writes are captured and printed by the CLI.
 - The default KOS fixture gets through GD-ROM init, video setup, Maple scan, the probe's `main()` output, and KOS shutdown. The runner reports this terminal path as `ProgramExit` when KOS has emitted its exit banner and execution returns outside loaded executable code.
-- The Maple controller fixtures see `dcSharp Virtual Controller`, read neutral or scripted controller state, validate an instruction-indexed transition across two raw Maple condition reads, and exercise absent/configured B0 behavior.
+- The Maple controller fixtures see `dcSharp Virtual Controller`, read neutral or scripted controller state, validate instruction-indexed transitions across raw Maple condition reads and idle sleeps, and exercise absent/configured B0 behavior.
+- The idle fixtures pin all current scheduler wake reasons: timer, VBlank, and input-script changes.
 - The framebuffer fixture writes a 320x240 RGB565 pattern and exposes it through VRAM diagnostics.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
 
 Next targets:
 
-- Extend event batching beyond simple self-branch waits as more idle-loop patterns become visible.
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Add more fixture expectations around device-domain access counts.
+- Deepen PVR fixture coverage with stronger TA command expectations and a first simple polygon/list probe.
+- Start moving from diagnostic AICA state toward silence-safe sample playback timing.
 
 ## Development Bias
 
