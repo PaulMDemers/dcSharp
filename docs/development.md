@@ -82,7 +82,7 @@ Useful run options:
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
 - `fixtures --report-json artifacts/reports/kos-fixtures.json` writes a structured fixture report while keeping the text summary on stdout.
 
-The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, and `minMapleGetConditionTransfers`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, current PVR register values with `pvrRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
+The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts plus scheduler VBlank, hardware tick, hardware batch, max batch, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, and `minMapleGetConditionTransfers`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 KOS fixtures are usually unstripped. When `.symtab` or `.dynsym` is present, text and JSON summaries include nearest function names for stop PCs and trace-tail entries.
 
@@ -94,7 +94,7 @@ Structured run summaries include aggregate device-access counts by domain and ac
 
 PVR summaries include current named register values plus recent register accesses. PVR TA writes are classified into diagnostic command kinds such as `PolygonHeader`, `Vertex`, `VertexEndOfStrip`, `SpriteHeader`, `ModifierVolume`, `UserClip`, and `YuvConverterData`.
 
-AICA channel summaries decode sample format, loop enable, sample address, loop points, pitch, pan, volume, key-on state, and active channel count while remaining silence-safe.
+AICA summaries include current named register values plus recent register accesses. Channel summaries decode sample format, loop enable, sample address, loop points, pitch, pan, volume, key-on state, and active channel count while remaining silence-safe.
 
 Maple summaries capture DMA command/response names, destination labels, receive buffers, response sizes, and decoded controller state for `GetCondition` responses.
 

@@ -139,6 +139,7 @@ public class DreamcastMemoryTests
         var snapshot = memory.CreateAudioSnapshot();
 
         Assert.True(snapshot.RegisterAccesses.Count >= 7);
+        Assert.Contains(snapshot.Registers, register => register.Name == "AICA_CH0_CONTROL" && register.ValueHex == "0x0000C000" && register.Channel == 0);
         Assert.Contains(snapshot.RegisterAccesses, access => access.Name == "AICA_CH0_CONTROL" && access.ValueHex == "0x0000C000");
         var channel = Assert.Single(snapshot.Channels);
         Assert.Equal(0, channel.Channel);

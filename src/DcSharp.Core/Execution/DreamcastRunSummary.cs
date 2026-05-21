@@ -314,6 +314,7 @@ public sealed record DreamcastAudioSummary(
     ulong NonZeroBytes,
     uint Fnv1A32,
     string Fnv1A32Hex,
+    IReadOnlyList<DreamcastAicaRegisterValueSummary> Registers,
     int RegisterAccessCount,
     IReadOnlyList<DreamcastAicaRegisterAccessSummary> RecentRegisterAccesses,
     IReadOnlyList<DreamcastAicaChannelSummary> Channels,
@@ -325,10 +326,23 @@ public sealed record DreamcastAudioSummary(
             snapshot.NonZeroBytes,
             snapshot.Fnv1A32,
             snapshot.Fnv1A32Hex,
+            snapshot.Registers.Select(DreamcastAicaRegisterValueSummary.FromRegister).ToArray(),
             snapshot.RegisterAccesses.Count,
             snapshot.RegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray(),
             snapshot.Channels.Count(channel => channel.Active));
+}
+
+public sealed record DreamcastAicaRegisterValueSummary(
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    int? Channel,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastAicaRegisterValueSummary FromRegister(DreamcastAicaRegisterValue register) =>
+        new(register.Offset, register.OffsetHex, register.Name, register.Channel, register.Value, register.ValueHex);
 }
 
 public sealed record DreamcastAicaRegisterAccessSummary(

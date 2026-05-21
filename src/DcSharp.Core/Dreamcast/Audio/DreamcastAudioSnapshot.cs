@@ -7,8 +7,17 @@ public sealed record DreamcastAudioSnapshot(
     ulong NonZeroBytes,
     uint Fnv1A32,
     string Fnv1A32Hex,
+    IReadOnlyList<DreamcastAicaRegisterValue> Registers,
     IReadOnlyList<DreamcastAicaRegisterAccess> RegisterAccesses,
     IReadOnlyList<DreamcastAicaChannelSnapshot> Channels);
+
+public sealed record DreamcastAicaRegisterValue(
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    int? Channel,
+    uint Value,
+    string ValueHex);
 
 public sealed record DreamcastAicaRegisterAccess(
     MemoryAccessKind Kind,

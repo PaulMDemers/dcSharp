@@ -163,6 +163,22 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var (registerName, expectedValueText) in fixture.AicaRegisters)
+        {
+            var register = summary.Audio.Registers.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
+            if (register is null)
+            {
+                failures.Add($"missing AICA register: {registerName}");
+                continue;
+            }
+
+            var expectedValue = ParseHex32(expectedValueText, $"AICA register {registerName}");
+            if (register.Value != expectedValue)
+            {
+                failures.Add($"AICA register {registerName} expected 0x{expectedValue:X8}, got {register.ValueHex}");
+            }
+        }
+
         foreach (var expected in fixture.AicaChannels)
         {
             var channel = summary.Audio.Channels.SingleOrDefault(channel => channel.Channel == expected.Channel);

@@ -481,6 +481,7 @@ public sealed class DreamcastMemory
             nonZeroBytes,
             hash,
             $"0x{hash:X8}",
+            CreateAicaRegisterValues(),
             aicaRegisterAccesses.ToArray(),
             CreateAicaChannelSnapshots());
     }
@@ -1174,6 +1175,24 @@ public sealed class DreamcastMemory
             value,
             $"0x{value:X8}"));
     }
+
+    private IReadOnlyList<DreamcastAicaRegisterValue> CreateAicaRegisterValues() =>
+        aicaRegisters
+            .Where(entry => entry.Key >= AicaRegisterBase && entry.Key < AicaRegisterLimit)
+            .OrderBy(entry => entry.Key)
+            .Select(entry =>
+            {
+                var offset = entry.Key - AicaRegisterBase;
+                var channel = TryGetAicaChannel(offset, out var channelIndex, out var channelOffset) ? channelIndex : (int?)null;
+                return new DreamcastAicaRegisterValue(
+                    offset,
+                    $"0x{offset:X4}",
+                    AicaRegisterName(offset),
+                    channel,
+                    entry.Value,
+                    $"0x{entry.Value:X8}");
+            })
+            .ToArray();
 
     private IReadOnlyList<DreamcastAicaChannelSnapshot> CreateAicaChannelSnapshots()
     {

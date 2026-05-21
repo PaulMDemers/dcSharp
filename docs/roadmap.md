@@ -53,8 +53,8 @@
 - Add PVR command logging before a full renderer. Started: current named PVR register values, named register accesses, and TA command writes are captured in video summaries.
 - Classify TA command writes before a full renderer. Started with first-word command kind and list type decoding.
 - Add fixture expectations for PVR state. Started: manifests can assert current named PVR register values and RGB565 sentinel samples.
-- Add fixture expectations for AICA state. Started: manifests can assert decoded channel control, sample, loop, pitch, pan, volume, and key-on fields.
-- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
+- Add fixture expectations for AICA state. Started: manifests can assert current named register values plus decoded channel control, sample, loop, pitch, pan, volume, and key-on fields.
+- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, current named register values, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
 
 ## Milestone 6: Media And Broader Compatibility
 

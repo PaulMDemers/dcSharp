@@ -60,6 +60,7 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MinControllerScriptChanges { get; set; }
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
     public Dictionary<string, string> PvrRegisters { get; set; } = [];
+    public Dictionary<string, string> AicaRegisters { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];

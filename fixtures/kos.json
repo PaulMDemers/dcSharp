@@ -286,6 +286,11 @@
         "pitch=0x00001ac0"
       ],
       "minAicaRegisterAccesses": 8,
+      "aicaRegisters": {
+        "AICA_CH0_CONTROL": "0x00008000",
+        "AICA_CH0_PITCH": "0x00001AC0",
+        "AICA_MASTER_VOLUME": "0x0000000F"
+      },
       "aicaChannels": [
         {
           "channel": 0,
