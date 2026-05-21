@@ -288,6 +288,43 @@
       }
     },
     {
+      "name": "asic_irqb",
+      "sample": "samples/kos/asic_irqb",
+      "artifact": "dcsharp_asic_irqb.elf",
+      "instructions": 30000000,
+      "traceTail": 8,
+      "expectedStopReason": "FirmwareExit",
+      "serialContains": [
+        "dcSharp ASIC IRQB probe complete",
+        "arch: exiting the system to the BIOS menu"
+      ],
+      "minMapleTransfers": 1,
+      "minMapleDeviceInfoTransfers": 1,
+      "asicPendingInterrupt": {
+        "eventCode": "0x0360",
+        "level": 11,
+        "levelName": "IRQB",
+        "registerName": "A",
+        "bit": 12,
+        "bitMask": "0x00001000"
+      },
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00001000",
+          "irq9Mask": "0x00000000",
+          "irqBMask": "0x00001000",
+          "pendingIrq9": "0x00000000",
+          "pendingIrqB": "0x00001000"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "maple": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "asic_events",
       "sample": "samples/kos/asic_events",
       "artifact": "dcsharp_asic_events.elf",
