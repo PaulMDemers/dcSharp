@@ -544,6 +544,8 @@ public sealed class DreamcastMemory
             ("origin", 0),
             ("pixel_1_0", 2),
             ("pixel_2_0", 4),
+            ("pixel_0_1_320x240", 320u * 2u),
+            ("pixel_1_1_320x240", ((320u * 1u) + 1u) * 2u),
             ("pixel_160_120_320x240", (120u * 320u + 160u) * 2u),
             ("pixel_319_239_320x240", (239u * 320u + 319u) * 2u),
             ("pixel_320_240_640x480", (240u * 640u + 320u) * 2u)

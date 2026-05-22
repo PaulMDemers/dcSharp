@@ -175,6 +175,8 @@ public class DreamcastMemoryTests
         Assert.True(snapshot.NonZeroBytes >= 3);
         Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
         Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
         var strip = Assert.Single(snapshot.PvrTaStrips);
         Assert.Equal("OpaquePolygon", strip.ListTypeName);
         Assert.Equal(3, strip.Vertices.Count);

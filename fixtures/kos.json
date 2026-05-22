@@ -384,6 +384,14 @@
         {
           "name": "pixel_1_0",
           "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x0000"
         }
       ],
       "minPvrRegisterAccesses": 8,
