@@ -126,16 +126,22 @@ static void RunElf(string path, string[] args)
 
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
-    var pvrTaLists = DreamcastVideoSummary.FromSnapshot(result.Video).PvrTaLists;
+    var videoSummary = DreamcastVideoSummary.FromSnapshot(result.Video);
+    var pvrTaLists = videoSummary.PvrTaLists;
     if (pvrTaLists.Count > 0)
     {
         Console.WriteLine($"PVR TA lists: {FormatPvrTaLists(pvrTaLists)}");
     }
 
-    var pvrTaStrips = DreamcastVideoSummary.FromSnapshot(result.Video).PvrTaStrips;
+    var pvrTaStrips = videoSummary.PvrTaStrips;
     if (pvrTaStrips.Count > 0)
     {
         Console.WriteLine($"PVR TA strips: {FormatPvrTaStrips(pvrTaStrips)}");
+    }
+
+    if (videoSummary.RecentPvrTaParameterHeaders.Count > 0)
+    {
+        Console.WriteLine($"PVR TA params: {FormatPvrTaParameterHeaders(videoSummary.RecentPvrTaParameterHeaders)}");
     }
 
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
@@ -337,6 +343,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.PvrTaStrips.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaStrips={FormatPvrTaStrips(result.Summary.Video.PvrTaStrips)}");
+                }
+
+                if (result.Summary.Video.RecentPvrTaParameterHeaders.Count > 0)
+                {
+                    Console.WriteLine($"  recentPvrTaParams={FormatPvrTaParameterHeaders(result.Summary.Video.RecentPvrTaParameterHeaders)}");
                 }
             }
 
@@ -662,6 +673,11 @@ static string FormatPvrTaLists(IReadOnlyList<DreamcastPvrTaListSummary> lists) =
 static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips) =>
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
+static string FormatPvrTaParameterHeaders(IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> headers) =>
+    string.Join(", ", headers
+        .GroupBy(header => new { header.Region, header.Kind, header.ParameterType, header.ListTypeName, header.EndOfStrip, header.ExpectedPayloadWords })
+        .Select(group => $"{group.Key.Region}:{group.Key.Kind}x{group.Count()} type={group.Key.ParameterType?.ToString(CultureInfo.InvariantCulture) ?? "none"} list={group.Key.ListTypeName ?? "none"} end={group.Key.EndOfStrip} payload={group.Key.ExpectedPayloadWords?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"));
+
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
@@ -738,6 +754,7 @@ internal sealed record FixtureReport(
     int? PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaListSummary>? PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
+    IReadOnlyList<DreamcastPvrTaParameterHeaderSummary>? RecentPvrTaParameterHeaders,
     int? AicaRegisterAccessCount,
     int? MapleTransferCount,
     int? MapleDeviceInfoCount,
@@ -772,6 +789,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Video.PvrTaLists,
             result.Summary?.Video.PvrTaStrips,
+            result.Summary?.Video.RecentPvrTaParameterHeaders,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Maple.TransferCount,
             result.Summary?.Maple.DeviceInfoCount,

@@ -517,6 +517,7 @@ public class DreamcastFixtureRunnerTests
             [],
             taWrites.Count,
             taWrites,
+            taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),
             pvrTaStrips ?? [],
             taWrites

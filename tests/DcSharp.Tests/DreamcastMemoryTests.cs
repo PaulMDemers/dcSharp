@@ -158,6 +158,31 @@ public class DreamcastMemoryTests
                 Assert.Equal(0, list.VertexCount);
                 Assert.Equal(0, list.VertexEndOfStripCount);
             });
+        Assert.Collection(
+            summary.RecentPvrTaParameterHeaders,
+            header =>
+            {
+                Assert.Equal("PolygonHeader", header.Kind);
+                Assert.Equal(4, header.ParameterType);
+                Assert.Equal("OpaquePolygon", header.ListTypeName);
+                Assert.False(header.HasKnownPayloadLength);
+            },
+            header =>
+            {
+                Assert.Equal("Vertex", header.Kind);
+                Assert.False(header.EndOfStrip);
+            },
+            header =>
+            {
+                Assert.Equal("VertexEndOfStrip", header.Kind);
+                Assert.True(header.EndOfStrip);
+            },
+            header =>
+            {
+                Assert.Equal("YuvConverterData", header.Kind);
+                Assert.Equal(0, header.ExpectedPayloadWords);
+                Assert.True(header.HasKnownPayloadLength);
+            });
     }
 
     [Fact]

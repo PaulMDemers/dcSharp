@@ -312,6 +312,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
+    IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> RecentPvrTaParameterHeaders,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
@@ -335,6 +336,7 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
+            snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaParameterHeaderSummary.FromWrite).ToArray(),
             snapshot.PvrTaCommandWrites
                 .GroupBy(write => new PvrTaListKey(write.Region, write.ListType, write.ListTypeName))
                 .OrderBy(group => group.Key.Region, StringComparer.Ordinal)
@@ -404,6 +406,44 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
 {
     public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
         new(write.Address, write.AddressHex, write.Region, write.Kind, write.ListType, write.ListTypeName, write.EndOfStrip, write.Size, write.Value, write.ValueHex);
+}
+
+public sealed record DreamcastPvrTaParameterHeaderSummary(
+    string Region,
+    uint Value,
+    string ValueHex,
+    string Kind,
+    int? ParameterType,
+    int? ListType,
+    string? ListTypeName,
+    bool EndOfStrip,
+    int? ExpectedPayloadWords,
+    bool HasKnownPayloadLength)
+{
+    public static DreamcastPvrTaParameterHeaderSummary FromWrite(DreamcastPvrTaCommandWrite write)
+    {
+        var header = DreamcastPvrTaParameterDecoder.Decode(write.Region, write.Value);
+        return FromHeader(header);
+    }
+
+    public static DreamcastPvrTaParameterHeaderSummary FromWriteSummary(DreamcastPvrTaCommandWriteSummary write)
+    {
+        var header = DreamcastPvrTaParameterDecoder.Decode(write.Region, write.Value);
+        return FromHeader(header);
+    }
+
+    private static DreamcastPvrTaParameterHeaderSummary FromHeader(DreamcastPvrTaParameterHeader header) =>
+        new(
+            header.Region,
+            header.Value,
+            header.ValueHex,
+            header.Kind,
+            header.ParameterType,
+            header.ListType,
+            header.ListTypeName,
+            header.EndOfStrip,
+            header.ExpectedPayloadWords,
+            header.HasKnownPayloadLength);
 }
 
 public sealed record DreamcastPvrTaListSummary(
