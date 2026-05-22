@@ -194,6 +194,9 @@ public class DreamcastMemoryTests
                 Assert.Equal("OpaquePolygon", header.ListTypeName);
                 Assert.Equal(7, header.ExpectedPayloadWords);
                 Assert.True(header.HasKnownPayloadLength);
+                Assert.Equal("ArgbPacked", header.PolygonHeaderCommand?.ColorFormatName);
+                Assert.Equal("Strip2", header.PolygonHeaderCommand?.StripLengthName);
+                Assert.True(header.PolygonHeaderCommand?.AutoStripLength);
             },
             header =>
             {

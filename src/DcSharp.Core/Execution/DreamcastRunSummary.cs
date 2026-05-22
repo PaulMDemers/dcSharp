@@ -455,7 +455,8 @@ public sealed record DreamcastPvrTaParameterHeaderSummary(
     string? ListTypeName,
     bool EndOfStrip,
     int? ExpectedPayloadWords,
-    bool HasKnownPayloadLength)
+    bool HasKnownPayloadLength,
+    DreamcastPvrTaPolygonHeaderCommandSummary? PolygonHeaderCommand)
 {
     public static DreamcastPvrTaParameterHeaderSummary FromWrite(DreamcastPvrTaCommandWrite write)
     {
@@ -480,7 +481,40 @@ public sealed record DreamcastPvrTaParameterHeaderSummary(
             header.ListTypeName,
             header.EndOfStrip,
             header.ExpectedPayloadWords,
-            header.HasKnownPayloadLength);
+            header.HasKnownPayloadLength,
+            header.PolygonHeaderCommand is { } command ? DreamcastPvrTaPolygonHeaderCommandSummary.FromCommand(command) : null);
+}
+
+public sealed record DreamcastPvrTaPolygonHeaderCommandSummary(
+    bool Uv16Bit,
+    bool Gouraud,
+    bool OffsetColorEnabled,
+    bool TextureEnabled,
+    int ColorFormat,
+    string ColorFormatName,
+    bool ModifierNormal,
+    bool ModifierEnabled,
+    int ClipMode,
+    string ClipModeName,
+    int StripLength,
+    string StripLengthName,
+    bool AutoStripLength)
+{
+    public static DreamcastPvrTaPolygonHeaderCommandSummary FromCommand(DreamcastPvrTaPolygonHeaderCommand command) =>
+        new(
+            command.Uv16Bit,
+            command.Gouraud,
+            command.OffsetColorEnabled,
+            command.TextureEnabled,
+            command.ColorFormat,
+            command.ColorFormatName,
+            command.ModifierNormal,
+            command.ModifierEnabled,
+            command.ClipMode,
+            command.ClipModeName,
+            command.StripLength,
+            command.StripLengthName,
+            command.AutoStripLength);
 }
 
 public sealed record DreamcastPvrTaListSummary(

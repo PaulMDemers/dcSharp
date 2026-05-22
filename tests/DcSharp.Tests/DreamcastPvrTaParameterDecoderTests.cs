@@ -17,6 +17,20 @@ public class DreamcastPvrTaParameterDecoderTests
         Assert.False(header.EndOfStrip);
         Assert.Equal(7, header.ExpectedPayloadWords);
         Assert.True(header.HasKnownPayloadLength);
+        var command = Assert.IsType<DreamcastPvrTaPolygonHeaderCommand>(header.PolygonHeaderCommand);
+        Assert.False(command.Uv16Bit);
+        Assert.False(command.Gouraud);
+        Assert.False(command.OffsetColorEnabled);
+        Assert.False(command.TextureEnabled);
+        Assert.Equal(0, command.ColorFormat);
+        Assert.Equal("ArgbPacked", command.ColorFormatName);
+        Assert.False(command.ModifierNormal);
+        Assert.False(command.ModifierEnabled);
+        Assert.Equal(0, command.ClipMode);
+        Assert.Equal("Disabled", command.ClipModeName);
+        Assert.Equal(1, command.StripLength);
+        Assert.Equal("Strip2", command.StripLengthName);
+        Assert.True(command.AutoStripLength);
     }
 
     [Theory]
