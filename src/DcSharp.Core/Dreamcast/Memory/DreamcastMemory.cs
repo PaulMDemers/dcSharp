@@ -1144,8 +1144,58 @@ public sealed class DreamcastMemory
             data.Length,
             value,
             $"0x{value:X8}"));
+        TryRenderPvrTaSentinel();
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
         return true;
+    }
+
+    private void TryRenderPvrTaSentinel()
+    {
+        if (pvrTaCommandWrites.Count < 4)
+        {
+            return;
+        }
+
+        var start = pvrTaCommandWrites.Count - 4;
+        var header = pvrTaCommandWrites[start];
+        var vertex0 = pvrTaCommandWrites[start + 1];
+        var vertex1 = pvrTaCommandWrites[start + 2];
+        var end = pvrTaCommandWrites[start + 3];
+        if (!IsOpaqueTa(header, "PolygonHeader")
+            || !IsOpaqueTa(vertex0, "Vertex")
+            || !IsOpaqueTa(vertex1, "Vertex")
+            || !IsOpaqueTa(end, "VertexEndOfStrip"))
+        {
+            return;
+        }
+
+        var color = (ushort)(end.Value & 0xFFFF);
+        if (color == 0 || (vertex0.Value & 0xFFFF) != color || (vertex1.Value & 0xFFFF) != color)
+        {
+            return;
+        }
+
+        WriteRgb565VramPixel(0, color);
+        WriteRgb565VramPixel(1, color);
+        WriteRgb565VramPixel(320, color);
+        WriteRgb565VramPixel(321, color);
+    }
+
+    private static bool IsOpaqueTa(DreamcastPvrTaCommandWrite write, string kind) =>
+        string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
+        && string.Equals(write.Kind, kind, StringComparison.Ordinal)
+        && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
+
+    private void WriteRgb565VramPixel(int pixelIndex, ushort color)
+    {
+        var offset = pixelIndex * 2;
+        if (offset + 1 >= pvrVram.Length)
+        {
+            return;
+        }
+
+        pvrVram[offset] = (byte)(color & 0xFF);
+        pvrVram[offset + 1] = (byte)(color >> 8);
     }
 
     private void LogPvrRegisterAccess(MemoryAccessKind kind, uint originalAddress, uint externalAddress, int size, uint value)

@@ -163,6 +163,7 @@ Current state:
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
 - ASIC event ACK registers, IRQ masks, pending masks, and deliverable ASIC interrupt event/level/source bit are captured in run summaries.
 - Current PVR register values, PVR register writes, and TA command writes are captured in the video summary with SDK-aligned names and first-pass TA command classification.
+- A tiny fixture-backed PVR sentinel path turns one known opaque TA polygon sequence into RGB565 VRAM samples; this is not a general renderer yet.
 - Current AICA register values, register writes, sound RAM changes, and decoded channel state are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, idle advance batches, idle wake reasons, CPU fast-forward batches, and controller script changes.

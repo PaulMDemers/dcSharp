@@ -161,6 +161,23 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void KnownOpaqueTaPolygonWritesVisibleVramSentinel()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x1000_0000, 0x8084_0000);
+        memory.WriteUInt32(0x1000_0000, 0xE000_F800);
+        memory.WriteUInt32(0x1000_0000, 0xE000_F800);
+        memory.WriteUInt32(0x1000_0000, 0xF000_F800);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.True(snapshot.NonZeroBytes >= 4);
+        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+    }
+
+    [Fact]
     public void AudioSnapshotReportsAicaRegisterAndChannelState()
     {
         var memory = new DreamcastMemory();

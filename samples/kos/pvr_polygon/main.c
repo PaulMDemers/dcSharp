@@ -18,9 +18,9 @@ int main(int argc, char **argv) {
     PVR_REG(0x0144) = 0x80000000u;
 
     DCSHARP_PVR_TA_INPUT = 0x80840000u;
-    DCSHARP_PVR_TA_INPUT = 0xe0000000u;
-    DCSHARP_PVR_TA_INPUT = 0xe0000000u;
-    DCSHARP_PVR_TA_INPUT = 0xf0000000u;
+    DCSHARP_PVR_TA_INPUT = 0xe000f800u;
+    DCSHARP_PVR_TA_INPUT = 0xe000f800u;
+    DCSHARP_PVR_TA_INPUT = 0xf000f800u;
 
     printf("dcSharp PVR polygon probe: opb_start=0x%08lx vertbuf_start=0x%08lx ta_init=0x%08lx\n",
            (unsigned long)PVR_REG(0x0124),
