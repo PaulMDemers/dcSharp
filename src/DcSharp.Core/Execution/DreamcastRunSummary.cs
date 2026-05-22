@@ -418,13 +418,33 @@ public sealed record DreamcastPvrTaListSummary(
 public sealed record DreamcastPvrTaVertexSummary(
     int X,
     int Y,
+    bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
-    uint Value,
-    string ValueHex)
+    uint ControlValue,
+    string ControlValueHex,
+    uint XValue,
+    string XValueHex,
+    uint YValue,
+    string YValueHex,
+    uint ColorValue,
+    string ColorValueHex)
 {
     public static DreamcastPvrTaVertexSummary FromVertex(DreamcastPvrTaVertex vertex) =>
-        new(vertex.X, vertex.Y, vertex.Rgb565, vertex.Rgb565Hex, vertex.Value, vertex.ValueHex);
+        new(
+            vertex.X,
+            vertex.Y,
+            vertex.EndOfStrip,
+            vertex.Rgb565,
+            vertex.Rgb565Hex,
+            vertex.ControlValue,
+            vertex.ControlValueHex,
+            vertex.XValue,
+            vertex.XValueHex,
+            vertex.YValue,
+            vertex.YValueHex,
+            vertex.ColorValue,
+            vertex.ColorValueHex);
 }
 
 public sealed record DreamcastPvrTaStripSummary(

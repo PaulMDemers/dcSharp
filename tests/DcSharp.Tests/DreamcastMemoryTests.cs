@@ -166,9 +166,9 @@ public class DreamcastMemoryTests
         var memory = new DreamcastMemory();
 
         memory.WriteUInt32(0x1000_0000, 0x8084_0000);
-        memory.WriteUInt32(0x1000_0000, 0xE011_F800);
-        memory.WriteUInt32(0x1000_0000, 0xE021_F800);
-        memory.WriteUInt32(0x1000_0000, 0xF012_F800);
+        WritePvrVertexPacket(memory, endOfStrip: false, x: 1, y: 1, color: 0xF800);
+        WritePvrVertexPacket(memory, endOfStrip: false, x: 2, y: 1, color: 0xF800);
+        WritePvrVertexPacket(memory, endOfStrip: true, x: 1, y: 2, color: 0xF800);
 
         var snapshot = memory.CreateVideoSnapshot();
 
@@ -179,6 +179,34 @@ public class DreamcastMemoryTests
         Assert.Equal("OpaquePolygon", strip.ListTypeName);
         Assert.Equal(3, strip.Vertices.Count);
         Assert.Equal(0xF800, strip.Rgb565);
+        Assert.Collection(
+            strip.Vertices,
+            vertex =>
+            {
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(1, vertex.Y);
+                Assert.Equal("0xE0000000", vertex.ControlValueHex);
+                Assert.Equal("0x0000F800", vertex.ColorValueHex);
+            },
+            vertex =>
+            {
+                Assert.Equal(2, vertex.X);
+                Assert.Equal(1, vertex.Y);
+            },
+            vertex =>
+            {
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(2, vertex.Y);
+                Assert.True(vertex.EndOfStrip);
+            });
+    }
+
+    private static void WritePvrVertexPacket(DreamcastMemory memory, bool endOfStrip, int x, int y, ushort color)
+    {
+        memory.WriteUInt32(0x1000_0000, endOfStrip ? 0xF000_0000 : 0xE000_0000);
+        memory.WriteUInt32(0x1000_0000, (uint)x << 16);
+        memory.WriteUInt32(0x1000_0000, (uint)y << 16);
+        memory.WriteUInt32(0x1000_0000, color);
     }
 
     [Fact]

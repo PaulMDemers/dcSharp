@@ -387,7 +387,7 @@
         }
       ],
       "minPvrRegisterAccesses": 8,
-      "minPvrTaCommandWrites": 4,
+      "minPvrTaCommandWrites": 13,
       "pvrRegisters": {
         "PVR_TA_OPB_START": "0x00100000",
         "PVR_TA_VERTBUF_START": "0x00200000",
@@ -409,23 +409,22 @@
           "region": "TA_INPUT",
           "listTypeName": "OpaquePolygon",
           "endOfStrip": false,
-          "value": "0xE011F800",
-          "minCount": 1
-        },
-        {
-          "kind": "Vertex",
-          "region": "TA_INPUT",
-          "listTypeName": "OpaquePolygon",
-          "endOfStrip": false,
-          "value": "0xE021F800",
-          "minCount": 1
+          "value": "0xE0000000",
+          "minCount": 2
         },
         {
           "kind": "VertexEndOfStrip",
           "region": "TA_INPUT",
           "listTypeName": "OpaquePolygon",
           "endOfStrip": true,
-          "value": "0xF012F800",
+          "value": "0xF0000000",
+          "minCount": 1
+        },
+        {
+          "kind": "Unknown",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "value": "0x0000F800",
           "minCount": 1
         }
       ],
@@ -442,7 +441,7 @@
         {
           "region": "TA_INPUT",
           "listTypeName": "OpaquePolygon",
-          "minCommands": 4,
+          "minCommands": 13,
           "minPolygonHeaders": 1,
           "minVertices": 2,
           "minVertexEndOfStrip": 1
