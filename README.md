@@ -183,7 +183,7 @@ Next targets:
 
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Replace the fixture-oriented vertex packet with real PVR vertex parameter decoding.
+- Replace the diagnostic fixture-only vertex packet with real PVR vertex parameter payload decoding.
 - Start moving from diagnostic AICA state toward silence-safe sample playback timing.
 
 ## Development Bias

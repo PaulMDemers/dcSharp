@@ -2,12 +2,12 @@ using DcSharp.Core.Dreamcast.Video;
 
 namespace DcSharp.Tests;
 
-public class DreamcastPvrTaVertexPacketDecoderTests
+public class DreamcastPvrTaDiagnosticVertexPacketDecoderTests
 {
     [Fact]
     public void DecodesControlAndPayloadWords()
     {
-        var decoder = new DreamcastPvrTaVertexPacketDecoder();
+        var decoder = new DreamcastPvrTaDiagnosticVertexPacketDecoder();
 
         decoder.Begin(CreateWrite("VertexEndOfStrip", 0xF000_0000), endOfStrip: true);
 
@@ -33,7 +33,7 @@ public class DreamcastPvrTaVertexPacketDecoderTests
     [Fact]
     public void DecodesSignedCoordinatePayloads()
     {
-        var decoder = new DreamcastPvrTaVertexPacketDecoder();
+        var decoder = new DreamcastPvrTaDiagnosticVertexPacketDecoder();
 
         decoder.Begin(CreateWrite("Vertex", 0xE000_0000), endOfStrip: false);
         Assert.False(decoder.AcceptPayload(0xFFFF_0000, out _));
@@ -50,7 +50,7 @@ public class DreamcastPvrTaVertexPacketDecoderTests
     [Fact]
     public void ResetDropsIncompletePacket()
     {
-        var decoder = new DreamcastPvrTaVertexPacketDecoder();
+        var decoder = new DreamcastPvrTaDiagnosticVertexPacketDecoder();
 
         decoder.Begin(CreateWrite("Vertex", 0xE000_0000), endOfStrip: false);
         Assert.False(decoder.AcceptPayload(0x0001_0000, out _));

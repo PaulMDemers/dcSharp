@@ -4,7 +4,7 @@ public sealed class DreamcastPvrTaState
 {
     private bool inRenderableOpaqueList;
     private uint currentHeaderValue;
-    private readonly DreamcastPvrTaVertexPacketDecoder vertexDecoder = new();
+    private readonly DreamcastPvrTaDiagnosticVertexPacketDecoder vertexDecoder = new();
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
     private readonly List<DreamcastPvrTaStrip> completedStrips = [];
 

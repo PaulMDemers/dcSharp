@@ -1,6 +1,6 @@
 namespace DcSharp.Core.Dreamcast.Video;
 
-public sealed class DreamcastPvrTaVertexPacketDecoder
+public sealed class DreamcastPvrTaDiagnosticVertexPacketDecoder
 {
     private PendingVertexPacket? pending;
 
