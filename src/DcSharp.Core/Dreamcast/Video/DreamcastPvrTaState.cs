@@ -4,7 +4,7 @@ public sealed class DreamcastPvrTaState
 {
     private bool inRenderableOpaqueList;
     private uint currentHeaderValue;
-    private PendingVertexPacket? pendingVertex;
+    private readonly DreamcastPvrTaVertexPacketDecoder vertexDecoder = new();
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
     private readonly List<DreamcastPvrTaStrip> completedStrips = [];
 
@@ -31,20 +31,20 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (pendingVertex is not null)
+        if (vertexDecoder.HasPending)
         {
             return AcceptVertexPayload(write);
         }
 
         if (string.Equals(write.Kind, "Vertex", StringComparison.Ordinal))
         {
-            pendingVertex = new PendingVertexPacket(write, EndOfStrip: false);
+            vertexDecoder.Begin(write, endOfStrip: false);
             return null;
         }
 
         if (string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))
         {
-            pendingVertex = new PendingVertexPacket(write, EndOfStrip: true);
+            vertexDecoder.Begin(write, endOfStrip: true);
             return null;
         }
 
@@ -54,20 +54,12 @@ public sealed class DreamcastPvrTaState
 
     private DreamcastPvrTaRenderCommand? AcceptVertexPayload(DreamcastPvrTaCommandWrite write)
     {
-        if (pendingVertex is null)
+        if (!vertexDecoder.AcceptPayload(write.Value, out var vertex))
         {
             return null;
         }
 
-        pendingVertex = pendingVertex.AcceptPayload(write.Value);
-        if (!pendingVertex.IsComplete)
-        {
-            return null;
-        }
-
-        var vertex = pendingVertex.ToVertex();
-        pendingVertex = null;
-        if (vertex.Rgb565 == 0)
+        if (vertex is null || vertex.Rgb565 == 0)
         {
             ResetStrip();
             return null;
@@ -114,7 +106,7 @@ public sealed class DreamcastPvrTaState
 
     private void ResetStrip()
     {
-        pendingVertex = null;
+        vertexDecoder.Reset();
         currentVertices.Clear();
     }
 }
@@ -133,56 +125,6 @@ public sealed record DreamcastPvrTaVertex(
     string YValueHex,
     uint ColorValue,
     string ColorValueHex);
-
-internal sealed record PendingVertexPacket(
-    DreamcastPvrTaCommandWrite Control,
-    bool EndOfStrip,
-    uint? XValue = null,
-    uint? YValue = null,
-    uint? ColorValue = null)
-{
-    public bool IsComplete => XValue is not null && YValue is not null && ColorValue is not null;
-
-    public PendingVertexPacket AcceptPayload(uint value)
-    {
-        if (XValue is null)
-        {
-            return this with { XValue = value };
-        }
-
-        if (YValue is null)
-        {
-            return this with { YValue = value };
-        }
-
-        return this with { ColorValue = value };
-    }
-
-    public DreamcastPvrTaVertex ToVertex()
-    {
-        var xValue = XValue ?? 0;
-        var yValue = YValue ?? 0;
-        var colorValue = ColorValue ?? 0;
-        var color = (ushort)(colorValue & 0xFFFF);
-        return new DreamcastPvrTaVertex(
-            DecodeSigned16Dot16(xValue),
-            DecodeSigned16Dot16(yValue),
-            EndOfStrip,
-            color,
-            $"0x{color:X4}",
-            Control.Value,
-            Control.ValueHex,
-            xValue,
-            $"0x{xValue:X8}",
-            yValue,
-            $"0x{yValue:X8}",
-            colorValue,
-            $"0x{colorValue:X8}");
-    }
-
-    private static int DecodeSigned16Dot16(uint value) =>
-        unchecked((short)(value >> 16));
-}
 
 public sealed record DreamcastPvrTaStrip(
     string Region,
