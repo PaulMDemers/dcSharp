@@ -565,6 +565,7 @@ public static class DreamcastFixtureRunner
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expected.FogTypeName is null || string.Equals(payload.Mode2Fields.FogTypeName, expected.FogTypeName, StringComparison.Ordinal))
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
+            && (expected.NonTwiddled is null || payload.Mode3Fields.NonTwiddled == expected.NonTwiddled)
             && (expected.PixelFormatName is null || string.Equals(payload.Mode3Fields.PixelFormatName, expected.PixelFormatName, StringComparison.Ordinal))
             && (expected.VqEnabled is null || payload.Mode3Fields.VqEnabled == expected.VqEnabled)
             && (expected.MipMapEnabled is null || payload.Mode3Fields.MipMapEnabled == expected.MipMapEnabled));
@@ -594,6 +595,7 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "fogTypeName", expected.FogTypeName);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
+        AddOptionalDetail(details, "nonTwiddled", expected.NonTwiddled);
         AddOptionalDetail(details, "pixelFormatName", expected.PixelFormatName);
         AddOptionalDetail(details, "vqEnabled", expected.VqEnabled);
         AddOptionalDetail(details, "mipMapEnabled", expected.MipMapEnabled);
@@ -863,6 +865,7 @@ public static class DreamcastFixtureRunner
             && expected.BlendDstName is null
             && expected.AlphaEnabled is null
             && expectedTextureBase is null
+            && expected.NonTwiddled is null
             && expected.PixelFormatName is null
             && expected.VqEnabled is null
             && expected.MipMapEnabled is null)
@@ -882,6 +885,7 @@ public static class DreamcastFixtureRunner
             && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
+            && (expected.NonTwiddled is null || payload.Mode3Fields.NonTwiddled == expected.NonTwiddled)
             && (expected.PixelFormatName is null || string.Equals(payload.Mode3Fields.PixelFormatName, expected.PixelFormatName, StringComparison.Ordinal))
             && (expected.VqEnabled is null || payload.Mode3Fields.VqEnabled == expected.VqEnabled)
             && (expected.MipMapEnabled is null || payload.Mode3Fields.MipMapEnabled == expected.MipMapEnabled);
@@ -931,6 +935,7 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "blendDst", expected.BlendDstName);
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
+        AddOptionalDetail(details, "nonTwiddled", expected.NonTwiddled);
         AddOptionalDetail(details, "pixelFormat", expected.PixelFormatName);
         AddOptionalDetail(details, "vq", expected.VqEnabled);
         AddOptionalDetail(details, "mipMap", expected.MipMapEnabled);

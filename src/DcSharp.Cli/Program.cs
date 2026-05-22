@@ -706,7 +706,7 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
 static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
     payload is null
         ? string.Empty
-        : $" mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} pixel={payload.Mode3Fields.PixelFormatName}";
+        : $" mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} twid={!payload.Mode3Fields.NonTwiddled} pixel={payload.Mode3Fields.PixelFormatName}";
 
 static string FormatPvrTaParameterHeaders(IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> headers) =>
     string.Join(", ", headers
@@ -743,7 +743,7 @@ static string FormatPvrTaPayloadWordName(string? payloadWordName) =>
 
 static string FormatPvrTaPolygonHeaderPayloads(IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary> payloads) =>
     string.Join(", ", payloads.Select(payload =>
-        $"{payload.Region}:{payload.ListTypeName ?? "none"} header={payload.HeaderValueHex} mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} fog={payload.Mode2Fields.FogTypeName} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} pixel={payload.Mode3Fields.PixelFormatName} vq={payload.Mode3Fields.VqEnabled} mip={payload.Mode3Fields.MipMapEnabled}"));
+        $"{payload.Region}:{payload.ListTypeName ?? "none"} header={payload.HeaderValueHex} mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} fog={payload.Mode2Fields.FogTypeName} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} twid={!payload.Mode3Fields.NonTwiddled} pixel={payload.Mode3Fields.PixelFormatName} vq={payload.Mode3Fields.VqEnabled} mip={payload.Mode3Fields.MipMapEnabled}"));
 
 static string FormatPvrTaRealVertexPayloads(IReadOnlyList<DreamcastPvrTaRealVertexPayloadSummary> vertices) =>
     string.Join(", ", vertices

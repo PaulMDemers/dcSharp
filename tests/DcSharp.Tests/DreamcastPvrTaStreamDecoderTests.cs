@@ -35,6 +35,7 @@ public class DreamcastPvrTaStreamDecoderTests
         Assert.Equal("SrcAlpha", payload.Mode2Fields.BlendSrcName);
         Assert.Equal(0x4800_1234u, payload.Mode3);
         Assert.Equal(0x0000_1234u, payload.Mode3Fields.TextureBase);
+        Assert.False(payload.Mode3Fields.NonTwiddled);
         Assert.Equal("Rgb565", payload.Mode3Fields.PixelFormatName);
         Assert.True(payload.Mode3Fields.VqEnabled);
         Assert.False(payload.Mode3Fields.MipMapEnabled);

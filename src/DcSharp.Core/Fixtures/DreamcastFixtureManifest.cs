@@ -188,6 +188,7 @@ public sealed class DreamcastFixturePvrTaPolygonHeaderPayloadExpectation
     public bool? AlphaEnabled { get; set; }
     public string? FogTypeName { get; set; }
     public string? TextureBase { get; set; }
+    public bool? NonTwiddled { get; set; }
     public string? PixelFormatName { get; set; }
     public bool? VqEnabled { get; set; }
     public bool? MipMapEnabled { get; set; }
@@ -238,6 +239,7 @@ public sealed class DreamcastFixturePvrTaStripExpectation
     public string? BlendDstName { get; set; }
     public bool? AlphaEnabled { get; set; }
     public string? TextureBase { get; set; }
+    public bool? NonTwiddled { get; set; }
     public string? PixelFormatName { get; set; }
     public bool? VqEnabled { get; set; }
     public bool? MipMapEnabled { get; set; }

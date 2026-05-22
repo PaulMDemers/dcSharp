@@ -14,6 +14,17 @@ static void write_words(const uint32_t *words, uint32_t count) {
     }
 }
 
+static uint32_t twiddled_index(uint32_t x, uint32_t y) {
+    uint32_t index = 0;
+
+    for(uint32_t bit = 0; bit < 16; bit++) {
+        index |= ((x >> bit) & 1u) << (bit * 2u);
+        index |= ((y >> bit) & 1u) << ((bit * 2u) + 1u);
+    }
+
+    return index;
+}
+
 static void write_pvr_vertex(uint32_t flags, uint32_t x, uint32_t y, uint32_t u, uint32_t v) {
     const uint32_t words[8] = {
         flags,
@@ -33,12 +44,12 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    const uint32_t texture_base = 0x00001000u;
+    const uint32_t texture_base = 0x00002000u;
     const uint32_t header[8] = {
         0x80840008u,
         0x02000000u,
         0x00000000u,
-        0x0c001000u,
+        0x08002000u,
         0x00000000u,
         0x00000000u,
         0x00000000u,
@@ -51,16 +62,16 @@ int main(int argc, char **argv) {
     PVR_REG(0x0130) = 0x00201000u;
     PVR_REG(0x0144) = 0x80000000u;
 
-    DCSHARP_PVR_VRAM16(texture_base + 0u) = 0xf800u;
-    DCSHARP_PVR_VRAM16(texture_base + 14u) = 0x07e0u;
-    DCSHARP_PVR_VRAM16(texture_base + (7u * 8u * 2u)) = 0x001fu;
+    DCSHARP_PVR_VRAM16(texture_base + (twiddled_index(0u, 0u) * 2u)) = 0xf800u;
+    DCSHARP_PVR_VRAM16(texture_base + (twiddled_index(7u, 0u) * 2u)) = 0x07e0u;
+    DCSHARP_PVR_VRAM16(texture_base + (twiddled_index(0u, 7u) * 2u)) = 0x001fu;
 
     write_words(header, 8);
     write_pvr_vertex(0xe0000000u, 0x3f800000u, 0x3f800000u, 0x00000000u, 0x00000000u);
     write_pvr_vertex(0xe0000000u, 0x40000000u, 0x3f800000u, 0x3f800000u, 0x00000000u);
     write_pvr_vertex(0xf0000000u, 0x3f800000u, 0x40000000u, 0x00000000u, 0x3f800000u);
 
-    printf("dcSharp PVR texture RGB565 probe: texture_base=0x%08lx mode3=0x%08lx ta_init=0x%08lx\n",
+    printf("dcSharp PVR texture twiddled RGB565 probe: texture_base=0x%08lx mode3=0x%08lx ta_init=0x%08lx\n",
            (unsigned long)texture_base,
            (unsigned long)header[3],
            (unsigned long)PVR_REG(0x0144));

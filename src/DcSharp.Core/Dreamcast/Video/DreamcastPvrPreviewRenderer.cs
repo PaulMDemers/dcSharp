@@ -203,9 +203,23 @@ public static class DreamcastPvrPreviewRenderer
         var v = (vertices[0].V * weightA) + (vertices[1].V * weightB) + (vertices[2].V * weightC);
         var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
         var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
-        var texelIndex = texelY * width + texelX;
+        var texelIndex = payload.Mode3Fields.NonTwiddled
+            ? (texelY * width) + texelX
+            : TwiddledTextureIndex(texelX, texelY);
         var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
         return ReadRgb565Pixel(vram, textureOffset / 2);
+    }
+
+    private static int TwiddledTextureIndex(int x, int y)
+    {
+        var index = 0;
+        for (var bit = 0; bit < 16; bit++)
+        {
+            index |= ((x >> bit) & 1) << (bit * 2);
+            index |= ((y >> bit) & 1) << ((bit * 2) + 1);
+        }
+
+        return index;
     }
 
     private static int TextureSize(int encoded) =>
