@@ -200,6 +200,12 @@
             "$ref": "#/$defs/pvrTaList"
           }
         },
+        "pvrTaStrips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaStrip"
+          }
+        },
         "videoSamples": {
           "type": "array",
           "items": {
@@ -390,6 +396,31 @@
           "minimum": 1
         },
         "minVertexEndOfStrip": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaStrip": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rgb565": {
+          "$ref": "#/$defs/hex16"
+        },
+        "minVertices": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minCount": {
           "type": "integer",
           "minimum": 1
         }

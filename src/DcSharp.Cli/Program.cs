@@ -132,6 +132,12 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR TA lists: {FormatPvrTaLists(pvrTaLists)}");
     }
 
+    var pvrTaStrips = DreamcastVideoSummary.FromSnapshot(result.Video).PvrTaStrips;
+    if (pvrTaStrips.Count > 0)
+    {
+        Console.WriteLine($"PVR TA strips: {FormatPvrTaStrips(pvrTaStrips)}");
+    }
+
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentPvrRegisters.Length > 0)
     {
@@ -322,10 +328,15 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
+                }
+
+                if (result.Summary.Video.PvrTaStrips.Count > 0)
+                {
+                    Console.WriteLine($"  pvrTaStrips={FormatPvrTaStrips(result.Summary.Video.PvrTaStrips)}");
                 }
             }
 
@@ -648,6 +659,9 @@ static string FormatController(DreamcastControllerState state) =>
 static string FormatPvrTaLists(IReadOnlyList<DreamcastPvrTaListSummary> lists) =>
     string.Join(", ", lists.Select(list => $"{list.Region}:{list.ListTypeName ?? "none"} commands={list.CommandCount} headers={list.PolygonHeaderCount} vertices={list.VertexCount} ends={list.VertexEndOfStripCount}"));
 
+static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips) =>
+    string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
+
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
@@ -723,6 +737,7 @@ internal sealed record FixtureReport(
     int? PvrRegisterAccessCount,
     int? PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaListSummary>? PvrTaLists,
+    IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
     int? AicaRegisterAccessCount,
     int? MapleTransferCount,
     int? MapleDeviceInfoCount,
@@ -756,6 +771,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrRegisterAccessCount,
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Video.PvrTaLists,
+            result.Summary?.Video.PvrTaStrips,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Maple.TransferCount,
             result.Summary?.Maple.DeviceInfoCount,

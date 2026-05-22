@@ -409,15 +409,32 @@
           "region": "TA_INPUT",
           "listTypeName": "OpaquePolygon",
           "endOfStrip": false,
-          "value": "0xE000F800",
-          "minCount": 2
+          "value": "0xE011F800",
+          "minCount": 1
+        },
+        {
+          "kind": "Vertex",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xE021F800",
+          "minCount": 1
         },
         {
           "kind": "VertexEndOfStrip",
           "region": "TA_INPUT",
           "listTypeName": "OpaquePolygon",
           "endOfStrip": true,
-          "value": "0xF000F800",
+          "value": "0xF012F800",
+          "minCount": 1
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "rgb565": "0xF800",
+          "minVertices": 3,
           "minCount": 1
         }
       ],

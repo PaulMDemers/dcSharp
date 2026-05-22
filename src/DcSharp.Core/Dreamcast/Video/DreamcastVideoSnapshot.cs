@@ -13,6 +13,7 @@ public sealed record DreamcastVideoSnapshot(
     IReadOnlyList<DreamcastPvrRegisterValue> PvrRegisters,
     IReadOnlyList<DreamcastPvrRegisterAccess> PvrRegisterAccesses,
     IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites,
+    IReadOnlyList<DreamcastPvrTaStrip> PvrTaStrips,
     byte[] Vram);
 
 public sealed record DreamcastVideoSample(

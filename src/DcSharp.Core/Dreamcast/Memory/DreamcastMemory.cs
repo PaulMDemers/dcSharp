@@ -461,6 +461,7 @@ public sealed class DreamcastMemory
             CreatePvrRegisterValues(),
             pvrRegisterAccesses.ToArray(),
             pvrTaCommandWrites.ToArray(),
+            pvrTaState.CompletedStrips.ToArray(),
             (byte[])pvrVram.Clone());
     }
 
@@ -1157,10 +1158,11 @@ public sealed class DreamcastMemory
 
     private void RenderPvrTaSentinel(DreamcastPvrTaRenderCommand command)
     {
-        WriteRgb565VramPixel(0, command.Rgb565);
-        WriteRgb565VramPixel(1, command.Rgb565);
-        WriteRgb565VramPixel(320, command.Rgb565);
-        WriteRgb565VramPixel(321, command.Rgb565);
+        var color = command.Strip.Rgb565;
+        WriteRgb565VramPixel(0, color);
+        WriteRgb565VramPixel(1, color);
+        WriteRgb565VramPixel(320, color);
+        WriteRgb565VramPixel(321, color);
     }
 
     private void WriteRgb565VramPixel(int pixelIndex, ushort color)

@@ -52,9 +52,9 @@
 
 - Start with framebuffer/register visibility. Started: PVR VRAM apertures are backed; `samples/kos/framebuffer` writes a RGB565 pattern and `samples/kos/video_mode` sets 640x480 RGB565 with sentinel pixels.
 - Dump the current RGB565 framebuffer snapshot to PNG for visual fixture checks. Done.
-- Add PVR command logging before a full renderer. Started: current named PVR register values, named register accesses, and TA command writes are captured in video summaries.
-- Classify TA command writes before a full renderer. Started with first-word command kind and list type decoding.
-- Add fixture expectations for PVR state. Started: manifests can assert current named PVR register values and RGB565 sentinel samples.
+- Add PVR command logging before a full renderer. Started: current named PVR register values, named register accesses, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in video summaries.
+- Classify TA command writes before a full renderer. Started with first-word command kind, list type decoding, and a tiny fixture-oriented opaque strip assembler.
+- Add fixture expectations for PVR state. Started: manifests can assert current named PVR register values, RGB565 sentinel samples, TA command/list counts, and assembled TA strip matches.
 - Add fixture expectations for AICA state. Started: manifests can assert current named register values plus decoded channel control, sample, loop, pitch, pan, volume, and key-on fields.
 - Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, current named register values, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
 

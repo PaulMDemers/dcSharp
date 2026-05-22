@@ -3,8 +3,11 @@ namespace DcSharp.Core.Dreamcast.Video;
 public sealed class DreamcastPvrTaState
 {
     private bool inRenderableOpaqueList;
-    private ushort? pendingColor;
-    private int verticesInCurrentStrip;
+    private uint currentHeaderValue;
+    private readonly List<DreamcastPvrTaVertex> currentVertices = [];
+    private readonly List<DreamcastPvrTaStrip> completedStrips = [];
+
+    public IReadOnlyList<DreamcastPvrTaStrip> CompletedStrips => completedStrips;
 
     public DreamcastPvrTaRenderCommand? Accept(DreamcastPvrTaCommandWrite write)
     {
@@ -17,6 +20,7 @@ public sealed class DreamcastPvrTaState
         if (string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
         {
             inRenderableOpaqueList = true;
+            currentHeaderValue = write.Value;
             ResetStrip();
             return null;
         }
@@ -49,21 +53,36 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (pendingColor is { } existing && existing != color)
+        if (currentVertices.Count > 0 && currentVertices[0].Rgb565 != color)
         {
             ResetStrip();
             return null;
         }
 
-        pendingColor = color;
-        verticesInCurrentStrip++;
+        currentVertices.Add(DreamcastPvrTaVertex.FromWrite(write));
         if (!endOfStrip)
         {
             return null;
         }
 
-        var canRender = verticesInCurrentStrip >= 3;
-        var result = canRender ? new DreamcastPvrTaRenderCommand(color) : null;
+        var canRender = currentVertices.Count >= 3;
+        var strip = canRender
+            ? new DreamcastPvrTaStrip(
+                write.Region,
+                write.ListType,
+                write.ListTypeName,
+                currentHeaderValue,
+                $"0x{currentHeaderValue:X8}",
+                color,
+                $"0x{color:X4}",
+                currentVertices.ToArray())
+            : null;
+        if (strip is not null)
+        {
+            completedStrips.Add(strip);
+        }
+
+        var result = strip is not null ? new DreamcastPvrTaRenderCommand(strip) : null;
         ResetStrip();
         return result;
     }
@@ -74,9 +93,42 @@ public sealed class DreamcastPvrTaState
 
     private void ResetStrip()
     {
-        pendingColor = null;
-        verticesInCurrentStrip = 0;
+        currentVertices.Clear();
     }
 }
 
-public sealed record DreamcastPvrTaRenderCommand(ushort Rgb565);
+public sealed record DreamcastPvrTaVertex(
+    int X,
+    int Y,
+    ushort Rgb565,
+    string Rgb565Hex,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrTaVertex FromWrite(DreamcastPvrTaCommandWrite write)
+    {
+        var color = (ushort)(write.Value & 0xFFFF);
+        return new DreamcastPvrTaVertex(
+            (int)((write.Value >> 20) & 0xF),
+            (int)((write.Value >> 16) & 0xF),
+            color,
+            $"0x{color:X4}",
+            write.Value,
+            write.ValueHex);
+    }
+}
+
+public sealed record DreamcastPvrTaStrip(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    ushort Rgb565,
+    string Rgb565Hex,
+    IReadOnlyList<DreamcastPvrTaVertex> Vertices);
+
+public sealed record DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip Strip)
+{
+    public ushort Rgb565 => Strip.Rgb565;
+}

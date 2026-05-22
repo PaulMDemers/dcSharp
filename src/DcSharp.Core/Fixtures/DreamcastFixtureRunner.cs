@@ -232,6 +232,11 @@ public static class DreamcastFixtureRunner
             ValidatePvrTaList(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.PvrTaStrips)
+        {
+            ValidatePvrTaStrip(failures, summary, expected);
+        }
+
         foreach (var (registerName, expectedValueText) in fixture.PvrRegisters)
         {
             var register = summary.Video.PvrRegisters.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
@@ -313,7 +318,7 @@ public static class DreamcastFixtureRunner
                 continue;
             }
 
-            var expectedRgb565 = ParseHex16(expected.Rgb565, expected.Name);
+            var expectedRgb565 = ParseHex16(expected.Rgb565, $"Video sample '{expected.Name}'");
             if (sample.Rgb565 != expectedRgb565)
             {
                 failures.Add($"video sample {expected.Name} expected 0x{expectedRgb565:X4}, got {sample.Rgb565Hex}");
@@ -323,12 +328,12 @@ public static class DreamcastFixtureRunner
         return failures;
     }
 
-    private static ushort ParseHex16(string text, string sampleName)
+    private static ushort ParseHex16(string text, string description)
     {
         var value = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
         if (!ushort.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new InvalidDataException($"Video sample '{sampleName}' has invalid RGB565 value '{text}'.");
+            throw new InvalidDataException($"{description} has invalid RGB565 value '{text}'.");
         }
 
         return parsed;
@@ -464,6 +469,49 @@ public static class DreamcastFixtureRunner
         if (expected.ListTypeName is not null)
         {
             details.Add($"list={expected.ListTypeName}");
+        }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidatePvrTaStrip(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixturePvrTaStripExpectation expected)
+    {
+        ushort? expectedColor = expected.Rgb565 is null ? null : ParseHex16(expected.Rgb565, "PVR TA strip color");
+        var count = summary.Video.PvrTaStrips.Count(strip =>
+            (expected.Region is null || string.Equals(strip.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(strip.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expectedColor is null || strip.Rgb565 == expectedColor)
+            && (expected.MinVertices is null || strip.VertexCount >= expected.MinVertices));
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} PVR TA strip {DescribePvrTaStripExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static string DescribePvrTaStripExpectation(DreamcastFixturePvrTaStripExpectation expected)
+    {
+        var details = new List<string>();
+        if (expected.Region is not null)
+        {
+            details.Add($"region={expected.Region}");
+        }
+
+        if (expected.ListTypeName is not null)
+        {
+            details.Add($"list={expected.ListTypeName}");
+        }
+
+        if (expected.Rgb565 is not null)
+        {
+            details.Add($"rgb565={expected.Rgb565}");
+        }
+
+        if (expected.MinVertices is not null)
+        {
+            details.Add($"minVertices={expected.MinVertices}");
         }
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);

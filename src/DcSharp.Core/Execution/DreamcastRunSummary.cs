@@ -313,6 +313,7 @@ public sealed record DreamcastVideoSummary(
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
+    IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 16) =>
@@ -348,6 +349,7 @@ public sealed record DreamcastVideoSummary(
                     group.Count(write => string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)),
                     group.Count(write => string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))))
                 .ToArray(),
+            snapshot.PvrTaStrips.Select(DreamcastPvrTaStripSummary.FromStrip).ToArray(),
             snapshot.PvrTaCommandWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -412,6 +414,42 @@ public sealed record DreamcastPvrTaListSummary(
     int PolygonHeaderCount,
     int VertexCount,
     int VertexEndOfStripCount);
+
+public sealed record DreamcastPvrTaVertexSummary(
+    int X,
+    int Y,
+    ushort Rgb565,
+    string Rgb565Hex,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrTaVertexSummary FromVertex(DreamcastPvrTaVertex vertex) =>
+        new(vertex.X, vertex.Y, vertex.Rgb565, vertex.Rgb565Hex, vertex.Value, vertex.ValueHex);
+}
+
+public sealed record DreamcastPvrTaStripSummary(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    ushort Rgb565,
+    string Rgb565Hex,
+    int VertexCount,
+    IReadOnlyList<DreamcastPvrTaVertexSummary> Vertices)
+{
+    public static DreamcastPvrTaStripSummary FromStrip(DreamcastPvrTaStrip strip) =>
+        new(
+            strip.Region,
+            strip.ListType,
+            strip.ListTypeName,
+            strip.HeaderValue,
+            strip.HeaderValueHex,
+            strip.Rgb565,
+            strip.Rgb565Hex,
+            strip.Vertices.Count,
+            strip.Vertices.Select(DreamcastPvrTaVertexSummary.FromVertex).ToArray());
+}
 
 public sealed record DreamcastPvrTaCommandKindSummary(string Kind, int Count);
 

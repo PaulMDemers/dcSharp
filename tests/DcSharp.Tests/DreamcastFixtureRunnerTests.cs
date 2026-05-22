@@ -129,6 +129,16 @@ public class DreamcastFixtureRunnerTests
                     MinPolygonHeaders = 1
                 }
             ],
+            PvrTaStrips =
+            [
+                new DreamcastFixturePvrTaStripExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    Rgb565 = "0xF800",
+                    MinVertices = 3
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F"
@@ -187,6 +197,19 @@ public class DreamcastFixtureRunnerTests
                     4,
                     0x8084_0000,
                     "0x80840000")
+            ],
+            pvrTaStrips:
+            [
+                new DreamcastPvrTaStripSummary(
+                    "TA_INPUT",
+                    0,
+                    "OpaquePolygon",
+                    0x8084_0000,
+                    "0x80840000",
+                    0xF800,
+                    "0xF800",
+                    3,
+                    [])
             ],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
             aicaChannels: [CreateAudioChannel()]);
@@ -279,6 +302,16 @@ public class DreamcastFixtureRunnerTests
                     Region = "TA_INPUT",
                     ListTypeName = "TranslucentPolygon",
                     MinCommands = 1
+                }
+            ],
+            PvrTaStrips =
+            [
+                new DreamcastFixturePvrTaStripExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    Rgb565 = "0xF800",
+                    MinVertices = 3
                 }
             ],
             AicaRegisters =
@@ -377,6 +410,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
         Assert.Contains("missing PVR TA list region=TA_INPUT list=TranslucentPolygon", failures);
+        Assert.Contains("expected at least 1 PVR TA strip region=TA_INPUT list=OpaquePolygon rgb565=0xF800 minVertices=3 matches, got 0", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
@@ -408,6 +442,7 @@ public class DreamcastFixtureRunnerTests
         DreamcastAsicSummary? asic = null,
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
         IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites = null,
+        IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
         IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null) =>
         new(
@@ -435,7 +470,7 @@ public class DreamcastFixtureRunnerTests
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
             asic ?? new DreamcastAsicSummary([], null, null, null, null),
-            CreateVideoSummary(pvrRegisters, pvrTaCommandWrites),
+            CreateVideoSummary(pvrRegisters, pvrTaCommandWrites, pvrTaStrips),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(
                 mapleTransfers,
@@ -465,7 +500,8 @@ public class DreamcastFixtureRunnerTests
 
     private static DreamcastVideoSummary CreateVideoSummary(
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters,
-        IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites)
+        IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites,
+        IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips)
     {
         var taWrites = pvrTaCommandWrites ?? [];
         return new DreamcastVideoSummary(
@@ -482,6 +518,7 @@ public class DreamcastFixtureRunnerTests
             taWrites.Count,
             taWrites,
             CreatePvrTaLists(taWrites),
+            pvrTaStrips ?? [],
             taWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
