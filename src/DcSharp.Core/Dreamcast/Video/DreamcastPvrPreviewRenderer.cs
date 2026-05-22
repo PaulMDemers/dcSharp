@@ -209,21 +209,7 @@ public static class DreamcastPvrPreviewRenderer
             (vertices[0].V * weightA) + (vertices[1].V * weightB) + (vertices[2].V * weightC),
             payload.Mode2Fields.VClamp,
             payload.Mode2Fields.VFlip);
-        var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
-        var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
-        var texelIndex = payload.Mode3Fields.NonTwiddled
-            ? (texelY * width) + texelX
-            : TwiddledTextureIndex(texelX, texelY);
-        var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
-        var texel = ReadRgb565Pixel(vram, textureOffset / 2);
-        var textureAlphaEnabled = !payload.Mode2Fields.TextureAlphaDisabled;
-        var textureSample = payload.Mode3Fields.PixelFormatName switch
-        {
-            "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
-            "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
-            "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
-            _ => null
-        };
+        var textureSample = SampleTexture(payload, vram, u, v, width, height);
         if (textureSample is null)
         {
             return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
@@ -231,6 +217,126 @@ public static class DreamcastPvrPreviewRenderer
 
         return ApplyTextureShading(strip.Rgb565, textureSample, payload.Mode2Fields.TextureShadingName);
     }
+
+    private static DreamcastPvrPreviewSourceSample? SampleTexture(
+        DreamcastPvrTaPolygonHeaderPayload payload,
+        ReadOnlySpan<byte> vram,
+        float u,
+        float v,
+        int width,
+        int height) =>
+        string.Equals(payload.Mode2Fields.FilterModeName, "Bilinear", StringComparison.Ordinal)
+            ? SampleBilinearTexture(payload, vram, u, v, width, height)
+            : SampleNearestTexture(payload, vram, u, v, width, height);
+
+    private static DreamcastPvrPreviewSourceSample? SampleNearestTexture(
+        DreamcastPvrTaPolygonHeaderPayload payload,
+        ReadOnlySpan<byte> vram,
+        float u,
+        float v,
+        int width,
+        int height)
+    {
+        var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
+        var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
+        return ReadTextureSample(payload, vram, width, texelX, texelY);
+    }
+
+    private static DreamcastPvrPreviewSourceSample? SampleBilinearTexture(
+        DreamcastPvrTaPolygonHeaderPayload payload,
+        ReadOnlySpan<byte> vram,
+        float u,
+        float v,
+        int width,
+        int height)
+    {
+        var texelX = Math.Clamp(u * (width - 1), 0.0f, width - 1);
+        var texelY = Math.Clamp(v * (height - 1), 0.0f, height - 1);
+        var x0 = Math.Clamp((int)MathF.Floor(texelX), 0, width - 1);
+        var y0 = Math.Clamp((int)MathF.Floor(texelY), 0, height - 1);
+        var x1 = Math.Clamp(x0 + 1, 0, width - 1);
+        var y1 = Math.Clamp(y0 + 1, 0, height - 1);
+        var xWeight = texelX - x0;
+        var yWeight = texelY - y0;
+
+        var topLeft = ReadTextureSample(payload, vram, width, x0, y0);
+        var topRight = ReadTextureSample(payload, vram, width, x1, y0);
+        var bottomLeft = ReadTextureSample(payload, vram, width, x0, y1);
+        var bottomRight = ReadTextureSample(payload, vram, width, x1, y1);
+        return topLeft is null || topRight is null || bottomLeft is null || bottomRight is null
+            ? null
+            : InterpolateSamples(topLeft, topRight, bottomLeft, bottomRight, xWeight, yWeight);
+    }
+
+    private static DreamcastPvrPreviewSourceSample? ReadTextureSample(
+        DreamcastPvrTaPolygonHeaderPayload payload,
+        ReadOnlySpan<byte> vram,
+        int width,
+        int x,
+        int y)
+    {
+        var texelIndex = payload.Mode3Fields.NonTwiddled
+            ? (y * width) + x
+            : TwiddledTextureIndex(x, y);
+        var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
+        var texel = ReadRgb565Pixel(vram, textureOffset / 2);
+        var textureAlphaEnabled = !payload.Mode2Fields.TextureAlphaDisabled;
+        return payload.Mode3Fields.PixelFormatName switch
+        {
+            "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
+            "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
+            "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
+            _ => null
+        };
+    }
+
+    private static DreamcastPvrPreviewSourceSample InterpolateSamples(
+        DreamcastPvrPreviewSourceSample topLeft,
+        DreamcastPvrPreviewSourceSample topRight,
+        DreamcastPvrPreviewSourceSample bottomLeft,
+        DreamcastPvrPreviewSourceSample bottomRight,
+        float xWeight,
+        float yWeight)
+    {
+        var (topLeftRed, topLeftGreen, topLeftBlue) = Rgb565ToRgb888(topLeft.Rgb565);
+        var (topRightRed, topRightGreen, topRightBlue) = Rgb565ToRgb888(topRight.Rgb565);
+        var (bottomLeftRed, bottomLeftGreen, bottomLeftBlue) = Rgb565ToRgb888(bottomLeft.Rgb565);
+        var (bottomRightRed, bottomRightGreen, bottomRightBlue) = Rgb565ToRgb888(bottomRight.Rgb565);
+        var red = InterpolateChannel(topLeftRed, topRightRed, bottomLeftRed, bottomRightRed, xWeight, yWeight);
+        var green = InterpolateChannel(topLeftGreen, topRightGreen, bottomLeftGreen, bottomRightGreen, xWeight, yWeight);
+        var blue = InterpolateChannel(topLeftBlue, topRightBlue, bottomLeftBlue, bottomRightBlue, xWeight, yWeight);
+
+        var hasAlpha = topLeft.Alpha is not null
+            || topRight.Alpha is not null
+            || bottomLeft.Alpha is not null
+            || bottomRight.Alpha is not null;
+        var alpha = hasAlpha
+            ? InterpolateChannel(
+                topLeft.Alpha ?? byte.MaxValue,
+                topRight.Alpha ?? byte.MaxValue,
+                bottomLeft.Alpha ?? byte.MaxValue,
+                bottomRight.Alpha ?? byte.MaxValue,
+                xWeight,
+                yWeight)
+            : (byte?)null;
+        return new DreamcastPvrPreviewSourceSample(Rgb888ToRgb565(red, green, blue), alpha);
+    }
+
+    private static byte InterpolateChannel(
+        byte topLeft,
+        byte topRight,
+        byte bottomLeft,
+        byte bottomRight,
+        float xWeight,
+        float yWeight)
+    {
+        var top = Lerp(topLeft, topRight, xWeight);
+        var bottom = Lerp(bottomLeft, bottomRight, xWeight);
+        return ClampToByte(Lerp(top, bottom, yWeight));
+    }
+
+    private static float Lerp(float a, float b, float weight) =>
+        a + ((b - a) * weight);
 
     private static DreamcastPvrPreviewSourceSample ApplyTextureShading(
         ushort vertexColor,

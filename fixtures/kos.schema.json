@@ -519,6 +519,12 @@
           "type": "string",
           "minLength": 1
         },
+        "textureShadingName": {
+          "$ref": "#/$defs/pvrTextureShadingName"
+        },
+        "filterModeName": {
+          "$ref": "#/$defs/pvrFilterModeName"
+        },
         "alphaEnabled": {
           "type": "boolean"
         },
@@ -528,6 +534,9 @@
         },
         "textureBase": {
           "$ref": "#/$defs/hex32"
+        },
+        "nonTwiddled": {
+          "type": "boolean"
         },
         "pixelFormatName": {
           "type": "string",
@@ -799,11 +808,20 @@
             "InverseDestAlpha"
           ]
         },
+        "textureShadingName": {
+          "$ref": "#/$defs/pvrTextureShadingName"
+        },
+        "filterModeName": {
+          "$ref": "#/$defs/pvrFilterModeName"
+        },
         "alphaEnabled": {
           "type": "boolean"
         },
         "textureBase": {
           "$ref": "#/$defs/hex32"
+        },
+        "nonTwiddled": {
+          "type": "boolean"
         },
         "pixelFormatName": {
           "enum": [
@@ -895,6 +913,22 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 255
+    },
+    "pvrTextureShadingName": {
+      "enum": [
+        "Replace",
+        "Modulate",
+        "Decal",
+        "ModulateAlpha"
+      ]
+    },
+    "pvrFilterModeName": {
+      "enum": [
+        "Nearest",
+        "Bilinear",
+        "Trilinear1",
+        "Trilinear2"
+      ]
     },
     "hex16": {
       "type": "string",

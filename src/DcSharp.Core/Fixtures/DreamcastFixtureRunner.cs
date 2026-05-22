@@ -562,6 +562,8 @@ public static class DreamcastFixtureRunner
             && (expected.DepthCompareName is null || string.Equals(payload.Mode1Fields.DepthCompareName, expected.DepthCompareName, StringComparison.Ordinal))
             && (expected.BlendSrcName is null || string.Equals(payload.Mode2Fields.BlendSrcName, expected.BlendSrcName, StringComparison.Ordinal))
             && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
+            && (expected.TextureShadingName is null || string.Equals(payload.Mode2Fields.TextureShadingName, expected.TextureShadingName, StringComparison.Ordinal))
+            && (expected.FilterModeName is null || string.Equals(payload.Mode2Fields.FilterModeName, expected.FilterModeName, StringComparison.Ordinal))
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expected.FogTypeName is null || string.Equals(payload.Mode2Fields.FogTypeName, expected.FogTypeName, StringComparison.Ordinal))
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
@@ -592,6 +594,8 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "depthCompareName", expected.DepthCompareName);
         AddOptionalDetail(details, "blendSrcName", expected.BlendSrcName);
         AddOptionalDetail(details, "blendDstName", expected.BlendDstName);
+        AddOptionalDetail(details, "textureShadingName", expected.TextureShadingName);
+        AddOptionalDetail(details, "filterModeName", expected.FilterModeName);
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "fogTypeName", expected.FogTypeName);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
@@ -863,6 +867,8 @@ public static class DreamcastFixtureRunner
             && expected.DepthCompareName is null
             && expected.BlendSrcName is null
             && expected.BlendDstName is null
+            && expected.TextureShadingName is null
+            && expected.FilterModeName is null
             && expected.AlphaEnabled is null
             && expectedTextureBase is null
             && expected.NonTwiddled is null
@@ -883,6 +889,8 @@ public static class DreamcastFixtureRunner
             && (expected.DepthCompareName is null || string.Equals(payload.Mode1Fields.DepthCompareName, expected.DepthCompareName, StringComparison.Ordinal))
             && (expected.BlendSrcName is null || string.Equals(payload.Mode2Fields.BlendSrcName, expected.BlendSrcName, StringComparison.Ordinal))
             && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
+            && (expected.TextureShadingName is null || string.Equals(payload.Mode2Fields.TextureShadingName, expected.TextureShadingName, StringComparison.Ordinal))
+            && (expected.FilterModeName is null || string.Equals(payload.Mode2Fields.FilterModeName, expected.FilterModeName, StringComparison.Ordinal))
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
             && (expected.NonTwiddled is null || payload.Mode3Fields.NonTwiddled == expected.NonTwiddled)
@@ -933,6 +941,8 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "depthCompare", expected.DepthCompareName);
         AddOptionalDetail(details, "blendSrc", expected.BlendSrcName);
         AddOptionalDetail(details, "blendDst", expected.BlendDstName);
+        AddOptionalDetail(details, "textureShading", expected.TextureShadingName);
+        AddOptionalDetail(details, "filterMode", expected.FilterModeName);
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
         AddOptionalDetail(details, "nonTwiddled", expected.NonTwiddled);

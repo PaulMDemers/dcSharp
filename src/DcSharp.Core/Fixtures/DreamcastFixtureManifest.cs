@@ -185,6 +185,8 @@ public sealed class DreamcastFixturePvrTaPolygonHeaderPayloadExpectation
     public string? DepthCompareName { get; set; }
     public string? BlendSrcName { get; set; }
     public string? BlendDstName { get; set; }
+    public string? TextureShadingName { get; set; }
+    public string? FilterModeName { get; set; }
     public bool? AlphaEnabled { get; set; }
     public string? FogTypeName { get; set; }
     public string? TextureBase { get; set; }
@@ -237,6 +239,8 @@ public sealed class DreamcastFixturePvrTaStripExpectation
     public string? DepthCompareName { get; set; }
     public string? BlendSrcName { get; set; }
     public string? BlendDstName { get; set; }
+    public string? TextureShadingName { get; set; }
+    public string? FilterModeName { get; set; }
     public bool? AlphaEnabled { get; set; }
     public string? TextureBase { get; set; }
     public bool? NonTwiddled { get; set; }

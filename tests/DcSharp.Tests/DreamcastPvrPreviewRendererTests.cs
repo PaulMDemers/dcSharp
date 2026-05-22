@@ -313,6 +313,29 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void SamplesBilinearTextureWhenFilterModeRequestsIt()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 3, 3, 0xF800);
+        WriteTexturePixel(vram, textureBase, 4, 3, 0x07E0);
+        WriteTexturePixel(vram, textureBase, 3, 4, 0x001F);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xFFFF,
+                [(1, 1), (3, 1), (1, 3)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                filterMode: "Bilinear",
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x8410, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void DecalsTextureAlphaOverVertexColor()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -387,6 +410,7 @@ public class DreamcastPvrPreviewRendererTests
         bool vFlip = false,
         bool textureAlphaDisabled = false,
         string textureShading = "Replace",
+        string filterMode = "Nearest",
         uint pixelFormat = 1,
         uint textureBase = 0,
         IReadOnlyList<(float U, float V)>? uvs = null) =>
@@ -396,7 +420,7 @@ public class DreamcastPvrPreviewRendererTests
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, pixelFormat, textureBase),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, pixelFormat, textureBase),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -438,6 +462,7 @@ public class DreamcastPvrPreviewRendererTests
         bool vFlip,
         bool textureAlphaDisabled,
         string textureShading,
+        string filterMode,
         uint pixelFormat,
         uint textureBase)
     {
@@ -473,6 +498,7 @@ public class DreamcastPvrPreviewRendererTests
         var mode2 = BlendBits(blendSrc) << 29
             | BlendBits(blendDst) << 26
             | (TextureShadingBits(textureShading) << 6)
+            | (FilterModeBits(filterMode) << 13)
             | (textureEnabled && vClamp ? 0x0000_8000u : 0)
             | (textureEnabled && uClamp ? 0x0001_0000u : 0)
             | (textureEnabled && vFlip ? 0x0002_0000u : 0)
@@ -516,6 +542,16 @@ public class DreamcastPvrPreviewRendererTests
             "Decal" => 2,
             "ModulateAlpha" => 3,
             _ => throw new ArgumentOutOfRangeException(nameof(textureShading), textureShading, "Unknown texture shading mode.")
+        };
+
+    private static uint FilterModeBits(string filterMode) =>
+        filterMode switch
+        {
+            "Nearest" => 0,
+            "Bilinear" => 1,
+            "Trilinear1" => 2,
+            "Trilinear2" => 3,
+            _ => throw new ArgumentOutOfRangeException(nameof(filterMode), filterMode, "Unknown filter mode.")
         };
 
     private static float[] CreateDepthBuffer(byte[] vram)
