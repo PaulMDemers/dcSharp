@@ -203,6 +203,28 @@ public class DreamcastMemoryTests
             });
     }
 
+    [Fact]
+    public void WiderOpaqueTaPolygonCoversSecondPreviewColumn()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x1000_0000, 0x8084_0000);
+        WritePvrVertexPacket(memory, endOfStrip: false, x: 1, y: 1, color: 0x07E0);
+        WritePvrVertexPacket(memory, endOfStrip: false, x: 3, y: 1, color: 0x07E0);
+        WritePvrVertexPacket(memory, endOfStrip: true, x: 1, y: 2, color: 0x07E0);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
+        var strip = Assert.Single(snapshot.PvrTaStrips);
+        Assert.Equal(0x07E0, strip.Rgb565);
+        Assert.Equal(3, strip.Vertices[1].X);
+    }
+
     private static void WritePvrVertexPacket(DreamcastMemory memory, bool endOfStrip, int x, int y, ushort color)
     {
         memory.WriteUInt32(0x1000_0000, endOfStrip ? 0xF000_0000 : 0xE000_0000);

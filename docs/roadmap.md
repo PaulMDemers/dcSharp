@@ -51,7 +51,7 @@
 ## Milestone 5: Video And Audio Bring-Up
 
 - Start with framebuffer/register visibility. Started: PVR VRAM apertures are backed; `samples/kos/framebuffer` writes a RGB565 pattern and `samples/kos/video_mode` sets 640x480 RGB565 with sentinel pixels.
-- Add the first tiny software preview path. Started: one assembled opaque TA strip can draw a small solid RGB565 triangle preview into VRAM for fixture diagnostics.
+- Add the first tiny software preview path. Started: assembled opaque TA strips can draw small solid RGB565 triangle previews into VRAM for red and green fixture diagnostics.
 - Dump the current RGB565 framebuffer snapshot to PNG for visual fixture checks. Done.
 - Add PVR command logging before a full renderer. Started: current named PVR register values, named register accesses, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in video summaries.
 - Classify TA command writes before a full renderer. Started with first-word command kind, list type decoding, and a tiny fixture-oriented opaque strip assembler that consumes control/X/Y/color vertex packets.

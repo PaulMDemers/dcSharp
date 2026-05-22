@@ -40,6 +40,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/framebuffer
 wsl -e bash tools/kos/build-sample.sh samples/kos/video_mode
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_registers
 wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_polygon
+wsl -e bash tools/kos/build-sample.sh samples/kos/pvr_polygon_green
 wsl -e bash tools/kos/build-sample.sh samples/kos/asic_irqb
 wsl -e bash tools/kos/build-sample.sh samples/kos/asic_events
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
@@ -160,6 +161,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_video_mode.elf`: sets 640x480 RGB565 video mode, writes sentinel VRAM pixels, exposes PVR/video diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_polygon.elf`: writes a minimal opaque polygon-style TA command sequence, exposes TA list/register diagnostics, shuts down, and reports `ProgramExit`.
+- `dcsharp_pvr_polygon_green.elf`: writes a second opaque polygon-style TA command sequence with a wider green preview triangle, exposes TA strip/list/register diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_asic_irqb.elf`: triggers a raw Maple DMA completion with ASIC IRQB enabled, leaves the decoded pending source observable, exits through the firmware-exit trap, and reports `FirmwareExit`.
 - `dcsharp_asic_events.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, observes the raw ACK bit, clears it, disables the mask, shuts down, and reports `ProgramExit`.
 - `dcsharp_vblank_idle.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, spins in a read-only ACK polling loop until synthetic VBlank, exposes idle VBlank wake diagnostics, clears the ACK bit, shuts down, and reports `ProgramExit`.
