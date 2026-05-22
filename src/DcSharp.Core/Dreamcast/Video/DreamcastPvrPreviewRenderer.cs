@@ -184,7 +184,6 @@ public static class DreamcastPvrPreviewRenderer
         var payload = strip.HeaderPayload;
         if (payload is null
             || !payload.Mode1Fields.TextureEnabled
-            || !string.Equals(payload.Mode3Fields.PixelFormatName, "Rgb565", StringComparison.Ordinal)
             || payload.Mode3Fields.VqEnabled
             || payload.Mode3Fields.MipMapEnabled)
         {
@@ -207,7 +206,12 @@ public static class DreamcastPvrPreviewRenderer
             ? (texelY * width) + texelX
             : TwiddledTextureIndex(texelX, texelY);
         var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
-        return ReadRgb565Pixel(vram, textureOffset / 2);
+        return payload.Mode3Fields.PixelFormatName switch
+        {
+            "Rgb565" => ReadRgb565Pixel(vram, textureOffset / 2),
+            "Argb1555" => Argb1555ToRgb565(ReadRgb565Pixel(vram, textureOffset / 2)),
+            _ => strip.Rgb565
+        };
     }
 
     private static int TwiddledTextureIndex(int x, int y)
@@ -288,6 +292,14 @@ public static class DreamcastPvrPreviewRenderer
             Expand5((value >> 11) & 0x1F),
             Expand6((value >> 5) & 0x3F),
             Expand5(value & 0x1F));
+
+    private static ushort Argb1555ToRgb565(ushort value)
+    {
+        var red = (value >> 10) & 0x1F;
+        var green = (value >> 5) & 0x1F;
+        var blue = value & 0x1F;
+        return (ushort)((red << 11) | (((green << 1) | (green >> 4)) << 5) | blue);
+    }
 
     private static byte Expand5(int value) =>
         (byte)((value << 3) | (value >> 2));
