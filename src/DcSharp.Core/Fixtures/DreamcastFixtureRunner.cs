@@ -564,6 +564,8 @@ public static class DreamcastFixtureRunner
             && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
             && (expected.TextureShadingName is null || string.Equals(payload.Mode2Fields.TextureShadingName, expected.TextureShadingName, StringComparison.Ordinal))
             && (expected.FilterModeName is null || string.Equals(payload.Mode2Fields.FilterModeName, expected.FilterModeName, StringComparison.Ordinal))
+            && (expected.TextureUSizeName is null || string.Equals(payload.Mode2Fields.TextureUSizeName, expected.TextureUSizeName, StringComparison.Ordinal))
+            && (expected.TextureVSizeName is null || string.Equals(payload.Mode2Fields.TextureVSizeName, expected.TextureVSizeName, StringComparison.Ordinal))
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expected.FogTypeName is null || string.Equals(payload.Mode2Fields.FogTypeName, expected.FogTypeName, StringComparison.Ordinal))
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
@@ -596,6 +598,8 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "blendDstName", expected.BlendDstName);
         AddOptionalDetail(details, "textureShadingName", expected.TextureShadingName);
         AddOptionalDetail(details, "filterModeName", expected.FilterModeName);
+        AddOptionalDetail(details, "textureUSizeName", expected.TextureUSizeName);
+        AddOptionalDetail(details, "textureVSizeName", expected.TextureVSizeName);
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "fogTypeName", expected.FogTypeName);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
@@ -869,6 +873,8 @@ public static class DreamcastFixtureRunner
             && expected.BlendDstName is null
             && expected.TextureShadingName is null
             && expected.FilterModeName is null
+            && expected.TextureUSizeName is null
+            && expected.TextureVSizeName is null
             && expected.AlphaEnabled is null
             && expectedTextureBase is null
             && expected.NonTwiddled is null
@@ -891,6 +897,8 @@ public static class DreamcastFixtureRunner
             && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
             && (expected.TextureShadingName is null || string.Equals(payload.Mode2Fields.TextureShadingName, expected.TextureShadingName, StringComparison.Ordinal))
             && (expected.FilterModeName is null || string.Equals(payload.Mode2Fields.FilterModeName, expected.FilterModeName, StringComparison.Ordinal))
+            && (expected.TextureUSizeName is null || string.Equals(payload.Mode2Fields.TextureUSizeName, expected.TextureUSizeName, StringComparison.Ordinal))
+            && (expected.TextureVSizeName is null || string.Equals(payload.Mode2Fields.TextureVSizeName, expected.TextureVSizeName, StringComparison.Ordinal))
             && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
             && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
             && (expected.NonTwiddled is null || payload.Mode3Fields.NonTwiddled == expected.NonTwiddled)
@@ -943,6 +951,8 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "blendDst", expected.BlendDstName);
         AddOptionalDetail(details, "textureShading", expected.TextureShadingName);
         AddOptionalDetail(details, "filterMode", expected.FilterModeName);
+        AddOptionalDetail(details, "textureUSize", expected.TextureUSizeName);
+        AddOptionalDetail(details, "textureVSize", expected.TextureVSizeName);
         AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
         AddOptionalDetail(details, "textureBase", expected.TextureBase);
         AddOptionalDetail(details, "nonTwiddled", expected.NonTwiddled);

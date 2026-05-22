@@ -186,6 +186,32 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void SamplesEncodedSixteenBySixteenTextureSize()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 16, 0xF800);
+        WriteTexturePixel(vram, textureBase, 15, 0, 16, 0x07E0);
+        WriteTexturePixel(vram, textureBase, 0, 15, 16, 0x001F);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xFFFF,
+                [(1, 1), (2, 1), (1, 2)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureUSize: 1,
+                textureVSize: 1,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void SamplesArgb1555TextureAsRgb565PreviewPixels()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -411,6 +437,8 @@ public class DreamcastPvrPreviewRendererTests
         bool textureAlphaDisabled = false,
         string textureShading = "Replace",
         string filterMode = "Nearest",
+        uint textureUSize = 0,
+        uint textureVSize = 0,
         uint pixelFormat = 1,
         uint textureBase = 0,
         IReadOnlyList<(float U, float V)>? uvs = null) =>
@@ -420,7 +448,7 @@ public class DreamcastPvrPreviewRendererTests
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, pixelFormat, textureBase),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, textureUSize, textureVSize, pixelFormat, textureBase),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -463,6 +491,8 @@ public class DreamcastPvrPreviewRendererTests
         bool textureAlphaDisabled,
         string textureShading,
         string filterMode,
+        uint textureUSize,
+        uint textureVSize,
         uint pixelFormat,
         uint textureBase)
     {
@@ -497,6 +527,8 @@ public class DreamcastPvrPreviewRendererTests
             | (depthWriteDisabled ? 0x0400_0000u : 0);
         var mode2 = BlendBits(blendSrc) << 29
             | BlendBits(blendDst) << 26
+            | textureVSize
+            | (textureUSize << 3)
             | (TextureShadingBits(textureShading) << 6)
             | (FilterModeBits(filterMode) << 13)
             | (textureEnabled && vClamp ? 0x0000_8000u : 0)
@@ -564,9 +596,12 @@ public class DreamcastPvrPreviewRendererTests
     private static uint SingleToUInt32Bits(float value) =>
         BitConverter.SingleToUInt32Bits(value);
 
-    private static void WriteTexturePixel(byte[] vram, uint textureBase, int x, int y, ushort value)
+    private static void WriteTexturePixel(byte[] vram, uint textureBase, int x, int y, ushort value) =>
+        WriteTexturePixel(vram, textureBase, x, y, 8, value);
+
+    private static void WriteTexturePixel(byte[] vram, uint textureBase, int x, int y, int textureWidth, ushort value)
     {
-        var offset = (int)textureBase + (((y * 8) + x) * 2);
+        var offset = (int)textureBase + (((y * textureWidth) + x) * 2);
         vram[offset] = (byte)(value & 0xFF);
         vram[offset + 1] = (byte)(value >> 8);
     }

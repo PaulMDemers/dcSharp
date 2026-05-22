@@ -525,6 +525,12 @@
         "filterModeName": {
           "$ref": "#/$defs/pvrFilterModeName"
         },
+        "textureUSizeName": {
+          "$ref": "#/$defs/pvrTextureSizeName"
+        },
+        "textureVSizeName": {
+          "$ref": "#/$defs/pvrTextureSizeName"
+        },
         "alphaEnabled": {
           "type": "boolean"
         },
@@ -814,6 +820,12 @@
         "filterModeName": {
           "$ref": "#/$defs/pvrFilterModeName"
         },
+        "textureUSizeName": {
+          "$ref": "#/$defs/pvrTextureSizeName"
+        },
+        "textureVSizeName": {
+          "$ref": "#/$defs/pvrTextureSizeName"
+        },
         "alphaEnabled": {
           "type": "boolean"
         },
@@ -928,6 +940,18 @@
         "Bilinear",
         "Trilinear1",
         "Trilinear2"
+      ]
+    },
+    "pvrTextureSizeName": {
+      "enum": [
+        "8",
+        "16",
+        "32",
+        "64",
+        "128",
+        "256",
+        "512",
+        "1024"
       ]
     },
     "hex16": {
