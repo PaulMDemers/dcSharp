@@ -91,6 +91,8 @@ public sealed class DreamcastPvrTaRealVertexPacketDecoder
             var xValue = XValue ?? 0;
             var yValue = YValue ?? 0;
             var zValue = ZValue ?? 0;
+            var uValue = UValue ?? 0;
+            var vValue = VValue ?? 0;
             var argbValue = ArgbValue ?? 0;
             var color = Argb8888ToRgb565(argbValue);
             return new DreamcastPvrTaVertex(
@@ -99,6 +101,12 @@ public sealed class DreamcastPvrTaRealVertexPacketDecoder
                 BitConverter.UInt32BitsToSingle(zValue),
                 zValue,
                 $"0x{zValue:X8}",
+                BitConverter.UInt32BitsToSingle(uValue),
+                uValue,
+                $"0x{uValue:X8}",
+                BitConverter.UInt32BitsToSingle(vValue),
+                vValue,
+                $"0x{vValue:X8}",
                 EndOfStrip,
                 color,
                 $"0x{color:X4}",

@@ -37,7 +37,8 @@ public static class DreamcastPvrPreviewRenderer
         {
             for (var x = 0; x <= maxX; x++)
             {
-                if (IsInsideTriangle(new Vector2(x, y), a, b, c))
+                var point = new Vector2(x, y);
+                if (IsInsideTriangle(point, a, b, c))
                 {
                     var pixelIndex = PreviewPixelIndex(x, y);
                     if (!PassesDepth(strip, vertices, pixelIndex, depthBuffer, useDepth))
@@ -45,7 +46,7 @@ public static class DreamcastPvrPreviewRenderer
                         continue;
                     }
 
-                    WritePreviewPixel(strip, vertices, vram, pixelIndex);
+                    WritePreviewPixel(strip, vertices, point, a, b, c, vram, pixelIndex);
                     WriteDepth(strip, vertices, pixelIndex, depthBuffer, useDepth);
                 }
             }
@@ -149,10 +150,14 @@ public static class DreamcastPvrPreviewRenderer
     private static void WritePreviewPixel(
         DreamcastPvrTaStrip strip,
         IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        Vector2 point,
+        Vector2 a,
+        Vector2 b,
+        Vector2 c,
         Span<byte> vram,
         int pixelIndex)
     {
-        var source = strip.Rgb565;
+        var source = SourceRgb565(strip, vertices, point, a, b, c, vram);
         var mode2 = strip.HeaderPayload?.Mode2Fields;
         if (mode2?.AlphaEnabled == true)
         {
@@ -165,6 +170,69 @@ public static class DreamcastPvrPreviewRenderer
         }
 
         WriteRgb565Pixel(vram, pixelIndex, source);
+    }
+
+    private static ushort SourceRgb565(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        Vector2 point,
+        Vector2 a,
+        Vector2 b,
+        Vector2 c,
+        ReadOnlySpan<byte> vram)
+    {
+        var payload = strip.HeaderPayload;
+        if (payload is null
+            || !payload.Mode1Fields.TextureEnabled
+            || !string.Equals(payload.Mode3Fields.PixelFormatName, "Rgb565", StringComparison.Ordinal)
+            || payload.Mode3Fields.VqEnabled
+            || payload.Mode3Fields.MipMapEnabled)
+        {
+            return strip.Rgb565;
+        }
+
+        var width = TextureSize(payload.Mode2Fields.TextureUSize);
+        var height = TextureSize(payload.Mode2Fields.TextureVSize);
+        if (width <= 0 || height <= 0)
+        {
+            return strip.Rgb565;
+        }
+
+        var (weightA, weightB, weightC) = Barycentric(point, a, b, c);
+        var u = (vertices[0].U * weightA) + (vertices[1].U * weightB) + (vertices[2].U * weightC);
+        var v = (vertices[0].V * weightA) + (vertices[1].V * weightB) + (vertices[2].V * weightC);
+        var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
+        var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
+        var texelIndex = texelY * width + texelX;
+        var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
+        return ReadRgb565Pixel(vram, textureOffset / 2);
+    }
+
+    private static int TextureSize(int encoded) =>
+        encoded switch
+        {
+            0 => 8,
+            1 => 16,
+            2 => 32,
+            3 => 64,
+            4 => 128,
+            5 => 256,
+            6 => 512,
+            _ => 1024
+        };
+
+    private static (float A, float B, float C) Barycentric(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
+    {
+        var denominator = EdgeFunction(a, b, c);
+        if (MathF.Abs(denominator) < 0.0001f)
+        {
+            return (1.0f, 0.0f, 0.0f);
+        }
+
+        var weightA = EdgeFunction(b, c, point) / denominator;
+        var weightB = EdgeFunction(c, a, point) / denominator;
+        var weightC = EdgeFunction(a, b, point) / denominator;
+        return (weightA, weightB, weightC);
     }
 
     private static ushort BlendRgb565(ushort source, ushort destination, byte sourceAlpha, string sourceBlend, string destinationBlend)
