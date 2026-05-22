@@ -194,6 +194,12 @@
             "$ref": "#/$defs/pvrTaCommand"
           }
         },
+        "pvrTaLists": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaList"
+          }
+        },
         "videoSamples": {
           "type": "array",
           "items": {
@@ -354,6 +360,36 @@
           "$ref": "#/$defs/hex32"
         },
         "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minCommands": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minPolygonHeaders": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minVertices": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minVertexEndOfStrip": {
           "type": "integer",
           "minimum": 1
         }

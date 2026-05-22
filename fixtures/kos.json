@@ -347,6 +347,16 @@
           "minCount": 1
         }
       ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minCommands": 3,
+          "minPolygonHeaders": 1,
+          "minVertices": 1,
+          "minVertexEndOfStrip": 1
+        }
+      ],
       "minDeviceAccessDomains": {
         "pvr": 1,
         "scif": 1
@@ -409,6 +419,16 @@
           "endOfStrip": true,
           "value": "0xF000F800",
           "minCount": 1
+        }
+      ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minCommands": 4,
+          "minPolygonHeaders": 1,
+          "minVertices": 2,
+          "minVertexEndOfStrip": 1
         }
       ],
       "minDeviceAccessDomains": {

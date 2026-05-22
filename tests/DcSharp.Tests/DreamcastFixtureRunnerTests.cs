@@ -119,6 +119,16 @@ public class DreamcastFixtureRunnerTests
                     Value = "0x80840000"
                 }
             ],
+            PvrTaLists =
+            [
+                new DreamcastFixturePvrTaListExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    MinCommands = 1,
+                    MinPolygonHeaders = 1
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F"
@@ -255,6 +265,22 @@ public class DreamcastFixtureRunnerTests
                     Value = "0x80840001"
                 }
             ],
+            PvrTaLists =
+            [
+                new DreamcastFixturePvrTaListExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    MinCommands = 2,
+                    MinVertices = 1
+                },
+                new DreamcastFixturePvrTaListExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "TranslucentPolygon",
+                    MinCommands = 1
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F",
@@ -348,6 +374,9 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
+        Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
+        Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
+        Assert.Contains("missing PVR TA list region=TA_INPUT list=TranslucentPolygon", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);

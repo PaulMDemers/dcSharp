@@ -227,6 +227,11 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.PvrTaLists)
+        {
+            ValidatePvrTaList(failures, summary, expected);
+        }
+
         foreach (var (registerName, expectedValueText) in fixture.PvrRegisters)
         {
             var register = summary.Video.PvrRegisters.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
@@ -416,6 +421,52 @@ public static class DreamcastFixtureRunner
         }
 
         return string.Join(" ", details);
+    }
+
+    private static void ValidatePvrTaList(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixturePvrTaListExpectation expected)
+    {
+        var lists = summary.Video.PvrTaLists.Where(list =>
+            (expected.Region is null || string.Equals(list.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(list.ListTypeName, expected.ListTypeName, StringComparison.Ordinal)))
+            .ToArray();
+        var description = DescribePvrTaListExpectation(expected);
+        if (lists.Length == 0)
+        {
+            failures.Add($"missing PVR TA list {description}");
+            return;
+        }
+
+        ValidatePvrTaListMinimum(failures, description, "commands", expected.MinCommands, lists.Sum(list => list.CommandCount));
+        ValidatePvrTaListMinimum(failures, description, "polygon headers", expected.MinPolygonHeaders, lists.Sum(list => list.PolygonHeaderCount));
+        ValidatePvrTaListMinimum(failures, description, "vertices", expected.MinVertices, lists.Sum(list => list.VertexCount));
+        ValidatePvrTaListMinimum(failures, description, "end-of-strip vertices", expected.MinVertexEndOfStrip, lists.Sum(list => list.VertexEndOfStripCount));
+    }
+
+    private static void ValidatePvrTaListMinimum(List<string> failures, string description, string counter, int? expected, int actual)
+    {
+        if (expected is not null && actual < expected)
+        {
+            failures.Add($"expected PVR TA list {description} to have at least {expected} {counter}, got {actual}");
+        }
+    }
+
+    private static string DescribePvrTaListExpectation(DreamcastFixturePvrTaListExpectation expected)
+    {
+        var details = new List<string>();
+        if (expected.Region is not null)
+        {
+            details.Add($"region={expected.Region}");
+        }
+
+        if (expected.ListTypeName is not null)
+        {
+            details.Add($"list={expected.ListTypeName}");
+        }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
 
     private static uint ParseHex32(string text, string description)

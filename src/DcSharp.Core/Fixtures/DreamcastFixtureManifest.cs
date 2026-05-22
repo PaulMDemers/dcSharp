@@ -77,6 +77,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixtureAsicEventRegisterExpectation> AsicEventRegisters { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
+    public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
 
     internal void Validate()
@@ -117,6 +118,16 @@ public sealed class DreamcastFixturePvrTaCommandExpectation
     public bool? EndOfStrip { get; set; }
     public string? Value { get; set; }
     public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaListExpectation
+{
+    public string? Region { get; set; }
+    public string? ListTypeName { get; set; }
+    public int? MinCommands { get; set; }
+    public int? MinPolygonHeaders { get; set; }
+    public int? MinVertices { get; set; }
+    public int? MinVertexEndOfStrip { get; set; }
 }
 
 public sealed class DreamcastFixtureAsicEventRegisterExpectation
