@@ -76,6 +76,7 @@ public sealed class DreamcastMemory
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
+    private readonly DreamcastPvrTaState pvrTaState = new();
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
@@ -1133,7 +1134,7 @@ public sealed class DreamcastMemory
 
         var value = ToValue(data);
         var command = DreamcastPvrTaCommandDecoder.Decode(region, value);
-        pvrTaCommandWrites.Add(new DreamcastPvrTaCommandWrite(
+        var write = new DreamcastPvrTaCommandWrite(
             address,
             $"0x{address:X8}",
             region,
@@ -1143,48 +1144,24 @@ public sealed class DreamcastMemory
             command.EndOfStrip,
             data.Length,
             value,
-            $"0x{value:X8}"));
-        TryRenderPvrTaSentinel();
+            $"0x{value:X8}");
+        pvrTaCommandWrites.Add(write);
+        if (pvrTaState.Accept(write) is { } renderCommand)
+        {
+            RenderPvrTaSentinel(renderCommand);
+        }
+
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
         return true;
     }
 
-    private void TryRenderPvrTaSentinel()
+    private void RenderPvrTaSentinel(DreamcastPvrTaRenderCommand command)
     {
-        if (pvrTaCommandWrites.Count < 4)
-        {
-            return;
-        }
-
-        var start = pvrTaCommandWrites.Count - 4;
-        var header = pvrTaCommandWrites[start];
-        var vertex0 = pvrTaCommandWrites[start + 1];
-        var vertex1 = pvrTaCommandWrites[start + 2];
-        var end = pvrTaCommandWrites[start + 3];
-        if (!IsOpaqueTa(header, "PolygonHeader")
-            || !IsOpaqueTa(vertex0, "Vertex")
-            || !IsOpaqueTa(vertex1, "Vertex")
-            || !IsOpaqueTa(end, "VertexEndOfStrip"))
-        {
-            return;
-        }
-
-        var color = (ushort)(end.Value & 0xFFFF);
-        if (color == 0 || (vertex0.Value & 0xFFFF) != color || (vertex1.Value & 0xFFFF) != color)
-        {
-            return;
-        }
-
-        WriteRgb565VramPixel(0, color);
-        WriteRgb565VramPixel(1, color);
-        WriteRgb565VramPixel(320, color);
-        WriteRgb565VramPixel(321, color);
+        WriteRgb565VramPixel(0, command.Rgb565);
+        WriteRgb565VramPixel(1, command.Rgb565);
+        WriteRgb565VramPixel(320, command.Rgb565);
+        WriteRgb565VramPixel(321, command.Rgb565);
     }
-
-    private static bool IsOpaqueTa(DreamcastPvrTaCommandWrite write, string kind) =>
-        string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
-        && string.Equals(write.Kind, kind, StringComparison.Ordinal)
-        && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
 
     private void WriteRgb565VramPixel(int pixelIndex, ushort color)
     {
