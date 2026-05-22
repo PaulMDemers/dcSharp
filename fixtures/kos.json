@@ -967,6 +967,306 @@
       }
     },
     {
+      "name": "pvr_real_modes",
+      "sample": "samples/kos/pvr_real_modes",
+      "artifact": "dcsharp_pvr_real_modes.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR real modes probe",
+        "header=0x80840008",
+        "mode1=0x96000000",
+        "mode2=0x84902064",
+        "mode3=0xce001234",
+        "ta_init=0x80000000"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x001F"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0x001F"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0x001F"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x0000"
+        }
+      ],
+      "minPvrRegisterAccesses": 8,
+      "minPvrTaCommandWrites": 32,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaCommands": [
+        {
+          "kind": "PolygonHeader",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0x80840008",
+          "minCount": 1
+        },
+        {
+          "kind": "Vertex",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xE0000000",
+          "minCount": 2
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
+          "minCount": 1
+        }
+      ],
+      "pvrTaStreamWrites": [
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "PolygonHeader",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "minCount": 7
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x96000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 0,
+          "payloadWordsRemaining": 6,
+          "payloadWordName": "Mode1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x84902064",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 1,
+          "payloadWordsRemaining": 5,
+          "payloadWordName": "Mode2",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0xCE001234",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 2,
+          "payloadWordsRemaining": 4,
+          "payloadWordName": "Mode3",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x11111111",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 3,
+          "payloadWordsRemaining": 3,
+          "payloadWordName": "Parameter0",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x22222222",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 4,
+          "payloadWordsRemaining": 2,
+          "payloadWordName": "Parameter1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x33333333",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 5,
+          "payloadWordsRemaining": 1,
+          "payloadWordName": "Parameter2",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x44444444",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840008",
+          "payloadWordIndex": 6,
+          "payloadWordsRemaining": 0,
+          "payloadWordName": "Parameter3",
+          "minCount": 1
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "Vertex",
+          "controlKind": "Vertex",
+          "controlValue": "0xE0000000",
+          "payloadWordsRemaining": 7,
+          "minCount": 2
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "Vertex",
+          "controlValue": "0xE0000000",
+          "minCount": 14
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "VertexEndOfStrip",
+          "controlKind": "VertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "VertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "minCount": 7
+        }
+      ],
+      "pvrTaPolygonHeaderPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840008",
+          "mode1": "0x96000000",
+          "mode2": "0x84902064",
+          "mode3": "0xCE001234",
+          "parameter0": "0x11111111",
+          "parameter1": "0x22222222",
+          "parameter2": "0x33333333",
+          "parameter3": "0x44444444",
+          "textureEnabled": true,
+          "depthWriteDisabled": true,
+          "cullingName": "Ccw",
+          "depthCompareName": "Greater",
+          "blendSrcName": "SrcAlpha",
+          "blendDstName": "One",
+          "alphaEnabled": true,
+          "fogTypeName": "Disabled",
+          "textureBase": "0x00001234",
+          "pixelFormatName": "Rgb565",
+          "vqEnabled": true,
+          "mipMapEnabled": true,
+          "minCount": 1
+        }
+      ],
+      "pvrTaParameterHeaders": [
+        {
+          "kind": "PolygonHeader",
+          "region": "TA_INPUT",
+          "parameterType": 4,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0x80840008",
+          "expectedPayloadWords": 7,
+          "hasKnownPayloadLength": true,
+          "gouraud": false,
+          "textureEnabled": true,
+          "colorFormatName": "ArgbPacked",
+          "clipModeName": "Disabled",
+          "stripLengthName": "Strip2",
+          "autoStripLength": true,
+          "minCount": 1
+        },
+        {
+          "kind": "Vertex",
+          "region": "TA_INPUT",
+          "parameterType": 7,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xE0000000",
+          "hasKnownPayloadLength": false,
+          "minCount": 2
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "parameterType": 7,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
+          "hasKnownPayloadLength": false,
+          "minCount": 1
+        }
+      ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minCommands": 1,
+          "minPolygonHeaders": 1,
+          "minVertices": 2,
+          "minVertexEndOfStrip": 1
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "rgb565": "0x001F",
+          "minVertices": 3,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "asic_irqb",
       "sample": "samples/kos/asic_irqb",
       "artifact": "dcsharp_asic_irqb.elf",
