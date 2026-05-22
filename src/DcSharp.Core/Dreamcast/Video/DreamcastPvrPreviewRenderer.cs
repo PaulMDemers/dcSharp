@@ -157,22 +157,25 @@ public static class DreamcastPvrPreviewRenderer
         Span<byte> vram,
         int pixelIndex)
     {
-        var source = SourceRgb565(strip, vertices, point, a, b, c, vram);
+        var source = SourceSample(strip, vertices, point, a, b, c, vram);
         var mode2 = strip.HeaderPayload?.Mode2Fields;
         if (mode2?.AlphaEnabled == true)
         {
-            source = BlendRgb565(
-                source,
-                ReadRgb565Pixel(vram, pixelIndex),
-                SourceAlpha(vertices),
-                mode2.BlendSrcName,
-                mode2.BlendDstName);
+            source = source with
+            {
+                Rgb565 = BlendRgb565(
+                    source.Rgb565,
+                    ReadRgb565Pixel(vram, pixelIndex),
+                    SourceAlpha(vertices, source.Alpha),
+                    mode2.BlendSrcName,
+                    mode2.BlendDstName)
+            };
         }
 
-        WriteRgb565Pixel(vram, pixelIndex, source);
+        WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
     }
 
-    private static ushort SourceRgb565(
+    private static DreamcastPvrPreviewSourceSample SourceSample(
         DreamcastPvrTaStrip strip,
         IReadOnlyList<DreamcastPvrTaVertex> vertices,
         Vector2 point,
@@ -187,14 +190,14 @@ public static class DreamcastPvrPreviewRenderer
             || payload.Mode3Fields.VqEnabled
             || payload.Mode3Fields.MipMapEnabled)
         {
-            return strip.Rgb565;
+            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
         }
 
         var width = TextureSize(payload.Mode2Fields.TextureUSize);
         var height = TextureSize(payload.Mode2Fields.TextureVSize);
         if (width <= 0 || height <= 0)
         {
-            return strip.Rgb565;
+            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
         }
 
         var (weightA, weightB, weightC) = Barycentric(point, a, b, c);
@@ -206,12 +209,14 @@ public static class DreamcastPvrPreviewRenderer
             ? (texelY * width) + texelX
             : TwiddledTextureIndex(texelX, texelY);
         var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
+        var texel = ReadRgb565Pixel(vram, textureOffset / 2);
+        var textureAlphaEnabled = !payload.Mode2Fields.TextureAlphaDisabled;
         return payload.Mode3Fields.PixelFormatName switch
         {
-            "Rgb565" => ReadRgb565Pixel(vram, textureOffset / 2),
-            "Argb1555" => Argb1555ToRgb565(ReadRgb565Pixel(vram, textureOffset / 2)),
-            "Argb4444" => Argb4444ToRgb565(ReadRgb565Pixel(vram, textureOffset / 2)),
-            _ => strip.Rgb565
+            "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
+            "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
+            "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
+            _ => new DreamcastPvrPreviewSourceSample(strip.Rgb565, null)
         };
     }
 
@@ -285,8 +290,13 @@ public static class DreamcastPvrPreviewRenderer
             _ => 1.0f
         };
 
-    private static byte SourceAlpha(IReadOnlyList<DreamcastPvrTaVertex> vertices) =>
-        vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24);
+    private static byte SourceAlpha(IReadOnlyList<DreamcastPvrTaVertex> vertices, byte? textureAlpha)
+    {
+        var vertexAlpha = vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24);
+        return textureAlpha is null
+            ? vertexAlpha
+            : (byte)(((textureAlpha.Value * vertexAlpha) + 127) / 255);
+    }
 
     private static (byte Red, byte Green, byte Blue) Rgb565ToRgb888(ushort value) =>
         (
@@ -302,6 +312,9 @@ public static class DreamcastPvrPreviewRenderer
         return (ushort)((red << 11) | (((green << 1) | (green >> 4)) << 5) | blue);
     }
 
+    private static byte Argb1555Alpha(ushort value) =>
+        (value & 0x8000) == 0 ? (byte)0 : byte.MaxValue;
+
     private static ushort Argb4444ToRgb565(ushort value)
     {
         var red = (value >> 8) & 0xF;
@@ -309,6 +322,12 @@ public static class DreamcastPvrPreviewRenderer
         var blue = value & 0xF;
         return (ushort)((Expand4To5(red) << 11) | (Expand4To6(green) << 5) | Expand4To5(blue));
     }
+
+    private static byte Argb4444Alpha(ushort value) =>
+        Expand4To8((value >> 12) & 0xF);
+
+    private static byte Expand4To8(int value) =>
+        (byte)((value << 4) | value);
 
     private static int Expand4To5(int value) =>
         (value << 1) | (value >> 3);
@@ -345,4 +364,6 @@ public static class DreamcastPvrPreviewRenderer
         vram[offset] = (byte)(color & 0xFF);
         vram[offset + 1] = (byte)(color >> 8);
     }
+
+    private sealed record DreamcastPvrPreviewSourceSample(ushort Rgb565, byte? Alpha);
 }

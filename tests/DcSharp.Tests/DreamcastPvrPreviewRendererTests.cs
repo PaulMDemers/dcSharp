@@ -235,6 +235,36 @@ public class DreamcastPvrPreviewRendererTests
         Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
     }
 
+    [Fact]
+    public void UsesArgb4444TextureAlphaForSourceBlend()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 0, 7, 0x8F00);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], argb: 0xFF00_FF00), vram);
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xFFFF,
+                [(1, 1), (2, 1), (1, 2)],
+                argb: 0xFFFF_FFFF,
+                alphaEnabled: true,
+                blendSrc: "SrcAlpha",
+                blendDst: "InverseSrcAlpha",
+                textureEnabled: true,
+                nonTwiddled: true,
+                pixelFormat: 2,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
     private static DreamcastPvrTaStrip CreateStrip(
         ushort color,
         IReadOnlyList<(int X, int Y)> points,
@@ -248,6 +278,7 @@ public class DreamcastPvrPreviewRendererTests
         string blendDst = "Zero",
         bool textureEnabled = false,
         bool nonTwiddled = false,
+        bool textureAlphaDisabled = false,
         uint pixelFormat = 1,
         uint textureBase = 0) =>
         new(
@@ -256,7 +287,7 @@ public class DreamcastPvrPreviewRendererTests
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, pixelFormat, textureBase),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, textureAlphaDisabled, pixelFormat, textureBase),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -292,6 +323,7 @@ public class DreamcastPvrPreviewRendererTests
         string blendDst,
         bool textureEnabled,
         bool nonTwiddled,
+        bool textureAlphaDisabled,
         uint pixelFormat,
         uint textureBase)
     {
@@ -326,6 +358,7 @@ public class DreamcastPvrPreviewRendererTests
             | (depthWriteDisabled ? 0x0400_0000u : 0);
         var mode2 = BlendBits(blendSrc) << 29
             | BlendBits(blendDst) << 26
+            | (textureAlphaDisabled ? 0x0008_0000u : 0)
             | (alphaEnabled ? 0x0010_0000u : 0);
         var mode3 = textureBase | (pixelFormat << 27) | (nonTwiddled ? 0x0400_0000u : 0);
         var header = new DreamcastPvrTaCommandWrite(
