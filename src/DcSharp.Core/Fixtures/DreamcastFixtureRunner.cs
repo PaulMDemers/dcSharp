@@ -227,6 +227,15 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.PvrTaParameterHeaders)
+        {
+            var count = CountPvrTaParameterHeaders(summary, expected);
+            if (count < expected.MinCount)
+            {
+                failures.Add($"expected at least {expected.MinCount} PVR TA parameter header {DescribePvrTaParameterHeaderExpectation(expected)} matches, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.PvrTaLists)
         {
             ValidatePvrTaList(failures, summary, expected);
@@ -426,6 +435,66 @@ public static class DreamcastFixtureRunner
         }
 
         return string.Join(" ", details);
+    }
+
+    private static int CountPvrTaParameterHeaders(DreamcastRunSummary summary, DreamcastFixturePvrTaParameterHeaderExpectation expected)
+    {
+        uint? expectedValue = expected.Value is null ? null : ParseHex32(expected.Value, "PVR TA parameter header value");
+        return summary.Video.RecentPvrTaParameterHeaders.Count(header =>
+            (expected.Kind is null || string.Equals(header.Kind, expected.Kind, StringComparison.Ordinal))
+            && (expected.Region is null || string.Equals(header.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ParameterType is null || header.ParameterType == expected.ParameterType)
+            && (expected.ListTypeName is null || string.Equals(header.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expected.EndOfStrip is null || header.EndOfStrip == expected.EndOfStrip)
+            && (expectedValue is null || header.Value == expectedValue)
+            && (expected.ExpectedPayloadWords is null || header.ExpectedPayloadWords == expected.ExpectedPayloadWords)
+            && (expected.HasKnownPayloadLength is null || header.HasKnownPayloadLength == expected.HasKnownPayloadLength));
+    }
+
+    private static string DescribePvrTaParameterHeaderExpectation(DreamcastFixturePvrTaParameterHeaderExpectation expected)
+    {
+        var details = new List<string>();
+        if (expected.Kind is not null)
+        {
+            details.Add($"kind={expected.Kind}");
+        }
+
+        if (expected.Region is not null)
+        {
+            details.Add($"region={expected.Region}");
+        }
+
+        if (expected.ParameterType is not null)
+        {
+            details.Add($"parameterType={expected.ParameterType}");
+        }
+
+        if (expected.ListTypeName is not null)
+        {
+            details.Add($"list={expected.ListTypeName}");
+        }
+
+        if (expected.EndOfStrip is not null)
+        {
+            details.Add($"endOfStrip={expected.EndOfStrip}");
+        }
+
+        if (expected.Value is not null)
+        {
+            details.Add($"value={expected.Value}");
+        }
+
+        if (expected.ExpectedPayloadWords is not null)
+        {
+            details.Add($"expectedPayloadWords={expected.ExpectedPayloadWords}");
+        }
+
+        if (expected.HasKnownPayloadLength is not null)
+        {
+            details.Add($"hasKnownPayloadLength={expected.HasKnownPayloadLength}");
+        }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
 
     private static void ValidatePvrTaList(

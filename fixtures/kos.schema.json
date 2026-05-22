@@ -194,6 +194,12 @@
             "$ref": "#/$defs/pvrTaCommand"
           }
         },
+        "pvrTaParameterHeaders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaParameterHeader"
+          }
+        },
         "pvrTaLists": {
           "type": "array",
           "items": {
@@ -364,6 +370,45 @@
         },
         "value": {
           "$ref": "#/$defs/hex32"
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaParameterHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameterType": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endOfStrip": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/hex32"
+        },
+        "expectedPayloadWords": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "hasKnownPayloadLength": {
+          "type": "boolean"
         },
         "minCount": {
           "type": "integer",
