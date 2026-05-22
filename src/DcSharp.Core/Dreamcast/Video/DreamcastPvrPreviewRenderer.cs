@@ -201,8 +201,14 @@ public static class DreamcastPvrPreviewRenderer
         }
 
         var (weightA, weightB, weightC) = Barycentric(point, a, b, c);
-        var u = (vertices[0].U * weightA) + (vertices[1].U * weightB) + (vertices[2].U * weightC);
-        var v = (vertices[0].V * weightA) + (vertices[1].V * weightB) + (vertices[2].V * weightC);
+        var u = TextureCoordinate(
+            (vertices[0].U * weightA) + (vertices[1].U * weightB) + (vertices[2].U * weightC),
+            payload.Mode2Fields.UClamp,
+            payload.Mode2Fields.UFlip);
+        var v = TextureCoordinate(
+            (vertices[0].V * weightA) + (vertices[1].V * weightB) + (vertices[2].V * weightC),
+            payload.Mode2Fields.VClamp,
+            payload.Mode2Fields.VFlip);
         var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
         var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
         var texelIndex = payload.Mode3Fields.NonTwiddled
@@ -218,6 +224,23 @@ public static class DreamcastPvrPreviewRenderer
             "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
             _ => new DreamcastPvrPreviewSourceSample(strip.Rgb565, null)
         };
+    }
+
+    private static float TextureCoordinate(float value, bool clamp, bool flip)
+    {
+        var coordinate = flip ? 1.0f - value : value;
+        return clamp ? Math.Clamp(coordinate, 0.0f, 1.0f) : RepeatTextureCoordinate(coordinate);
+    }
+
+    private static float RepeatTextureCoordinate(float value)
+    {
+        if (!float.IsFinite(value))
+        {
+            return 0.0f;
+        }
+
+        var wrapped = value - MathF.Floor(value);
+        return MathF.Abs(wrapped) < 0.0001f && value > 0.0f ? 1.0f : wrapped;
     }
 
     private static int TwiddledTextureIndex(int x, int y)

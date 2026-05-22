@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     const uint32_t header[8] = {
         0x80840008u,
         0x02000000u,
-        0x00000000u,
+        0x00018000u,
         0x0c001000u,
         0x00000000u,
         0x00000000u,

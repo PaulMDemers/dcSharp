@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     const uint32_t opaque_mode1 = 0x00000000u;
     const uint32_t opaque_mode2 = 0x00000000u;
     const uint32_t texture_mode1 = 0x02000000u;
-    const uint32_t texture_mode2 = 0x94100000u;
+    const uint32_t texture_mode2 = 0x94118000u;
     const uint32_t texture_mode3 = 0x14005000u;
 
     PVR_REG(0x0124) = 0x00100000u;

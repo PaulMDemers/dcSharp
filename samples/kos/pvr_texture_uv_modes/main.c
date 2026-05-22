@@ -33,12 +33,12 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    const uint32_t texture_base = 0x00003000u;
+    const uint32_t texture_base = 0x00006000u;
     const uint32_t header[8] = {
         0x80840008u,
         0x02000000u,
-        0x00018000u,
-        0x04003000u,
+        0x00078000u,
+        0x0c006000u,
         0x00000000u,
         0x00000000u,
         0x00000000u,
@@ -51,17 +51,18 @@ int main(int argc, char **argv) {
     PVR_REG(0x0130) = 0x00201000u;
     PVR_REG(0x0144) = 0x80000000u;
 
-    DCSHARP_PVR_VRAM16(texture_base + 0u) = 0xfc00u;
-    DCSHARP_PVR_VRAM16(texture_base + 14u) = 0x83e0u;
-    DCSHARP_PVR_VRAM16(texture_base + (7u * 8u * 2u)) = 0x801fu;
+    DCSHARP_PVR_VRAM16(texture_base + (((7u * 8u) + 7u) * 2u)) = 0xf800u;
+    DCSHARP_PVR_VRAM16(texture_base + (((7u * 8u) + 0u) * 2u)) = 0x07e0u;
+    DCSHARP_PVR_VRAM16(texture_base + (((0u * 8u) + 7u) * 2u)) = 0x001fu;
 
     write_words(header, 8);
     write_pvr_vertex(0xe0000000u, 0x3f800000u, 0x3f800000u, 0x00000000u, 0x00000000u);
     write_pvr_vertex(0xe0000000u, 0x40000000u, 0x3f800000u, 0x3f800000u, 0x00000000u);
     write_pvr_vertex(0xf0000000u, 0x3f800000u, 0x40000000u, 0x00000000u, 0x3f800000u);
 
-    printf("dcSharp PVR texture ARGB1555 probe: texture_base=0x%08lx mode3=0x%08lx ta_init=0x%08lx\n",
+    printf("dcSharp PVR texture UV mode probe: texture_base=0x%08lx mode2=0x%08lx mode3=0x%08lx ta_init=0x%08lx\n",
            (unsigned long)texture_base,
+           (unsigned long)header[2],
            (unsigned long)header[3],
            (unsigned long)PVR_REG(0x0144));
 
