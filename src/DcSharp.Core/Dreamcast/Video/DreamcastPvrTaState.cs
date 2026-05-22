@@ -2,9 +2,14 @@ namespace DcSharp.Core.Dreamcast.Video;
 
 public sealed class DreamcastPvrTaState
 {
+    private const int PolygonHeaderPayloadWords = 7;
     private bool inRenderableOpaqueList;
+    private bool awaitingHeaderPayloadOrShortcut;
+    private bool inRealStream;
+    private int headerPayloadWordsRemaining;
     private uint currentHeaderValue;
-    private readonly DreamcastPvrTaDiagnosticVertexPacketDecoder vertexDecoder = new();
+    private readonly DreamcastPvrTaDiagnosticVertexPacketDecoder diagnosticVertexDecoder = new();
+    private readonly DreamcastPvrTaRealVertexPacketDecoder realVertexDecoder = new();
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
     private readonly List<DreamcastPvrTaStrip> completedStrips = [];
 
@@ -12,17 +17,18 @@ public sealed class DreamcastPvrTaState
 
     public DreamcastPvrTaRenderCommand? Accept(DreamcastPvrTaCommandWrite write)
     {
-        if (!IsOpaqueInput(write))
+        if (!string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal))
         {
             ResetStrip();
             return null;
         }
 
-        if (string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
+        if (IsOpaqueInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
         {
+            ResetStrip();
             inRenderableOpaqueList = true;
             currentHeaderValue = write.Value;
-            ResetStrip();
+            awaitingHeaderPayloadOrShortcut = true;
             return null;
         }
 
@@ -31,20 +37,45 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (vertexDecoder.HasPending)
+        if (awaitingHeaderPayloadOrShortcut)
         {
-            return AcceptVertexPayload(write);
+            awaitingHeaderPayloadOrShortcut = false;
+            if (!IsVertexControl(write))
+            {
+                inRealStream = true;
+                headerPayloadWordsRemaining = PolygonHeaderPayloadWords - 1;
+                return null;
+            }
         }
 
-        if (string.Equals(write.Kind, "Vertex", StringComparison.Ordinal))
+        if (headerPayloadWordsRemaining > 0)
         {
-            vertexDecoder.Begin(write, endOfStrip: false);
+            headerPayloadWordsRemaining--;
             return null;
         }
 
-        if (string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))
+        if (realVertexDecoder.HasPending)
         {
-            vertexDecoder.Begin(write, endOfStrip: true);
+            return AcceptRealVertexPayload(write);
+        }
+
+        if (diagnosticVertexDecoder.HasPending)
+        {
+            return AcceptDiagnosticVertexPayload(write);
+        }
+
+        if (IsOpaqueInput(write) && IsVertexControl(write))
+        {
+            var endOfStrip = string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
+            if (inRealStream)
+            {
+                realVertexDecoder.Begin(write, endOfStrip);
+            }
+            else
+            {
+                diagnosticVertexDecoder.Begin(write, endOfStrip);
+            }
+
             return null;
         }
 
@@ -52,13 +83,28 @@ public sealed class DreamcastPvrTaState
         return null;
     }
 
-    private DreamcastPvrTaRenderCommand? AcceptVertexPayload(DreamcastPvrTaCommandWrite write)
+    private DreamcastPvrTaRenderCommand? AcceptDiagnosticVertexPayload(DreamcastPvrTaCommandWrite write)
     {
-        if (!vertexDecoder.AcceptPayload(write.Value, out var vertex))
+        if (!diagnosticVertexDecoder.AcceptPayload(write.Value, out var vertex))
         {
             return null;
         }
 
+        return AcceptVertex(write, vertex);
+    }
+
+    private DreamcastPvrTaRenderCommand? AcceptRealVertexPayload(DreamcastPvrTaCommandWrite write)
+    {
+        if (!realVertexDecoder.AcceptPayload(write.Value, out var vertex))
+        {
+            return null;
+        }
+
+        return AcceptVertex(write, vertex);
+    }
+
+    private DreamcastPvrTaRenderCommand? AcceptVertex(DreamcastPvrTaCommandWrite write, DreamcastPvrTaVertex? vertex)
+    {
         if (vertex is null || vertex.Rgb565 == 0)
         {
             ResetStrip();
@@ -100,13 +146,21 @@ public sealed class DreamcastPvrTaState
         return result;
     }
 
+    private static bool IsVertexControl(DreamcastPvrTaCommandWrite write) =>
+        string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
+        || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
+
     private static bool IsOpaqueInput(DreamcastPvrTaCommandWrite write) =>
         string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
         && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
 
     private void ResetStrip()
     {
-        vertexDecoder.Reset();
+        awaitingHeaderPayloadOrShortcut = false;
+        inRealStream = false;
+        headerPayloadWordsRemaining = 0;
+        diagnosticVertexDecoder.Reset();
+        realVertexDecoder.Reset();
         currentVertices.Clear();
     }
 }

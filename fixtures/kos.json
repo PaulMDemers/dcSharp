@@ -641,6 +641,25 @@
         "vertex_words=24",
         "ta_init=0x80000000"
       ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x0000"
+        }
+      ],
       "minPvrRegisterAccesses": 8,
       "minPvrTaCommandWrites": 32,
       "pvrRegisters": {
@@ -717,6 +736,15 @@
           "minPolygonHeaders": 1,
           "minVertices": 2,
           "minVertexEndOfStrip": 1
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "rgb565": "0xF800",
+          "minVertices": 3,
+          "minCount": 1
         }
       ],
       "minDeviceAccessDomains": {

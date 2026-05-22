@@ -46,6 +46,49 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void CompletesRealPvrVertexStrip()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0000)));
+        for (var index = 0; index < 7; index++)
+        {
+            Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        }
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0xFFFF_0000));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0xFFFF_0000));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0xFFFF_0000);
+
+        Assert.NotNull(render);
+        Assert.Equal(0xF800, render.Rgb565);
+        var strip = Assert.Single(state.CompletedStrips);
+        Assert.Equal("OpaquePolygon", strip.ListTypeName);
+        Assert.Equal(3, strip.Vertices.Count);
+        Assert.Collection(
+            strip.Vertices,
+            vertex =>
+            {
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(1, vertex.Y);
+                Assert.Equal("0x3F800000", vertex.XValueHex);
+                Assert.Equal("0xFFFF0000", vertex.ColorValueHex);
+            },
+            vertex =>
+            {
+                Assert.Equal(2, vertex.X);
+                Assert.Equal(1, vertex.Y);
+                Assert.False(vertex.EndOfStrip);
+            },
+            vertex =>
+            {
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(2, vertex.Y);
+                Assert.True(vertex.EndOfStrip);
+            });
+    }
+
+    [Fact]
     public void IgnoresIncompleteOrMismatchedStrips()
     {
         var state = new DreamcastPvrTaState();
@@ -69,6 +112,23 @@ public class DreamcastPvrTaStateTests
         Assert.Null(state.Accept(CreateWrite("Unknown", (uint)x << 16)));
         Assert.Null(state.Accept(CreateWrite("Unknown", (uint)y << 16)));
         return state.Accept(CreateWrite("Unknown", color));
+    }
+
+    private static DreamcastPvrTaRenderCommand? AcceptRealVertexPacket(
+        DreamcastPvrTaState state,
+        string kind,
+        uint x,
+        uint y,
+        uint argb)
+    {
+        Assert.Null(state.Accept(CreateWrite(kind, string.Equals(kind, "VertexEndOfStrip", StringComparison.Ordinal) ? 0xF000_0000 : 0xE000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", x)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", y)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", argb)));
+        return state.Accept(CreateWrite("Unknown", 0));
     }
 
     private static DreamcastPvrTaCommandWrite CreateWrite(string kind, uint value) =>
