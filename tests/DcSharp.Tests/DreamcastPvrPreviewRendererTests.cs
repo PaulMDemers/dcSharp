@@ -288,6 +288,57 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void ModulatesTextureColorWithVertexColor()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 0, 7, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0x07E0,
+                [(1, 1), (2, 1), (1, 2)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureShading: "Modulate",
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
+    public void DecalsTextureAlphaOverVertexColor()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 0, 7, 0x8F00);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0x07E0,
+                [(1, 1), (2, 1), (1, 2)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureShading: "Decal",
+                pixelFormat: 2,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void UsesArgb4444TextureAlphaForSourceBlend()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -335,6 +386,7 @@ public class DreamcastPvrPreviewRendererTests
         bool uFlip = false,
         bool vFlip = false,
         bool textureAlphaDisabled = false,
+        string textureShading = "Replace",
         uint pixelFormat = 1,
         uint textureBase = 0,
         IReadOnlyList<(float U, float V)>? uvs = null) =>
@@ -344,7 +396,7 @@ public class DreamcastPvrPreviewRendererTests
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, pixelFormat, textureBase),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, pixelFormat, textureBase),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -385,6 +437,7 @@ public class DreamcastPvrPreviewRendererTests
         bool uFlip,
         bool vFlip,
         bool textureAlphaDisabled,
+        string textureShading,
         uint pixelFormat,
         uint textureBase)
     {
@@ -419,6 +472,7 @@ public class DreamcastPvrPreviewRendererTests
             | (depthWriteDisabled ? 0x0400_0000u : 0);
         var mode2 = BlendBits(blendSrc) << 29
             | BlendBits(blendDst) << 26
+            | (TextureShadingBits(textureShading) << 6)
             | (textureEnabled && vClamp ? 0x0000_8000u : 0)
             | (textureEnabled && uClamp ? 0x0001_0000u : 0)
             | (textureEnabled && vFlip ? 0x0002_0000u : 0)
@@ -452,6 +506,16 @@ public class DreamcastPvrPreviewRendererTests
             "DestAlpha" => 6,
             "InverseDestAlpha" => 7,
             _ => throw new ArgumentOutOfRangeException(nameof(blend), blend, "Unknown blend mode.")
+        };
+
+    private static uint TextureShadingBits(string textureShading) =>
+        textureShading switch
+        {
+            "Replace" => 0,
+            "Modulate" => 1,
+            "Decal" => 2,
+            "ModulateAlpha" => 3,
+            _ => throw new ArgumentOutOfRangeException(nameof(textureShading), textureShading, "Unknown texture shading mode.")
         };
 
     private static float[] CreateDepthBuffer(byte[] vram)

@@ -166,7 +166,7 @@ public static class DreamcastPvrPreviewRenderer
                 Rgb565 = BlendRgb565(
                     source.Rgb565,
                     ReadRgb565Pixel(vram, pixelIndex),
-                    SourceAlpha(vertices, source.Alpha),
+                    SourceAlpha(vertices, source.Alpha, source.AlphaMultipliesVertex),
                     mode2.BlendSrcName,
                     mode2.BlendDstName)
             };
@@ -217,14 +217,51 @@ public static class DreamcastPvrPreviewRenderer
         var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
         var texel = ReadRgb565Pixel(vram, textureOffset / 2);
         var textureAlphaEnabled = !payload.Mode2Fields.TextureAlphaDisabled;
-        return payload.Mode3Fields.PixelFormatName switch
+        var textureSample = payload.Mode3Fields.PixelFormatName switch
         {
             "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
             "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
             "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
-            _ => new DreamcastPvrPreviewSourceSample(strip.Rgb565, null)
+            _ => null
         };
+        if (textureSample is null)
+        {
+            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
+        }
+
+        return ApplyTextureShading(strip.Rgb565, textureSample, payload.Mode2Fields.TextureShadingName);
     }
+
+    private static DreamcastPvrPreviewSourceSample ApplyTextureShading(
+        ushort vertexColor,
+        DreamcastPvrPreviewSourceSample texture,
+        string textureShadingName) =>
+        textureShadingName switch
+        {
+            "Modulate" => texture with
+            {
+                Rgb565 = ModulateRgb565(vertexColor, texture.Rgb565),
+                AlphaMultipliesVertex = false
+            },
+            "Decal" => new DreamcastPvrPreviewSourceSample(
+                DecalRgb565(vertexColor, texture.Rgb565, texture.Alpha ?? byte.MaxValue),
+                null),
+            "ModulateAlpha" => texture with { Rgb565 = ModulateRgb565(vertexColor, texture.Rgb565) },
+            _ => texture with { AlphaMultipliesVertex = false }
+        };
+
+    private static ushort ModulateRgb565(ushort source, ushort texture)
+    {
+        var (sourceRed, sourceGreen, sourceBlue) = Rgb565ToRgb888(source);
+        var (textureRed, textureGreen, textureBlue) = Rgb565ToRgb888(texture);
+        return Rgb888ToRgb565(
+            ClampToByte((sourceRed * textureRed) / 255.0f),
+            ClampToByte((sourceGreen * textureGreen) / 255.0f),
+            ClampToByte((sourceBlue * textureBlue) / 255.0f));
+    }
+
+    private static ushort DecalRgb565(ushort source, ushort texture, byte textureAlpha) =>
+        BlendRgb565(texture, source, textureAlpha, "SrcAlpha", "InverseSrcAlpha");
 
     private static float TextureCoordinate(float value, bool clamp, bool flip)
     {
@@ -313,12 +350,20 @@ public static class DreamcastPvrPreviewRenderer
             _ => 1.0f
         };
 
-    private static byte SourceAlpha(IReadOnlyList<DreamcastPvrTaVertex> vertices, byte? textureAlpha)
+    private static byte SourceAlpha(
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        byte? textureAlpha,
+        bool textureAlphaMultipliesVertex)
     {
         var vertexAlpha = vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24);
-        return textureAlpha is null
-            ? vertexAlpha
-            : (byte)(((textureAlpha.Value * vertexAlpha) + 127) / 255);
+        if (textureAlpha is null)
+        {
+            return vertexAlpha;
+        }
+
+        return textureAlphaMultipliesVertex
+            ? (byte)(((textureAlpha.Value * vertexAlpha) + 127) / 255)
+            : textureAlpha.Value;
     }
 
     private static (byte Red, byte Green, byte Blue) Rgb565ToRgb888(ushort value) =>
@@ -388,5 +433,8 @@ public static class DreamcastPvrPreviewRenderer
         vram[offset + 1] = (byte)(color >> 8);
     }
 
-    private sealed record DreamcastPvrPreviewSourceSample(ushort Rgb565, byte? Alpha);
+    private sealed record DreamcastPvrPreviewSourceSample(
+        ushort Rgb565,
+        byte? Alpha,
+        bool AlphaMultipliesVertex = true);
 }
