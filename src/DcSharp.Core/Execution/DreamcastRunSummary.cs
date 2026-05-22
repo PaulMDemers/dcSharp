@@ -426,7 +426,8 @@ public sealed record DreamcastPvrTaStreamWriteSummary(
     uint ControlValue,
     string ControlValueHex,
     int? PayloadWordIndex,
-    int? PayloadWordsRemaining)
+    int? PayloadWordsRemaining,
+    string? PayloadWordName)
 {
     public static DreamcastPvrTaStreamWriteSummary FromWrite(DreamcastPvrTaStreamWrite write) =>
         new(
@@ -442,7 +443,8 @@ public sealed record DreamcastPvrTaStreamWriteSummary(
             write.ControlValue,
             write.ControlValueHex,
             write.PayloadWordIndex,
-            write.PayloadWordsRemaining);
+            write.PayloadWordsRemaining,
+            write.PayloadWordName);
 }
 
 public sealed record DreamcastPvrTaParameterHeaderSummary(

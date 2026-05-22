@@ -417,6 +417,10 @@
         "payloadWordsRemaining": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "payloadWordName": {
+          "type": "string",
+          "minLength": 1
+        },
         "minCount": {
           "type": "integer",
           "minimum": 1

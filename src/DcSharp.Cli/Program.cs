@@ -710,8 +710,11 @@ static string FormatPvrTaPolygonCommand(DreamcastPvrTaPolygonHeaderCommandSummar
 
 static string FormatPvrTaStreamWrites(IReadOnlyList<DreamcastPvrTaStreamWriteSummary> writes) =>
     string.Join(", ", writes
-        .GroupBy(write => new { write.Region, write.Role, write.ControlKind })
-        .Select(group => $"{group.Key.Region}:{group.Key.Role}:{group.Key.ControlKind}x{group.Count()}"));
+        .GroupBy(write => new { write.Region, write.Role, write.ControlKind, write.PayloadWordName })
+        .Select(group => $"{group.Key.Region}:{group.Key.Role}:{group.Key.ControlKind}{FormatPvrTaPayloadWordName(group.Key.PayloadWordName)}x{group.Count()}"));
+
+static string FormatPvrTaPayloadWordName(string? payloadWordName) =>
+    payloadWordName is null ? string.Empty : $":{payloadWordName}";
 
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)

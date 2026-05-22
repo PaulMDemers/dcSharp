@@ -753,6 +753,83 @@
           "minCount": 7
         },
         {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 0,
+          "payloadWordsRemaining": 6,
+          "payloadWordName": "Mode1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 1,
+          "payloadWordsRemaining": 5,
+          "payloadWordName": "Mode2",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 2,
+          "payloadWordsRemaining": 4,
+          "payloadWordName": "Mode3",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 3,
+          "payloadWordsRemaining": 3,
+          "payloadWordName": "Parameter0",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 4,
+          "payloadWordsRemaining": 2,
+          "payloadWordName": "Parameter1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 5,
+          "payloadWordsRemaining": 1,
+          "payloadWordName": "Parameter2",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordIndex": 6,
+          "payloadWordsRemaining": 0,
+          "payloadWordName": "Parameter3",
+          "minCount": 1
+        },
+        {
           "role": "Control",
           "region": "TA_INPUT",
           "kind": "Vertex",

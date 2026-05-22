@@ -25,6 +25,7 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("PolygonHeader", write.ControlKind);
                 Assert.Equal(7, write.PayloadWordsRemaining);
                 Assert.Null(write.PayloadWordIndex);
+                Assert.Null(write.PayloadWordName);
             },
             write =>
             {
@@ -32,18 +33,21 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("PolygonHeader", write.ControlKind);
                 Assert.Equal(0, write.PayloadWordIndex);
                 Assert.Equal(6, write.PayloadWordsRemaining);
+                Assert.Equal("Mode1", write.PayloadWordName);
             },
             write =>
             {
                 Assert.Equal("Payload", write.Role);
                 Assert.Equal(1, write.PayloadWordIndex);
                 Assert.Equal(5, write.PayloadWordsRemaining);
+                Assert.Equal("Mode2", write.PayloadWordName);
             },
             write =>
             {
                 Assert.Equal("Payload", write.Role);
                 Assert.Equal(2, write.PayloadWordIndex);
                 Assert.Equal(4, write.PayloadWordsRemaining);
+                Assert.Equal("Mode3", write.PayloadWordName);
             });
     }
 
@@ -67,6 +71,7 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("Vertex", write.ControlKind);
                 Assert.Null(write.PayloadWordIndex);
                 Assert.Equal(7, write.PayloadWordsRemaining);
+                Assert.Null(write.PayloadWordName);
             },
             write =>
             {
@@ -74,6 +79,7 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("Vertex", write.ControlKind);
                 Assert.Equal(0, write.PayloadWordIndex);
                 Assert.Equal(6, write.PayloadWordsRemaining);
+                Assert.Null(write.PayloadWordName);
             },
             write =>
             {
@@ -81,6 +87,7 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("Vertex", write.ControlKind);
                 Assert.Equal(1, write.PayloadWordIndex);
                 Assert.Equal(5, write.PayloadWordsRemaining);
+                Assert.Null(write.PayloadWordName);
             });
     }
 

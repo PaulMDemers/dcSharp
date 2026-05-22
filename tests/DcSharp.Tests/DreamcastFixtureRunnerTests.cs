@@ -131,6 +131,18 @@ public class DreamcastFixtureRunnerTests
                     ControlKind = "PolygonHeader",
                     ControlValue = "0x80840000",
                     PayloadWordsRemaining = 7
+                },
+                new DreamcastFixturePvrTaStreamWriteExpectation
+                {
+                    Role = "Payload",
+                    Region = "TA_INPUT",
+                    Kind = "Unknown",
+                    Value = "0x00000000",
+                    ControlKind = "PolygonHeader",
+                    ControlValue = "0x80840000",
+                    PayloadWordIndex = 0,
+                    PayloadWordsRemaining = 6,
+                    PayloadWordName = "Mode1"
                 }
             ],
             PvrTaParameterHeaders =
@@ -236,7 +248,18 @@ public class DreamcastFixtureRunnerTests
                     false,
                     4,
                     0x8084_0000,
-                    "0x80840000")
+                    "0x80840000"),
+                new DreamcastPvrTaCommandWriteSummary(
+                    0x1000_0000,
+                    "0x10000000",
+                    "TA_INPUT",
+                    "Unknown",
+                    0,
+                    "OpaquePolygon",
+                    false,
+                    4,
+                    0x0000_0000,
+                    "0x00000000")
             ],
             pvrTaStrips:
             [
@@ -343,7 +366,8 @@ public class DreamcastFixtureRunnerTests
                     ControlKind = "Vertex",
                     ControlValue = "0xE0000000",
                     PayloadWordIndex = 0,
-                    PayloadWordsRemaining = 6
+                    PayloadWordsRemaining = 6,
+                    PayloadWordName = "Mode1"
                 }
             ],
             PvrTaParameterHeaders =
@@ -487,7 +511,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
-        Assert.Contains("expected at least 1 PVR TA stream write role=Payload region=TA_INPUT kind=Unknown value=0x3F800000 controlKind=Vertex controlValue=0xE0000000 payloadWordIndex=0 payloadWordsRemaining=6 matches, got 0", failures);
+        Assert.Contains("expected at least 1 PVR TA stream write role=Payload region=TA_INPUT kind=Unknown value=0x3F800000 controlKind=Vertex controlValue=0xE0000000 payloadWordIndex=0 payloadWordsRemaining=6 payloadWordName=Mode1 matches, got 0", failures);
         Assert.Contains("expected at least 1 PVR TA parameter header kind=PolygonHeader region=TA_INPUT parameterType=5 list=OpaquePolygon value=0x80840001 expectedPayloadWords=7 hasKnownPayloadLength=True textureEnabled=True colorFormatName=FourFloats autoStripLength=False matches, got 0", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);

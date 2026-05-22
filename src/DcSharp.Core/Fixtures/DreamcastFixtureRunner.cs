@@ -458,7 +458,8 @@ public static class DreamcastFixtureRunner
             && (expected.ControlKind is null || string.Equals(write.ControlKind, expected.ControlKind, StringComparison.Ordinal))
             && (expectedControlValue is null || write.ControlValue == expectedControlValue)
             && (expected.PayloadWordIndex is null || write.PayloadWordIndex == expected.PayloadWordIndex)
-            && (expected.PayloadWordsRemaining is null || write.PayloadWordsRemaining == expected.PayloadWordsRemaining));
+            && (expected.PayloadWordsRemaining is null || write.PayloadWordsRemaining == expected.PayloadWordsRemaining)
+            && (expected.PayloadWordName is null || string.Equals(write.PayloadWordName, expected.PayloadWordName, StringComparison.Ordinal)));
     }
 
     private static string DescribePvrTaStreamWriteExpectation(DreamcastFixturePvrTaStreamWriteExpectation expected)
@@ -502,6 +503,11 @@ public static class DreamcastFixtureRunner
         if (expected.PayloadWordsRemaining is not null)
         {
             details.Add($"payloadWordsRemaining={expected.PayloadWordsRemaining}");
+        }
+
+        if (expected.PayloadWordName is not null)
+        {
+            details.Add($"payloadWordName={expected.PayloadWordName}");
         }
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);

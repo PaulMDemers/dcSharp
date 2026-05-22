@@ -22,7 +22,8 @@ public static class DreamcastPvrTaStreamDecoder
                     payloadControl.Value,
                     payloadControl.ValueHex,
                     payloadWordIndex,
-                    payloadWordsRemaining - 1));
+                    payloadWordsRemaining - 1,
+                    PayloadWordName(payloadControl.Kind, payloadWordIndex)));
                 payloadWordIndex++;
                 payloadWordsRemaining--;
                 if (payloadWordsRemaining == 0)
@@ -42,7 +43,8 @@ public static class DreamcastPvrTaStreamDecoder
                 header.Value,
                 header.ValueHex,
                 null,
-                ExpectedPayloadWords(header)));
+                ExpectedPayloadWords(header),
+                null));
             if (ExpectedPayloadWords(header) is > 0 and var expectedPayloadWords)
             {
                 payloadControl = new PayloadControl(header.Region, header.Kind, header.Value, header.ValueHex);
@@ -63,6 +65,23 @@ public static class DreamcastPvrTaStreamDecoder
     private static int? ExpectedPayloadWords(DreamcastPvrTaParameterHeader header) =>
         header.ExpectedPayloadWords
         ?? (header.Kind is "Vertex" or "VertexEndOfStrip" ? 7 : null);
+
+    private static string? PayloadWordName(string controlKind, int payloadWordIndex) =>
+        controlKind switch
+        {
+            "PolygonHeader" => payloadWordIndex switch
+            {
+                0 => "Mode1",
+                1 => "Mode2",
+                2 => "Mode3",
+                3 => "Parameter0",
+                4 => "Parameter1",
+                5 => "Parameter2",
+                6 => "Parameter3",
+                _ => null
+            },
+            _ => null
+        };
 }
 
 internal sealed record PayloadControl(string Region, string Kind, uint Value, string ValueHex);
@@ -74,4 +93,5 @@ public sealed record DreamcastPvrTaStreamWrite(
     uint ControlValue,
     string ControlValueHex,
     int? PayloadWordIndex,
-    int? PayloadWordsRemaining);
+    int? PayloadWordsRemaining,
+    string? PayloadWordName);

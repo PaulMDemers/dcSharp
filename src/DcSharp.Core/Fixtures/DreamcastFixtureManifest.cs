@@ -159,6 +159,7 @@ public sealed class DreamcastFixturePvrTaStreamWriteExpectation
     public string? ControlValue { get; set; }
     public int? PayloadWordIndex { get; set; }
     public int? PayloadWordsRemaining { get; set; }
+    public string? PayloadWordName { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

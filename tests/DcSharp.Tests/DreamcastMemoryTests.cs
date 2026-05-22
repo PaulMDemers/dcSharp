@@ -172,12 +172,14 @@ public class DreamcastMemoryTests
                 Assert.Equal("PolygonHeader", write.ControlKind);
                 Assert.Equal(0, write.PayloadWordIndex);
                 Assert.Equal(6, write.PayloadWordsRemaining);
+                Assert.Equal("Mode1", write.PayloadWordName);
             },
             write =>
             {
                 Assert.Equal("Payload", write.Role);
                 Assert.Equal("PolygonHeader", write.ControlKind);
                 Assert.Equal(1, write.PayloadWordIndex);
+                Assert.Equal("Mode2", write.PayloadWordName);
             },
             write =>
             {
