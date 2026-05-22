@@ -25,10 +25,10 @@ public static class DreamcastPvrTaParameterDecoder
         kind switch
         {
             "Vertex" or "VertexEndOfStrip" => null,
-            "PolygonHeader" => null,
-            "SpriteHeader" => null,
-            "ModifierVolume" => null,
-            "UserClip" => null,
+            "PolygonHeader" => 7,
+            "SpriteHeader" => 7,
+            "ModifierVolume" => 7,
+            "UserClip" => 7,
             "YuvConverterData" => 0,
             _ => null
         };

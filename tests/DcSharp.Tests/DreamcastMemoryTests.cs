@@ -165,7 +165,8 @@ public class DreamcastMemoryTests
                 Assert.Equal("PolygonHeader", header.Kind);
                 Assert.Equal(4, header.ParameterType);
                 Assert.Equal("OpaquePolygon", header.ListTypeName);
-                Assert.False(header.HasKnownPayloadLength);
+                Assert.Equal(7, header.ExpectedPayloadWords);
+                Assert.True(header.HasKnownPayloadLength);
             },
             header =>
             {

@@ -129,7 +129,8 @@ public class DreamcastFixtureRunnerTests
                     ListTypeName = "OpaquePolygon",
                     EndOfStrip = false,
                     Value = "0x80840000",
-                    HasKnownPayloadLength = false
+                    ExpectedPayloadWords = 7,
+                    HasKnownPayloadLength = true
                 }
             ],
             PvrTaLists =
@@ -310,6 +311,7 @@ public class DreamcastFixtureRunnerTests
                     ParameterType = 5,
                     ListTypeName = "OpaquePolygon",
                     Value = "0x80840001",
+                    ExpectedPayloadWords = 7,
                     HasKnownPayloadLength = true
                 }
             ],
@@ -432,7 +434,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
-        Assert.Contains("expected at least 1 PVR TA parameter header kind=PolygonHeader region=TA_INPUT parameterType=5 list=OpaquePolygon value=0x80840001 hasKnownPayloadLength=True matches, got 0", failures);
+        Assert.Contains("expected at least 1 PVR TA parameter header kind=PolygonHeader region=TA_INPUT parameterType=5 list=OpaquePolygon value=0x80840001 expectedPayloadWords=7 hasKnownPayloadLength=True matches, got 0", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
         Assert.Contains("missing PVR TA list region=TA_INPUT list=TranslucentPolygon", failures);

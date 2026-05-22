@@ -15,7 +15,21 @@ public class DreamcastPvrTaParameterDecoderTests
         Assert.Equal(0, header.ListType);
         Assert.Equal("OpaquePolygon", header.ListTypeName);
         Assert.False(header.EndOfStrip);
-        Assert.False(header.HasKnownPayloadLength);
+        Assert.Equal(7, header.ExpectedPayloadWords);
+        Assert.True(header.HasKnownPayloadLength);
+    }
+
+    [Theory]
+    [InlineData(0xA000_0000u, "SpriteHeader")]
+    [InlineData(0x8000_0000u, "ModifierVolume")]
+    [InlineData(0x2000_0000u, "UserClip")]
+    public void DecodesKnownHeaderPayloadLengths(uint value, string expectedKind)
+    {
+        var header = DreamcastPvrTaParameterDecoder.Decode("TA_INPUT", value);
+
+        Assert.Equal(expectedKind, header.Kind);
+        Assert.Equal(7, header.ExpectedPayloadWords);
+        Assert.True(header.HasKnownPayloadLength);
     }
 
     [Fact]

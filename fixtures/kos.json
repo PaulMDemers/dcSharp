@@ -444,7 +444,8 @@
           "listTypeName": "OpaquePolygon",
           "endOfStrip": false,
           "value": "0x80840000",
-          "hasKnownPayloadLength": false,
+          "expectedPayloadWords": 7,
+          "hasKnownPayloadLength": true,
           "minCount": 1
         },
         {
@@ -578,7 +579,8 @@
           "listTypeName": "OpaquePolygon",
           "endOfStrip": false,
           "value": "0x80840000",
-          "hasKnownPayloadLength": false,
+          "expectedPayloadWords": 7,
+          "hasKnownPayloadLength": true,
           "minCount": 1
         },
         {
