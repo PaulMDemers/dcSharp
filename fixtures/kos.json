@@ -695,6 +695,56 @@
           "minCount": 1
         }
       ],
+      "pvrTaStreamWrites": [
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "PolygonHeader",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "PolygonHeader",
+          "controlValue": "0x80840000",
+          "minCount": 7
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "Vertex",
+          "controlKind": "Vertex",
+          "controlValue": "0xE0000000",
+          "payloadWordsRemaining": 7,
+          "minCount": 2
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "Vertex",
+          "controlValue": "0xE0000000",
+          "minCount": 14
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "VertexEndOfStrip",
+          "controlKind": "VertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "controlKind": "VertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "minCount": 7
+        }
+      ],
       "pvrTaParameterHeaders": [
         {
           "kind": "PolygonHeader",

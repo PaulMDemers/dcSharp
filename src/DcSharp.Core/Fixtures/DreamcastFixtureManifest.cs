@@ -77,6 +77,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixtureAsicEventRegisterExpectation> AsicEventRegisters { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
+    public List<DreamcastFixturePvrTaStreamWriteExpectation> PvrTaStreamWrites { get; set; } = [];
     public List<DreamcastFixturePvrTaParameterHeaderExpectation> PvrTaParameterHeaders { get; set; } = [];
     public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
@@ -132,6 +133,19 @@ public sealed class DreamcastFixturePvrTaParameterHeaderExpectation
     public string? Value { get; set; }
     public int? ExpectedPayloadWords { get; set; }
     public bool? HasKnownPayloadLength { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaStreamWriteExpectation
+{
+    public string? Role { get; set; }
+    public string? Region { get; set; }
+    public string? Kind { get; set; }
+    public string? Value { get; set; }
+    public string? ControlKind { get; set; }
+    public string? ControlValue { get; set; }
+    public int? PayloadWordIndex { get; set; }
+    public int? PayloadWordsRemaining { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

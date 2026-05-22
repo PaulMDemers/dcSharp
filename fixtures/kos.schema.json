@@ -194,6 +194,12 @@
             "$ref": "#/$defs/pvrTaCommand"
           }
         },
+        "pvrTaStreamWrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaStreamWrite"
+          }
+        },
         "pvrTaParameterHeaders": {
           "type": "array",
           "items": {
@@ -370,6 +376,46 @@
         },
         "value": {
           "$ref": "#/$defs/hex32"
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaStreamWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "Control",
+            "Payload"
+          ]
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/$defs/hex32"
+        },
+        "controlKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controlValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "payloadWordIndex": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "payloadWordsRemaining": {
+          "$ref": "#/$defs/nonNegativeInteger"
         },
         "minCount": {
           "type": "integer",

@@ -227,6 +227,15 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.PvrTaStreamWrites)
+        {
+            var count = CountPvrTaStreamWrites(summary, expected);
+            if (count < expected.MinCount)
+            {
+                failures.Add($"expected at least {expected.MinCount} PVR TA stream write {DescribePvrTaStreamWriteExpectation(expected)} matches, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.PvrTaParameterHeaders)
         {
             var count = CountPvrTaParameterHeaders(summary, expected);
@@ -435,6 +444,67 @@ public static class DreamcastFixtureRunner
         }
 
         return string.Join(" ", details);
+    }
+
+    private static int CountPvrTaStreamWrites(DreamcastRunSummary summary, DreamcastFixturePvrTaStreamWriteExpectation expected)
+    {
+        uint? expectedValue = expected.Value is null ? null : ParseHex32(expected.Value, "PVR TA stream write value");
+        uint? expectedControlValue = expected.ControlValue is null ? null : ParseHex32(expected.ControlValue, "PVR TA stream control value");
+        return summary.Video.RecentPvrTaStreamWrites.Count(write =>
+            (expected.Role is null || string.Equals(write.Role, expected.Role, StringComparison.Ordinal))
+            && (expected.Region is null || string.Equals(write.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.Kind is null || string.Equals(write.Kind, expected.Kind, StringComparison.Ordinal))
+            && (expectedValue is null || write.Value == expectedValue)
+            && (expected.ControlKind is null || string.Equals(write.ControlKind, expected.ControlKind, StringComparison.Ordinal))
+            && (expectedControlValue is null || write.ControlValue == expectedControlValue)
+            && (expected.PayloadWordIndex is null || write.PayloadWordIndex == expected.PayloadWordIndex)
+            && (expected.PayloadWordsRemaining is null || write.PayloadWordsRemaining == expected.PayloadWordsRemaining));
+    }
+
+    private static string DescribePvrTaStreamWriteExpectation(DreamcastFixturePvrTaStreamWriteExpectation expected)
+    {
+        var details = new List<string>();
+        if (expected.Role is not null)
+        {
+            details.Add($"role={expected.Role}");
+        }
+
+        if (expected.Region is not null)
+        {
+            details.Add($"region={expected.Region}");
+        }
+
+        if (expected.Kind is not null)
+        {
+            details.Add($"kind={expected.Kind}");
+        }
+
+        if (expected.Value is not null)
+        {
+            details.Add($"value={expected.Value}");
+        }
+
+        if (expected.ControlKind is not null)
+        {
+            details.Add($"controlKind={expected.ControlKind}");
+        }
+
+        if (expected.ControlValue is not null)
+        {
+            details.Add($"controlValue={expected.ControlValue}");
+        }
+
+        if (expected.PayloadWordIndex is not null)
+        {
+            details.Add($"payloadWordIndex={expected.PayloadWordIndex}");
+        }
+
+        if (expected.PayloadWordsRemaining is not null)
+        {
+            details.Add($"payloadWordsRemaining={expected.PayloadWordsRemaining}");
+        }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
 
     private static int CountPvrTaParameterHeaders(DreamcastRunSummary summary, DreamcastFixturePvrTaParameterHeaderExpectation expected)
