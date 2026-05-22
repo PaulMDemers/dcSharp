@@ -19,6 +19,11 @@ public static class DreamcastPvrPreviewRenderer
         var a = new Vector2(vertices[0].X - minX, vertices[0].Y - minY);
         var b = new Vector2(vertices[1].X - minX, vertices[1].Y - minY);
         var c = new Vector2(vertices[2].X - minX, vertices[2].Y - minY);
+        if (IsCulled(strip, a, b, c))
+        {
+            return;
+        }
+
         var maxX = (int)MathF.Max(a.X, MathF.Max(b.X, c.X));
         var maxY = (int)MathF.Max(a.Y, MathF.Max(b.Y, c.Y));
 
@@ -32,6 +37,24 @@ public static class DreamcastPvrPreviewRenderer
                 }
             }
         }
+    }
+
+    private static bool IsCulled(DreamcastPvrTaStrip strip, Vector2 a, Vector2 b, Vector2 c)
+    {
+        var cullingName = strip.HeaderPayload?.Mode1Fields.CullingName;
+        if (cullingName is null || string.Equals(cullingName, "None", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var signedArea = EdgeFunction(a, b, c);
+        return cullingName switch
+        {
+            "Small" => signedArea == 0,
+            "Ccw" => signedArea > 0,
+            "Cw" => signedArea < 0,
+            _ => false
+        };
     }
 
     private static bool IsInsideTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)

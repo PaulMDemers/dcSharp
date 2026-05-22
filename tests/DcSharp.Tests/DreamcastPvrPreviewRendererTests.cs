@@ -44,14 +44,49 @@ public class DreamcastPvrPreviewRendererTests
         Assert.All(vram, value => Assert.Equal(0, value));
     }
 
-    private static DreamcastPvrTaStrip CreateStrip(ushort color, IReadOnlyList<(int X, int Y)> points) =>
+    [Fact]
+    public void RendersCounterClockwiseCullingForAcceptedWinding()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var strip = CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], culling: "Ccw");
+
+        DreamcastPvrPreviewRenderer.RenderStrip(strip, vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
+    public void CullsClockwiseModeForOppositeWinding()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var strip = CreateStrip(0xF800, [(1, 1), (2, 1), (1, 2)], culling: "Cw");
+
+        DreamcastPvrPreviewRenderer.RenderStrip(strip, vram);
+
+        Assert.All(vram, value => Assert.Equal(0, value));
+    }
+
+    [Fact]
+    public void DoesNotCullWhenHeaderPayloadIsAbsent()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var strip = CreateStrip(0xF800, [(1, 1), (2, 1), (1, 2)], culling: null);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(strip, vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+    }
+
+    private static DreamcastPvrTaStrip CreateStrip(ushort color, IReadOnlyList<(int X, int Y)> points, string? culling = null) =>
         new(
             "TA_INPUT",
             0,
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            null,
+            CreateHeaderPayload(culling),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -68,6 +103,35 @@ public class DreamcastPvrPreviewRendererTests
                 $"0x{(uint)point.Y << 16:X8}",
                 color,
                 $"0x{color:X8}")).ToArray());
+
+    private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(string? culling)
+    {
+        if (culling is null)
+        {
+            return null;
+        }
+
+        var cullingBits = culling switch
+        {
+            "None" => 0u,
+            "Small" => 1u,
+            "Ccw" => 2u,
+            "Cw" => 3u,
+            _ => throw new ArgumentOutOfRangeException(nameof(culling), culling, "Unknown culling mode.")
+        };
+        var header = new DreamcastPvrTaCommandWrite(
+            0x1000_0000,
+            "0x10000000",
+            "TA_INPUT",
+            "PolygonHeader",
+            0,
+            "OpaquePolygon",
+            false,
+            4,
+            0x8084_0000,
+            "0x80840000");
+        return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [(cullingBits << 27), 0, 0, 0, 0, 0, 0]);
+    }
 
     private static ushort ReadRgb565(byte[] vram, int x, int y)
     {
