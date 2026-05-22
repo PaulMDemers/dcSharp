@@ -685,8 +685,28 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
 
 static string FormatPvrTaParameterHeaders(IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> headers) =>
     string.Join(", ", headers
-        .GroupBy(header => new { header.Region, header.Kind, header.ParameterType, header.ListTypeName, header.EndOfStrip, header.ExpectedPayloadWords })
-        .Select(group => $"{group.Key.Region}:{group.Key.Kind}x{group.Count()} type={group.Key.ParameterType?.ToString(CultureInfo.InvariantCulture) ?? "none"} list={group.Key.ListTypeName ?? "none"} end={group.Key.EndOfStrip} payload={group.Key.ExpectedPayloadWords?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"));
+        .GroupBy(header => new
+        {
+            header.Region,
+            header.Kind,
+            header.ParameterType,
+            header.ListTypeName,
+            header.EndOfStrip,
+            header.ExpectedPayloadWords,
+            header.PolygonHeaderCommand?.ColorFormatName,
+            header.PolygonHeaderCommand?.TextureEnabled,
+            header.PolygonHeaderCommand?.Gouraud,
+            header.PolygonHeaderCommand?.ClipModeName,
+            header.PolygonHeaderCommand?.StripLengthName,
+            header.PolygonHeaderCommand?.AutoStripLength
+        })
+        .Select(group =>
+            $"{group.Key.Region}:{group.Key.Kind}x{group.Count()} type={group.Key.ParameterType?.ToString(CultureInfo.InvariantCulture) ?? "none"} list={group.Key.ListTypeName ?? "none"} end={group.Key.EndOfStrip} payload={group.Key.ExpectedPayloadWords?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}{FormatPvrTaPolygonCommand(group.First().PolygonHeaderCommand)}"));
+
+static string FormatPvrTaPolygonCommand(DreamcastPvrTaPolygonHeaderCommandSummary? command) =>
+    command is null
+        ? string.Empty
+        : $" poly=color={command.ColorFormatName} tex={command.TextureEnabled} gouraud={command.Gouraud} clip={command.ClipModeName} strip={command.StripLengthName} auto={command.AutoStripLength}";
 
 static string FormatPvrTaStreamWrites(IReadOnlyList<DreamcastPvrTaStreamWriteSummary> writes) =>
     string.Join(", ", writes
