@@ -481,6 +481,20 @@
           "listTypeName": "OpaquePolygon",
           "rgb565": "0xF800",
           "minVertices": 3,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
           "minCount": 1
         }
       ],
@@ -622,6 +636,20 @@
           "listTypeName": "OpaquePolygon",
           "rgb565": "0x07E0",
           "minVertices": 3,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 3,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
           "minCount": 1
         }
       ],
@@ -812,6 +840,20 @@
           "listTypeName": "OpaquePolygon",
           "rgb565": "0xF800",
           "minVertices": 3,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 2,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 2
+            }
+          ],
           "minCount": 1
         }
       ],

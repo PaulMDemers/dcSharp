@@ -178,7 +178,14 @@ public sealed class DreamcastFixturePvrTaStripExpectation
     public string? ListTypeName { get; set; }
     public string? Rgb565 { get; set; }
     public int? MinVertices { get; set; }
+    public List<DreamcastFixturePvrTaVertexExpectation> Vertices { get; set; } = [];
     public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaVertexExpectation
+{
+    public int X { get; set; }
+    public int Y { get; set; }
 }
 
 public sealed class DreamcastFixtureAsicEventRegisterExpectation

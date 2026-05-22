@@ -571,9 +571,31 @@
           "type": "integer",
           "minimum": 1
         },
+        "vertices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaStripVertex"
+          }
+        },
         "minCount": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "pvrTaStripVertex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
         }
       }
     },

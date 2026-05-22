@@ -170,7 +170,13 @@ public class DreamcastFixtureRunnerTests
                     Region = "TA_INPUT",
                     ListTypeName = "OpaquePolygon",
                     Rgb565 = "0xF800",
-                    MinVertices = 3
+                    MinVertices = 3,
+                    Vertices =
+                    [
+                        new DreamcastFixturePvrTaVertexExpectation { X = 1, Y = 1 },
+                        new DreamcastFixturePvrTaVertexExpectation { X = 2, Y = 1 },
+                        new DreamcastFixturePvrTaVertexExpectation { X = 1, Y = 2 }
+                    ]
                 }
             ],
             AicaRegisters =
@@ -243,7 +249,11 @@ public class DreamcastFixtureRunnerTests
                     0xF800,
                     "0xF800",
                     3,
-                    [])
+                    [
+                        CreatePvrTaVertexSummary(1, 1),
+                        CreatePvrTaVertexSummary(2, 1),
+                        CreatePvrTaVertexSummary(1, 2, endOfStrip: true)
+                    ])
             ],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
             aicaChannels: [CreateAudioChannel()]);
@@ -375,7 +385,13 @@ public class DreamcastFixtureRunnerTests
                     Region = "TA_INPUT",
                     ListTypeName = "OpaquePolygon",
                     Rgb565 = "0xF800",
-                    MinVertices = 3
+                    MinVertices = 3,
+                    Vertices =
+                    [
+                        new DreamcastFixturePvrTaVertexExpectation { X = 1, Y = 1 },
+                        new DreamcastFixturePvrTaVertexExpectation { X = 2, Y = 1 },
+                        new DreamcastFixturePvrTaVertexExpectation { X = 1, Y = 2 }
+                    ]
                 }
             ],
             AicaRegisters =
@@ -476,7 +492,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
         Assert.Contains("missing PVR TA list region=TA_INPUT list=TranslucentPolygon", failures);
-        Assert.Contains("expected at least 1 PVR TA strip region=TA_INPUT list=OpaquePolygon rgb565=0xF800 minVertices=3 matches, got 0", failures);
+        Assert.Contains("expected at least 1 PVR TA strip region=TA_INPUT list=OpaquePolygon rgb565=0xF800 minVertices=3 vertices=1,1/2,1/1,2 matches, got 0", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
@@ -608,6 +624,27 @@ public class DreamcastFixtureRunnerTests
             write.Size,
             write.Value,
             write.ValueHex);
+
+    private static DreamcastPvrTaVertexSummary CreatePvrTaVertexSummary(int x, int y, bool endOfStrip = false)
+    {
+        var xValue = (uint)x << 16;
+        var yValue = (uint)y << 16;
+        var controlValue = endOfStrip ? 0xF000_0000u : 0xE000_0000u;
+        return new DreamcastPvrTaVertexSummary(
+            x,
+            y,
+            endOfStrip,
+            0xF800,
+            "0xF800",
+            controlValue,
+            $"0x{controlValue:X8}",
+            xValue,
+            $"0x{xValue:X8}",
+            yValue,
+            $"0x{yValue:X8}",
+            0x0000_F800,
+            "0x0000F800");
+    }
 
     private static IReadOnlyList<DreamcastPvrTaListSummary> CreatePvrTaLists(IReadOnlyList<DreamcastPvrTaCommandWriteSummary> taWrites) =>
         taWrites

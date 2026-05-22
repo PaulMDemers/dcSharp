@@ -686,11 +686,27 @@ public static class DreamcastFixtureRunner
             (expected.Region is null || string.Equals(strip.Region, expected.Region, StringComparison.Ordinal))
             && (expected.ListTypeName is null || string.Equals(strip.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
             && (expectedColor is null || strip.Rgb565 == expectedColor)
-            && (expected.MinVertices is null || strip.VertexCount >= expected.MinVertices));
+            && (expected.MinVertices is null || strip.VertexCount >= expected.MinVertices)
+            && MatchesPvrTaStripVertices(strip, expected.Vertices));
         if (count < expected.MinCount)
         {
             failures.Add($"expected at least {expected.MinCount} PVR TA strip {DescribePvrTaStripExpectation(expected)} matches, got {count}");
         }
+    }
+
+    private static bool MatchesPvrTaStripVertices(
+        DreamcastPvrTaStripSummary strip,
+        IReadOnlyList<DreamcastFixturePvrTaVertexExpectation> expectedVertices)
+    {
+        if (expectedVertices.Count == 0)
+        {
+            return true;
+        }
+
+        return strip.Vertices.Count == expectedVertices.Count
+            && strip.Vertices
+                .Zip(expectedVertices)
+                .All(pair => pair.First.X == pair.Second.X && pair.First.Y == pair.Second.Y);
     }
 
     private static string DescribePvrTaStripExpectation(DreamcastFixturePvrTaStripExpectation expected)
@@ -714,6 +730,11 @@ public static class DreamcastFixtureRunner
         if (expected.MinVertices is not null)
         {
             details.Add($"minVertices={expected.MinVertices}");
+        }
+
+        if (expected.Vertices.Count > 0)
+        {
+            details.Add($"vertices={string.Join("/", expected.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}");
         }
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
