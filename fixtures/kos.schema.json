@@ -740,6 +740,89 @@
           "type": "string",
           "minLength": 1
         },
+        "mode1": {
+          "$ref": "#/$defs/hex32"
+        },
+        "mode2": {
+          "$ref": "#/$defs/hex32"
+        },
+        "mode3": {
+          "$ref": "#/$defs/hex32"
+        },
+        "textureEnabled": {
+          "type": "boolean"
+        },
+        "depthWriteDisabled": {
+          "type": "boolean"
+        },
+        "cullingName": {
+          "enum": [
+            "None",
+            "Small",
+            "Ccw",
+            "Cw"
+          ]
+        },
+        "depthCompareName": {
+          "enum": [
+            "Never",
+            "Less",
+            "Equal",
+            "LessOrEqual",
+            "Greater",
+            "NotEqual",
+            "GreaterOrEqual",
+            "Always"
+          ]
+        },
+        "blendSrcName": {
+          "enum": [
+            "Zero",
+            "One",
+            "DestColor",
+            "InverseDestColor",
+            "SrcAlpha",
+            "InverseSrcAlpha",
+            "DestAlpha",
+            "InverseDestAlpha"
+          ]
+        },
+        "blendDstName": {
+          "enum": [
+            "Zero",
+            "One",
+            "DestColor",
+            "InverseDestColor",
+            "SrcAlpha",
+            "InverseSrcAlpha",
+            "DestAlpha",
+            "InverseDestAlpha"
+          ]
+        },
+        "alphaEnabled": {
+          "type": "boolean"
+        },
+        "textureBase": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pixelFormatName": {
+          "enum": [
+            "Argb1555",
+            "Rgb565",
+            "Argb4444",
+            "Yuv422",
+            "Bump",
+            "Palette4Bpp",
+            "Palette8Bpp",
+            "Reserved"
+          ]
+        },
+        "vqEnabled": {
+          "type": "boolean"
+        },
+        "mipMapEnabled": {
+          "type": "boolean"
+        },
         "rgb565": {
           "$ref": "#/$defs/hex16"
         },

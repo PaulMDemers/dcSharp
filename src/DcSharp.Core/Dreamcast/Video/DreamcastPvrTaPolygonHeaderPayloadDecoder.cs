@@ -2,7 +2,7 @@ namespace DcSharp.Core.Dreamcast.Video;
 
 public static class DreamcastPvrTaPolygonHeaderPayloadDecoder
 {
-    private const int PayloadWordCount = 7;
+    public const int PayloadWordCount = 7;
 
     public static IReadOnlyList<DreamcastPvrTaPolygonHeaderPayload> Decode(IReadOnlyList<DreamcastPvrTaCommandWrite> writes)
     {
@@ -37,7 +37,7 @@ public static class DreamcastPvrTaPolygonHeaderPayloadDecoder
             pending.WordSeen[index] = true;
             if (pending.WordSeen.Count(seen => seen) == PayloadWordCount)
             {
-                decoded.Add(CreatePayload(pending));
+                decoded.Add(DecodePayload(pending.Header, pending.Words));
                 pending = null;
             }
         }
@@ -45,34 +45,46 @@ public static class DreamcastPvrTaPolygonHeaderPayloadDecoder
         return decoded;
     }
 
+    public static DreamcastPvrTaPolygonHeaderPayload DecodePayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        ArgumentNullException.ThrowIfNull(words);
+        if (words.Count != PayloadWordCount)
+        {
+            throw new ArgumentException($"PVR TA polygon header payload must contain {PayloadWordCount} words.", nameof(words));
+        }
+
+        return CreatePayload(header, words);
+    }
+
     private static bool IsVertexShortcut(DreamcastPvrTaCommandWrite write) =>
         string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
         || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
 
-    private static DreamcastPvrTaPolygonHeaderPayload CreatePayload(PendingPolygonHeaderPayload pending) =>
+    private static DreamcastPvrTaPolygonHeaderPayload CreatePayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words) =>
         new(
-            pending.Header.Region,
-            pending.Header.ListType,
-            pending.Header.ListTypeName,
-            pending.Header.Value,
-            pending.Header.ValueHex,
-            pending.Words[0],
-            Hex32(pending.Words[0]),
-            DecodeMode1(pending.Words[0]),
-            pending.Words[1],
-            Hex32(pending.Words[1]),
-            DecodeMode2(pending.Words[1]),
-            pending.Words[2],
-            Hex32(pending.Words[2]),
-            DecodeMode3(pending.Words[2]),
-            pending.Words[3],
-            Hex32(pending.Words[3]),
-            pending.Words[4],
-            Hex32(pending.Words[4]),
-            pending.Words[5],
-            Hex32(pending.Words[5]),
-            pending.Words[6],
-            Hex32(pending.Words[6]));
+            header.Region,
+            header.ListType,
+            header.ListTypeName,
+            header.Value,
+            header.ValueHex,
+            words[0],
+            Hex32(words[0]),
+            DecodeMode1(words[0]),
+            words[1],
+            Hex32(words[1]),
+            DecodeMode2(words[1]),
+            words[2],
+            Hex32(words[2]),
+            DecodeMode3(words[2]),
+            words[3],
+            Hex32(words[3]),
+            words[4],
+            Hex32(words[4]),
+            words[5],
+            Hex32(words[5]),
+            words[6],
+            Hex32(words[6]));
 
     private static DreamcastPvrTaPolygonHeaderMode1 DecodeMode1(uint value)
     {

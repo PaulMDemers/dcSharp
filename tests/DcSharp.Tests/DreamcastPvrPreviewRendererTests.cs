@@ -51,6 +51,7 @@ public class DreamcastPvrPreviewRendererTests
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
+            null,
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(

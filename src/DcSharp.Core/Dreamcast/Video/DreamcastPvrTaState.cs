@@ -2,12 +2,15 @@ namespace DcSharp.Core.Dreamcast.Video;
 
 public sealed class DreamcastPvrTaState
 {
-    private const int PolygonHeaderPayloadWords = 7;
+    private const int PolygonHeaderPayloadWords = DreamcastPvrTaPolygonHeaderPayloadDecoder.PayloadWordCount;
     private bool inRenderableOpaqueList;
     private bool awaitingHeaderPayloadOrShortcut;
     private bool inRealStream;
     private int headerPayloadWordsRemaining;
+    private DreamcastPvrTaCommandWrite? currentHeader;
     private uint currentHeaderValue;
+    private readonly uint[] currentHeaderPayloadWords = new uint[PolygonHeaderPayloadWords];
+    private DreamcastPvrTaPolygonHeaderPayload? currentHeaderPayload;
     private readonly DreamcastPvrTaDiagnosticVertexPacketDecoder diagnosticVertexDecoder = new();
     private readonly DreamcastPvrTaRealVertexPacketDecoder realVertexDecoder = new();
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
@@ -27,6 +30,7 @@ public sealed class DreamcastPvrTaState
         {
             ResetStrip();
             inRenderableOpaqueList = true;
+            currentHeader = write;
             currentHeaderValue = write.Value;
             awaitingHeaderPayloadOrShortcut = true;
             return null;
@@ -43,14 +47,19 @@ public sealed class DreamcastPvrTaState
             if (!IsVertexControl(write))
             {
                 inRealStream = true;
+                currentHeaderPayloadWords[0] = write.Value;
                 headerPayloadWordsRemaining = PolygonHeaderPayloadWords - 1;
+                CompleteHeaderPayloadIfReady();
                 return null;
             }
         }
 
         if (headerPayloadWordsRemaining > 0)
         {
+            var wordIndex = PolygonHeaderPayloadWords - headerPayloadWordsRemaining;
+            currentHeaderPayloadWords[wordIndex] = write.Value;
             headerPayloadWordsRemaining--;
+            CompleteHeaderPayloadIfReady();
             return null;
         }
 
@@ -132,6 +141,7 @@ public sealed class DreamcastPvrTaState
                 write.ListTypeName,
                 currentHeaderValue,
                 $"0x{currentHeaderValue:X8}",
+                currentHeaderPayload,
                 color,
                 $"0x{color:X4}",
                 currentVertices.ToArray())
@@ -144,6 +154,14 @@ public sealed class DreamcastPvrTaState
         var result = strip is not null ? new DreamcastPvrTaRenderCommand(strip) : null;
         ResetStrip();
         return result;
+    }
+
+    private void CompleteHeaderPayloadIfReady()
+    {
+        if (headerPayloadWordsRemaining == 0 && currentHeader is not null)
+        {
+            currentHeaderPayload = DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(currentHeader, currentHeaderPayloadWords);
+        }
     }
 
     private static bool IsVertexControl(DreamcastPvrTaCommandWrite write) =>
@@ -159,6 +177,8 @@ public sealed class DreamcastPvrTaState
         awaitingHeaderPayloadOrShortcut = false;
         inRealStream = false;
         headerPayloadWordsRemaining = 0;
+        currentHeader = null;
+        currentHeaderPayload = null;
         diagnosticVertexDecoder.Reset();
         realVertexDecoder.Reset();
         currentVertices.Clear();
@@ -186,6 +206,7 @@ public sealed record DreamcastPvrTaStrip(
     string? ListTypeName,
     uint HeaderValue,
     string HeaderValueHex,
+    DreamcastPvrTaPolygonHeaderPayload? HeaderPayload,
     ushort Rgb565,
     string Rgb565Hex,
     IReadOnlyList<DreamcastPvrTaVertex> Vertices);

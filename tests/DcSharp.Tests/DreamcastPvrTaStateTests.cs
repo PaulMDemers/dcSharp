@@ -18,6 +18,7 @@ public class DreamcastPvrTaStateTests
         Assert.Equal(0xF800, render.Rgb565);
         var strip = Assert.Single(state.CompletedStrips);
         Assert.Equal("OpaquePolygon", strip.ListTypeName);
+        Assert.Null(strip.HeaderPayload);
         Assert.Equal("0x80840000", strip.HeaderValueHex);
         Assert.Equal("0xF800", strip.Rgb565Hex);
         Assert.Collection(
@@ -64,6 +65,10 @@ public class DreamcastPvrTaStateTests
         Assert.Equal(0xF800, render.Rgb565);
         var strip = Assert.Single(state.CompletedStrips);
         Assert.Equal("OpaquePolygon", strip.ListTypeName);
+        Assert.NotNull(strip.HeaderPayload);
+        Assert.Equal("0x00000000", strip.HeaderPayload.Mode1Hex);
+        Assert.Equal("Never", strip.HeaderPayload.Mode1Fields.DepthCompareName);
+        Assert.Equal("Argb1555", strip.HeaderPayload.Mode3Fields.PixelFormatName);
         Assert.Equal(3, strip.Vertices.Count);
         Assert.Collection(
             strip.Vertices,
@@ -86,6 +91,44 @@ public class DreamcastPvrTaStateTests
                 Assert.Equal(2, vertex.Y);
                 Assert.True(vertex.EndOfStrip);
             });
+    }
+
+    [Fact]
+    public void CarriesRealPolygonHeaderPayloadIntoCompletedStrip()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0008)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x9600_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x8490_2064)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xCE00_1234)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x1111_1111)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x2222_2222)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3333_3333)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x4444_4444)));
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0xFF00_00FF));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0xFF00_00FF));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0xFF00_00FF);
+
+        Assert.NotNull(render);
+        var strip = Assert.Single(state.CompletedStrips);
+        var payload = Assert.IsType<DreamcastPvrTaPolygonHeaderPayload>(strip.HeaderPayload);
+        Assert.Equal("0x96000000", payload.Mode1Hex);
+        Assert.True(payload.Mode1Fields.TextureEnabled);
+        Assert.True(payload.Mode1Fields.DepthWriteDisabled);
+        Assert.Equal("Ccw", payload.Mode1Fields.CullingName);
+        Assert.Equal("Greater", payload.Mode1Fields.DepthCompareName);
+        Assert.Equal("0x84902064", payload.Mode2Hex);
+        Assert.Equal("SrcAlpha", payload.Mode2Fields.BlendSrcName);
+        Assert.Equal("One", payload.Mode2Fields.BlendDstName);
+        Assert.True(payload.Mode2Fields.AlphaEnabled);
+        Assert.Equal("Disabled", payload.Mode2Fields.FogTypeName);
+        Assert.Equal("0xCE001234", payload.Mode3Hex);
+        Assert.Equal("0x00001234", payload.Mode3Fields.TextureBaseHex);
+        Assert.Equal("Rgb565", payload.Mode3Fields.PixelFormatName);
+        Assert.True(payload.Mode3Fields.VqEnabled);
+        Assert.True(payload.Mode3Fields.MipMapEnabled);
     }
 
     [Fact]

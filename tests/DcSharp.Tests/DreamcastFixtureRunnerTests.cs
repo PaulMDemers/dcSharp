@@ -269,6 +269,7 @@ public class DreamcastFixtureRunnerTests
                     "OpaquePolygon",
                     0x8084_0000,
                     "0x80840000",
+                    null,
                     0xF800,
                     "0xF800",
                     3,

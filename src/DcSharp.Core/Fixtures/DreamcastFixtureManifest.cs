@@ -227,6 +227,20 @@ public sealed class DreamcastFixturePvrTaStripExpectation
 {
     public string? Region { get; set; }
     public string? ListTypeName { get; set; }
+    public string? Mode1 { get; set; }
+    public string? Mode2 { get; set; }
+    public string? Mode3 { get; set; }
+    public bool? TextureEnabled { get; set; }
+    public bool? DepthWriteDisabled { get; set; }
+    public string? CullingName { get; set; }
+    public string? DepthCompareName { get; set; }
+    public string? BlendSrcName { get; set; }
+    public string? BlendDstName { get; set; }
+    public bool? AlphaEnabled { get; set; }
+    public string? TextureBase { get; set; }
+    public string? PixelFormatName { get; set; }
+    public bool? VqEnabled { get; set; }
+    public bool? MipMapEnabled { get; set; }
     public string? Rgb565 { get; set; }
     public int? MinVertices { get; set; }
     public List<DreamcastFixturePvrTaVertexExpectation> Vertices { get; set; } = [];

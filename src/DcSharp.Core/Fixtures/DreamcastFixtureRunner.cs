@@ -826,9 +826,14 @@ public static class DreamcastFixtureRunner
         DreamcastFixturePvrTaStripExpectation expected)
     {
         ushort? expectedColor = expected.Rgb565 is null ? null : ParseHex16(expected.Rgb565, "PVR TA strip color");
+        uint? expectedMode1 = expected.Mode1 is null ? null : ParseHex32(expected.Mode1, "PVR TA strip mode1");
+        uint? expectedMode2 = expected.Mode2 is null ? null : ParseHex32(expected.Mode2, "PVR TA strip mode2");
+        uint? expectedMode3 = expected.Mode3 is null ? null : ParseHex32(expected.Mode3, "PVR TA strip mode3");
+        uint? expectedTextureBase = expected.TextureBase is null ? null : ParseHex32(expected.TextureBase, "PVR TA strip texture base");
         var count = summary.Video.PvrTaStrips.Count(strip =>
             (expected.Region is null || string.Equals(strip.Region, expected.Region, StringComparison.Ordinal))
             && (expected.ListTypeName is null || string.Equals(strip.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && MatchesPvrTaStripHeaderPayload(strip, expected, expectedMode1, expectedMode2, expectedMode3, expectedTextureBase)
             && (expectedColor is null || strip.Rgb565 == expectedColor)
             && (expected.MinVertices is null || strip.VertexCount >= expected.MinVertices)
             && MatchesPvrTaStripVertices(strip, expected.Vertices));
@@ -836,6 +841,50 @@ public static class DreamcastFixtureRunner
         {
             failures.Add($"expected at least {expected.MinCount} PVR TA strip {DescribePvrTaStripExpectation(expected)} matches, got {count}");
         }
+    }
+
+    private static bool MatchesPvrTaStripHeaderPayload(
+        DreamcastPvrTaStripSummary strip,
+        DreamcastFixturePvrTaStripExpectation expected,
+        uint? expectedMode1,
+        uint? expectedMode2,
+        uint? expectedMode3,
+        uint? expectedTextureBase)
+    {
+        var payload = strip.HeaderPayload;
+        if (expectedMode1 is null
+            && expectedMode2 is null
+            && expectedMode3 is null
+            && expected.TextureEnabled is null
+            && expected.DepthWriteDisabled is null
+            && expected.CullingName is null
+            && expected.DepthCompareName is null
+            && expected.BlendSrcName is null
+            && expected.BlendDstName is null
+            && expected.AlphaEnabled is null
+            && expectedTextureBase is null
+            && expected.PixelFormatName is null
+            && expected.VqEnabled is null
+            && expected.MipMapEnabled is null)
+        {
+            return true;
+        }
+
+        return payload is not null
+            && (expectedMode1 is null || payload.Mode1 == expectedMode1)
+            && (expectedMode2 is null || payload.Mode2 == expectedMode2)
+            && (expectedMode3 is null || payload.Mode3 == expectedMode3)
+            && (expected.TextureEnabled is null || payload.Mode1Fields.TextureEnabled == expected.TextureEnabled)
+            && (expected.DepthWriteDisabled is null || payload.Mode1Fields.DepthWriteDisabled == expected.DepthWriteDisabled)
+            && (expected.CullingName is null || string.Equals(payload.Mode1Fields.CullingName, expected.CullingName, StringComparison.Ordinal))
+            && (expected.DepthCompareName is null || string.Equals(payload.Mode1Fields.DepthCompareName, expected.DepthCompareName, StringComparison.Ordinal))
+            && (expected.BlendSrcName is null || string.Equals(payload.Mode2Fields.BlendSrcName, expected.BlendSrcName, StringComparison.Ordinal))
+            && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
+            && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
+            && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
+            && (expected.PixelFormatName is null || string.Equals(payload.Mode3Fields.PixelFormatName, expected.PixelFormatName, StringComparison.Ordinal))
+            && (expected.VqEnabled is null || payload.Mode3Fields.VqEnabled == expected.VqEnabled)
+            && (expected.MipMapEnabled is null || payload.Mode3Fields.MipMapEnabled == expected.MipMapEnabled);
     }
 
     private static bool MatchesPvrTaStripVertices(
@@ -870,6 +919,21 @@ public static class DreamcastFixtureRunner
         {
             details.Add($"rgb565={expected.Rgb565}");
         }
+
+        AddOptionalDetail(details, "mode1", expected.Mode1);
+        AddOptionalDetail(details, "mode2", expected.Mode2);
+        AddOptionalDetail(details, "mode3", expected.Mode3);
+        AddOptionalDetail(details, "textureEnabled", expected.TextureEnabled);
+        AddOptionalDetail(details, "depthWriteDisabled", expected.DepthWriteDisabled);
+        AddOptionalDetail(details, "culling", expected.CullingName);
+        AddOptionalDetail(details, "depthCompare", expected.DepthCompareName);
+        AddOptionalDetail(details, "blendSrc", expected.BlendSrcName);
+        AddOptionalDetail(details, "blendDst", expected.BlendDstName);
+        AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
+        AddOptionalDetail(details, "textureBase", expected.TextureBase);
+        AddOptionalDetail(details, "pixelFormat", expected.PixelFormatName);
+        AddOptionalDetail(details, "vq", expected.VqEnabled);
+        AddOptionalDetail(details, "mipMap", expected.MipMapEnabled);
 
         if (expected.MinVertices is not null)
         {

@@ -701,7 +701,12 @@ static string FormatPvrTaLists(IReadOnlyList<DreamcastPvrTaListSummary> lists) =
     string.Join(", ", lists.Select(list => $"{list.Region}:{list.ListTypeName ?? "none"} commands={list.CommandCount} headers={list.PolygonHeaderCount} vertices={list.VertexCount} ends={list.VertexEndOfStripCount}"));
 
 static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips) =>
-    string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
+    string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
+
+static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
+    payload is null
+        ? string.Empty
+        : $" mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} pixel={payload.Mode3Fields.PixelFormatName}";
 
 static string FormatPvrTaParameterHeaders(IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> headers) =>
     string.Join(", ", headers
