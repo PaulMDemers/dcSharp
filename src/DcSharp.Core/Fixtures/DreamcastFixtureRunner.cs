@@ -518,8 +518,49 @@ public static class DreamcastFixtureRunner
             && (expected.EndOfStrip is null || header.EndOfStrip == expected.EndOfStrip)
             && (expectedValue is null || header.Value == expectedValue)
             && (expected.ExpectedPayloadWords is null || header.ExpectedPayloadWords == expected.ExpectedPayloadWords)
-            && (expected.HasKnownPayloadLength is null || header.HasKnownPayloadLength == expected.HasKnownPayloadLength));
+            && (expected.HasKnownPayloadLength is null || header.HasKnownPayloadLength == expected.HasKnownPayloadLength)
+            && MatchesPolygonHeaderCommand(header.PolygonHeaderCommand, expected));
     }
+
+    private static bool MatchesPolygonHeaderCommand(
+        DreamcastPvrTaPolygonHeaderCommandSummary? command,
+        DreamcastFixturePvrTaParameterHeaderExpectation expected)
+    {
+        if (!HasPolygonHeaderCommandFilters(expected))
+        {
+            return true;
+        }
+
+        return command is not null
+            && (expected.Uv16Bit is null || command.Uv16Bit == expected.Uv16Bit)
+            && (expected.Gouraud is null || command.Gouraud == expected.Gouraud)
+            && (expected.OffsetColorEnabled is null || command.OffsetColorEnabled == expected.OffsetColorEnabled)
+            && (expected.TextureEnabled is null || command.TextureEnabled == expected.TextureEnabled)
+            && (expected.ColorFormat is null || command.ColorFormat == expected.ColorFormat)
+            && (expected.ColorFormatName is null || string.Equals(command.ColorFormatName, expected.ColorFormatName, StringComparison.Ordinal))
+            && (expected.ModifierNormal is null || command.ModifierNormal == expected.ModifierNormal)
+            && (expected.ModifierEnabled is null || command.ModifierEnabled == expected.ModifierEnabled)
+            && (expected.ClipMode is null || command.ClipMode == expected.ClipMode)
+            && (expected.ClipModeName is null || string.Equals(command.ClipModeName, expected.ClipModeName, StringComparison.Ordinal))
+            && (expected.StripLength is null || command.StripLength == expected.StripLength)
+            && (expected.StripLengthName is null || string.Equals(command.StripLengthName, expected.StripLengthName, StringComparison.Ordinal))
+            && (expected.AutoStripLength is null || command.AutoStripLength == expected.AutoStripLength);
+    }
+
+    private static bool HasPolygonHeaderCommandFilters(DreamcastFixturePvrTaParameterHeaderExpectation expected) =>
+        expected.Uv16Bit is not null
+        || expected.Gouraud is not null
+        || expected.OffsetColorEnabled is not null
+        || expected.TextureEnabled is not null
+        || expected.ColorFormat is not null
+        || expected.ColorFormatName is not null
+        || expected.ModifierNormal is not null
+        || expected.ModifierEnabled is not null
+        || expected.ClipMode is not null
+        || expected.ClipModeName is not null
+        || expected.StripLength is not null
+        || expected.StripLengthName is not null
+        || expected.AutoStripLength is not null;
 
     private static string DescribePvrTaParameterHeaderExpectation(DreamcastFixturePvrTaParameterHeaderExpectation expected)
     {
@@ -564,7 +605,29 @@ public static class DreamcastFixtureRunner
             details.Add($"hasKnownPayloadLength={expected.HasKnownPayloadLength}");
         }
 
+        AddOptionalDetail(details, "uv16Bit", expected.Uv16Bit);
+        AddOptionalDetail(details, "gouraud", expected.Gouraud);
+        AddOptionalDetail(details, "offsetColorEnabled", expected.OffsetColorEnabled);
+        AddOptionalDetail(details, "textureEnabled", expected.TextureEnabled);
+        AddOptionalDetail(details, "colorFormat", expected.ColorFormat);
+        AddOptionalDetail(details, "colorFormatName", expected.ColorFormatName);
+        AddOptionalDetail(details, "modifierNormal", expected.ModifierNormal);
+        AddOptionalDetail(details, "modifierEnabled", expected.ModifierEnabled);
+        AddOptionalDetail(details, "clipMode", expected.ClipMode);
+        AddOptionalDetail(details, "clipModeName", expected.ClipModeName);
+        AddOptionalDetail(details, "stripLength", expected.StripLength);
+        AddOptionalDetail(details, "stripLengthName", expected.StripLengthName);
+        AddOptionalDetail(details, "autoStripLength", expected.AutoStripLength);
+
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void AddOptionalDetail(List<string> details, string name, object? value)
+    {
+        if (value is not null)
+        {
+            details.Add($"{name}={value}");
+        }
     }
 
     private static void ValidatePvrTaList(

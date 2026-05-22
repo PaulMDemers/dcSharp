@@ -133,6 +133,19 @@ public sealed class DreamcastFixturePvrTaParameterHeaderExpectation
     public string? Value { get; set; }
     public int? ExpectedPayloadWords { get; set; }
     public bool? HasKnownPayloadLength { get; set; }
+    public bool? Uv16Bit { get; set; }
+    public bool? Gouraud { get; set; }
+    public bool? OffsetColorEnabled { get; set; }
+    public bool? TextureEnabled { get; set; }
+    public int? ColorFormat { get; set; }
+    public string? ColorFormatName { get; set; }
+    public bool? ModifierNormal { get; set; }
+    public bool? ModifierEnabled { get; set; }
+    public int? ClipMode { get; set; }
+    public string? ClipModeName { get; set; }
+    public int? StripLength { get; set; }
+    public string? StripLengthName { get; set; }
+    public bool? AutoStripLength { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

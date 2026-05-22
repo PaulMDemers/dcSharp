@@ -456,6 +456,66 @@
         "hasKnownPayloadLength": {
           "type": "boolean"
         },
+        "uv16Bit": {
+          "type": "boolean"
+        },
+        "gouraud": {
+          "type": "boolean"
+        },
+        "offsetColorEnabled": {
+          "type": "boolean"
+        },
+        "textureEnabled": {
+          "type": "boolean"
+        },
+        "colorFormat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "colorFormatName": {
+          "enum": [
+            "ArgbPacked",
+            "FourFloats",
+            "Intensity",
+            "IntensityPrevious"
+          ]
+        },
+        "modifierNormal": {
+          "type": "boolean"
+        },
+        "modifierEnabled": {
+          "type": "boolean"
+        },
+        "clipMode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "clipModeName": {
+          "enum": [
+            "Disabled",
+            "Reserved",
+            "Inside",
+            "Outside"
+          ]
+        },
+        "stripLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "stripLengthName": {
+          "enum": [
+            "Strip1",
+            "Strip2",
+            "Strip4",
+            "Strip6"
+          ]
+        },
+        "autoStripLength": {
+          "type": "boolean"
+        },
         "minCount": {
           "type": "integer",
           "minimum": 1
