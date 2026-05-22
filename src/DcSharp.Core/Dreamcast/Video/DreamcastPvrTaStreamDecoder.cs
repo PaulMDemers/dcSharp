@@ -7,27 +7,27 @@ public static class DreamcastPvrTaStreamDecoder
         ArgumentNullException.ThrowIfNull(writes);
 
         var decoded = new List<DreamcastPvrTaStreamWrite>(writes.Count);
-        DreamcastPvrTaParameterHeader? payloadHeader = null;
+        PayloadControl? payloadControl = null;
         var payloadWordsRemaining = 0;
         var payloadWordIndex = 0;
 
         foreach (var write in writes)
         {
-            if (payloadHeader is not null && payloadWordsRemaining > 0 && string.Equals(write.Region, payloadHeader.Region, StringComparison.Ordinal))
+            if (payloadControl is not null && payloadWordsRemaining > 0 && string.Equals(write.Region, payloadControl.Region, StringComparison.Ordinal))
             {
                 decoded.Add(new DreamcastPvrTaStreamWrite(
                     write,
                     "Payload",
-                    payloadHeader.Kind,
-                    payloadHeader.Value,
-                    payloadHeader.ValueHex,
+                    payloadControl.Kind,
+                    payloadControl.Value,
+                    payloadControl.ValueHex,
                     payloadWordIndex,
                     payloadWordsRemaining - 1));
                 payloadWordIndex++;
                 payloadWordsRemaining--;
                 if (payloadWordsRemaining == 0)
                 {
-                    payloadHeader = null;
+                    payloadControl = null;
                     payloadWordIndex = 0;
                 }
 
@@ -42,16 +42,16 @@ public static class DreamcastPvrTaStreamDecoder
                 header.Value,
                 header.ValueHex,
                 null,
-                header.ExpectedPayloadWords));
-            if (header.ExpectedPayloadWords is > 0)
+                ExpectedPayloadWords(header)));
+            if (ExpectedPayloadWords(header) is > 0 and var expectedPayloadWords)
             {
-                payloadHeader = header;
-                payloadWordsRemaining = header.ExpectedPayloadWords.Value;
+                payloadControl = new PayloadControl(header.Region, header.Kind, header.Value, header.ValueHex);
+                payloadWordsRemaining = expectedPayloadWords;
                 payloadWordIndex = 0;
             }
             else
             {
-                payloadHeader = null;
+                payloadControl = null;
                 payloadWordsRemaining = 0;
                 payloadWordIndex = 0;
             }
@@ -59,7 +59,13 @@ public static class DreamcastPvrTaStreamDecoder
 
         return decoded;
     }
+
+    private static int? ExpectedPayloadWords(DreamcastPvrTaParameterHeader header) =>
+        header.ExpectedPayloadWords
+        ?? (header.Kind is "Vertex" or "VertexEndOfStrip" ? 7 : null);
 }
+
+internal sealed record PayloadControl(string Region, string Kind, uint Value, string ValueHex);
 
 public sealed record DreamcastPvrTaStreamWrite(
     DreamcastPvrTaCommandWrite Write,

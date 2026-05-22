@@ -48,12 +48,13 @@ public class DreamcastPvrTaStreamDecoderTests
     }
 
     [Fact]
-    public void TreatsUnknownLengthVerticesAsControlWords()
+    public void TracksGenericVertexPayloadWords()
     {
         var writes = new[]
         {
             CreateWrite("TA_INPUT", 0xE000_0000),
-            CreateWrite("TA_INPUT", 0x0001_0000)
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000)
         };
 
         var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
@@ -65,12 +66,21 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("Control", write.Role);
                 Assert.Equal("Vertex", write.ControlKind);
                 Assert.Null(write.PayloadWordIndex);
-                Assert.Null(write.PayloadWordsRemaining);
+                Assert.Equal(7, write.PayloadWordsRemaining);
             },
             write =>
             {
-                Assert.Equal("Control", write.Role);
-                Assert.Equal("Unknown", write.ControlKind);
+                Assert.Equal("Payload", write.Role);
+                Assert.Equal("Vertex", write.ControlKind);
+                Assert.Equal(0, write.PayloadWordIndex);
+                Assert.Equal(6, write.PayloadWordsRemaining);
+            },
+            write =>
+            {
+                Assert.Equal("Payload", write.Role);
+                Assert.Equal("Vertex", write.ControlKind);
+                Assert.Equal(1, write.PayloadWordIndex);
+                Assert.Equal(5, write.PayloadWordsRemaining);
             });
     }
 
