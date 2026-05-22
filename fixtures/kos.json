@@ -1547,6 +1547,136 @@
       }
     },
     {
+      "name": "pvr_depth",
+      "sample": "samples/kos/pvr_depth",
+      "artifact": "dcsharp_pvr_depth.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR depth probe",
+        "first_greater=0x80000000",
+        "less=0x20000000",
+        "reject_greater=0x80000000",
+        "ta_init=0x80000000"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0xF800"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x0000"
+        }
+      ],
+      "minPvrRegisterAccesses": 8,
+      "minPvrTaCommandWrites": 96,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaPolygonHeaderPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "mode1": "0x80000000",
+          "depthCompareName": "Greater",
+          "cullingName": "None",
+          "minCount": 2
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "mode1": "0x20000000",
+          "depthCompareName": "Less",
+          "cullingName": "None",
+          "minCount": 1
+        }
+      ],
+      "pvrTaRealVertexPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "argb": "0xFF00FF00",
+          "rgb565": "0x07E0",
+          "zValue": "0x3F000000",
+          "minCount": 3
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "argb": "0xFFFF0000",
+          "rgb565": "0xF800",
+          "zValue": "0x3E800000",
+          "minCount": 3
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "argb": "0xFF0000FF",
+          "rgb565": "0x001F",
+          "zValue": "0x3E000000",
+          "minCount": 3
+        }
+      ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minCommands": 1,
+          "minPolygonHeaders": 3,
+          "minVertices": 6,
+          "minVertexEndOfStrip": 3
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "mode1": "0x80000000",
+          "depthCompareName": "Greater",
+          "rgb565": "0x07E0",
+          "minVertices": 3,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "mode1": "0x20000000",
+          "depthCompareName": "Less",
+          "rgb565": "0xF800",
+          "minVertices": 3,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "mode1": "0x80000000",
+          "depthCompareName": "Greater",
+          "rgb565": "0x001F",
+          "minVertices": 3,
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "asic_irqb",
       "sample": "samples/kos/asic_irqb",
       "artifact": "dcsharp_asic_irqb.elf",

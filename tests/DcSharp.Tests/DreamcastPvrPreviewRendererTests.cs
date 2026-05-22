@@ -79,19 +79,64 @@ public class DreamcastPvrPreviewRendererTests
         Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
     }
 
-    private static DreamcastPvrTaStrip CreateStrip(ushort color, IReadOnlyList<(int X, int Y)> points, string? culling = null) =>
+    [Fact]
+    public void LessDepthCompareOverwritesFartherPreviewPixels()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var depth = CreateDepthBuffer(vram);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], z: 0.5f, depthCompare: "Always"), vram, depth);
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0xF800, [(1, 1), (2, 1), (1, 2)], z: 0.25f, depthCompare: "Less"), vram, depth);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+    }
+
+    [Fact]
+    public void GreaterDepthCompareRejectsFartherPreviewPixels()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var depth = CreateDepthBuffer(vram);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], z: 0.5f, depthCompare: "Always"), vram, depth);
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0xF800, [(1, 1), (2, 1), (1, 2)], z: 0.25f, depthCompare: "Greater"), vram, depth);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+    }
+
+    [Fact]
+    public void DepthWriteDisabledDoesNotUpdatePreviewDepth()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        var depth = CreateDepthBuffer(vram);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], z: 0.5f, depthCompare: "Always", depthWriteDisabled: true), vram, depth);
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0xF800, [(1, 1), (2, 1), (1, 2)], z: 0.25f, depthCompare: "Greater"), vram, depth);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+    }
+
+    private static DreamcastPvrTaStrip CreateStrip(
+        ushort color,
+        IReadOnlyList<(int X, int Y)> points,
+        string? culling = null,
+        float z = 1.0f,
+        string? depthCompare = null,
+        bool depthWriteDisabled = false) =>
         new(
             "TA_INPUT",
             0,
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
                 point.X,
                 point.Y,
+                z,
+                SingleToUInt32Bits(z),
+                $"0x{SingleToUInt32Bits(z):X8}",
                 index == points.Count - 1,
                 color,
                 $"0x{color:X4}",
@@ -104,14 +149,14 @@ public class DreamcastPvrPreviewRendererTests
                 color,
                 $"0x{color:X8}")).ToArray());
 
-    private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(string? culling)
+    private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(string? culling, string? depthCompare, bool depthWriteDisabled)
     {
-        if (culling is null)
+        if (culling is null && depthCompare is null && !depthWriteDisabled)
         {
             return null;
         }
 
-        var cullingBits = culling switch
+        var cullingBits = (culling ?? "None") switch
         {
             "None" => 0u,
             "Small" => 1u,
@@ -119,6 +164,21 @@ public class DreamcastPvrPreviewRendererTests
             "Cw" => 3u,
             _ => throw new ArgumentOutOfRangeException(nameof(culling), culling, "Unknown culling mode.")
         };
+        var depthCompareBits = (depthCompare ?? "Never") switch
+        {
+            "Never" => 0u,
+            "Less" => 1u,
+            "Equal" => 2u,
+            "LessOrEqual" => 3u,
+            "Greater" => 4u,
+            "NotEqual" => 5u,
+            "GreaterOrEqual" => 6u,
+            "Always" => 7u,
+            _ => throw new ArgumentOutOfRangeException(nameof(depthCompare), depthCompare, "Unknown depth compare mode.")
+        };
+        var mode1 = (depthCompareBits << 29)
+            | (cullingBits << 27)
+            | (depthWriteDisabled ? 0x0400_0000u : 0);
         var header = new DreamcastPvrTaCommandWrite(
             0x1000_0000,
             "0x10000000",
@@ -130,8 +190,18 @@ public class DreamcastPvrPreviewRendererTests
             4,
             0x8084_0000,
             "0x80840000");
-        return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [(cullingBits << 27), 0, 0, 0, 0, 0, 0]);
+        return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [mode1, 0, 0, 0, 0, 0, 0]);
     }
+
+    private static float[] CreateDepthBuffer(byte[] vram)
+    {
+        var depth = new float[vram.Length / 2];
+        Array.Fill(depth, float.NaN);
+        return depth;
+    }
+
+    private static uint SingleToUInt32Bits(float value) =>
+        BitConverter.SingleToUInt32Bits(value);
 
     private static ushort ReadRgb565(byte[] vram, int x, int y)
     {

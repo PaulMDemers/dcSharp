@@ -90,11 +90,15 @@ public sealed class DreamcastPvrTaRealVertexPacketDecoder
         {
             var xValue = XValue ?? 0;
             var yValue = YValue ?? 0;
+            var zValue = ZValue ?? 0;
             var argbValue = ArgbValue ?? 0;
             var color = Argb8888ToRgb565(argbValue);
             return new DreamcastPvrTaVertex(
                 DecodeFloatCoordinate(xValue),
                 DecodeFloatCoordinate(yValue),
+                BitConverter.UInt32BitsToSingle(zValue),
+                zValue,
+                $"0x{zValue:X8}",
                 EndOfStrip,
                 color,
                 $"0x{color:X4}",

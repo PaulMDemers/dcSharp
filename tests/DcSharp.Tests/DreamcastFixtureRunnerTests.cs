@@ -676,6 +676,9 @@ public class DreamcastFixtureRunnerTests
         return new DreamcastPvrTaVertexSummary(
             x,
             y,
+            1.0f,
+            0x3F80_0000,
+            "0x3F800000",
             endOfStrip,
             0xF800,
             "0xF800",

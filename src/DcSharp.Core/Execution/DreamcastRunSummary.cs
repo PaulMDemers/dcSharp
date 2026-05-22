@@ -653,6 +653,9 @@ public sealed record DreamcastPvrTaListSummary(
 public sealed record DreamcastPvrTaVertexSummary(
     int X,
     int Y,
+    float Z,
+    uint ZValue,
+    string ZValueHex,
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
@@ -669,6 +672,9 @@ public sealed record DreamcastPvrTaVertexSummary(
         new(
             vertex.X,
             vertex.Y,
+            vertex.Z,
+            vertex.ZValue,
+            vertex.ZValueHex,
             vertex.EndOfStrip,
             vertex.Rgb565,
             vertex.Rgb565Hex,

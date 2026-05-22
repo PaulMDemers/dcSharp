@@ -64,6 +64,9 @@ public sealed class DreamcastPvrTaDiagnosticVertexPacketDecoder
             return new DreamcastPvrTaVertex(
                 DecodeSigned16Dot16(xValue),
                 DecodeSigned16Dot16(yValue),
+                1.0f,
+                0x3F80_0000,
+                "0x3F800000",
                 EndOfStrip,
                 color,
                 $"0x{color:X4}",

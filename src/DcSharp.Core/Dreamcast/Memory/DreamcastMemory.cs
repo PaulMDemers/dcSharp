@@ -69,6 +69,7 @@ public sealed class DreamcastMemory
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
     private readonly byte[] pvrVram = new byte[PvrVramByteCount];
+    private readonly float[] pvrPreviewDepth = new float[PvrVramByteCount / 2];
     private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
@@ -88,6 +89,7 @@ public sealed class DreamcastMemory
         DreamcastControllerState? controllerB = null,
         IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null)
     {
+        Array.Fill(pvrPreviewDepth, float.NaN);
         mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
         if (controllerB is { } controllerBState)
         {
@@ -1151,7 +1153,7 @@ public sealed class DreamcastMemory
         pvrTaCommandWrites.Add(write);
         if (pvrTaState.Accept(write) is { } renderCommand)
         {
-            DreamcastPvrPreviewRenderer.RenderStrip(renderCommand.Strip, pvrVram);
+            DreamcastPvrPreviewRenderer.RenderStrip(renderCommand.Strip, pvrVram, pvrPreviewDepth);
         }
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));

@@ -6,7 +6,13 @@ public static class DreamcastPvrPreviewRenderer
 {
     public const int Width = 320;
 
-    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram)
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram) =>
+        RenderStrip(strip, vram, [], useDepth: false);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
+        RenderStrip(strip, vram, depthBuffer, useDepth: true);
+
+    private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
     {
         var vertices = strip.Vertices.Take(3).ToArray();
         if (vertices.Length < 3)
@@ -33,11 +39,79 @@ public static class DreamcastPvrPreviewRenderer
             {
                 if (IsInsideTriangle(new Vector2(x, y), a, b, c))
                 {
-                    WriteRgb565Pixel(vram, PreviewPixelIndex(x, y), strip.Rgb565);
+                    var pixelIndex = PreviewPixelIndex(x, y);
+                    if (!PassesDepth(strip, vertices, pixelIndex, depthBuffer, useDepth))
+                    {
+                        continue;
+                    }
+
+                    WriteRgb565Pixel(vram, pixelIndex, strip.Rgb565);
+                    WriteDepth(strip, vertices, pixelIndex, depthBuffer, useDepth);
                 }
             }
         }
     }
+
+    private static bool PassesDepth(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        int pixelIndex,
+        Span<float> depthBuffer,
+        bool useDepth)
+    {
+        if (!useDepth || pixelIndex >= depthBuffer.Length)
+        {
+            return true;
+        }
+
+        var depthCompareName = strip.HeaderPayload?.Mode1Fields.DepthCompareName;
+        if (depthCompareName is null || string.Equals(depthCompareName, "Never", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var incoming = PreviewDepth(vertices);
+        var current = depthBuffer[pixelIndex];
+        if (float.IsNaN(current))
+        {
+            return true;
+        }
+
+        const float epsilon = 0.0001f;
+        return depthCompareName switch
+        {
+            "Less" => incoming < current,
+            "Equal" => MathF.Abs(incoming - current) <= epsilon,
+            "LessOrEqual" => incoming < current || MathF.Abs(incoming - current) <= epsilon,
+            "Greater" => incoming > current,
+            "NotEqual" => MathF.Abs(incoming - current) > epsilon,
+            "GreaterOrEqual" => incoming > current || MathF.Abs(incoming - current) <= epsilon,
+            "Always" => true,
+            _ => true
+        };
+    }
+
+    private static void WriteDepth(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        int pixelIndex,
+        Span<float> depthBuffer,
+        bool useDepth)
+    {
+        if (!useDepth
+            || pixelIndex >= depthBuffer.Length
+            || strip.HeaderPayload?.Mode1Fields.DepthWriteDisabled == true
+            || strip.HeaderPayload?.Mode1Fields.DepthCompareName is null
+            || string.Equals(strip.HeaderPayload.Mode1Fields.DepthCompareName, "Never", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        depthBuffer[pixelIndex] = PreviewDepth(vertices);
+    }
+
+    private static float PreviewDepth(IReadOnlyList<DreamcastPvrTaVertex> vertices) =>
+        (vertices[0].Z + vertices[1].Z + vertices[2].Z) / 3.0f;
 
     private static bool IsCulled(DreamcastPvrTaStrip strip, Vector2 a, Vector2 b, Vector2 c)
     {

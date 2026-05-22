@@ -188,6 +188,9 @@ public sealed class DreamcastPvrTaState
 public sealed record DreamcastPvrTaVertex(
     int X,
     int Y,
+    float Z,
+    uint ZValue,
+    string ZValueHex,
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
