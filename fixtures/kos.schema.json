@@ -206,6 +206,12 @@
             "$ref": "#/$defs/pvrTaPolygonHeaderPayload"
           }
         },
+        "pvrTaRealVertexPayloads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaRealVertexPayload"
+          }
+        },
         "pvrTaParameterHeaders": {
           "type": "array",
           "items": {
@@ -532,6 +538,60 @@
         },
         "mipMapEnabled": {
           "type": "boolean"
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaRealVertexPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controlValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "endOfStrip": {
+          "type": "boolean"
+        },
+        "xValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "roundedX": {
+          "type": "integer"
+        },
+        "yValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "roundedY": {
+          "type": "integer"
+        },
+        "zValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "uValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "vValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "argb": {
+          "$ref": "#/$defs/hex32"
+        },
+        "rgb565": {
+          "$ref": "#/$defs/hex16"
+        },
+        "offsetArgb": {
+          "$ref": "#/$defs/hex32"
         },
         "minCount": {
           "type": "integer",

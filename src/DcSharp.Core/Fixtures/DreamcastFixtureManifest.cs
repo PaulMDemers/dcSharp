@@ -79,6 +79,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixturePvrTaStreamWriteExpectation> PvrTaStreamWrites { get; set; } = [];
     public List<DreamcastFixturePvrTaPolygonHeaderPayloadExpectation> PvrTaPolygonHeaderPayloads { get; set; } = [];
+    public List<DreamcastFixturePvrTaRealVertexPayloadExpectation> PvrTaRealVertexPayloads { get; set; } = [];
     public List<DreamcastFixturePvrTaParameterHeaderExpectation> PvrTaParameterHeaders { get; set; } = [];
     public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
@@ -190,6 +191,25 @@ public sealed class DreamcastFixturePvrTaPolygonHeaderPayloadExpectation
     public string? PixelFormatName { get; set; }
     public bool? VqEnabled { get; set; }
     public bool? MipMapEnabled { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaRealVertexPayloadExpectation
+{
+    public string? Region { get; set; }
+    public string? ListTypeName { get; set; }
+    public string? ControlValue { get; set; }
+    public bool? EndOfStrip { get; set; }
+    public string? XValue { get; set; }
+    public int? RoundedX { get; set; }
+    public string? YValue { get; set; }
+    public int? RoundedY { get; set; }
+    public string? ZValue { get; set; }
+    public string? UValue { get; set; }
+    public string? VValue { get; set; }
+    public string? Argb { get; set; }
+    public string? Rgb565 { get; set; }
+    public string? OffsetArgb { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

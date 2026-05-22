@@ -245,6 +245,15 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.PvrTaRealVertexPayloads)
+        {
+            var count = CountPvrTaRealVertexPayloads(summary, expected);
+            if (count < expected.MinCount)
+            {
+                failures.Add($"expected at least {expected.MinCount} PVR TA real vertex payload {DescribePvrTaRealVertexPayloadExpectation(expected)} matches, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.PvrTaParameterHeaders)
         {
             var count = CountPvrTaParameterHeaders(summary, expected);
@@ -588,6 +597,56 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "pixelFormatName", expected.PixelFormatName);
         AddOptionalDetail(details, "vqEnabled", expected.VqEnabled);
         AddOptionalDetail(details, "mipMapEnabled", expected.MipMapEnabled);
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static int CountPvrTaRealVertexPayloads(DreamcastRunSummary summary, DreamcastFixturePvrTaRealVertexPayloadExpectation expected)
+    {
+        uint? expectedControlValue = expected.ControlValue is null ? null : ParseHex32(expected.ControlValue, "PVR TA real vertex control value");
+        uint? expectedXValue = expected.XValue is null ? null : ParseHex32(expected.XValue, "PVR TA real vertex x value");
+        uint? expectedYValue = expected.YValue is null ? null : ParseHex32(expected.YValue, "PVR TA real vertex y value");
+        uint? expectedZValue = expected.ZValue is null ? null : ParseHex32(expected.ZValue, "PVR TA real vertex z value");
+        uint? expectedUValue = expected.UValue is null ? null : ParseHex32(expected.UValue, "PVR TA real vertex u value");
+        uint? expectedVValue = expected.VValue is null ? null : ParseHex32(expected.VValue, "PVR TA real vertex v value");
+        uint? expectedArgb = expected.Argb is null ? null : ParseHex32(expected.Argb, "PVR TA real vertex ARGB");
+        ushort? expectedRgb565 = expected.Rgb565 is null ? null : ParseHex16(expected.Rgb565, "PVR TA real vertex RGB565");
+        uint? expectedOffsetArgb = expected.OffsetArgb is null ? null : ParseHex32(expected.OffsetArgb, "PVR TA real vertex offset ARGB");
+
+        return summary.Video.PvrTaRealVertexPayloads.Count(vertex =>
+            (expected.Region is null || string.Equals(vertex.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(vertex.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expectedControlValue is null || vertex.ControlValue == expectedControlValue)
+            && (expected.EndOfStrip is null || vertex.EndOfStrip == expected.EndOfStrip)
+            && (expectedXValue is null || vertex.XValue == expectedXValue)
+            && (expected.RoundedX is null || vertex.RoundedX == expected.RoundedX)
+            && (expectedYValue is null || vertex.YValue == expectedYValue)
+            && (expected.RoundedY is null || vertex.RoundedY == expected.RoundedY)
+            && (expectedZValue is null || vertex.ZValue == expectedZValue)
+            && (expectedUValue is null || vertex.UValue == expectedUValue)
+            && (expectedVValue is null || vertex.VValue == expectedVValue)
+            && (expectedArgb is null || vertex.Argb == expectedArgb)
+            && (expectedRgb565 is null || vertex.Rgb565 == expectedRgb565)
+            && (expectedOffsetArgb is null || vertex.OffsetArgb == expectedOffsetArgb));
+    }
+
+    private static string DescribePvrTaRealVertexPayloadExpectation(DreamcastFixturePvrTaRealVertexPayloadExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "region", expected.Region);
+        AddOptionalDetail(details, "list", expected.ListTypeName);
+        AddOptionalDetail(details, "controlValue", expected.ControlValue);
+        AddOptionalDetail(details, "endOfStrip", expected.EndOfStrip);
+        AddOptionalDetail(details, "xValue", expected.XValue);
+        AddOptionalDetail(details, "roundedX", expected.RoundedX);
+        AddOptionalDetail(details, "yValue", expected.YValue);
+        AddOptionalDetail(details, "roundedY", expected.RoundedY);
+        AddOptionalDetail(details, "zValue", expected.ZValue);
+        AddOptionalDetail(details, "uValue", expected.UValue);
+        AddOptionalDetail(details, "vValue", expected.VValue);
+        AddOptionalDetail(details, "argb", expected.Argb);
+        AddOptionalDetail(details, "rgb565", expected.Rgb565);
+        AddOptionalDetail(details, "offsetArgb", expected.OffsetArgb);
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }

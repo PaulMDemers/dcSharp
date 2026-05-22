@@ -314,6 +314,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary> RecentPvrTaStreamWrites,
     IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary> PvrTaPolygonHeaderPayloads,
+    IReadOnlyList<DreamcastPvrTaRealVertexPayloadSummary> PvrTaRealVertexPayloads,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> RecentPvrTaParameterHeaders,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
@@ -344,6 +345,9 @@ public sealed record DreamcastVideoSummary(
                 .ToArray(),
             DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(snapshot.PvrTaCommandWrites)
                 .Select(DreamcastPvrTaPolygonHeaderPayloadSummary.FromPayload)
+                .ToArray(),
+            DreamcastPvrTaRealVertexPayloadDecoder.Decode(snapshot.PvrTaCommandWrites)
+                .Select(DreamcastPvrTaRealVertexPayloadSummary.FromPayload)
                 .ToArray(),
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaParameterHeaderSummary.FromWrite).ToArray(),
             snapshot.PvrTaCommandWrites
@@ -499,6 +503,70 @@ public sealed record DreamcastPvrTaPolygonHeaderPayloadSummary(
             payload.Parameter2Hex,
             payload.Parameter3,
             payload.Parameter3Hex);
+}
+
+public sealed record DreamcastPvrTaRealVertexPayloadSummary(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint ControlValue,
+    string ControlValueHex,
+    bool EndOfStrip,
+    uint XValue,
+    string XValueHex,
+    float X,
+    int RoundedX,
+    uint YValue,
+    string YValueHex,
+    float Y,
+    int RoundedY,
+    uint ZValue,
+    string ZValueHex,
+    float Z,
+    uint UValue,
+    string UValueHex,
+    float U,
+    uint VValue,
+    string VValueHex,
+    float V,
+    uint Argb,
+    string ArgbHex,
+    ushort Rgb565,
+    string Rgb565Hex,
+    uint OffsetArgb,
+    string OffsetArgbHex)
+{
+    public static DreamcastPvrTaRealVertexPayloadSummary FromPayload(DreamcastPvrTaRealVertexPayload payload) =>
+        new(
+            payload.Region,
+            payload.ListType,
+            payload.ListTypeName,
+            payload.ControlValue,
+            payload.ControlValueHex,
+            payload.EndOfStrip,
+            payload.XValue,
+            payload.XValueHex,
+            payload.X,
+            payload.RoundedX,
+            payload.YValue,
+            payload.YValueHex,
+            payload.Y,
+            payload.RoundedY,
+            payload.ZValue,
+            payload.ZValueHex,
+            payload.Z,
+            payload.UValue,
+            payload.UValueHex,
+            payload.U,
+            payload.VValue,
+            payload.VValueHex,
+            payload.V,
+            payload.Argb,
+            payload.ArgbHex,
+            payload.Rgb565,
+            payload.Rgb565Hex,
+            payload.OffsetArgb,
+            payload.OffsetArgbHex);
 }
 
 public sealed record DreamcastPvrTaParameterHeaderSummary(

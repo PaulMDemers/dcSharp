@@ -641,6 +641,9 @@ public class DreamcastFixtureRunnerTests
             DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())
                 .Select(DreamcastPvrTaPolygonHeaderPayloadSummary.FromPayload)
                 .ToArray(),
+            DreamcastPvrTaRealVertexPayloadDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())
+                .Select(DreamcastPvrTaRealVertexPayloadSummary.FromPayload)
+                .ToArray(),
             taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),
             pvrTaStrips ?? [],

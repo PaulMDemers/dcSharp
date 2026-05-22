@@ -58,6 +58,60 @@ public class DreamcastPvrTaStreamDecoderTests
     }
 
     [Fact]
+    public void DecodesRealVertexPayloadsAfterRealPolygonHeader()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8084_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xE000_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x4000_0000),
+            CreateWrite("TA_INPUT", 0x4040_0000),
+            CreateWrite("TA_INPUT", 0x3F00_0000),
+            CreateWrite("TA_INPUT", 0x3E80_0000),
+            CreateWrite("TA_INPUT", 0xFF00_00FF),
+            CreateWrite("TA_INPUT", 0x0102_0304)
+        };
+
+        var vertex = Assert.Single(DreamcastPvrTaRealVertexPayloadDecoder.Decode(writes));
+
+        Assert.Equal("TA_INPUT", vertex.Region);
+        Assert.Equal("OpaquePolygon", vertex.ListTypeName);
+        Assert.False(vertex.EndOfStrip);
+        Assert.Equal(0xE000_0000u, vertex.ControlValue);
+        Assert.Equal(1, vertex.RoundedX);
+        Assert.Equal(2, vertex.RoundedY);
+        Assert.Equal(3.0f, vertex.Z);
+        Assert.Equal(0.5f, vertex.U);
+        Assert.Equal(0.25f, vertex.V);
+        Assert.Equal(0xFF00_00FFu, vertex.Argb);
+        Assert.Equal(0x001F, vertex.Rgb565);
+        Assert.Equal(0x0102_0304u, vertex.OffsetArgb);
+    }
+
+    [Fact]
+    public void IgnoresDiagnosticVertexShortcutsForRealVertexPayloads()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8084_0000),
+            CreateWrite("TA_INPUT", 0xE000_0000),
+            CreateWrite("TA_INPUT", 0x0001_0000),
+            CreateWrite("TA_INPUT", 0x0001_0000),
+            CreateWrite("TA_INPUT", 0x0000_F800)
+        };
+
+        Assert.Empty(DreamcastPvrTaRealVertexPayloadDecoder.Decode(writes));
+    }
+
+    [Fact]
     public void TracksKnownHeaderPayloadWords()
     {
         var writes = new[]

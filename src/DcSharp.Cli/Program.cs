@@ -154,6 +154,11 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR TA polygon payloads: {FormatPvrTaPolygonHeaderPayloads(videoSummary.PvrTaPolygonHeaderPayloads)}");
     }
 
+    if (videoSummary.PvrTaRealVertexPayloads.Count > 0)
+    {
+        Console.WriteLine($"PVR TA real vertices: {FormatPvrTaRealVertexPayloads(videoSummary.PvrTaRealVertexPayloads)}");
+    }
+
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentPvrRegisters.Length > 0)
     {
@@ -368,6 +373,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.PvrTaPolygonHeaderPayloads.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaPolygonPayloads={FormatPvrTaPolygonHeaderPayloads(result.Summary.Video.PvrTaPolygonHeaderPayloads)}");
+                }
+
+                if (result.Summary.Video.PvrTaRealVertexPayloads.Count > 0)
+                {
+                    Console.WriteLine($"  pvrTaRealVertices={FormatPvrTaRealVertexPayloads(result.Summary.Video.PvrTaRealVertexPayloads)}");
                 }
             }
 
@@ -730,6 +740,14 @@ static string FormatPvrTaPolygonHeaderPayloads(IReadOnlyList<DreamcastPvrTaPolyg
     string.Join(", ", payloads.Select(payload =>
         $"{payload.Region}:{payload.ListTypeName ?? "none"} header={payload.HeaderValueHex} mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} fog={payload.Mode2Fields.FogTypeName} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} pixel={payload.Mode3Fields.PixelFormatName} vq={payload.Mode3Fields.VqEnabled} mip={payload.Mode3Fields.MipMapEnabled}"));
 
+static string FormatPvrTaRealVertexPayloads(IReadOnlyList<DreamcastPvrTaRealVertexPayloadSummary> vertices) =>
+    string.Join(", ", vertices
+        .GroupBy(vertex => new { vertex.Region, vertex.ListTypeName, vertex.Rgb565Hex, vertex.ArgbHex })
+        .Select(group => $"{group.Key.Region}:{group.Key.ListTypeName ?? "none"} vertices={group.Count()} points={string.Join("/", group.Select(vertex => $"{vertex.RoundedX},{vertex.RoundedY}"))} z={string.Join("/", group.Select(vertex => FormatFloat(vertex.Z)))} argb={group.Key.ArgbHex} rgb565={group.Key.Rgb565Hex} ends={group.Count(vertex => vertex.EndOfStrip)}"));
+
+static string FormatFloat(float value) =>
+    value.ToString("0.###", CultureInfo.InvariantCulture);
+
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
@@ -808,6 +826,7 @@ internal sealed record FixtureReport(
     IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary>? RecentPvrTaStreamWrites,
     IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary>? PvrTaPolygonHeaderPayloads,
+    IReadOnlyList<DreamcastPvrTaRealVertexPayloadSummary>? PvrTaRealVertexPayloads,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary>? RecentPvrTaParameterHeaders,
     int? AicaRegisterAccessCount,
     int? MapleTransferCount,
@@ -845,6 +864,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaStrips,
             result.Summary?.Video.RecentPvrTaStreamWrites,
             result.Summary?.Video.PvrTaPolygonHeaderPayloads,
+            result.Summary?.Video.PvrTaRealVertexPayloads,
             result.Summary?.Video.RecentPvrTaParameterHeaders,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Maple.TransferCount,

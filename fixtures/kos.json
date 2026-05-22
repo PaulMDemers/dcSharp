@@ -889,6 +889,62 @@
           "minCount": 1
         }
       ],
+      "pvrTaRealVertexPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "controlValue": "0xE0000000",
+          "endOfStrip": false,
+          "argb": "0xFFFF0000",
+          "rgb565": "0xF800",
+          "zValue": "0x3F800000",
+          "uValue": "0x00000000",
+          "vValue": "0x00000000",
+          "offsetArgb": "0x00000000",
+          "minCount": 2
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "controlValue": "0xF0000000",
+          "endOfStrip": true,
+          "argb": "0xFFFF0000",
+          "rgb565": "0xF800",
+          "zValue": "0x3F800000",
+          "uValue": "0x00000000",
+          "vValue": "0x00000000",
+          "offsetArgb": "0x00000000",
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x3F800000",
+          "roundedX": 1,
+          "yValue": "0x3F800000",
+          "roundedY": 1,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x40000000",
+          "roundedX": 2,
+          "yValue": "0x3F800000",
+          "roundedY": 1,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x3F800000",
+          "roundedX": 1,
+          "yValue": "0x40000000",
+          "roundedY": 2,
+          "endOfStrip": true,
+          "minCount": 1
+        }
+      ],
       "pvrTaParameterHeaders": [
         {
           "kind": "PolygonHeader",
@@ -1186,6 +1242,62 @@
           "pixelFormatName": "Rgb565",
           "vqEnabled": true,
           "mipMapEnabled": true,
+          "minCount": 1
+        }
+      ],
+      "pvrTaRealVertexPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "controlValue": "0xE0000000",
+          "endOfStrip": false,
+          "argb": "0xFF0000FF",
+          "rgb565": "0x001F",
+          "zValue": "0x3F800000",
+          "uValue": "0x00000000",
+          "vValue": "0x00000000",
+          "offsetArgb": "0x00000000",
+          "minCount": 2
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "controlValue": "0xF0000000",
+          "endOfStrip": true,
+          "argb": "0xFF0000FF",
+          "rgb565": "0x001F",
+          "zValue": "0x3F800000",
+          "uValue": "0x00000000",
+          "vValue": "0x00000000",
+          "offsetArgb": "0x00000000",
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x3F800000",
+          "roundedX": 1,
+          "yValue": "0x3F800000",
+          "roundedY": 1,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x40000000",
+          "roundedX": 2,
+          "yValue": "0x3F800000",
+          "roundedY": 1,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x3F800000",
+          "roundedX": 1,
+          "yValue": "0x40000000",
+          "roundedY": 2,
+          "endOfStrip": true,
           "minCount": 1
         }
       ],
