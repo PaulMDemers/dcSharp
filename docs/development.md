@@ -162,6 +162,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_pvr_registers.elf`: writes named PVR framebuffer/TA registers plus TA command/YUV apertures, exposes PVR diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_polygon.elf`: writes a minimal opaque polygon-style TA command sequence, exposes TA list/register diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_pvr_polygon_green.elf`: writes a second opaque polygon-style TA command sequence with a wider green preview triangle, exposes TA strip/list/register diagnostics, shuts down, and reports `ProgramExit`.
+- `dcsharp_pvr_real_polygon.elf`: writes a real-shaped 32-byte polygon header followed by three `pvr_vertex_t`-style 32-byte vertices, exposes TA stream/list/register diagnostics, shuts down, and reports `ProgramExit`.
 - `dcsharp_asic_irqb.elf`: triggers a raw Maple DMA completion with ASIC IRQB enabled, leaves the decoded pending source observable, exits through the firmware-exit trap, and reports `FirmwareExit`.
 - `dcsharp_asic_events.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, observes the raw ACK bit, clears it, disables the mask, shuts down, and reports `ProgramExit`.
 - `dcsharp_vblank_idle.elf`: masks SH-4 interrupts, enables ASIC VBlank IRQ9, spins in a read-only ACK polling loop until synthetic VBlank, exposes idle VBlank wake diagnostics, clears the ACK bit, shuts down, and reports `ProgramExit`.

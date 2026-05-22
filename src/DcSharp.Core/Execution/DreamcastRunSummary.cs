@@ -318,7 +318,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
-    public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 16) =>
+    public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
         new(
             snapshot.VramBytes,
             snapshot.NonZeroBytes,
