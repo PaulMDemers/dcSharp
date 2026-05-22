@@ -163,7 +163,7 @@ Current state:
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
 - ASIC event ACK registers, IRQ masks, pending masks, and deliverable ASIC interrupt event/level/source bit are captured in run summaries.
 - Current PVR register values, PVR register writes, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in the video summary with SDK-aligned names and first-pass TA command classification.
-- A tiny fixture-backed PVR sentinel path turns one assembled opaque TA polygon strip into RGB565 VRAM samples; this is not a general renderer yet.
+- A tiny fixture-backed PVR preview raster path turns one assembled opaque TA polygon strip into RGB565 VRAM samples; this is not a general renderer yet.
 - Current AICA register values, register writes, sound RAM changes, and decoded channel state are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, idle advance batches, idle wake reasons, CPU fast-forward batches, and controller script changes.
@@ -180,7 +180,7 @@ Next targets:
 
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Move the opaque TA strip path from sentinel pixels toward a tiny solid-triangle software raster path.
+- Replace the fixture-oriented pseudo vertex format with a real PVR vertex decoder.
 - Start moving from diagnostic AICA state toward silence-safe sample playback timing.
 
 ## Development Bias

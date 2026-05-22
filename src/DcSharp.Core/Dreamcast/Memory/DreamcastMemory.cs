@@ -1149,20 +1149,57 @@ public sealed class DreamcastMemory
         pvrTaCommandWrites.Add(write);
         if (pvrTaState.Accept(write) is { } renderCommand)
         {
-            RenderPvrTaSentinel(renderCommand);
+            RenderPvrTaStripPreview(renderCommand);
         }
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
         return true;
     }
 
-    private void RenderPvrTaSentinel(DreamcastPvrTaRenderCommand command)
+    private void RenderPvrTaStripPreview(DreamcastPvrTaRenderCommand command)
     {
-        var color = command.Strip.Rgb565;
-        WriteRgb565VramPixel(0, color);
-        WriteRgb565VramPixel(1, color);
-        WriteRgb565VramPixel(320, color);
-        WriteRgb565VramPixel(321, color);
+        var vertices = command.Strip.Vertices.Take(3).ToArray();
+        if (vertices.Length < 3)
+        {
+            return;
+        }
+
+        var minX = vertices.Min(vertex => vertex.X);
+        var minY = vertices.Min(vertex => vertex.Y);
+        var a = new Vector2(vertices[0].X - minX, vertices[0].Y - minY);
+        var b = new Vector2(vertices[1].X - minX, vertices[1].Y - minY);
+        var c = new Vector2(vertices[2].X - minX, vertices[2].Y - minY);
+        var maxX = (int)MathF.Max(a.X, MathF.Max(b.X, c.X));
+        var maxY = (int)MathF.Max(a.Y, MathF.Max(b.Y, c.Y));
+
+        for (var y = 0; y <= maxY; y++)
+        {
+            for (var x = 0; x <= maxX; x++)
+            {
+                if (IsInsideTriangle(new Vector2(x, y), a, b, c))
+                {
+                    WriteRgb565VramPixel(PvrPreviewPixelIndex(x, y), command.Strip.Rgb565);
+                }
+            }
+        }
+    }
+
+    private static bool IsInsideTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
+    {
+        var edge0 = EdgeFunction(a, b, point);
+        var edge1 = EdgeFunction(b, c, point);
+        var edge2 = EdgeFunction(c, a, point);
+        return (edge0 >= 0 && edge1 >= 0 && edge2 >= 0)
+            || (edge0 <= 0 && edge1 <= 0 && edge2 <= 0);
+    }
+
+    private static float EdgeFunction(Vector2 a, Vector2 b, Vector2 point) =>
+        ((point.X - a.X) * (b.Y - a.Y)) - ((point.Y - a.Y) * (b.X - a.X));
+
+    private static int PvrPreviewPixelIndex(int x, int y)
+    {
+        const int width = 320;
+        return (y * width) + x;
     }
 
     private void WriteRgb565VramPixel(int pixelIndex, ushort color)

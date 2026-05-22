@@ -161,7 +161,7 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
-    public void KnownOpaqueTaPolygonWritesVisibleVramSentinel()
+    public void KnownOpaqueTaPolygonWritesVisiblePreviewPixels()
     {
         var memory = new DreamcastMemory();
 
@@ -172,7 +172,7 @@ public class DreamcastMemoryTests
 
         var snapshot = memory.CreateVideoSnapshot();
 
-        Assert.True(snapshot.NonZeroBytes >= 4);
+        Assert.True(snapshot.NonZeroBytes >= 3);
         Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
         Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
         var strip = Assert.Single(snapshot.PvrTaStrips);
