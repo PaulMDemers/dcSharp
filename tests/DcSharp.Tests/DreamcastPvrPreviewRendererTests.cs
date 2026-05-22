@@ -210,6 +210,31 @@ public class DreamcastPvrPreviewRendererTests
         Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
     }
 
+    [Fact]
+    public void SamplesArgb4444TextureAsRgb565PreviewPixels()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xFF00);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0xF0F0);
+        WriteTexturePixel(vram, textureBase, 0, 7, 0xF00F);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xFFFF,
+                [(1, 1), (2, 1), (1, 2)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                pixelFormat: 2,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
     private static DreamcastPvrTaStrip CreateStrip(
         ushort color,
         IReadOnlyList<(int X, int Y)> points,

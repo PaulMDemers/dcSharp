@@ -210,6 +210,7 @@ public static class DreamcastPvrPreviewRenderer
         {
             "Rgb565" => ReadRgb565Pixel(vram, textureOffset / 2),
             "Argb1555" => Argb1555ToRgb565(ReadRgb565Pixel(vram, textureOffset / 2)),
+            "Argb4444" => Argb4444ToRgb565(ReadRgb565Pixel(vram, textureOffset / 2)),
             _ => strip.Rgb565
         };
     }
@@ -300,6 +301,20 @@ public static class DreamcastPvrPreviewRenderer
         var blue = value & 0x1F;
         return (ushort)((red << 11) | (((green << 1) | (green >> 4)) << 5) | blue);
     }
+
+    private static ushort Argb4444ToRgb565(ushort value)
+    {
+        var red = (value >> 8) & 0xF;
+        var green = (value >> 4) & 0xF;
+        var blue = value & 0xF;
+        return (ushort)((Expand4To5(red) << 11) | (Expand4To6(green) << 5) | Expand4To5(blue));
+    }
+
+    private static int Expand4To5(int value) =>
+        (value << 1) | (value >> 3);
+
+    private static int Expand4To6(int value) =>
+        (value << 2) | (value >> 2);
 
     private static byte Expand5(int value) =>
         (byte)((value << 3) | (value >> 2));
