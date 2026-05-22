@@ -144,6 +144,11 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR TA params: {FormatPvrTaParameterHeaders(videoSummary.RecentPvrTaParameterHeaders)}");
     }
 
+    if (videoSummary.RecentPvrTaStreamWrites.Count > 0)
+    {
+        Console.WriteLine($"PVR TA stream: {FormatPvrTaStreamWrites(videoSummary.RecentPvrTaStreamWrites)}");
+    }
+
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentPvrRegisters.Length > 0)
     {
@@ -348,6 +353,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.RecentPvrTaParameterHeaders.Count > 0)
                 {
                     Console.WriteLine($"  recentPvrTaParams={FormatPvrTaParameterHeaders(result.Summary.Video.RecentPvrTaParameterHeaders)}");
+                }
+
+                if (result.Summary.Video.RecentPvrTaStreamWrites.Count > 0)
+                {
+                    Console.WriteLine($"  recentPvrTaStream={FormatPvrTaStreamWrites(result.Summary.Video.RecentPvrTaStreamWrites)}");
                 }
             }
 
@@ -678,6 +688,11 @@ static string FormatPvrTaParameterHeaders(IReadOnlyList<DreamcastPvrTaParameterH
         .GroupBy(header => new { header.Region, header.Kind, header.ParameterType, header.ListTypeName, header.EndOfStrip, header.ExpectedPayloadWords })
         .Select(group => $"{group.Key.Region}:{group.Key.Kind}x{group.Count()} type={group.Key.ParameterType?.ToString(CultureInfo.InvariantCulture) ?? "none"} list={group.Key.ListTypeName ?? "none"} end={group.Key.EndOfStrip} payload={group.Key.ExpectedPayloadWords?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"));
 
+static string FormatPvrTaStreamWrites(IReadOnlyList<DreamcastPvrTaStreamWriteSummary> writes) =>
+    string.Join(", ", writes
+        .GroupBy(write => new { write.Region, write.Role, write.ControlKind })
+        .Select(group => $"{group.Key.Region}:{group.Key.Role}:{group.Key.ControlKind}x{group.Count()}"));
+
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
@@ -754,6 +769,7 @@ internal sealed record FixtureReport(
     int? PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaListSummary>? PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
+    IReadOnlyList<DreamcastPvrTaStreamWriteSummary>? RecentPvrTaStreamWrites,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary>? RecentPvrTaParameterHeaders,
     int? AicaRegisterAccessCount,
     int? MapleTransferCount,
@@ -789,6 +805,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Video.PvrTaLists,
             result.Summary?.Video.PvrTaStrips,
+            result.Summary?.Video.RecentPvrTaStreamWrites,
             result.Summary?.Video.RecentPvrTaParameterHeaders,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Maple.TransferCount,

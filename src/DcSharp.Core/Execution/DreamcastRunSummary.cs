@@ -312,6 +312,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
+    IReadOnlyList<DreamcastPvrTaStreamWriteSummary> RecentPvrTaStreamWrites,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> RecentPvrTaParameterHeaders,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
@@ -336,6 +337,10 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
+            DreamcastPvrTaStreamDecoder.Decode(snapshot.PvrTaCommandWrites)
+                .TakeLast(Math.Max(0, recentCount))
+                .Select(DreamcastPvrTaStreamWriteSummary.FromWrite)
+                .ToArray(),
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaParameterHeaderSummary.FromWrite).ToArray(),
             snapshot.PvrTaCommandWrites
                 .GroupBy(write => new PvrTaListKey(write.Region, write.ListType, write.ListTypeName))
@@ -406,6 +411,38 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
 {
     public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
         new(write.Address, write.AddressHex, write.Region, write.Kind, write.ListType, write.ListTypeName, write.EndOfStrip, write.Size, write.Value, write.ValueHex);
+}
+
+public sealed record DreamcastPvrTaStreamWriteSummary(
+    uint Address,
+    string AddressHex,
+    string Region,
+    string Role,
+    string Kind,
+    int Size,
+    uint Value,
+    string ValueHex,
+    string ControlKind,
+    uint ControlValue,
+    string ControlValueHex,
+    int? PayloadWordIndex,
+    int? PayloadWordsRemaining)
+{
+    public static DreamcastPvrTaStreamWriteSummary FromWrite(DreamcastPvrTaStreamWrite write) =>
+        new(
+            write.Write.Address,
+            write.Write.AddressHex,
+            write.Write.Region,
+            write.Role,
+            write.Write.Kind,
+            write.Write.Size,
+            write.Write.Value,
+            write.Write.ValueHex,
+            write.ControlKind,
+            write.ControlValue,
+            write.ControlValueHex,
+            write.PayloadWordIndex,
+            write.PayloadWordsRemaining);
 }
 
 public sealed record DreamcastPvrTaParameterHeaderSummary(

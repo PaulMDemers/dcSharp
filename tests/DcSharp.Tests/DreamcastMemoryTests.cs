@@ -159,6 +159,33 @@ public class DreamcastMemoryTests
                 Assert.Equal(0, list.VertexEndOfStripCount);
             });
         Assert.Collection(
+            summary.RecentPvrTaStreamWrites,
+            write =>
+            {
+                Assert.Equal("Control", write.Role);
+                Assert.Equal("PolygonHeader", write.ControlKind);
+                Assert.Equal(7, write.PayloadWordsRemaining);
+            },
+            write =>
+            {
+                Assert.Equal("Payload", write.Role);
+                Assert.Equal("PolygonHeader", write.ControlKind);
+                Assert.Equal(0, write.PayloadWordIndex);
+                Assert.Equal(6, write.PayloadWordsRemaining);
+            },
+            write =>
+            {
+                Assert.Equal("Payload", write.Role);
+                Assert.Equal("PolygonHeader", write.ControlKind);
+                Assert.Equal(1, write.PayloadWordIndex);
+            },
+            write =>
+            {
+                Assert.Equal("Control", write.Role);
+                Assert.Equal("YuvConverterData", write.ControlKind);
+                Assert.Equal(0, write.PayloadWordsRemaining);
+            });
+        Assert.Collection(
             summary.RecentPvrTaParameterHeaders,
             header =>
             {

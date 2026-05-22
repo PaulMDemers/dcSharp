@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Fixtures;
 
@@ -545,6 +546,9 @@ public class DreamcastFixtureRunnerTests
             [],
             taWrites.Count,
             taWrites,
+            DreamcastPvrTaStreamDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())
+                .Select(DreamcastPvrTaStreamWriteSummary.FromWrite)
+                .ToArray(),
             taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),
             pvrTaStrips ?? [],
@@ -554,6 +558,19 @@ public class DreamcastFixtureRunnerTests
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
                 .ToArray());
     }
+
+    private static DreamcastPvrTaCommandWrite ToCommandWrite(DreamcastPvrTaCommandWriteSummary write) =>
+        new(
+            write.Address,
+            write.AddressHex,
+            write.Region,
+            write.Kind,
+            write.ListType,
+            write.ListTypeName,
+            write.EndOfStrip,
+            write.Size,
+            write.Value,
+            write.ValueHex);
 
     private static IReadOnlyList<DreamcastPvrTaListSummary> CreatePvrTaLists(IReadOnlyList<DreamcastPvrTaCommandWriteSummary> taWrites) =>
         taWrites
