@@ -26,21 +26,6 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (IsOpaqueInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
-        {
-            ResetStrip();
-            inRenderableOpaqueList = true;
-            currentHeader = write;
-            currentHeaderValue = write.Value;
-            awaitingHeaderPayloadOrShortcut = true;
-            return null;
-        }
-
-        if (!inRenderableOpaqueList)
-        {
-            return null;
-        }
-
         if (awaitingHeaderPayloadOrShortcut)
         {
             awaitingHeaderPayloadOrShortcut = false;
@@ -71,6 +56,21 @@ public sealed class DreamcastPvrTaState
         if (diagnosticVertexDecoder.HasPending)
         {
             return AcceptDiagnosticVertexPayload(write);
+        }
+
+        if (IsOpaqueInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
+        {
+            ResetStrip();
+            inRenderableOpaqueList = true;
+            currentHeader = write;
+            currentHeaderValue = write.Value;
+            awaitingHeaderPayloadOrShortcut = true;
+            return null;
+        }
+
+        if (!inRenderableOpaqueList)
+        {
+            return null;
         }
 
         if (IsOpaqueInput(write) && IsVertexControl(write))

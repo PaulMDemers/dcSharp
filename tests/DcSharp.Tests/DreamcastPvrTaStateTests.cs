@@ -132,6 +132,27 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void CompletesRealPvrVertexStripWhenArgbPayloadLooksLikeHeader()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0000)));
+        for (var index = 0; index < 7; index++)
+        {
+            Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        }
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0x80FF_0000));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0x80FF_0000));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0x80FF_0000);
+
+        Assert.NotNull(render);
+        var strip = Assert.Single(state.CompletedStrips);
+        Assert.Equal(0xF800, strip.Rgb565);
+        Assert.All(strip.Vertices, vertex => Assert.Equal("0x80FF0000", vertex.ColorValueHex));
+    }
+
+    [Fact]
     public void IgnoresIncompleteOrMismatchedStrips()
     {
         var state = new DreamcastPvrTaState();

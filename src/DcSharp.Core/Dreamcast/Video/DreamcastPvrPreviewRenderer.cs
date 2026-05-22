@@ -45,7 +45,7 @@ public static class DreamcastPvrPreviewRenderer
                         continue;
                     }
 
-                    WriteRgb565Pixel(vram, pixelIndex, strip.Rgb565);
+                    WritePreviewPixel(strip, vertices, vram, pixelIndex);
                     WriteDepth(strip, vertices, pixelIndex, depthBuffer, useDepth);
                 }
             }
@@ -145,6 +145,85 @@ public static class DreamcastPvrPreviewRenderer
 
     private static int PreviewPixelIndex(int x, int y) =>
         (y * Width) + x;
+
+    private static void WritePreviewPixel(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        Span<byte> vram,
+        int pixelIndex)
+    {
+        var source = strip.Rgb565;
+        var mode2 = strip.HeaderPayload?.Mode2Fields;
+        if (mode2?.AlphaEnabled == true)
+        {
+            source = BlendRgb565(
+                source,
+                ReadRgb565Pixel(vram, pixelIndex),
+                SourceAlpha(vertices),
+                mode2.BlendSrcName,
+                mode2.BlendDstName);
+        }
+
+        WriteRgb565Pixel(vram, pixelIndex, source);
+    }
+
+    private static ushort BlendRgb565(ushort source, ushort destination, byte sourceAlpha, string sourceBlend, string destinationBlend)
+    {
+        var (sourceRed, sourceGreen, sourceBlue) = Rgb565ToRgb888(source);
+        var (destinationRed, destinationGreen, destinationBlue) = Rgb565ToRgb888(destination);
+        var red = BlendChannel(sourceRed, destinationRed, sourceAlpha, sourceBlend, destinationBlend);
+        var green = BlendChannel(sourceGreen, destinationGreen, sourceAlpha, sourceBlend, destinationBlend);
+        var blue = BlendChannel(sourceBlue, destinationBlue, sourceAlpha, sourceBlend, destinationBlend);
+        return Rgb888ToRgb565(red, green, blue);
+    }
+
+    private static byte BlendChannel(byte source, byte destination, byte sourceAlpha, string sourceBlend, string destinationBlend)
+    {
+        var sourceFactor = BlendFactor(sourceBlend, sourceAlpha, source, destination);
+        var destinationFactor = BlendFactor(destinationBlend, sourceAlpha, source, destination);
+        return ClampToByte((source * sourceFactor) + (destination * destinationFactor));
+    }
+
+    private static float BlendFactor(string blend, byte sourceAlpha, byte source, byte destination) =>
+        blend switch
+        {
+            "Zero" => 0.0f,
+            "One" => 1.0f,
+            "DestColor" => destination / 255.0f,
+            "InverseDestColor" => 1.0f - (destination / 255.0f),
+            "SrcAlpha" => sourceAlpha / 255.0f,
+            "InverseSrcAlpha" => 1.0f - (sourceAlpha / 255.0f),
+            "DestAlpha" => 1.0f,
+            "InverseDestAlpha" => 0.0f,
+            _ => 1.0f
+        };
+
+    private static byte SourceAlpha(IReadOnlyList<DreamcastPvrTaVertex> vertices) =>
+        vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24);
+
+    private static (byte Red, byte Green, byte Blue) Rgb565ToRgb888(ushort value) =>
+        (
+            Expand5((value >> 11) & 0x1F),
+            Expand6((value >> 5) & 0x3F),
+            Expand5(value & 0x1F));
+
+    private static byte Expand5(int value) =>
+        (byte)((value << 3) | (value >> 2));
+
+    private static byte Expand6(int value) =>
+        (byte)((value << 2) | (value >> 4));
+
+    private static ushort Rgb888ToRgb565(byte red, byte green, byte blue) =>
+        (ushort)(((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3));
+
+    private static byte ClampToByte(float value) =>
+        (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
+
+    private static ushort ReadRgb565Pixel(ReadOnlySpan<byte> vram, int pixelIndex)
+    {
+        var offset = pixelIndex * 2;
+        return offset + 1 >= vram.Length ? (ushort)0 : (ushort)(vram[offset] | (vram[offset + 1] << 8));
+    }
 
     private static void WriteRgb565Pixel(Span<byte> vram, int pixelIndex, ushort color)
     {

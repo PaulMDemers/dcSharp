@@ -115,20 +115,46 @@ public class DreamcastPvrPreviewRendererTests
         Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
     }
 
+    [Fact]
+    public void AlphaBlendUsesSourceAlphaAndDestinationPixel()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], argb: 0xFF00_FF00), vram);
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xF800,
+                [(1, 1), (2, 1), (1, 2)],
+                argb: 0x80FF_0000,
+                alphaEnabled: true,
+                blendSrc: "SrcAlpha",
+                blendDst: "InverseSrcAlpha"),
+            vram);
+
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 1));
+    }
+
     private static DreamcastPvrTaStrip CreateStrip(
         ushort color,
         IReadOnlyList<(int X, int Y)> points,
         string? culling = null,
         float z = 1.0f,
         string? depthCompare = null,
-        bool depthWriteDisabled = false) =>
+        bool depthWriteDisabled = false,
+        uint? argb = null,
+        bool alphaEnabled = false,
+        string blendSrc = "One",
+        string blendDst = "Zero") =>
         new(
             "TA_INPUT",
             0,
             "OpaquePolygon",
             0x8084_0000,
             "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled),
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -146,12 +172,18 @@ public class DreamcastPvrPreviewRendererTests
                 $"0x{(uint)point.X << 16:X8}",
                 (uint)point.Y << 16,
                 $"0x{(uint)point.Y << 16:X8}",
-                color,
-                $"0x{color:X8}")).ToArray());
+                argb ?? color,
+                $"0x{argb ?? color:X8}")).ToArray());
 
-    private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(string? culling, string? depthCompare, bool depthWriteDisabled)
+    private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(
+        string? culling,
+        string? depthCompare,
+        bool depthWriteDisabled,
+        bool alphaEnabled,
+        string blendSrc,
+        string blendDst)
     {
-        if (culling is null && depthCompare is null && !depthWriteDisabled)
+        if (culling is null && depthCompare is null && !depthWriteDisabled && !alphaEnabled)
         {
             return null;
         }
@@ -179,6 +211,9 @@ public class DreamcastPvrPreviewRendererTests
         var mode1 = (depthCompareBits << 29)
             | (cullingBits << 27)
             | (depthWriteDisabled ? 0x0400_0000u : 0);
+        var mode2 = BlendBits(blendSrc) << 29
+            | BlendBits(blendDst) << 26
+            | (alphaEnabled ? 0x0010_0000u : 0);
         var header = new DreamcastPvrTaCommandWrite(
             0x1000_0000,
             "0x10000000",
@@ -190,8 +225,22 @@ public class DreamcastPvrPreviewRendererTests
             4,
             0x8084_0000,
             "0x80840000");
-        return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [mode1, 0, 0, 0, 0, 0, 0]);
+        return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [mode1, mode2, 0, 0, 0, 0, 0]);
     }
+
+    private static uint BlendBits(string blend) =>
+        blend switch
+        {
+            "Zero" => 0,
+            "One" => 1,
+            "DestColor" => 2,
+            "InverseDestColor" => 3,
+            "SrcAlpha" => 4,
+            "InverseSrcAlpha" => 5,
+            "DestAlpha" => 6,
+            "InverseDestAlpha" => 7,
+            _ => throw new ArgumentOutOfRangeException(nameof(blend), blend, "Unknown blend mode.")
+        };
 
     private static float[] CreateDepthBuffer(byte[] vram)
     {
