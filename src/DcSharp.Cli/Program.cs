@@ -149,6 +149,11 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR TA stream: {FormatPvrTaStreamWrites(videoSummary.RecentPvrTaStreamWrites)}");
     }
 
+    if (videoSummary.PvrTaPolygonHeaderPayloads.Count > 0)
+    {
+        Console.WriteLine($"PVR TA polygon payloads: {FormatPvrTaPolygonHeaderPayloads(videoSummary.PvrTaPolygonHeaderPayloads)}");
+    }
+
     var currentPvrRegisters = result.Video.PvrRegisters.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentPvrRegisters.Length > 0)
     {
@@ -358,6 +363,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.RecentPvrTaStreamWrites.Count > 0)
                 {
                     Console.WriteLine($"  recentPvrTaStream={FormatPvrTaStreamWrites(result.Summary.Video.RecentPvrTaStreamWrites)}");
+                }
+
+                if (result.Summary.Video.PvrTaPolygonHeaderPayloads.Count > 0)
+                {
+                    Console.WriteLine($"  pvrTaPolygonPayloads={FormatPvrTaPolygonHeaderPayloads(result.Summary.Video.PvrTaPolygonHeaderPayloads)}");
                 }
             }
 
@@ -716,6 +726,10 @@ static string FormatPvrTaStreamWrites(IReadOnlyList<DreamcastPvrTaStreamWriteSum
 static string FormatPvrTaPayloadWordName(string? payloadWordName) =>
     payloadWordName is null ? string.Empty : $":{payloadWordName}";
 
+static string FormatPvrTaPolygonHeaderPayloads(IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary> payloads) =>
+    string.Join(", ", payloads.Select(payload =>
+        $"{payload.Region}:{payload.ListTypeName ?? "none"} header={payload.HeaderValueHex} mode1={payload.Mode1Hex} depth={payload.Mode1Fields.DepthCompareName} cull={payload.Mode1Fields.CullingName} mode2={payload.Mode2Hex} blend={payload.Mode2Fields.BlendSrcName}/{payload.Mode2Fields.BlendDstName} alpha={payload.Mode2Fields.AlphaEnabled} fog={payload.Mode2Fields.FogTypeName} mode3={payload.Mode3Hex} texBase={payload.Mode3Fields.TextureBaseHex} pixel={payload.Mode3Fields.PixelFormatName} vq={payload.Mode3Fields.VqEnabled} mip={payload.Mode3Fields.MipMapEnabled}"));
+
 static DreamcastControllerState EffectiveControllerA(DreamcastRunOptions options, ulong instructionsExecuted) =>
     EffectiveController(options, 0x20, instructionsExecuted)
     ?? DreamcastControllerState.Neutral;
@@ -793,6 +807,7 @@ internal sealed record FixtureReport(
     IReadOnlyList<DreamcastPvrTaListSummary>? PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary>? RecentPvrTaStreamWrites,
+    IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary>? PvrTaPolygonHeaderPayloads,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary>? RecentPvrTaParameterHeaders,
     int? AicaRegisterAccessCount,
     int? MapleTransferCount,
@@ -829,6 +844,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaLists,
             result.Summary?.Video.PvrTaStrips,
             result.Summary?.Video.RecentPvrTaStreamWrites,
+            result.Summary?.Video.PvrTaPolygonHeaderPayloads,
             result.Summary?.Video.RecentPvrTaParameterHeaders,
             result.Summary?.Audio.RegisterAccessCount,
             result.Summary?.Maple.TransferCount,

@@ -386,6 +386,17 @@ public class DreamcastFixtureRunnerTests
                     AutoStripLength = false
                 }
             ],
+            PvrTaPolygonHeaderPayloads =
+            [
+                new DreamcastFixturePvrTaPolygonHeaderPayloadExpectation
+                {
+                    Region = "TA_INPUT",
+                    ListTypeName = "OpaquePolygon",
+                    HeaderValue = "0x80840000",
+                    Mode1 = "0x00000001",
+                    DepthCompareName = "Less"
+                }
+            ],
             PvrTaLists =
             [
                 new DreamcastFixturePvrTaListExpectation
@@ -512,6 +523,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
         Assert.Contains("expected at least 1 PVR TA stream write role=Payload region=TA_INPUT kind=Unknown value=0x3F800000 controlKind=Vertex controlValue=0xE0000000 payloadWordIndex=0 payloadWordsRemaining=6 payloadWordName=Mode1 matches, got 0", failures);
+        Assert.Contains("expected at least 1 PVR TA polygon header payload region=TA_INPUT list=OpaquePolygon headerValue=0x80840000 mode1=0x00000001 depthCompareName=Less matches, got 0", failures);
         Assert.Contains("expected at least 1 PVR TA parameter header kind=PolygonHeader region=TA_INPUT parameterType=5 list=OpaquePolygon value=0x80840001 expectedPayloadWords=7 hasKnownPayloadLength=True textureEnabled=True colorFormatName=FourFloats autoStripLength=False matches, got 0", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 2 commands, got 1", failures);
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
@@ -625,6 +637,9 @@ public class DreamcastFixtureRunnerTests
             taWrites,
             DreamcastPvrTaStreamDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())
                 .Select(DreamcastPvrTaStreamWriteSummary.FromWrite)
+                .ToArray(),
+            DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())
+                .Select(DreamcastPvrTaPolygonHeaderPayloadSummary.FromPayload)
                 .ToArray(),
             taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),

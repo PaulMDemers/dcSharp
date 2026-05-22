@@ -313,6 +313,7 @@ public sealed record DreamcastVideoSummary(
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary> RecentPvrTaStreamWrites,
+    IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary> PvrTaPolygonHeaderPayloads,
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> RecentPvrTaParameterHeaders,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
@@ -340,6 +341,9 @@ public sealed record DreamcastVideoSummary(
             DreamcastPvrTaStreamDecoder.Decode(snapshot.PvrTaCommandWrites)
                 .TakeLast(Math.Max(0, recentCount))
                 .Select(DreamcastPvrTaStreamWriteSummary.FromWrite)
+                .ToArray(),
+            DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(snapshot.PvrTaCommandWrites)
+                .Select(DreamcastPvrTaPolygonHeaderPayloadSummary.FromPayload)
                 .ToArray(),
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaParameterHeaderSummary.FromWrite).ToArray(),
             snapshot.PvrTaCommandWrites
@@ -445,6 +449,56 @@ public sealed record DreamcastPvrTaStreamWriteSummary(
             write.PayloadWordIndex,
             write.PayloadWordsRemaining,
             write.PayloadWordName);
+}
+
+public sealed record DreamcastPvrTaPolygonHeaderPayloadSummary(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    uint Mode1,
+    string Mode1Hex,
+    DreamcastPvrTaPolygonHeaderMode1 Mode1Fields,
+    uint Mode2,
+    string Mode2Hex,
+    DreamcastPvrTaPolygonHeaderMode2 Mode2Fields,
+    uint Mode3,
+    string Mode3Hex,
+    DreamcastPvrTaPolygonHeaderMode3 Mode3Fields,
+    uint Parameter0,
+    string Parameter0Hex,
+    uint Parameter1,
+    string Parameter1Hex,
+    uint Parameter2,
+    string Parameter2Hex,
+    uint Parameter3,
+    string Parameter3Hex)
+{
+    public static DreamcastPvrTaPolygonHeaderPayloadSummary FromPayload(DreamcastPvrTaPolygonHeaderPayload payload) =>
+        new(
+            payload.Region,
+            payload.ListType,
+            payload.ListTypeName,
+            payload.HeaderValue,
+            payload.HeaderValueHex,
+            payload.Mode1,
+            payload.Mode1Hex,
+            payload.Mode1Fields,
+            payload.Mode2,
+            payload.Mode2Hex,
+            payload.Mode2Fields,
+            payload.Mode3,
+            payload.Mode3Hex,
+            payload.Mode3Fields,
+            payload.Parameter0,
+            payload.Parameter0Hex,
+            payload.Parameter1,
+            payload.Parameter1Hex,
+            payload.Parameter2,
+            payload.Parameter2Hex,
+            payload.Parameter3,
+            payload.Parameter3Hex);
 }
 
 public sealed record DreamcastPvrTaParameterHeaderSummary(

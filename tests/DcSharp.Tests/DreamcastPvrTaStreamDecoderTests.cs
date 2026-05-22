@@ -5,6 +5,59 @@ namespace DcSharp.Tests;
 public class DreamcastPvrTaStreamDecoderTests
 {
     [Fact]
+    public void DecodesRealPolygonHeaderPayloadWords()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8084_0000),
+            CreateWrite("TA_INPUT", 0x0600_0000),
+            CreateWrite("TA_INPUT", 0x8010_0000),
+            CreateWrite("TA_INPUT", 0x4800_1234),
+            CreateWrite("TA_INPUT", 0x1111_1111),
+            CreateWrite("TA_INPUT", 0x2222_2222),
+            CreateWrite("TA_INPUT", 0x3333_3333),
+            CreateWrite("TA_INPUT", 0x4444_4444)
+        };
+
+        var payload = Assert.Single(DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(writes));
+
+        Assert.Equal("TA_INPUT", payload.Region);
+        Assert.Equal("OpaquePolygon", payload.ListTypeName);
+        Assert.Equal(0x8084_0000u, payload.HeaderValue);
+        Assert.Equal(0x0600_0000u, payload.Mode1);
+        Assert.True(payload.Mode1Fields.TextureEnabled);
+        Assert.True(payload.Mode1Fields.DepthWriteDisabled);
+        Assert.Equal("None", payload.Mode1Fields.CullingName);
+        Assert.Equal("Never", payload.Mode1Fields.DepthCompareName);
+        Assert.Equal(0x8010_0000u, payload.Mode2);
+        Assert.True(payload.Mode2Fields.AlphaEnabled);
+        Assert.Equal("Zero", payload.Mode2Fields.BlendDstName);
+        Assert.Equal("SrcAlpha", payload.Mode2Fields.BlendSrcName);
+        Assert.Equal(0x4800_1234u, payload.Mode3);
+        Assert.Equal(0x0000_1234u, payload.Mode3Fields.TextureBase);
+        Assert.Equal("Rgb565", payload.Mode3Fields.PixelFormatName);
+        Assert.True(payload.Mode3Fields.VqEnabled);
+        Assert.False(payload.Mode3Fields.MipMapEnabled);
+        Assert.Equal(0x1111_1111u, payload.Parameter0);
+        Assert.Equal(0x4444_4444u, payload.Parameter3);
+    }
+
+    [Fact]
+    public void IgnoresDiagnosticVertexShortcutAfterPolygonHeader()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8084_0000),
+            CreateWrite("TA_INPUT", 0xE000_0000),
+            CreateWrite("TA_INPUT", 0x0001_0000),
+            CreateWrite("TA_INPUT", 0x0001_0000),
+            CreateWrite("TA_INPUT", 0x0000_F800)
+        };
+
+        Assert.Empty(DreamcastPvrTaPolygonHeaderPayloadDecoder.Decode(writes));
+    }
+
+    [Fact]
     public void TracksKnownHeaderPayloadWords()
     {
         var writes = new[]

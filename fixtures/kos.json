@@ -862,6 +862,33 @@
           "minCount": 7
         }
       ],
+      "pvrTaPolygonHeaderPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840000",
+          "mode1": "0x00000000",
+          "mode2": "0x00000000",
+          "mode3": "0x00000000",
+          "parameter0": "0x00000000",
+          "parameter1": "0x00000000",
+          "parameter2": "0x00000000",
+          "parameter3": "0x00000000",
+          "textureEnabled": false,
+          "depthWriteDisabled": false,
+          "cullingName": "None",
+          "depthCompareName": "Never",
+          "blendSrcName": "Zero",
+          "blendDstName": "Zero",
+          "alphaEnabled": false,
+          "fogTypeName": "Table",
+          "textureBase": "0x00000000",
+          "pixelFormatName": "Argb1555",
+          "vqEnabled": false,
+          "mipMapEnabled": false,
+          "minCount": 1
+        }
+      ],
       "pvrTaParameterHeaders": [
         {
           "kind": "PolygonHeader",

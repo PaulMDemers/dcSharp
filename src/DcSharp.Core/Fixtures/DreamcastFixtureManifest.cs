@@ -78,6 +78,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixturePvrTaStreamWriteExpectation> PvrTaStreamWrites { get; set; } = [];
+    public List<DreamcastFixturePvrTaPolygonHeaderPayloadExpectation> PvrTaPolygonHeaderPayloads { get; set; } = [];
     public List<DreamcastFixturePvrTaParameterHeaderExpectation> PvrTaParameterHeaders { get; set; } = [];
     public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
@@ -160,6 +161,35 @@ public sealed class DreamcastFixturePvrTaStreamWriteExpectation
     public int? PayloadWordIndex { get; set; }
     public int? PayloadWordsRemaining { get; set; }
     public string? PayloadWordName { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaPolygonHeaderPayloadExpectation
+{
+    public string? Region { get; set; }
+    public string? ListTypeName { get; set; }
+    public string? HeaderValue { get; set; }
+    public string? Mode1 { get; set; }
+    public string? Mode2 { get; set; }
+    public string? Mode3 { get; set; }
+    public string? Parameter0 { get; set; }
+    public string? Parameter1 { get; set; }
+    public string? Parameter2 { get; set; }
+    public string? Parameter3 { get; set; }
+    public bool? TextureEnabled { get; set; }
+    public bool? DepthWriteDisabled { get; set; }
+    public int? Culling { get; set; }
+    public string? CullingName { get; set; }
+    public int? DepthCompare { get; set; }
+    public string? DepthCompareName { get; set; }
+    public string? BlendSrcName { get; set; }
+    public string? BlendDstName { get; set; }
+    public bool? AlphaEnabled { get; set; }
+    public string? FogTypeName { get; set; }
+    public string? TextureBase { get; set; }
+    public string? PixelFormatName { get; set; }
+    public bool? VqEnabled { get; set; }
+    public bool? MipMapEnabled { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

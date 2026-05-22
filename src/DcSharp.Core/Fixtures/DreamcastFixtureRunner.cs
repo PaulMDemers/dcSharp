@@ -236,6 +236,15 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.PvrTaPolygonHeaderPayloads)
+        {
+            var count = CountPvrTaPolygonHeaderPayloads(summary, expected);
+            if (count < expected.MinCount)
+            {
+                failures.Add($"expected at least {expected.MinCount} PVR TA polygon header payload {DescribePvrTaPolygonHeaderPayloadExpectation(expected)} matches, got {count}");
+            }
+        }
+
         foreach (var expected in fixture.PvrTaParameterHeaders)
         {
             var count = CountPvrTaParameterHeaders(summary, expected);
@@ -509,6 +518,76 @@ public static class DreamcastFixtureRunner
         {
             details.Add($"payloadWordName={expected.PayloadWordName}");
         }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static int CountPvrTaPolygonHeaderPayloads(DreamcastRunSummary summary, DreamcastFixturePvrTaPolygonHeaderPayloadExpectation expected)
+    {
+        uint? expectedHeaderValue = expected.HeaderValue is null ? null : ParseHex32(expected.HeaderValue, "PVR TA polygon header payload header value");
+        uint? expectedMode1 = expected.Mode1 is null ? null : ParseHex32(expected.Mode1, "PVR TA polygon header payload mode1");
+        uint? expectedMode2 = expected.Mode2 is null ? null : ParseHex32(expected.Mode2, "PVR TA polygon header payload mode2");
+        uint? expectedMode3 = expected.Mode3 is null ? null : ParseHex32(expected.Mode3, "PVR TA polygon header payload mode3");
+        uint? expectedParameter0 = expected.Parameter0 is null ? null : ParseHex32(expected.Parameter0, "PVR TA polygon header payload parameter0");
+        uint? expectedParameter1 = expected.Parameter1 is null ? null : ParseHex32(expected.Parameter1, "PVR TA polygon header payload parameter1");
+        uint? expectedParameter2 = expected.Parameter2 is null ? null : ParseHex32(expected.Parameter2, "PVR TA polygon header payload parameter2");
+        uint? expectedParameter3 = expected.Parameter3 is null ? null : ParseHex32(expected.Parameter3, "PVR TA polygon header payload parameter3");
+        uint? expectedTextureBase = expected.TextureBase is null ? null : ParseHex32(expected.TextureBase, "PVR TA polygon header texture base");
+
+        return summary.Video.PvrTaPolygonHeaderPayloads.Count(payload =>
+            (expected.Region is null || string.Equals(payload.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(payload.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expectedHeaderValue is null || payload.HeaderValue == expectedHeaderValue)
+            && (expectedMode1 is null || payload.Mode1 == expectedMode1)
+            && (expectedMode2 is null || payload.Mode2 == expectedMode2)
+            && (expectedMode3 is null || payload.Mode3 == expectedMode3)
+            && (expectedParameter0 is null || payload.Parameter0 == expectedParameter0)
+            && (expectedParameter1 is null || payload.Parameter1 == expectedParameter1)
+            && (expectedParameter2 is null || payload.Parameter2 == expectedParameter2)
+            && (expectedParameter3 is null || payload.Parameter3 == expectedParameter3)
+            && (expected.TextureEnabled is null || payload.Mode1Fields.TextureEnabled == expected.TextureEnabled)
+            && (expected.DepthWriteDisabled is null || payload.Mode1Fields.DepthWriteDisabled == expected.DepthWriteDisabled)
+            && (expected.Culling is null || payload.Mode1Fields.Culling == expected.Culling)
+            && (expected.CullingName is null || string.Equals(payload.Mode1Fields.CullingName, expected.CullingName, StringComparison.Ordinal))
+            && (expected.DepthCompare is null || payload.Mode1Fields.DepthCompare == expected.DepthCompare)
+            && (expected.DepthCompareName is null || string.Equals(payload.Mode1Fields.DepthCompareName, expected.DepthCompareName, StringComparison.Ordinal))
+            && (expected.BlendSrcName is null || string.Equals(payload.Mode2Fields.BlendSrcName, expected.BlendSrcName, StringComparison.Ordinal))
+            && (expected.BlendDstName is null || string.Equals(payload.Mode2Fields.BlendDstName, expected.BlendDstName, StringComparison.Ordinal))
+            && (expected.AlphaEnabled is null || payload.Mode2Fields.AlphaEnabled == expected.AlphaEnabled)
+            && (expected.FogTypeName is null || string.Equals(payload.Mode2Fields.FogTypeName, expected.FogTypeName, StringComparison.Ordinal))
+            && (expectedTextureBase is null || payload.Mode3Fields.TextureBase == expectedTextureBase)
+            && (expected.PixelFormatName is null || string.Equals(payload.Mode3Fields.PixelFormatName, expected.PixelFormatName, StringComparison.Ordinal))
+            && (expected.VqEnabled is null || payload.Mode3Fields.VqEnabled == expected.VqEnabled)
+            && (expected.MipMapEnabled is null || payload.Mode3Fields.MipMapEnabled == expected.MipMapEnabled));
+    }
+
+    private static string DescribePvrTaPolygonHeaderPayloadExpectation(DreamcastFixturePvrTaPolygonHeaderPayloadExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "region", expected.Region);
+        AddOptionalDetail(details, "list", expected.ListTypeName);
+        AddOptionalDetail(details, "headerValue", expected.HeaderValue);
+        AddOptionalDetail(details, "mode1", expected.Mode1);
+        AddOptionalDetail(details, "mode2", expected.Mode2);
+        AddOptionalDetail(details, "mode3", expected.Mode3);
+        AddOptionalDetail(details, "parameter0", expected.Parameter0);
+        AddOptionalDetail(details, "parameter1", expected.Parameter1);
+        AddOptionalDetail(details, "parameter2", expected.Parameter2);
+        AddOptionalDetail(details, "parameter3", expected.Parameter3);
+        AddOptionalDetail(details, "textureEnabled", expected.TextureEnabled);
+        AddOptionalDetail(details, "depthWriteDisabled", expected.DepthWriteDisabled);
+        AddOptionalDetail(details, "culling", expected.Culling);
+        AddOptionalDetail(details, "cullingName", expected.CullingName);
+        AddOptionalDetail(details, "depthCompare", expected.DepthCompare);
+        AddOptionalDetail(details, "depthCompareName", expected.DepthCompareName);
+        AddOptionalDetail(details, "blendSrcName", expected.BlendSrcName);
+        AddOptionalDetail(details, "blendDstName", expected.BlendDstName);
+        AddOptionalDetail(details, "alphaEnabled", expected.AlphaEnabled);
+        AddOptionalDetail(details, "fogTypeName", expected.FogTypeName);
+        AddOptionalDetail(details, "textureBase", expected.TextureBase);
+        AddOptionalDetail(details, "pixelFormatName", expected.PixelFormatName);
+        AddOptionalDetail(details, "vqEnabled", expected.VqEnabled);
+        AddOptionalDetail(details, "mipMapEnabled", expected.MipMapEnabled);
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }

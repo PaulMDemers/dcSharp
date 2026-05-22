@@ -200,6 +200,12 @@
             "$ref": "#/$defs/pvrTaStreamWrite"
           }
         },
+        "pvrTaPolygonHeaderPayloads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaPolygonHeaderPayload"
+          }
+        },
         "pvrTaParameterHeaders": {
           "type": "array",
           "items": {
@@ -420,6 +426,112 @@
         "payloadWordName": {
           "type": "string",
           "minLength": 1
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pvrTaPolygonHeaderPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headerValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "mode1": {
+          "$ref": "#/$defs/hex32"
+        },
+        "mode2": {
+          "$ref": "#/$defs/hex32"
+        },
+        "mode3": {
+          "$ref": "#/$defs/hex32"
+        },
+        "parameter0": {
+          "$ref": "#/$defs/hex32"
+        },
+        "parameter1": {
+          "$ref": "#/$defs/hex32"
+        },
+        "parameter2": {
+          "$ref": "#/$defs/hex32"
+        },
+        "parameter3": {
+          "$ref": "#/$defs/hex32"
+        },
+        "textureEnabled": {
+          "type": "boolean"
+        },
+        "depthWriteDisabled": {
+          "type": "boolean"
+        },
+        "culling": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "cullingName": {
+          "enum": [
+            "None",
+            "Small",
+            "Ccw",
+            "Cw"
+          ]
+        },
+        "depthCompare": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "depthCompareName": {
+          "enum": [
+            "Never",
+            "Less",
+            "Equal",
+            "LessOrEqual",
+            "Greater",
+            "NotEqual",
+            "GreaterOrEqual",
+            "Always"
+          ]
+        },
+        "blendSrcName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blendDstName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alphaEnabled": {
+          "type": "boolean"
+        },
+        "fogTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "textureBase": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pixelFormatName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vqEnabled": {
+          "type": "boolean"
+        },
+        "mipMapEnabled": {
+          "type": "boolean"
         },
         "minCount": {
           "type": "integer",
