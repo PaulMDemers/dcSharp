@@ -58,6 +58,7 @@ public sealed class DreamcastFixtureDefinition
     public int? MinMapleDmaBatches { get; set; }
     public bool RequireNoMapleDescriptorLimitHits { get; set; }
     public int? MinGdromTocCommands { get; set; }
+    public int? MinGdromStatusCommands { get; set; }
     public int? MinGdromReadCommands { get; set; }
     public int? MinGdromBytesRead { get; set; }
     public ulong? MinVblankEvents { get; set; }
@@ -89,6 +90,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
     public List<DreamcastFixtureGdromTocExpectation> GdromTocs { get; set; } = [];
+    public List<DreamcastFixtureGdromStatusExpectation> GdromStatuses { get; set; } = [];
     public List<DreamcastFixtureGdromReadExpectation> GdromReads { get; set; } = [];
 
     internal void Validate()
@@ -145,6 +147,18 @@ public sealed class DreamcastFixtureGdromTocExpectation
     public int? LastTrack { get; set; }
     public string? DataTrackStartFad { get; set; }
     public string? LeadoutFad { get; set; }
+    public bool? Success { get; set; }
+    public string? Status { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixtureGdromStatusExpectation
+{
+    public string? Buffer { get; set; }
+    public int? StatusCode { get; set; }
+    public string? StatusName { get; set; }
+    public int? DiscType { get; set; }
+    public string? DiscTypeName { get; set; }
     public bool? Success { get; set; }
     public string? Status { get; set; }
     public int MinCount { get; set; } = 1;

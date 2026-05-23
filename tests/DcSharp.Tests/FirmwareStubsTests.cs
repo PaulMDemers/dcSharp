@@ -11,6 +11,7 @@ public class FirmwareStubsTests
     private const uint GdromSendCommand = 0;
     private const uint GdromCheckCommand = 1;
     private const uint GdromAbortCommand = 3;
+    private const uint GdromCheckDrive = 4;
     private const uint GdromCommandPioRead = 16;
     private const uint GdromCommandGetToc2 = 19;
     private const uint GdromCommandNop = 29;
@@ -115,6 +116,44 @@ public class FirmwareStubsTests
         Assert.Equal("no media image loaded", toc.Status);
     }
 
+    [Fact]
+    public void GdromCheckDriveReportsStandbyWhenMediaIsLoaded()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var response = CheckDrive(handler, memory);
+        var status = Assert.Single(memory.CreateGdromSnapshot().StatusCommands);
+
+        Assert.Equal(0u, response);
+        Assert.Equal(2u, memory.ReadUInt32(StatusAddress));
+        Assert.Equal(0x20u, memory.ReadUInt32(StatusAddress + 4));
+        Assert.Equal(2, status.StatusCode);
+        Assert.Equal("standby", status.StatusName);
+        Assert.Equal(0x20, status.DiscType);
+        Assert.Equal("CD-ROM XA", status.DiscTypeName);
+        Assert.True(status.Success);
+    }
+
+    [Fact]
+    public void GdromCheckDriveReportsNoDiscWhenNoMediaIsLoaded()
+    {
+        var memory = new DreamcastMemory();
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var response = CheckDrive(handler, memory);
+        var status = Assert.Single(memory.CreateGdromSnapshot().StatusCommands);
+
+        Assert.Equal(0u, response);
+        Assert.Equal(7u, memory.ReadUInt32(StatusAddress));
+        Assert.Equal(0u, memory.ReadUInt32(StatusAddress + 4));
+        Assert.Equal(7, status.StatusCode);
+        Assert.Equal("no disc", status.StatusName);
+        Assert.Equal(0, status.DiscType);
+        Assert.Equal("CDDA/no disc", status.DiscTypeName);
+        Assert.True(status.Success);
+    }
+
     private static uint SendGdromCommand(
         FirmwareStubs.FirmwareTrapHandler handler,
         DreamcastMemory memory,
@@ -148,6 +187,16 @@ public class FirmwareStubsTests
         var state = CreateGdromState(GdromAbortCommand);
         state.R[4] = commandId;
         Assert.True(handler.TryHandle(state, memory, out _));
+    }
+
+    private static uint CheckDrive(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory)
+    {
+        var state = CreateGdromState(GdromCheckDrive);
+        state.R[4] = StatusAddress;
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
     }
 
     private static Sh4State CreateGdromState(uint function) =>

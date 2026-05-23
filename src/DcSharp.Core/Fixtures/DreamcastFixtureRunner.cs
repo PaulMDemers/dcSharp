@@ -172,6 +172,11 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected at least {minGdromTocCommands} GD-ROM TOC commands, got {summary.Gdrom.TocCommandCount}");
         }
 
+        if (fixture.MinGdromStatusCommands is { } minGdromStatusCommands && summary.Gdrom.StatusCommandCount < minGdromStatusCommands)
+        {
+            failures.Add($"expected at least {minGdromStatusCommands} GD-ROM status commands, got {summary.Gdrom.StatusCommandCount}");
+        }
+
         if (fixture.MinGdromReadCommands is { } minGdromReadCommands && summary.Gdrom.ReadCommandCount < minGdromReadCommands)
         {
             failures.Add($"expected at least {minGdromReadCommands} GD-ROM read commands, got {summary.Gdrom.ReadCommandCount}");
@@ -416,6 +421,11 @@ public static class DreamcastFixtureRunner
             ValidateGdromToc(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.GdromStatuses)
+        {
+            ValidateGdromStatus(failures, summary, expected);
+        }
+
         return failures;
     }
 
@@ -496,6 +506,40 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "lastTrack", expected.LastTrack);
         AddOptionalDetail(details, "dataTrackStartFad", expected.DataTrackStartFad);
         AddOptionalDetail(details, "leadoutFad", expected.LeadoutFad);
+        AddOptionalDetail(details, "success", expected.Success);
+        AddOptionalDetail(details, "status", expected.Status);
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidateGdromStatus(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixtureGdromStatusExpectation expected)
+    {
+        uint? expectedBuffer = expected.Buffer is null ? null : ParseHex32(expected.Buffer, "GD-ROM status buffer");
+        var count = summary.Gdrom.RecentStatusCommands.Count(status =>
+            (expectedBuffer is null || status.BufferAddress == expectedBuffer)
+            && (expected.StatusCode is null || status.StatusCode == expected.StatusCode)
+            && (expected.StatusName is null || string.Equals(status.StatusName, expected.StatusName, StringComparison.Ordinal))
+            && (expected.DiscType is null || status.DiscType == expected.DiscType)
+            && (expected.DiscTypeName is null || string.Equals(status.DiscTypeName, expected.DiscTypeName, StringComparison.Ordinal))
+            && (expected.Success is null || status.Success == expected.Success)
+            && (expected.Status is null || string.Equals(status.Status, expected.Status, StringComparison.Ordinal)));
+
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} GD-ROM status {DescribeGdromStatusExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static string DescribeGdromStatusExpectation(DreamcastFixtureGdromStatusExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "buffer", expected.Buffer);
+        AddOptionalDetail(details, "statusCode", expected.StatusCode);
+        AddOptionalDetail(details, "statusName", expected.StatusName);
+        AddOptionalDetail(details, "discType", expected.DiscType);
+        AddOptionalDetail(details, "discTypeName", expected.DiscTypeName);
         AddOptionalDetail(details, "success", expected.Success);
         AddOptionalDetail(details, "status", expected.Status);
         return details.Count == 0 ? "<any>" : string.Join(" ", details);

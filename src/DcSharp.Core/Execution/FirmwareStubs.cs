@@ -41,6 +41,8 @@ internal static class FirmwareStubs
         private const int GdromCompleted = 2;
         private const int GdromNoDiscStatus = 2;
         private const int CdStatusStandby = 2;
+        private const int CdStatusNoDisc = 7;
+        private const int CdCdda = 0x00;
         private const int CdRomXa = 0x20;
 
         private uint nextCommandId = 1;
@@ -181,7 +183,14 @@ internal static class FirmwareStubs
 
         private static uint CheckDrive(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
-            WriteWords(memory, state.R[4], CdStatusStandby, CdRomXa);
+            var snapshot = memory.CreateGdromSnapshot();
+            var statusCode = snapshot.HasMedia ? CdStatusStandby : CdStatusNoDisc;
+            var discType = snapshot.HasMedia ? CdRomXa : CdCdda;
+            var statusName = snapshot.HasMedia ? "standby" : "no disc";
+            var discTypeName = snapshot.HasMedia ? "CD-ROM XA" : "CDDA/no disc";
+
+            WriteWords(memory, state.R[4], statusCode, discType);
+            memory.RecordGdromStatusCommand(state.R[4], statusCode, statusName, discType, discTypeName, true, "drive status reported");
             return 0;
         }
 

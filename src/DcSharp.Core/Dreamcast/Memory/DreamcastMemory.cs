@@ -84,6 +84,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
     private readonly List<DreamcastGdromTocCommand> gdromTocCommands = [];
+    private readonly List<DreamcastGdromStatusCommand> gdromStatusCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
@@ -568,7 +569,8 @@ public sealed class DreamcastMemory
             mediaImage?.SectorSize,
             mediaImage?.SectorCount,
             gdromReadCommands.ToArray(),
-            gdromTocCommands.ToArray());
+            gdromTocCommands.ToArray(),
+            gdromStatusCommands.ToArray());
 
     public void RecordGdromTocCommand(
         uint parameterAddress,
@@ -590,6 +592,24 @@ public sealed class DreamcastMemory
             dataTrackStartFad is { } startValue ? $"0x{startValue:X8}" : null,
             leadoutFad,
             leadoutFad is { } leadoutValue ? $"0x{leadoutValue:X8}" : null,
+            success,
+            status));
+
+    public void RecordGdromStatusCommand(
+        uint bufferAddress,
+        int statusCode,
+        string statusName,
+        int discType,
+        string discTypeName,
+        bool success,
+        string status) =>
+        gdromStatusCommands.Add(new DreamcastGdromStatusCommand(
+            bufferAddress,
+            $"0x{bufferAddress:X8}",
+            statusCode,
+            statusName,
+            discType,
+            discTypeName,
             success,
             status));
 

@@ -928,8 +928,12 @@ public sealed record DreamcastGdromSummary(
     int TocCommandCount,
     int SuccessfulTocCommandCount,
     int FailedTocCommandCount,
+    int StatusCommandCount,
+    int SuccessfulStatusCommandCount,
+    int FailedStatusCommandCount,
     IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands,
-    IReadOnlyList<DreamcastGdromTocCommandSummary> RecentTocCommands)
+    IReadOnlyList<DreamcastGdromTocCommandSummary> RecentTocCommands,
+    IReadOnlyList<DreamcastGdromStatusCommandSummary> RecentStatusCommands)
 {
     public static DreamcastGdromSummary FromSnapshot(DreamcastGdromSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -943,8 +947,12 @@ public sealed record DreamcastGdromSummary(
             snapshot.TocCommands.Count,
             snapshot.TocCommands.Count(command => command.Success),
             snapshot.TocCommands.Count(command => !command.Success),
+            snapshot.StatusCommands.Count,
+            snapshot.StatusCommands.Count(command => command.Success),
+            snapshot.StatusCommands.Count(command => !command.Success),
             snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray(),
-            snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray());
+            snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray(),
+            snapshot.StatusCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromStatusCommandSummary.FromCommand).ToArray());
 }
 
 public sealed record DreamcastGdromReadCommandSummary(
@@ -1003,6 +1011,28 @@ public sealed record DreamcastGdromTocCommandSummary(
             command.DataTrackStartFadHex,
             command.LeadoutFad,
             command.LeadoutFadHex,
+            command.Success,
+            command.Status);
+}
+
+public sealed record DreamcastGdromStatusCommandSummary(
+    uint BufferAddress,
+    string BufferAddressHex,
+    int StatusCode,
+    string StatusName,
+    int DiscType,
+    string DiscTypeName,
+    bool Success,
+    string Status)
+{
+    public static DreamcastGdromStatusCommandSummary FromCommand(DreamcastGdromStatusCommand command) =>
+        new(
+            command.BufferAddress,
+            command.BufferAddressHex,
+            command.StatusCode,
+            command.StatusName,
+            command.DiscType,
+            command.DiscTypeName,
             command.Success,
             command.Status);
 }

@@ -361,7 +361,7 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
@@ -400,6 +400,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Gdrom.RecentTocCommands.Count > 0)
                 {
                     Console.WriteLine($"  gdromTocs={FormatGdromTocs(result.Summary.Gdrom.RecentTocCommands)}");
+                }
+
+                if (result.Summary.Gdrom.RecentStatusCommands.Count > 0)
+                {
+                    Console.WriteLine($"  gdromStatuses={FormatGdromStatuses(result.Summary.Gdrom.RecentStatusCommands)}");
                 }
             }
 
@@ -788,6 +793,12 @@ static string FormatGdromReads(IReadOnlyList<DreamcastGdromReadCommandSummary> r
 static string FormatGdromTocs(IReadOnlyList<DreamcastGdromTocCommandSummary> tocs) =>
     string.Join(", ", tocs.Select(toc =>
         $"buffer={toc.BufferAddressHex ?? "none"} first={toc.FirstTrack?.ToString(CultureInfo.InvariantCulture) ?? "none"} last={toc.LastTrack?.ToString(CultureInfo.InvariantCulture) ?? "none"} data={toc.DataTrackStartFadHex ?? "none"} leadout={toc.LeadoutFadHex ?? "none"} ok={toc.Success} status={toc.Status}"));
+
+static string FormatGdromStatuses(IReadOnlyList<DreamcastGdromStatusCommandSummary> statuses) =>
+    string.Join(", ", statuses
+        .GroupBy(status => new { status.BufferAddressHex, status.StatusCode, status.StatusName, status.DiscType, status.DiscTypeName, status.Success, status.Status })
+        .Select(group =>
+            $"buffer={group.Key.BufferAddressHex} drive={group.Key.StatusCode}/{group.Key.StatusName} disc={group.Key.DiscType}/{group.Key.DiscTypeName} ok={group.Key.Success} status={group.Key.Status} x{group.Count()}"));
 
 static string FormatFloat(float value) =>
     value.ToString("0.###", CultureInfo.InvariantCulture);

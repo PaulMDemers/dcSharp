@@ -409,7 +409,7 @@ internal sealed class MainForm : Form
             $"PVR: registers={summary.Video.PvrRegisterAccessCount:N0}, taWrites={summary.Video.PvrTaCommandWriteCount:N0}, strips={summary.Video.PvrTaStrips.Count:N0}",
             $"AICA: registers={summary.Audio.RegisterAccessCount:N0}, channels={summary.Audio.Channels.Count:N0}, active={summary.Audio.ActiveChannelCount:N0}",
             $"Maple: transfers={summary.Maple.TransferCount:N0}, dmaBatches={summary.Maple.DmaBatchCount:N0}",
-            $"GD-ROM: media={summary.Gdrom.HasMedia}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
+            $"GD-ROM: media={summary.Gdrom.HasMedia}, statuses={summary.Gdrom.StatusCommandCount:N0}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
             $"Scheduler: vblanks={summary.Scheduler.VBlankEventsRaised:N0}, hardwareTicks={summary.Scheduler.HardwareAdvanceTicks:N0}, fastForward={summary.Scheduler.CpuFastForwardInstructions:N0}"
         };
 
@@ -447,6 +447,13 @@ internal sealed class MainForm : Form
                 $"  buffer={toc.BufferAddressHex ?? "none"} first={toc.FirstTrack?.ToString() ?? "none"} last={toc.LastTrack?.ToString() ?? "none"} data={toc.DataTrackStartFadHex ?? "none"} leadout={toc.LeadoutFadHex ?? "none"} ok={toc.Success} status={toc.Status}"));
         }
 
+        if (summary.Gdrom.RecentStatusCommands.Count > 0)
+        {
+            lines.Add("");
+            lines.Add("GD-ROM status:");
+            lines.AddRange(FormatGdromStatuses(summary.Gdrom.RecentStatusCommands.TakeLast(8)));
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -465,7 +472,8 @@ internal sealed class MainForm : Form
             $"  Successful reads: {gdrom.SuccessfulReadCommandCount:N0}",
             $"  Failed reads: {gdrom.FailedReadCommandCount:N0}",
             $"  Bytes read: {gdrom.BytesRead:N0}",
-            $"  TOCs: {gdrom.TocCommandCount:N0}"
+            $"  TOCs: {gdrom.TocCommandCount:N0}",
+            $"  Status probes: {gdrom.StatusCommandCount:N0}"
         };
 
         lines.Add("");
@@ -490,6 +498,17 @@ internal sealed class MainForm : Form
             lines.AddRange(gdrom.RecentTocCommands.Select(FormatGdromToc));
         }
 
+        lines.Add("");
+        lines.Add("Recent status probes:");
+        if (gdrom.RecentStatusCommands.Count == 0)
+        {
+            lines.Add("  none");
+        }
+        else
+        {
+            lines.AddRange(FormatGdromStatuses(gdrom.RecentStatusCommands));
+        }
+
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -504,6 +523,17 @@ internal sealed class MainForm : Form
         var outcome = toc.Success ? "OK  " : "FAIL";
         return $"  [{outcome}] buffer={toc.BufferAddressHex ?? "none"} first={toc.FirstTrack?.ToString() ?? "none"} last={toc.LastTrack?.ToString() ?? "none"} data={toc.DataTrackStartFadHex ?? "none"} leadout={toc.LeadoutFadHex ?? "none"} status={toc.Status}";
     }
+
+    private static string FormatGdromStatus(DreamcastGdromStatusCommandSummary status)
+    {
+        var outcome = status.Success ? "OK  " : "FAIL";
+        return $"  [{outcome}] buffer={status.BufferAddressHex} drive={status.StatusCode}/{status.StatusName} disc={status.DiscType}/{status.DiscTypeName} status={status.Status}";
+    }
+
+    private static IEnumerable<string> FormatGdromStatuses(IEnumerable<DreamcastGdromStatusCommandSummary> statuses) =>
+        statuses
+            .GroupBy(status => new { status.BufferAddressHex, status.StatusCode, status.StatusName, status.DiscType, status.DiscTypeName, status.Success, status.Status })
+            .Select(group => $"{FormatGdromStatus(group.First())} x{group.Count()}");
 
     private static string DisplayPath(string path) =>
         string.IsNullOrWhiteSpace(path) ? "<none>" : path;

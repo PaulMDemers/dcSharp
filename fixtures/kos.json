@@ -96,6 +96,33 @@
       }
     },
     {
+      "name": "gdrom_status",
+      "sample": "samples/kos/gdrom_status",
+      "artifact": "dcsharp_gdrom_status.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM status rv=0 status=2 disc=0x20",
+        "dcSharp GD-ROM status probe done"
+      ],
+      "minGdromStatusCommands": 1,
+      "gdromStatuses": [
+        {
+          "statusCode": 2,
+          "statusName": "standby",
+          "discType": 32,
+          "discTypeName": "CD-ROM XA",
+          "success": true,
+          "status": "drive status reported"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_no_media",
       "sample": "samples/kos/gdrom_no_media",
       "artifact": "dcsharp_gdrom_no_media.elf",
@@ -115,6 +142,32 @@
           "bytesRead": 0,
           "success": false,
           "status": "no media image loaded"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
+      "name": "gdrom_status_no_media",
+      "sample": "samples/kos/gdrom_status_no_media",
+      "artifact": "dcsharp_gdrom_status_no_media.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM status no media rv=0 status=7 disc=0x00",
+        "dcSharp GD-ROM status no media probe done"
+      ],
+      "minGdromStatusCommands": 1,
+      "gdromStatuses": [
+        {
+          "statusCode": 7,
+          "statusName": "no disc",
+          "discType": 0,
+          "discTypeName": "CDDA/no disc",
+          "success": true,
+          "status": "drive status reported"
         }
       ],
       "minDeviceAccessDomains": {

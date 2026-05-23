@@ -228,6 +228,18 @@ public class DreamcastFixtureRunnerTests
                     Status = "TOC written"
                 }
             ],
+            GdromStatuses =
+            [
+                new DreamcastFixtureGdromStatusExpectation
+                {
+                    StatusCode = 2,
+                    StatusName = "standby",
+                    DiscType = 0x20,
+                    DiscTypeName = "CD-ROM XA",
+                    Success = true,
+                    Status = "drive status reported"
+                }
+            ],
             GdromReads =
             [
                 new DreamcastFixtureGdromReadExpectation
@@ -628,7 +640,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, [], []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], []),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -801,6 +813,9 @@ public class DreamcastFixtureRunnerTests
             1,
             1,
             0,
+            1,
+            1,
+            0,
             [
                 new DreamcastGdromReadCommandSummary(
                     0x8C01_0000,
@@ -830,6 +845,17 @@ public class DreamcastFixtureRunnerTests
                     "0x0000AFC9",
                     true,
                     "TOC written")
+            ],
+            [
+                new DreamcastGdromStatusCommandSummary(
+                    0x8C01_0300,
+                    "0x8C010300",
+                    2,
+                    "standby",
+                    0x20,
+                    "CD-ROM XA",
+                    true,
+                    "drive status reported")
             ]);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(
