@@ -118,7 +118,7 @@ Run summaries also include scheduler diagnostics for synthetic VBlank events, ha
 
 Structured run summaries include aggregate device-access counts by domain and access kind, plus recent device accesses. Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 
-GD-ROM summaries include whether media is loaded, media sector size/count, aggregate read command counts, successful/failed counts, total bytes read, and recent firmware read requests with parameter address, LBA, sector count, destination, bytes requested/read, success, and status text. These diagnostics are also shown in CLI fixture output and the desktop summary panel.
+GD-ROM summaries include whether media is loaded, media sector size/count, aggregate read command counts, successful/failed counts, total bytes read, and recent firmware read requests with parameter address, LBA, sector count, destination, bytes requested/read, success, and status text. The firmware syscall HLE also tracks queued command ids, reports completed reads with transferred byte counts, and maps no-media read failures into the status word KOS uses for `ERR_NO_DISC`. These diagnostics are shown in CLI fixture output and the desktop summary panel.
 
 ASIC summaries include current event ACK registers, IRQ9/IRQB/IRQD masks, per-level pending masks, and the currently deliverable ASIC interrupt event/level/source bit. Unit tests cover A/B/C event-bank source decoding and independent ACK clearing.
 

@@ -33,11 +33,15 @@ internal static class FirmwareStubs
         private const uint SuperFunctionGdrom = 0;
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
+        private const int GdromFailed = -1;
+        private const int GdromNoActive = 0;
         private const int GdromCompleted = 2;
+        private const int GdromNoDiscStatus = 2;
         private const int CdStatusStandby = 2;
         private const int CdRomXa = 0x20;
 
         private uint nextCommandId = 1;
+        private readonly Dictionary<uint, GdromQueuedCommand> commands = [];
 
         public bool TryHandle(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
         {
@@ -71,9 +75,9 @@ internal static class FirmwareStubs
             function switch
             {
                 0 => SendCommand(state, memory),
-                1 => CompleteCommand(state, memory),
+                1 => CheckCommand(state, memory),
                 2 => 0,
-                3 => 0,
+                3 => AbortCommand(state),
                 4 => CheckDrive(state, memory),
                 5 => 0,
                 6 => 0,
@@ -91,18 +95,42 @@ internal static class FirmwareStubs
         private uint SendCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
             var commandId = nextCommandId++;
-            if (state.R[4] is GdromCommandPioRead or GdromCommandDmaRead)
-            {
-                memory.ExecuteGdromPioReadCommand(state.R[5]);
-            }
-
+            commands[commandId] = ExecuteCommand(state.R[4], state.R[5], memory);
             return commandId;
         }
 
-        private static uint CompleteCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
+        private static GdromQueuedCommand ExecuteCommand(uint command, uint parameters, DreamcastMemory memory)
         {
-            WriteWords(memory, state.R[5], 0, 0, 0, 0);
-            return GdromCompleted;
+            if (command is GdromCommandPioRead or GdromCommandDmaRead)
+            {
+                memory.ExecuteGdromPioReadCommand(parameters);
+                var read = memory.CreateGdromSnapshot().ReadCommands.LastOrDefault();
+                return read?.Success == true
+                    ? GdromQueuedCommand.Completed(0, 0, read.BytesRead, 0)
+                    : GdromQueuedCommand.Failed(MapReadFailureStatus(read), 0, read?.BytesRead ?? 0, 0);
+            }
+
+            return GdromQueuedCommand.Completed(0, 0, 0, 0);
+        }
+
+        private static int MapReadFailureStatus(DreamcastGdromReadCommand? read) =>
+            read?.Status == "no media image loaded" ? GdromNoDiscStatus : 0;
+
+        private uint CheckCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
+        {
+            if (!commands.TryGetValue(state.R[4], out var command))
+            {
+                command = new GdromQueuedCommand(GdromNoActive, 0, 0, 0, 0);
+            }
+
+            WriteWords(memory, state.R[5], command.Status0, command.Status1, command.TransferredBytes, command.AtaStatus);
+            return unchecked((uint)command.Response);
+        }
+
+        private uint AbortCommand(DcSharp.Core.Cpu.Sh4State state)
+        {
+            commands.Remove(state.R[4]);
+            return 0;
         }
 
         private static uint CheckDrive(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
@@ -148,6 +176,20 @@ internal static class FirmwareStubs
             {
                 memory.WriteUInt32(address + ((uint)i * 4), unchecked((uint)values[i]));
             }
+        }
+
+        private sealed record GdromQueuedCommand(
+            int Response,
+            int Status0,
+            int Status1,
+            int TransferredBytes,
+            int AtaStatus)
+        {
+            public static GdromQueuedCommand Completed(int status0, int status1, int transferredBytes, int ataStatus) =>
+                new(GdromCompleted, status0, status1, transferredBytes, ataStatus);
+
+            public static GdromQueuedCommand Failed(int status0, int status1, int transferredBytes, int ataStatus) =>
+                new(GdromFailed, status0, status1, transferredBytes, ataStatus);
         }
     }
 }
