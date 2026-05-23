@@ -167,6 +167,16 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected no Maple descriptor-limit hits, got {summary.Maple.DescriptorLimitHitCount}");
         }
 
+        if (fixture.MinGdromReadCommands is { } minGdromReadCommands && summary.Gdrom.ReadCommandCount < minGdromReadCommands)
+        {
+            failures.Add($"expected at least {minGdromReadCommands} GD-ROM read commands, got {summary.Gdrom.ReadCommandCount}");
+        }
+
+        if (fixture.MinGdromBytesRead is { } minGdromBytesRead && summary.Gdrom.BytesRead < minGdromBytesRead)
+        {
+            failures.Add($"expected at least {minGdromBytesRead} GD-ROM bytes read, got {summary.Gdrom.BytesRead}");
+        }
+
         if (fixture.MinVblankEvents is { } minVblankEvents && summary.Scheduler.VBlankEventsRaised < minVblankEvents)
         {
             failures.Add($"expected at least {minVblankEvents} scheduler VBlank events, got {summary.Scheduler.VBlankEventsRaised}");
@@ -391,6 +401,11 @@ public static class DreamcastFixtureRunner
             }
         }
 
+        foreach (var expected in fixture.GdromReads)
+        {
+            ValidateGdromRead(failures, summary, expected);
+        }
+
         return failures;
     }
 
@@ -403,6 +418,41 @@ public static class DreamcastFixtureRunner
         }
 
         return parsed;
+    }
+
+    private static void ValidateGdromRead(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixtureGdromReadExpectation expected)
+    {
+        uint? expectedSector = expected.Sector is null ? null : ParseHex32(expected.Sector, "GD-ROM read sector");
+        uint? expectedDestination = expected.Destination is null ? null : ParseHex32(expected.Destination, "GD-ROM read destination");
+        var count = summary.Gdrom.RecentReadCommands.Count(read =>
+            (expectedSector is null || read.Sector == expectedSector)
+            && (expectedDestination is null || read.Destination == expectedDestination)
+            && (expected.SectorCount is null || read.SectorCount == expected.SectorCount)
+            && (expected.BytesRequested is null || read.BytesRequested == expected.BytesRequested)
+            && (expected.BytesRead is null || read.BytesRead == expected.BytesRead)
+            && (expected.Success is null || read.Success == expected.Success)
+            && (expected.Status is null || string.Equals(read.Status, expected.Status, StringComparison.Ordinal)));
+
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} GD-ROM read {DescribeGdromReadExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static string DescribeGdromReadExpectation(DreamcastFixtureGdromReadExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "sector", expected.Sector);
+        AddOptionalDetail(details, "destination", expected.Destination);
+        AddOptionalDetail(details, "sectorCount", expected.SectorCount);
+        AddOptionalDetail(details, "bytesRequested", expected.BytesRequested);
+        AddOptionalDetail(details, "bytesRead", expected.BytesRead);
+        AddOptionalDetail(details, "success", expected.Success);
+        AddOptionalDetail(details, "status", expected.Status);
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
 
     private static void ValidateHex32(List<string> failures, string label, string? expectedText, uint actual, string actualHex)

@@ -31,6 +31,7 @@ Build individual KOS samples:
 ```bash
 wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
+wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_read
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer_callback
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
@@ -60,7 +61,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/asic_events
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 ```
 
-Generated ELF files are copied to `artifacts/kos/`, which is intentionally ignored by git.
+Generated ELF files are copied to `artifacts/kos/`, which is intentionally ignored by git. `tools/kos/build-fixtures.sh` also generates legal local GD-ROM fixture media under `artifacts/media/`; to refresh only the media, run `wsl -e bash tools/kos/build-fixture-media.sh`.
 
 ## Run Fixtures
 
@@ -105,7 +106,7 @@ Useful run options:
 - `fixtures --filter <name>` runs or validates only fixtures whose names contain the filter text.
 - `fixtures --report-json artifacts/reports/kos-fixtures.json` writes a structured fixture report while keeping the text summary on stdout.
 
-The fixture manifest keeps sample paths, artifact names, instruction budgets, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts, grouped PVR TA list summaries, assembled PVR TA strip summaries, plus scheduler VBlank, hardware tick, hardware batch, max batch, idle advance, idle wake, CPU fast-forward, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, `minMapleGetConditionTransfers`, `minMapleDmaBatches`, and `requireNoMapleDescriptorLimitHits`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, `minIdleAdvanceTicks`, `minIdleAdvanceBatches`, `maxIdleAdvanceBatch`, `minIdleTimerWakes`, `minIdleVBlankWakes`, `minIdleInputWakes`, `minCpuFastForwardInstructions`, `minCpuFastForwardBatches`, `maxCpuFastForwardBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, ASIC expectations with `requireNoAsicPendingInterrupt`, `asicPendingInterrupt`, and `asicEventRegisters`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
+The fixture manifest keeps sample paths, artifact names, instruction budgets, optional `mediaPath`, static `controllers`, instruction-indexed `controllerScripts`, and expected serial/video/audio checks together. Fixture text and JSON reports include Maple transfer counts, grouped PVR TA list summaries, assembled PVR TA strip summaries, GD-ROM read summaries, plus scheduler VBlank, hardware tick, hardware batch, max batch, idle advance, idle wake, CPU fast-forward, and controller-script change diagnostics for timing comparisons. Manifests can also set optional Maple thresholds such as `minMapleTransfers`, `minMapleDeviceInfoTransfers`, `minMapleGetConditionTransfers`, `minMapleDmaBatches`, and `requireNoMapleDescriptorLimitHits`, GD-ROM thresholds and read filters with `minGdromReadCommands`, `minGdromBytesRead`, and `gdromReads`, scheduler thresholds such as `minVblankEvents`, `minHardwareAdvanceTicks`, `minHardwareAdvanceBatches`, `maxHardwareAdvanceBatch`, `minIdleAdvanceTicks`, `minIdleAdvanceBatches`, `maxIdleAdvanceBatch`, `minIdleTimerWakes`, `minIdleVBlankWakes`, `minIdleInputWakes`, `minCpuFastForwardInstructions`, `minCpuFastForwardBatches`, `maxCpuFastForwardBatch`, and `minControllerScriptChanges`, device-domain thresholds with `minDeviceAccessDomains`, ASIC expectations with `requireNoAsicPendingInterrupt`, `asicPendingInterrupt`, and `asicEventRegisters`, current PVR register values with `pvrRegisters`, current AICA register values with `aicaRegisters`, and decoded AICA channel state with `aicaChannels`. Use `--artifacts <path>` with the `fixtures` command when testing a different artifact directory.
 
 `fixtures/kos.json` declares the local `fixtures/kos.schema.json` schema for editor validation and autocomplete. Keep the schema in sync whenever a new manifest field becomes part of the supported fixture contract.
 
@@ -168,6 +169,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 
 - `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_read.elf`: reads one sector from generated local GDI media through `cdrom_read_sectors()`, observes the `DCSH` sentinel in RAM, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer_callback.elf`: chains the KOS TMU0 primary timer callback, observes three wakeups, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.

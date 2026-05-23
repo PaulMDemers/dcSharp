@@ -75,6 +75,8 @@ public class DreamcastFixtureRunnerTests
             MinMapleGetConditionTransfers = 5,
             MinMapleDmaBatches = 2,
             RequireNoMapleDescriptorLimitHits = true,
+            MinGdromReadCommands = 1,
+            MinGdromBytesRead = 2048,
             MinVblankEvents = 2,
             MinHardwareAdvanceTicks = 100,
             MinHardwareAdvanceBatches = 20,
@@ -212,6 +214,18 @@ public class DreamcastFixtureRunnerTests
                     KeyOn = false,
                     KeyOnExecute = true
                 }
+            ],
+            GdromReads =
+            [
+                new DreamcastFixtureGdromReadExpectation
+                {
+                    Sector = "0x0000AFC8",
+                    SectorCount = 1,
+                    BytesRequested = 2048,
+                    BytesRead = 2048,
+                    Success = true,
+                    Status = "media read completed"
+                }
             ]
         };
         var summary = CreateSummary(
@@ -235,6 +249,7 @@ public class DreamcastFixtureRunnerTests
             mapleGetConditionTransfers: 5,
             mapleDmaBatches: 2,
             asic: CreateAsicSummary(),
+            gdrom: CreateGdromSummary(),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
             pvrTaCommandWrites:
             [
@@ -559,6 +574,7 @@ public class DreamcastFixtureRunnerTests
         int mapleDmaBatches = 0,
         int mapleDescriptorLimitHits = 0,
         DreamcastAsicSummary? asic = null,
+        DreamcastGdromSummary? gdrom = null,
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
         IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites = null,
         IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips = null,
@@ -599,7 +615,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, []),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -759,6 +775,31 @@ public class DreamcastFixtureRunnerTests
             pendingEventCode is { } sourceCode && pendingLevel is { } sourceLevel
                 ? new DreamcastAsicPendingInterruptSummary(sourceCode, $"0x{sourceCode:X4}", sourceLevel, "IRQ9", 0, "A", 3, 0x00000008, "0x00000008")
                 : null);
+
+    private static DreamcastGdromSummary CreateGdromSummary() =>
+        new(
+            true,
+            2048,
+            45001,
+            1,
+            1,
+            0,
+            2048,
+            [
+                new DreamcastGdromReadCommandSummary(
+                    0x8C01_0000,
+                    "0x8C010000",
+                    0x0000_AFC8,
+                    "0x0000AFC8",
+                    0x8C02_0000,
+                    "0x8C020000",
+                    1,
+                    2048,
+                    2048,
+                    2048,
+                    true,
+                    "media read completed")
+            ]);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(
         int channel = 0,

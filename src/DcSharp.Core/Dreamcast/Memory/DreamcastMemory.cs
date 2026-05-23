@@ -414,15 +414,34 @@ public sealed class DreamcastMemory
         var sector = ReadUInt32(parameterAddress);
         var destination = ReadUInt32(parameterAddress + 4);
         var sectorCount = ReadUInt32(parameterAddress + 8);
-        if (sectorCount == 0)
+        return ExecuteGdromRead(parameterAddress, sector, destination, sectorCount);
+    }
+
+    public uint ExecuteGdromPioReadCommand(uint parameterAddress)
+    {
+        if (parameterAddress == 0)
         {
-            sectorCount = 1;
+            RecordGdromRead(parameterAddress, null, null, null, 0, 0, false, "missing parameter block");
+            return 1;
         }
 
+        var sector = ReadUInt32(parameterAddress);
+        var sectorCount = ReadUInt32(parameterAddress + 4);
+        var destination = ReadUInt32(parameterAddress + 8);
+        return ExecuteGdromRead(parameterAddress, sector, destination, sectorCount);
+    }
+
+    private uint ExecuteGdromRead(uint parameterAddress, uint sector, uint destination, uint sectorCount)
+    {
         if (mediaImage is null)
         {
             RecordGdromRead(parameterAddress, sector, destination, sectorCount, 0, 0, false, "no media image loaded");
             return 1;
+        }
+
+        if (sectorCount == 0)
+        {
+            sectorCount = 1;
         }
 
         var bytesRequested = GdromRequestedBytes(sectorCount);

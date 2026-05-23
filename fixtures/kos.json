@@ -40,6 +40,35 @@
       }
     },
     {
+      "name": "gdrom_read",
+      "sample": "samples/kos/gdrom_read",
+      "artifact": "dcsharp_gdrom_read.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM read probe status=0",
+        "dcSharp GD-ROM sentinel=44435348",
+        "dcSharp GD-ROM read probe done"
+      ],
+      "minGdromReadCommands": 1,
+      "minGdromBytesRead": 2048,
+      "gdromReads": [
+        {
+          "sector": "0x0000AFC8",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "timer",
       "sample": "samples/kos/timer",
       "artifact": "dcsharp_timer.elf",

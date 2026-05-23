@@ -70,6 +70,28 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void GdromPioReadCommandUsesKosParameterLayout()
+    {
+        var media = new RawSectorMediaImage(CreateMediaData(2), 2048);
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0004, 1);
+        memory.WriteUInt32(0x8C01_0008, 0x8C02_0000);
+        memory.WriteUInt32(0x8C01_000C, 0);
+
+        var status = memory.ExecuteGdromPioReadCommand(0x8C01_0000);
+        var snapshot = memory.CreateGdromSnapshot();
+
+        Assert.Equal(0u, status);
+        Assert.Equal(0x20, memory.ReadByte(0x8C02_0000));
+        var read = Assert.Single(snapshot.ReadCommands);
+        Assert.Equal(1u, read.Sector);
+        Assert.Equal(1u, read.SectorCount);
+        Assert.Equal(0x8C02_0000u, read.Destination);
+        Assert.True(read.Success);
+    }
+
+    [Fact]
     public void GdromSnapshotReportsFailedReads()
     {
         var memory = new DreamcastMemory();

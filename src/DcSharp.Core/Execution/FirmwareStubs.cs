@@ -31,6 +31,8 @@ internal static class FirmwareStubs
     internal sealed class FirmwareTrapHandler
     {
         private const uint SuperFunctionGdrom = 0;
+        private const uint GdromCommandPioRead = 16;
+        private const uint GdromCommandDmaRead = 17;
         private const int GdromCompleted = 2;
         private const int CdStatusStandby = 2;
         private const int CdRomXa = 0x20;
@@ -68,7 +70,7 @@ internal static class FirmwareStubs
         private uint HandleGdrom(uint function, DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory) =>
             function switch
             {
-                0 => nextCommandId++,
+                0 => SendCommand(state, memory),
                 1 => CompleteCommand(state, memory),
                 2 => 0,
                 3 => 0,
@@ -85,6 +87,17 @@ internal static class FirmwareStubs
                 14 => ReadSectors(state, memory),
                 _ => 0
             };
+
+        private uint SendCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
+        {
+            var commandId = nextCommandId++;
+            if (state.R[4] is GdromCommandPioRead or GdromCommandDmaRead)
+            {
+                memory.ExecuteGdromPioReadCommand(state.R[5]);
+            }
+
+            return commandId;
+        }
 
         private static uint CompleteCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {

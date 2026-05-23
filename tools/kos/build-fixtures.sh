@@ -41,6 +41,8 @@ if [[ "${#samples[@]}" -eq 0 ]]; then
   exit 1
 fi
 
+bash "$script_dir/build-fixture-media.sh"
+
 for sample in "${samples[@]}"; do
   echo "==> Building $sample"
   "$script_dir/build-sample.sh" "$sample"
