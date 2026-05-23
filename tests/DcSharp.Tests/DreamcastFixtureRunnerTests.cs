@@ -599,6 +599,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
+            new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, []),
             new DreamcastSchedulerSummary(
                 0,
                 0,

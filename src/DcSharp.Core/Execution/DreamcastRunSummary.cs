@@ -37,6 +37,7 @@ public sealed record DreamcastRunSummary(
     DreamcastVideoSummary Video,
     DreamcastAudioSummary Audio,
     DreamcastMapleSummary Maple,
+    DreamcastGdromSummary Gdrom,
     DreamcastSchedulerSummary Scheduler)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
@@ -88,6 +89,7 @@ public sealed record DreamcastRunSummary(
             DreamcastVideoSummary.FromSnapshot(result.Video),
             DreamcastAudioSummary.FromSnapshot(result.Audio),
             DreamcastMapleSummary.FromSnapshot(result.Maple),
+            DreamcastGdromSummary.FromSnapshot(result.Gdrom ?? DreamcastGdromSnapshot.Empty),
             DreamcastSchedulerSummary.FromSnapshot(result.Scheduler));
     }
 
@@ -913,6 +915,58 @@ public sealed record DreamcastMapleDmaTransferSummary(
             transfer.ResponseName,
             transfer.ResponseBytes,
             transfer.ControllerState is { } state ? DreamcastControllerSummary.FromState(state) : null);
+}
+
+public sealed record DreamcastGdromSummary(
+    bool HasMedia,
+    int? SectorSize,
+    ulong? SectorCount,
+    int ReadCommandCount,
+    int SuccessfulReadCommandCount,
+    int FailedReadCommandCount,
+    int BytesRead,
+    IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands)
+{
+    public static DreamcastGdromSummary FromSnapshot(DreamcastGdromSnapshot snapshot, int recentCount = 16) =>
+        new(
+            snapshot.HasMedia,
+            snapshot.SectorSize,
+            snapshot.SectorCount,
+            snapshot.ReadCommands.Count,
+            snapshot.ReadCommands.Count(command => command.Success),
+            snapshot.ReadCommands.Count(command => !command.Success),
+            snapshot.ReadCommands.Sum(command => command.BytesRead),
+            snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray());
+}
+
+public sealed record DreamcastGdromReadCommandSummary(
+    uint ParameterAddress,
+    string ParameterAddressHex,
+    uint? Sector,
+    string? SectorHex,
+    uint? Destination,
+    string? DestinationHex,
+    uint? SectorCount,
+    int? SectorSize,
+    int BytesRequested,
+    int BytesRead,
+    bool Success,
+    string Status)
+{
+    public static DreamcastGdromReadCommandSummary FromCommand(DreamcastGdromReadCommand command) =>
+        new(
+            command.ParameterAddress,
+            command.ParameterAddressHex,
+            command.Sector,
+            command.SectorHex,
+            command.Destination,
+            command.DestinationHex,
+            command.SectorCount,
+            command.SectorSize,
+            command.BytesRequested,
+            command.BytesRead,
+            command.Success,
+            command.Status);
 }
 
 public sealed record DreamcastSchedulerSummary(

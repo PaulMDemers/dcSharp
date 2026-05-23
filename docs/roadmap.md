@@ -62,5 +62,5 @@
 ## Milestone 6: Media And Broader Compatibility
 
 - Parse legal/local media formats. Started: raw 2048-byte data, 2352-byte CD-sector payload extraction, simple CUE data-track selection, and GDI data-track mapping by absolute LBA.
-- Add GD-ROM sector read behavior. Started: firmware GD-ROM HLE can read sectors from the loaded media image into system RAM.
+- Add GD-ROM sector read behavior. Started: firmware GD-ROM HLE can read sectors from the loaded media image into system RAM, and summaries record sector/count/destination/status diagnostics for each read command.
 - Run public redistributable demos and user-provided local images through the artifact pipeline.

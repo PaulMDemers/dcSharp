@@ -1,6 +1,7 @@
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Execution;
+using DcSharp.Core.Media;
 
 namespace DcSharp.Tests;
 
@@ -37,6 +38,53 @@ public class DreamcastMemoryTests
 
         Assert.Equal(0xAB, memory.ReadByte(0xACFF_FFFF));
         Assert.Equal(0xAB, memory.ReadByte(0xADFF_FFFF));
+    }
+
+    [Fact]
+    public void GdromSnapshotReportsMediaReadCommands()
+    {
+        var media = new RawSectorMediaImage(CreateMediaData(2), 2048);
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0004, 0x8C02_0000);
+        memory.WriteUInt32(0x8C01_0008, 1);
+
+        var status = memory.ExecuteGdromCommand(0x8C01_0000);
+        var snapshot = memory.CreateGdromSnapshot();
+
+        Assert.Equal(0u, status);
+        Assert.Equal(0x20, memory.ReadByte(0x8C02_0000));
+        Assert.True(snapshot.HasMedia);
+        Assert.Equal(2048, snapshot.SectorSize);
+        Assert.Equal(2ul, snapshot.SectorCount);
+        var read = Assert.Single(snapshot.ReadCommands);
+        Assert.True(read.Success);
+        Assert.Equal(1u, read.Sector);
+        Assert.Equal("0x00000001", read.SectorHex);
+        Assert.Equal(0x8C02_0000u, read.Destination);
+        Assert.Equal("0x8C020000", read.DestinationHex);
+        Assert.Equal(1u, read.SectorCount);
+        Assert.Equal(2048, read.BytesRequested);
+        Assert.Equal(2048, read.BytesRead);
+        Assert.Equal("media read completed", read.Status);
+    }
+
+    [Fact]
+    public void GdromSnapshotReportsFailedReads()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C01_0000, 0);
+        memory.WriteUInt32(0x8C01_0004, 0x8C02_0000);
+        memory.WriteUInt32(0x8C01_0008, 1);
+
+        var status = memory.ExecuteGdromCommand(0x8C01_0000);
+        var snapshot = memory.CreateGdromSnapshot();
+
+        Assert.Equal(1u, status);
+        Assert.False(snapshot.HasMedia);
+        var read = Assert.Single(snapshot.ReadCommands);
+        Assert.False(read.Success);
+        Assert.Equal("no media image loaded", read.Status);
     }
 
     [Fact]
@@ -749,5 +797,16 @@ public class DreamcastMemoryTests
         var summaryBatch = Assert.Single(summary.RecentDmaBatches);
         Assert.True(summaryBatch.HitDescriptorLimit);
         Assert.False(summaryBatch.Completed);
+    }
+
+    private static byte[] CreateMediaData(int sectors)
+    {
+        var data = new byte[sectors * 2048];
+        for (var sector = 0; sector < sectors; sector++)
+        {
+            data[sector * 2048] = (byte)(0x10 + (sector * 0x10));
+        }
+
+        return data;
     }
 }

@@ -406,6 +406,7 @@ internal sealed class MainForm : Form
             $"PVR: registers={summary.Video.PvrRegisterAccessCount:N0}, taWrites={summary.Video.PvrTaCommandWriteCount:N0}, strips={summary.Video.PvrTaStrips.Count:N0}",
             $"AICA: registers={summary.Audio.RegisterAccessCount:N0}, channels={summary.Audio.Channels.Count:N0}, active={summary.Audio.ActiveChannelCount:N0}",
             $"Maple: transfers={summary.Maple.TransferCount:N0}, dmaBatches={summary.Maple.DmaBatchCount:N0}",
+            $"GD-ROM: media={summary.Gdrom.HasMedia}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
             $"Scheduler: vblanks={summary.Scheduler.VBlankEventsRaised:N0}, hardwareTicks={summary.Scheduler.HardwareAdvanceTicks:N0}, fastForward={summary.Scheduler.CpuFastForwardInstructions:N0}"
         };
 
@@ -425,6 +426,14 @@ internal sealed class MainForm : Form
             lines.Add("PVR strips:");
             lines.AddRange(summary.Video.PvrTaStrips.TakeLast(8).Select(strip =>
                 $"  {strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex} mode2={strip.HeaderPayload?.Mode2Hex ?? "none"} mode3={strip.HeaderPayload?.Mode3Hex ?? "none"}"));
+        }
+
+        if (summary.Gdrom.RecentReadCommands.Count > 0)
+        {
+            lines.Add("");
+            lines.Add("GD-ROM reads:");
+            lines.AddRange(summary.Gdrom.RecentReadCommands.TakeLast(8).Select(read =>
+                $"  sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString() ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead}/{read.BytesRequested} ok={read.Success} status={read.Status}"));
         }
 
         return string.Join(Environment.NewLine, lines);

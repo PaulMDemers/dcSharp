@@ -82,6 +82,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
+    private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
@@ -404,8 +405,9 @@ public sealed class DreamcastMemory
 
     public uint ExecuteGdromCommand(uint parameterAddress)
     {
-        if (mediaImage is null || parameterAddress == 0)
+        if (parameterAddress == 0)
         {
+            RecordGdromRead(parameterAddress, null, null, null, 0, 0, false, "missing parameter block");
             return 1;
         }
 
@@ -417,14 +419,28 @@ public sealed class DreamcastMemory
             sectorCount = 1;
         }
 
-        if (destination == 0)
+        if (mediaImage is null)
         {
+            RecordGdromRead(parameterAddress, sector, destination, sectorCount, 0, 0, false, "no media image loaded");
             return 1;
         }
 
-        return TryReadMediaSectors(sector, destination, sectorCount)
-            ? 0u
-            : 1u;
+        var bytesRequested = GdromRequestedBytes(sectorCount);
+        if (bytesRequested == 0)
+        {
+            RecordGdromRead(parameterAddress, sector, destination, sectorCount, 0, 0, false, "invalid media sector size/count");
+            return 1;
+        }
+
+        if (destination == 0)
+        {
+            RecordGdromRead(parameterAddress, sector, destination, sectorCount, bytesRequested, 0, false, "missing destination");
+            return 1;
+        }
+
+        var success = TryReadMediaSectors(sector, destination, sectorCount, out var bytesRead, out var status);
+        RecordGdromRead(parameterAddress, sector, destination, sectorCount, bytesRequested, bytesRead, success, status);
+        return success ? 0u : 1u;
     }
 
     public ushort ReadInstructionUInt16(uint address)
@@ -525,6 +541,13 @@ public sealed class DreamcastMemory
 
     public DreamcastMapleSnapshot CreateMapleSnapshot() =>
         new(mapleTransfers.ToArray(), mapleDmaBatches.ToArray());
+
+    public DreamcastGdromSnapshot CreateGdromSnapshot() =>
+        new(
+            mediaImage is not null,
+            mediaImage?.SectorSize,
+            mediaImage?.SectorCount,
+            gdromReadCommands.ToArray());
 
     public DreamcastAsicSnapshot CreateAsicSnapshot()
     {
@@ -1039,38 +1062,81 @@ public sealed class DreamcastMemory
         return masked;
     }
 
-    private bool TryReadMediaSectors(uint sector, uint destination, uint sectorCount)
+    private int GdromRequestedBytes(uint sectorCount)
     {
         if (mediaImage is null || sectorCount == 0)
         {
+            return 0;
+        }
+
+        var sectorSize = mediaImage.SectorSize;
+        return sectorSize <= 0 || sectorCount > int.MaxValue / (uint)sectorSize
+            ? 0
+            : (int)(sectorCount * (uint)sectorSize);
+    }
+
+    private bool TryReadMediaSectors(uint sector, uint destination, uint sectorCount, out int bytesRead, out string status)
+    {
+        bytesRead = 0;
+        status = "media read completed";
+        if (mediaImage is null || sectorCount == 0)
+        {
+            status = mediaImage is null ? "no media image loaded" : "zero sectors requested";
             return false;
         }
 
         var sectorSize = mediaImage.SectorSize;
         if (sectorSize <= 0 || sectorCount > int.MaxValue / (uint)sectorSize)
         {
+            status = "invalid media sector size/count";
             return false;
         }
 
         var totalBytes = (int)(sectorCount * (uint)sectorSize);
         if (!TryGetSystemRamOffset(destination, totalBytes, out _))
         {
+            status = "destination outside system RAM";
             return false;
         }
 
         var buffer = new byte[sectorSize];
         for (uint index = 0; index < sectorCount; index++)
         {
-            if (!mediaImage.TryReadSector(sector + index, buffer, out var bytesRead) || bytesRead != sectorSize)
+            if (!mediaImage.TryReadSector(sector + index, buffer, out var sectorBytesRead) || sectorBytesRead != sectorSize)
             {
+                status = $"sector read failed at LBA {sector + index}";
                 return false;
             }
 
             Write(destination + (index * (uint)sectorSize), buffer);
+            bytesRead += sectorSize;
         }
 
         return true;
     }
+
+    private void RecordGdromRead(
+        uint parameterAddress,
+        uint? sector,
+        uint? destination,
+        uint? sectorCount,
+        int bytesRequested,
+        int bytesRead,
+        bool success,
+        string status) =>
+        gdromReadCommands.Add(new DreamcastGdromReadCommand(
+            parameterAddress,
+            $"0x{parameterAddress:X8}",
+            sector,
+            sector is { } sectorValue ? $"0x{sectorValue:X8}" : null,
+            destination,
+            destination is { } destinationValue ? $"0x{destinationValue:X8}" : null,
+            sectorCount,
+            mediaImage?.SectorSize,
+            bytesRequested,
+            bytesRead,
+            success,
+            status));
 
     private static bool IsTimerControl(uint address) =>
         address is TimerControl0 or TimerControl1 or TimerControl2;

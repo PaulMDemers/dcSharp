@@ -173,6 +173,8 @@ static void RunElf(string path, string[] args)
     }
 
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");
+    var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
+    Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, sectorSize={gdrom.SectorSize?.ToString(CultureInfo.InvariantCulture) ?? "none"}, sectors={gdrom.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, bytes={gdrom.ReadCommands.Sum(command => command.BytesRead)}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, idleTicks={result.Scheduler.IdleAdvanceTicks}, idleBatches={result.Scheduler.IdleAdvanceBatches}, maxIdleBatch={result.Scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{result.Scheduler.IdleTimerWakeCount}/vblank:{result.Scheduler.IdleVBlankWakeCount}/input:{result.Scheduler.IdleInputWakeCount}, cpuFastForward={result.Scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={result.Scheduler.CpuFastForwardBatches}, maxCpuFastForward={result.Scheduler.MaxCpuFastForwardBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
         ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
@@ -218,6 +220,11 @@ static void RunElf(string path, string[] args)
     {
         var state = transfer.ControllerState is { } controller ? $", state={FormatController(controller)}" : string.Empty;
         Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationName} ({transfer.DestinationHex}), recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
+    }
+
+    foreach (var read in gdrom.ReadCommands.TakeLast(8))
+    {
+        Console.WriteLine($"  GD-ROM read: sector={read.SectorHex ?? "none"}, count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, dest={read.DestinationHex ?? "none"}, bytes={read.BytesRead}/{read.BytesRequested}, ok={read.Success}, status={read.Status}");
     }
 
     foreach (var batch in result.Maple.DmaBatches.TakeLast(4))
@@ -349,7 +356,7 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
@@ -378,6 +385,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.PvrTaRealVertexPayloads.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaRealVertices={FormatPvrTaRealVertexPayloads(result.Summary.Video.PvrTaRealVertexPayloads)}");
+                }
+
+                if (result.Summary.Gdrom.RecentReadCommands.Count > 0)
+                {
+                    Console.WriteLine($"  gdromReads={FormatGdromReads(result.Summary.Gdrom.RecentReadCommands)}");
                 }
             }
 
@@ -758,6 +770,10 @@ static string FormatPvrTaRealVertexPayloads(IReadOnlyList<DreamcastPvrTaRealVert
     string.Join(", ", vertices
         .GroupBy(vertex => new { vertex.Region, vertex.ListTypeName, vertex.Rgb565Hex, vertex.ArgbHex })
         .Select(group => $"{group.Key.Region}:{group.Key.ListTypeName ?? "none"} vertices={group.Count()} points={string.Join("/", group.Select(vertex => $"{vertex.RoundedX},{vertex.RoundedY}"))} z={string.Join("/", group.Select(vertex => FormatFloat(vertex.Z)))} argb={group.Key.ArgbHex} rgb565={group.Key.Rgb565Hex} ends={group.Count(vertex => vertex.EndOfStrip)}"));
+
+static string FormatGdromReads(IReadOnlyList<DreamcastGdromReadCommandSummary> reads) =>
+    string.Join(", ", reads.Select(read =>
+        $"sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead}/{read.BytesRequested} ok={read.Success} status={read.Status}"));
 
 static string FormatFloat(float value) =>
     value.ToString("0.###", CultureInfo.InvariantCulture);

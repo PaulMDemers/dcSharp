@@ -190,6 +190,7 @@ Current state:
 - The framebuffer fixture writes a 320x240 RGB565 pattern and exposes it through VRAM diagnostics.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
 - Legal/local media loading supports raw 2048-byte sector data, 2352-byte CD-sector payload extraction, simple CUE data-track selection, and GDI data tracks mapped by absolute LBA.
+- GD-ROM firmware HLE read commands are captured in run summaries with media presence, sector size/count, requested LBA/count, destination, bytes read, success, and failure status.
 - The WinForms desktop workbench can run selected ELF/media pairs, show serial/trace/device diagnostics, preview RGB565 VRAM, and derive framebuffer dimensions from `PVR_FB_SIZE` when a program configures it.
 
 Next targets:
