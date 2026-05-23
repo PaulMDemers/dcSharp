@@ -37,6 +37,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_missing_file
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_dir
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_nested
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_multisector
+wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_seek
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer
 wsl -e bash tools/kos/build-sample.sh samples/kos/timer_callback
 wsl -e bash tools/kos/build-sample.sh samples/kos/maple_controller
@@ -180,6 +181,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_gdrom_dir.elf`: enumerates `/cd`, observes `readme.txt` and `data` through KOS `fs_iso9660` directory traversal, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_nested.elf`: enumerates `/cd/DATA`, opens `/cd/DATA/SECOND.TXT`, reads the nested file text through KOS `fs_iso9660`, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_multisector.elf`: opens `/cd/DATA/BIG.BIN`, reads a 5000-byte file across three ISO sectors in odd-sized chunks, verifies EOF and byte content, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_seek.elf`: seeks within `/cd/DATA/BIG.BIN`, reads across sector boundaries, rereads from later offsets, verifies tail/EOF behavior, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer_callback.elf`: chains the KOS TMU0 primary timer callback, observes three wakeups, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
