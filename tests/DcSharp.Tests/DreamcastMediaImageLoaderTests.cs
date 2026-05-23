@@ -180,10 +180,92 @@ public class DreamcastMediaImageLoaderTests
         }
     }
 
+    [Fact]
+    public void LoadFromGdiMapsAbsoluteLbaFrom2352ByteDataTrack()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var trackPath = Path.Combine(tempRoot, "track data.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, CreateCdSector([0xA0, 0xA1]).Concat(CreateCdSector([0xB0, 0xB1])).ToArray());
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                1
+                3 45000 4 2352 "{{Path.GetFileName(trackPath)}}" 0
+                """);
+
+            var media = DreamcastMediaImageLoader.LoadFromFile(gdiPath);
+
+            Assert.Equal(2048, media.SectorSize);
+            Assert.Equal(45002ul, media.SectorCount);
+
+            Span<byte> sector = stackalloc byte[2048];
+            Assert.False(media.TryReadSector(44999, sector, out var bytesRead));
+            Assert.Equal(0, bytesRead);
+
+            Assert.True(media.TryReadSector(45000, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0xA0, sector[0]);
+            Assert.Equal(0xA1, sector[1]);
+
+            Assert.True(media.TryReadSector(45001, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0xB0, sector[0]);
+            Assert.Equal(0xB1, sector[1]);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadFromGdiHonorsDataTrackFileOffset()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var trackPath = Path.Combine(tempRoot, "track03.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, Enumerable.Repeat((byte)0xCC, 16).Concat(Create2048Sector([0x44, 0x45])).ToArray());
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                1
+                3 45000 4 2048 {{Path.GetFileName(trackPath)}} 16
+                """);
+
+            var media = DreamcastMediaImageLoader.LoadFromFile(gdiPath);
+
+            Span<byte> sector = stackalloc byte[2048];
+            Assert.True(media.TryReadSector(45000, sector, out var bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x44, sector[0]);
+            Assert.Equal(0x45, sector[1]);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static byte[] CreateCdSector(byte[] payloadHeader)
     {
         var sector = new byte[2352];
         Array.Copy(payloadHeader, 0, sector, 16, payloadHeader.Length);
+        return sector;
+    }
+
+    private static byte[] Create2048Sector(byte[] payloadHeader)
+    {
+        var sector = new byte[2048];
+        Array.Copy(payloadHeader, sector, payloadHeader.Length);
         return sector;
     }
 }
