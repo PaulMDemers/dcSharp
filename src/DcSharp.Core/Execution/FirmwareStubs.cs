@@ -82,6 +82,7 @@ internal static class FirmwareStubs
                 11 => 0,
                 12 => 0,
                 13 => CheckTransfer(state, memory),
+                14 => ReadSectors(state, memory),
                 _ => 0
             };
 
@@ -116,6 +117,11 @@ internal static class FirmwareStubs
             }
 
             return 0;
+        }
+
+        private static uint ReadSectors(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
+        {
+            return memory.ExecuteGdromCommand(state.R[4]);
         }
 
         private static void WriteWords(DreamcastMemory memory, uint address, params int[] values)

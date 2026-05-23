@@ -21,6 +21,23 @@ public static class DreamcastFixtureRunner
 
     public static DreamcastRunOptions CreateRunOptions(DreamcastFixtureDefinition fixture)
     {
+        return CreateRunOptions(fixture, null);
+    }
+
+    public static DreamcastFixtureCheckResult Run(DreamcastFixtureDefinition fixture, string artifactPath, string repoRoot)
+    {
+        ArgumentNullException.ThrowIfNull(fixture);
+
+        using var stream = File.OpenRead(artifactPath);
+        var options = CreateRunOptions(fixture, repoRoot);
+        var result = new DreamcastRunner().Run(ElfFile.Read(stream), options);
+        var summary = DreamcastRunSummary.FromResult(result, options);
+
+        return new DreamcastFixtureCheckResult(fixture.Name, artifactPath, summary, Validate(fixture, summary));
+    }
+
+    public static DreamcastRunOptions CreateRunOptions(DreamcastFixtureDefinition fixture, string? repoRoot)
+    {
         ArgumentNullException.ThrowIfNull(fixture);
 
         var controllerA = fixture.ControllerA is null
@@ -38,6 +55,9 @@ public static class DreamcastFixtureRunner
         var controllerScripts = fixture.ControllerScripts.ToDictionary(
             entry => DreamcastControllerStateParser.ParseMapleAddress(entry.Key),
             entry => DreamcastControllerStateParser.ParseScript(entry.Value));
+        var media = fixture.MediaPath is null
+            ? null
+            : DreamcastMediaImageLoader.LoadFromFile(ResolveMediaPath(repoRoot, fixture.MediaPath));
 
         return new DreamcastRunOptions(
             fixture.Instructions,
@@ -47,8 +67,18 @@ public static class DreamcastFixtureRunner
             controllerScript,
             ControllerB: controllerB,
             Controllers: controllers.Count == 0 ? null : controllers,
-            ControllerScripts: controllerScripts.Count == 0 ? null : controllerScripts);
+            ControllerScripts: controllerScripts.Count == 0 ? null : controllerScripts,
+            Media: media);
     }
+
+    private static string ResolveMediaPath(string? repoRoot, string mediaPath) =>
+        string.IsNullOrWhiteSpace(mediaPath)
+            ? throw new InvalidDataException("fixture media path is empty.")
+            : (string.IsNullOrWhiteSpace(repoRoot)
+                ? Path.GetFullPath(mediaPath)
+                : Path.IsPathRooted(mediaPath)
+                    ? Path.GetFullPath(mediaPath)
+                    : Path.GetFullPath(Path.Combine(repoRoot, mediaPath)));
 
     public static IReadOnlyList<string> Validate(DreamcastFixtureDefinition fixture, DreamcastRunSummary summary)
     {

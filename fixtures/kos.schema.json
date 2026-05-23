@@ -43,6 +43,10 @@
           "type": "string",
           "minLength": 1
         },
+        "mediaPath": {
+          "type": "string",
+          "minLength": 1
+        },
         "artifact": {
           "type": "string",
           "minLength": 1

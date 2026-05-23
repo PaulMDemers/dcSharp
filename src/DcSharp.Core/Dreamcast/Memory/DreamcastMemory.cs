@@ -3,6 +3,7 @@ using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
+using DcSharp.Core.Media;
 using System.Numerics;
 using System.Text;
 
@@ -82,14 +83,17 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
+    private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
 
     public DreamcastMemory(
         DreamcastControllerState? controllerA = null,
         DreamcastControllerState? controllerB = null,
-        IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null)
+        IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null,
+        IDreamcastMediaImage? media = null)
     {
         Array.Fill(pvrPreviewDepth, float.NaN);
+        mediaImage = media;
         mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
         if (controllerB is { } controllerBState)
         {
@@ -396,6 +400,31 @@ public sealed class DreamcastMemory
             | (systemRam[offset + 1] << 8)
             | (systemRam[offset + 2] << 16)
             | (systemRam[offset + 3] << 24));
+    }
+
+    public uint ExecuteGdromCommand(uint parameterAddress)
+    {
+        if (mediaImage is null || parameterAddress == 0)
+        {
+            return 1;
+        }
+
+        var sector = ReadUInt32(parameterAddress);
+        var destination = ReadUInt32(parameterAddress + 4);
+        var sectorCount = ReadUInt32(parameterAddress + 8);
+        if (sectorCount == 0)
+        {
+            sectorCount = 1;
+        }
+
+        if (destination == 0)
+        {
+            return 1;
+        }
+
+        return TryReadMediaSectors(sector, destination, sectorCount)
+            ? 0u
+            : 1u;
     }
 
     public ushort ReadInstructionUInt16(uint address)
@@ -1008,6 +1037,39 @@ public sealed class DreamcastMemory
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, masked));
         return masked;
+    }
+
+    private bool TryReadMediaSectors(uint sector, uint destination, uint sectorCount)
+    {
+        if (mediaImage is null || sectorCount == 0)
+        {
+            return false;
+        }
+
+        var sectorSize = mediaImage.SectorSize;
+        if (sectorSize <= 0 || sectorCount > int.MaxValue / (uint)sectorSize)
+        {
+            return false;
+        }
+
+        var totalBytes = (int)(sectorCount * (uint)sectorSize);
+        if (!TryGetSystemRamOffset(destination, totalBytes, out _))
+        {
+            return false;
+        }
+
+        var buffer = new byte[sectorSize];
+        for (uint index = 0; index < sectorCount; index++)
+        {
+            if (!mediaImage.TryReadSector(sector + index, buffer, out var bytesRead) || bytesRead != sectorSize)
+            {
+                return false;
+            }
+
+            Write(destination + (index * (uint)sectorSize), buffer);
+        }
+
+        return true;
     }
 
     private static bool IsTimerControl(uint address) =>

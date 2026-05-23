@@ -35,6 +35,7 @@ public sealed class DreamcastFixtureDefinition
 {
     public string Name { get; set; } = string.Empty;
     public string Sample { get; set; } = string.Empty;
+    public string? MediaPath { get; set; }
     public string Artifact { get; set; } = string.Empty;
     public ulong Instructions { get; set; }
     public int TraceTail { get; set; } = 8;
@@ -95,6 +96,11 @@ public sealed class DreamcastFixtureDefinition
         if (string.IsNullOrWhiteSpace(Artifact))
         {
             throw new InvalidDataException($"Fixture '{Name}' is missing an artifact.");
+        }
+
+        if (MediaPath is { } mediaPath && string.IsNullOrWhiteSpace(mediaPath))
+        {
+            throw new InvalidDataException($"Fixture '{Name}' has an empty mediaPath.");
         }
 
         if (Instructions == 0)

@@ -327,7 +327,7 @@ static int RunFixtures(string manifestPath, string[] args)
             continue;
         }
 
-        results.Add(DreamcastFixtureRunner.Run(fixture, artifactPath));
+        results.Add(DreamcastFixtureRunner.Run(fixture, artifactPath, repoRoot));
     }
 
     var reports = results.Select(FixtureReport.FromResult).ToArray();
@@ -497,6 +497,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     MemoryAccessKind? deviceKind = null;
     AddressRange? deviceAddressRange = null;
     string? deviceDomain = null;
+    string? mediaPath = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -580,6 +581,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 deviceDomain = ParseDeviceDomain(args[index + 1]);
                 index++;
                 break;
+            case "--media" when index + 1 < args.Length:
+                mediaPath = args[index + 1];
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -603,6 +608,9 @@ static CliRunOptions ParseRunOptions(string[] args)
     var traceCapture = traceLogPath is null
         ? null
         : new DreamcastTraceCaptureOptions(traceStartPc, traceEndPc, traceLogLimit);
+    var media = mediaPath is null
+        ? null
+        : DreamcastMediaImageLoader.LoadFromFile(mediaPath);
 
     return new CliRunOptions(
         new DreamcastRunOptions(
@@ -614,7 +622,8 @@ static CliRunOptions ParseRunOptions(string[] args)
             traceCapture,
             controllerB,
             controllers.Count == 0 ? null : controllers,
-            controllerScripts.Count == 0 ? null : controllerScripts),
+            controllerScripts.Count == 0 ? null : controllerScripts,
+            media),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -771,7 +780,7 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
