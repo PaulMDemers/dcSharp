@@ -9,6 +9,7 @@ The first target is not retail-game compatibility. The first target is a determi
 - C# solution: `dcSharp.slnx`
 - Core library: `src/DcSharp.Core`
 - CLI: `src/DcSharp.Cli`
+- Desktop host: `src/DcSharp.Desktop`
 - Tests: `tests/DcSharp.Tests`
 - KallistiOS samples:
   - `samples/kos/hello`: default KOS init fixture that now reaches `main()` after Maple startup.
@@ -139,6 +140,14 @@ The default test suite keeps long KOS fixture runs opt-in. To exercise the built
 $env:DCSHARP_RUN_KOS_FIXTURES='1'
 dotnet test dcSharp.slnx
 ```
+
+Try the desktop host:
+
+```powershell
+dotnet run --project src/DcSharp.Desktop
+```
+
+The desktop app lets you pick an ELF and optional media file (`.bin`/`.cue`), set an instruction limit, and run the selected image through the same core runner used by the CLI.
 
 For the usual fast local check, including whitespace diff checks, fixture-manifest validation, and the unit suite:
 

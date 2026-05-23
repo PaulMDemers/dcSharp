@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/DcSharp.Cli/DcSharp.Cli.csproj" />
     <Project Path="src/DcSharp.Core/DcSharp.Core.csproj" />
+    <Project Path="src/DcSharp.Desktop/DcSharp.Desktop.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DcSharp.Tests/DcSharp.Tests.csproj" />
