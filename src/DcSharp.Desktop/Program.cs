@@ -49,6 +49,7 @@ internal sealed class MainForm : Form
     private readonly Label elapsedValue = new();
     private readonly FramebufferView framebufferView = new();
     private readonly TextBox summaryText = CreateLogBox();
+    private readonly TextBox gdromText = CreateLogBox();
     private readonly TextBox serialText = CreateLogBox();
     private readonly TextBox traceText = CreateLogBox();
     private readonly TextBox devicesText = CreateLogBox();
@@ -259,6 +260,7 @@ internal sealed class MainForm : Form
     {
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(CreateTab("Summary", summaryText));
+        tabs.TabPages.Add(CreateTab("GD-ROM", gdromText));
         tabs.TabPages.Add(CreateTab("Serial", serialText));
         tabs.TabPages.Add(CreateTab("Trace", traceText));
         tabs.TabPages.Add(CreateTab("Devices", devicesText));
@@ -381,6 +383,7 @@ internal sealed class MainForm : Form
         elapsedValue.Text = elapsed.ToString("hh\\:mm\\:ss\\.fff");
 
         summaryText.Text = BuildSummary(result, summary, elapsed);
+        gdromText.Text = BuildGdromDiagnostics(summary.Gdrom, mediaPath.Text);
         serialText.Text = result.SerialOutput.Count == 0
             ? "<no serial output>"
             : Encoding.ASCII.GetString(result.SerialOutput.ToArray());
@@ -446,6 +449,64 @@ internal sealed class MainForm : Form
 
         return string.Join(Environment.NewLine, lines);
     }
+
+    private static string BuildGdromDiagnostics(DreamcastGdromSummary gdrom, string selectedMediaPath)
+    {
+        var lines = new List<string>
+        {
+            "Media:",
+            $"  Selected path: {DisplayPath(selectedMediaPath)}",
+            $"  Loaded: {gdrom.HasMedia}",
+            $"  Sector size: {gdrom.SectorSize?.ToString("N0") ?? "none"}",
+            $"  Sectors: {gdrom.SectorCount?.ToString("N0") ?? "none"}",
+            "",
+            "Command totals:",
+            $"  Reads: {gdrom.ReadCommandCount:N0}",
+            $"  Successful reads: {gdrom.SuccessfulReadCommandCount:N0}",
+            $"  Failed reads: {gdrom.FailedReadCommandCount:N0}",
+            $"  Bytes read: {gdrom.BytesRead:N0}",
+            $"  TOCs: {gdrom.TocCommandCount:N0}"
+        };
+
+        lines.Add("");
+        lines.Add("Recent reads:");
+        if (gdrom.RecentReadCommands.Count == 0)
+        {
+            lines.Add("  none");
+        }
+        else
+        {
+            lines.AddRange(gdrom.RecentReadCommands.Select(FormatGdromRead));
+        }
+
+        lines.Add("");
+        lines.Add("Recent TOCs:");
+        if (gdrom.RecentTocCommands.Count == 0)
+        {
+            lines.Add("  none");
+        }
+        else
+        {
+            lines.AddRange(gdrom.RecentTocCommands.Select(FormatGdromToc));
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatGdromRead(DreamcastGdromReadCommandSummary read)
+    {
+        var outcome = read.Success ? "OK  " : "FAIL";
+        return $"  [{outcome}] sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString() ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead:N0}/{read.BytesRequested:N0} status={read.Status}";
+    }
+
+    private static string FormatGdromToc(DreamcastGdromTocCommandSummary toc)
+    {
+        var outcome = toc.Success ? "OK  " : "FAIL";
+        return $"  [{outcome}] buffer={toc.BufferAddressHex ?? "none"} first={toc.FirstTrack?.ToString() ?? "none"} last={toc.LastTrack?.ToString() ?? "none"} data={toc.DataTrackStartFadHex ?? "none"} leadout={toc.LeadoutFadHex ?? "none"} status={toc.Status}";
+    }
+
+    private static string DisplayPath(string path) =>
+        string.IsNullOrWhiteSpace(path) ? "<none>" : path;
 
     private static string BuildTrace(DreamcastRunResult result)
     {
@@ -589,6 +650,7 @@ internal sealed class MainForm : Form
     private void ClearOutput(bool keepFramebuffer = false)
     {
         summaryText.Clear();
+        gdromText.Clear();
         serialText.Clear();
         traceText.Clear();
         devicesText.Clear();
