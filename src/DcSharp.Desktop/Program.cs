@@ -24,6 +24,8 @@ internal sealed class MainForm : Form
 {
     private const int DefaultFramebufferWidth = 320;
     private const int DefaultFramebufferHeight = 240;
+    private const int MaxFramebufferWidth = 1024;
+    private const int MaxFramebufferHeight = 768;
     private const ulong DefaultInstructionLimit = 70_000_000;
 
     private readonly ToolStrip toolStrip = new();
@@ -100,11 +102,11 @@ internal sealed class MainForm : Form
         instructionLimit.ThousandsSeparator = true;
 
         framebufferWidth.Minimum = 1;
-        framebufferWidth.Maximum = 1024;
+        framebufferWidth.Maximum = MaxFramebufferWidth;
         framebufferWidth.Value = DefaultFramebufferWidth;
 
         framebufferHeight.Minimum = 1;
-        framebufferHeight.Maximum = 768;
+        framebufferHeight.Maximum = MaxFramebufferHeight;
         framebufferHeight.Value = DefaultFramebufferHeight;
 
         elfPath.Anchor = AnchorStyles.Left | AnchorStyles.Right;
@@ -329,8 +331,13 @@ internal sealed class MainForm : Form
 
     private void UpdateFramebuffer(DreamcastRunResult result)
     {
-        var width = (int)framebufferWidth.Value;
-        var height = (int)framebufferHeight.Value;
+        var (width, height, derivedFromPvr) = ResolveFramebufferDimensions(result.Video);
+        if (derivedFromPvr)
+        {
+            framebufferWidth.Value = width;
+            framebufferHeight.Value = height;
+        }
+
         framebufferView.SetFramebuffer(CreateBitmap(result.Video.Vram, width, height), width, height);
     }
 
@@ -366,9 +373,10 @@ internal sealed class MainForm : Form
     private void UpdateDiagnostics(DreamcastRunResult result, TimeSpan elapsed)
     {
         var summary = DreamcastRunSummary.FromResult(result);
+        var (width, height, derivedFromPvr) = ResolveFramebufferDimensions(result.Video);
         stopValue.Text = result.StopReason.ToString();
         instructionValue.Text = result.Cpu.InstructionsExecuted.ToString("N0");
-        videoValue.Text = $"{result.Video.NonZeroBytes:N0} nonzero";
+        videoValue.Text = $"{width}x{height}{(derivedFromPvr ? " PVR" : " manual")}, {result.Video.NonZeroBytes:N0} nonzero";
         serialValue.Text = $"{result.SerialOutput.Count:N0} bytes";
         elapsedValue.Text = elapsed.ToString("hh\\:mm\\:ss\\.fff");
 
@@ -468,7 +476,7 @@ internal sealed class MainForm : Form
         using var dialog = new OpenFileDialog
         {
             Title = "Select optional media image",
-            Filter = "Disc images (*.cue;*.bin;*.raw)|*.cue;*.bin;*.raw|All files (*.*)|*.*"
+            Filter = "Disc images (*.gdi;*.cue;*.bin;*.raw)|*.gdi;*.cue;*.bin;*.raw|All files (*.*)|*.*"
         };
 
         if (dialog.ShowDialog(this) == DialogResult.OK)
@@ -500,6 +508,7 @@ internal sealed class MainForm : Form
                 elfPath.Text = file;
             }
             else if (string.Equals(extension, ".cue", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".gdi", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(extension, ".bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(extension, ".raw", StringComparison.OrdinalIgnoreCase))
             {
@@ -583,6 +592,34 @@ internal sealed class MainForm : Form
     private void UpdateStatus(string text)
     {
         statusLabel.Text = text;
+    }
+
+    private (int Width, int Height, bool DerivedFromPvr) ResolveFramebufferDimensions(DreamcastVideoSnapshot video)
+    {
+        if (TryDecodePvrFramebufferSize(video, out var width, out var height))
+        {
+            return (width, height, true);
+        }
+
+        return ((int)framebufferWidth.Value, (int)framebufferHeight.Value, false);
+    }
+
+    private static bool TryDecodePvrFramebufferSize(DreamcastVideoSnapshot video, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        var register = video.PvrRegisters.FirstOrDefault(register => string.Equals(register.Name, "PVR_FB_SIZE", StringComparison.Ordinal));
+        if (register is null)
+        {
+            return false;
+        }
+
+        width = (((int)register.Value & 0x3FF) + 1) * 2;
+        height = ((int)((register.Value >> 10) & 0x3FF)) + 1;
+        return width >= 1
+            && width <= MaxFramebufferWidth
+            && height >= 1
+            && height <= MaxFramebufferHeight;
     }
 
     private static Label CreateFieldLabel(string text) =>
