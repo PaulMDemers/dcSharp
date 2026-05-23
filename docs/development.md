@@ -41,6 +41,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_toc_no_media
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_out_of_range
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_raw_multisector
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_multitrack_toc_read
+wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_gdi_2352_toc_read
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_file
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_missing_file
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_dir
@@ -194,6 +195,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_gdrom_out_of_range.elf`: attempts a raw `cdrom_read_sectors()` call past the generated media leadout, observes the KOS-visible failure, verifies the destination buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_raw_multisector.elf`: reads three contiguous sectors from generated local GDI media with one `cdrom_read_sectors()` call, verifies `BIG.BIN` bytes and zero padding, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_multitrack_toc_read.elf`: reads the TOC from generated two-track local GDI media, discovers the last data track through `cdrom_locate_data_track()`, reads its sentinel sector at FAD 45150, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_gdi_2352_toc_read.elf`: reads the TOC from generated local GDI media whose track 5 uses 2352-byte source sectors plus a file offset, discovers FAD 45200, reads the extracted user-data sentinel, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_file.elf`: opens `/cd/README.TXT` from the generated local ISO9660-in-GDI media, reads the file text through KOS `fs_iso9660`, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_missing_file.elf`: attempts to open a missing `/cd/MISSING.TXT`, observes the expected VFS failure, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_dir.elf`: enumerates `/cd`, observes `readme.txt` and `data` through KOS `fs_iso9660` directory traversal, shuts down, and reports `ProgramExit`.

@@ -320,6 +320,45 @@
       }
     },
     {
+      "name": "gdrom_gdi_2352_toc_read",
+      "sample": "samples/kos/gdrom_gdi_2352_toc_read",
+      "artifact": "dcsharp_gdrom_gdi_2352_toc_read.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom_2352_track05.gdi",
+      "instructions": 90000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM 2352 toc=0 read=0 first=5 last=5 located=45200 leadout=45220 sentinel=4d323335",
+        "dcSharp GD-ROM 2352 probe done"
+      ],
+      "minGdromTocCommands": 1,
+      "minGdromReadCommands": 1,
+      "minGdromBytesRead": 2048,
+      "gdromTocs": [
+        {
+          "firstTrack": 5,
+          "lastTrack": 5,
+          "dataTrackStartFad": "0x0000B090",
+          "leadoutFad": "0x0000B0A4",
+          "success": true,
+          "status": "TOC written"
+        }
+      ],
+      "gdromReads": [
+        {
+          "sector": "0x0000B090",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_file",
       "sample": "samples/kos/gdrom_file",
       "artifact": "dcsharp_gdrom_file.elf",

@@ -62,6 +62,12 @@ def kos_extent(track_sector):
     return TRACK_START_FAD + track_sector - 150
 
 
+def cd_sector(payload):
+    sector = bytearray(2352)
+    sector[16:16 + len(payload)] = payload
+    return sector
+
+
 media_dir = Path(sys.argv[1])
 track = bytearray(TRACK_SECTORS * SECTOR_SIZE)
 
@@ -140,6 +146,19 @@ multi_gdi_path.write_text(
     '3 45000 4 2048 dcsharp_gdrom_multitrack_track03.bin 0\n'
     '4 45150 4 2048 dcsharp_gdrom_multitrack_track04.bin 0\n',
     encoding='ascii')
+
+edge_track = bytearray(b"OFFSET-PREFIX-FOR-2352-GDI....!!")
+edge_track.extend(cd_sector(b"M235"))
+for index in range(1, TRACK_SECTORS):
+    edge_track.extend(cd_sector(bytes([(index * 17) & 0xff])))
+
+edge_track_path = media_dir / "dcsharp_gdrom_2352_track05.bin"
+edge_gdi_path = media_dir / "dcsharp_gdrom_2352_track05.gdi"
+edge_track_path.write_bytes(edge_track)
+edge_gdi_path.write_text(
+    '1\n'
+    '5 45200 4 2352 dcsharp_gdrom_2352_track05.bin 32\n',
+    encoding='ascii')
 PY
 
 echo "Built fixture media:"
@@ -148,4 +167,6 @@ printf '%s\n' \
   "$media_dir/dcsharp_gdrom_track03.bin" \
   "$media_dir/dcsharp_gdrom_multitrack.gdi" \
   "$media_dir/dcsharp_gdrom_multitrack_track03.bin" \
-  "$media_dir/dcsharp_gdrom_multitrack_track04.bin"
+  "$media_dir/dcsharp_gdrom_multitrack_track04.bin" \
+  "$media_dir/dcsharp_gdrom_2352_track05.gdi" \
+  "$media_dir/dcsharp_gdrom_2352_track05.bin"

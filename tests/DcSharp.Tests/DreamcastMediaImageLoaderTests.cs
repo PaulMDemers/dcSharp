@@ -291,6 +291,53 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void LoadFromGdiMapsOffset2352DataTrackWithNonDefaultTrackNumber()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var trackPath = Path.Combine(tempRoot, "track05.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, Enumerable.Repeat((byte)0xCC, 32).Concat(CreateCdSector([0x5A, 0x5B])).Concat(CreateCdSector([0x6A, 0x6B])).ToArray());
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                1
+                5 45200 4 2352 {{Path.GetFileName(trackPath)}} 32
+                """);
+
+            var media = DreamcastMediaImageLoader.LoadFromFile(gdiPath);
+
+            Assert.Equal(45202ul, media.SectorCount);
+            Assert.Equal(45202u, media.LeadoutFad);
+            var track = Assert.Single(media.Tracks);
+            Assert.Equal(5, track.TrackNumber);
+            Assert.Equal(45200u, track.StartFad);
+            Assert.Equal(2ul, track.SectorCount);
+
+            Span<byte> sector = stackalloc byte[2048];
+            Assert.False(media.TryReadSector(45199, sector, out var bytesRead));
+            Assert.Equal(0, bytesRead);
+
+            Assert.True(media.TryReadSector(45200, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x5A, sector[0]);
+            Assert.Equal(0x5B, sector[1]);
+
+            Assert.True(media.TryReadSector(45201, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x6A, sector[0]);
+            Assert.Equal(0x6B, sector[1]);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void LoadFromGdiHonorsDataTrackFileOffset()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
