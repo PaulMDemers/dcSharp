@@ -51,16 +51,16 @@
 ## Milestone 5: Video And Audio Bring-Up
 
 - Start with framebuffer/register visibility. Started: PVR VRAM apertures are backed; `samples/kos/framebuffer` writes a RGB565 pattern and `samples/kos/video_mode` sets 640x480 RGB565 with sentinel pixels.
-- Add the first tiny software preview path. Started: assembled opaque TA strips can draw small solid RGB565 triangle previews into VRAM for red, green, and real `pvr_vertex_t` fixture diagnostics.
+- Add the first tiny software preview path. Started: assembled opaque TA strips can draw small RGB565 triangle previews into VRAM for flat-color and Gouraud-color fixtures, with selected depth, blend, UV, filter, and texture format behavior.
 - Dump the current RGB565 framebuffer snapshot to PNG for visual fixture checks. Done.
 - Add PVR command logging before a full renderer. Started: current named PVR register values, named register accesses, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in video summaries.
-- Classify TA command writes before a full renderer. Started with first-word command kind, list type decoding, a real TA parameter decoder skeleton, a TA stream control/payload diagnostic view, real-shaped KOS polygon header/vertex fixtures with zero and nonzero mode payloads, and a tiny diagnostic opaque strip assembler that consumes fixture-only control/X/Y/color vertex packets.
+- Classify TA command writes before a full renderer. Started with first-word command kind, list type decoding, a real TA parameter decoder skeleton, a TA stream control/payload diagnostic view, real-shaped KOS polygon header/vertex fixtures with zero and nonzero mode payloads, a tiny diagnostic opaque strip assembler that consumes fixture-only control/X/Y/color vertex packets, and mixed-color Gouraud strip assembly for matching headers.
 - Add fixture expectations for PVR state. Started: manifests can assert current named PVR register values, RGB565 sentinel samples, TA command/list counts, and assembled TA strip matches.
 - Add fixture expectations for AICA state. Started: manifests can assert current named register values plus decoded channel control, sample, loop, pitch, pan, volume, and key-on fields.
 - Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, current named register values, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
 
 ## Milestone 6: Media And Broader Compatibility
 
-- Parse legal/local media formats.
-- Add GD-ROM sector read behavior.
+- Parse legal/local media formats. Started: raw 2048-byte data, 2352-byte CD-sector payload extraction, simple CUE data-track selection, and GDI data-track mapping by absolute LBA.
+- Add GD-ROM sector read behavior. Started: firmware GD-ROM HLE can read sectors from the loaded media image into system RAM.
 - Run public redistributable demos and user-provided local images through the artifact pipeline.

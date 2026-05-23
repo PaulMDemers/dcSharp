@@ -177,7 +177,7 @@ Current state:
 - Structured run summaries include aggregate device-access counts by domain and access kind, plus recent access details.
 - ASIC event ACK registers, IRQ masks, pending masks, and deliverable ASIC interrupt event/level/source bit are captured in run summaries.
 - Current PVR register values, PVR register writes, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in the video summary with SDK-aligned names and first-pass TA command classification.
-- A tiny fixture-backed PVR preview raster path turns one assembled opaque TA polygon strip into RGB565 VRAM samples; this is not a general renderer yet.
+- A tiny fixture-backed PVR preview raster path turns assembled opaque TA polygon strips into RGB565 VRAM samples, including flat color, Gouraud vertex color interpolation, depth checks, alpha blending, and selected RGB565/ARGB texture sampling behavior; this is not a general renderer yet.
 - Current AICA register values, register writes, sound RAM changes, and decoded channel state are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, idle advance batches, idle wake reasons, CPU fast-forward batches, and controller script changes.
@@ -189,12 +189,14 @@ Current state:
 - The idle fixtures pin all current scheduler wake reasons: timer, VBlank, and input-script changes.
 - The framebuffer fixture writes a 320x240 RGB565 pattern and exposes it through VRAM diagnostics.
 - The CLI can emit structured JSON summaries for fixture regression checks and tooling.
+- Legal/local media loading supports raw 2048-byte sector data, 2352-byte CD-sector payload extraction, simple CUE data-track selection, and GDI data tracks mapped by absolute LBA.
+- The WinForms desktop workbench can run selected ELF/media pairs, show serial/trace/device diagnostics, preview RGB565 VRAM, and derive framebuffer dimensions from `PVR_FB_SIZE` when a program configures it.
 
 Next targets:
 
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
-- Replace the diagnostic fixture-only vertex packet with real PVR vertex parameter payload decoding.
+- Expand real PVR vertex parameter payload coverage beyond the current packed-color fixture shape.
 - Start moving from diagnostic AICA state toward silence-safe sample playback timing.
 
 ## Development Bias

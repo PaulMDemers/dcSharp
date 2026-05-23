@@ -97,6 +97,7 @@ Useful run options:
 - `--controller-a-script "0:none;200000:start,a"` is a compatibility shorthand for A0 scripts.
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
+- `--media path` accepts raw 2048-byte sector images, 2352-byte CD-sector dumps, simple CUE sheets, and GDI descriptors with local data tracks.
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
