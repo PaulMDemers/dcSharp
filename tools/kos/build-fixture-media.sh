@@ -123,7 +123,29 @@ gdi_path.write_text(
     '1\n'
     '3 45000 4 2048 dcsharp_gdrom_track03.bin 0\n',
     encoding='ascii')
+
+multi_track03 = bytearray(2 * SECTOR_SIZE)
+multi_track03[0:4] = b"MTK3"
+multi_track04 = bytearray(track)
+multi_track04[0:4] = b"MTK4"
+multi_track04[32:36] = b"DCSH"
+
+multi_track03_path = media_dir / "dcsharp_gdrom_multitrack_track03.bin"
+multi_track04_path = media_dir / "dcsharp_gdrom_multitrack_track04.bin"
+multi_gdi_path = media_dir / "dcsharp_gdrom_multitrack.gdi"
+multi_track03_path.write_bytes(multi_track03)
+multi_track04_path.write_bytes(multi_track04)
+multi_gdi_path.write_text(
+    '2\n'
+    '3 45000 4 2048 dcsharp_gdrom_multitrack_track03.bin 0\n'
+    '4 45150 4 2048 dcsharp_gdrom_multitrack_track04.bin 0\n',
+    encoding='ascii')
 PY
 
 echo "Built fixture media:"
-printf '%s\n' "$media_dir/dcsharp_gdrom.gdi" "$media_dir/dcsharp_gdrom_track03.bin"
+printf '%s\n' \
+  "$media_dir/dcsharp_gdrom.gdi" \
+  "$media_dir/dcsharp_gdrom_track03.bin" \
+  "$media_dir/dcsharp_gdrom_multitrack.gdi" \
+  "$media_dir/dcsharp_gdrom_multitrack_track03.bin" \
+  "$media_dir/dcsharp_gdrom_multitrack_track04.bin"

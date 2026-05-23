@@ -653,7 +653,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, null, null, [], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], []),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -819,6 +819,9 @@ public class DreamcastFixtureRunnerTests
             true,
             2048,
             45001,
+            0x0000_AFC9,
+            "0x0000AFC9",
+            [new DreamcastMediaTrackSummary(3, 0x0000_AFC8, "0x0000AFC8", 4, 1)],
             1,
             1,
             0,

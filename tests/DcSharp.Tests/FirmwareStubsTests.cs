@@ -100,6 +100,37 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void GdromGetToc2WritesMultipleDataTracks()
+    {
+        var media = new GdiMediaImage(
+        [
+            new GdiMediaTrack(3, 45_000, 2048, 0, CreateMediaData(2)),
+            new GdiMediaTrack(4, 45_150, 2048, 0, CreateMediaData(3))
+        ]);
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(ParameterAddress, 0);
+        memory.WriteUInt32(ParameterAddress + 4, TocAddress);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        var response = CheckGdromCommand(handler, memory, commandId);
+        var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
+
+        Assert.Equal(GdromCompleted, response);
+        Assert.Equal(0x4000_AFC8u, memory.ReadUInt32(TocAddress + 8));
+        Assert.Equal(0x4000_B05Eu, memory.ReadUInt32(TocAddress + 12));
+        Assert.Equal(3u, (memory.ReadUInt32(TocAddress + 396) >> 16) & 0xFF);
+        Assert.Equal(4u, (memory.ReadUInt32(TocAddress + 400) >> 16) & 0xFF);
+        Assert.Equal(0x0000_B061u, memory.ReadUInt32(TocAddress + 404));
+        Assert.True(toc.Success);
+        Assert.Equal(3, toc.FirstTrack);
+        Assert.Equal(4, toc.LastTrack);
+        Assert.Equal(0x0000_B05Eu, toc.DataTrackStartFad);
+        Assert.Equal(0x0000_B061u, toc.LeadoutFad);
+        Assert.Equal("TOC written", toc.Status);
+    }
+
+    [Fact]
     public void GdromGetToc2FailsWhenNoMediaIsLoaded()
     {
         var memory = new DreamcastMemory();

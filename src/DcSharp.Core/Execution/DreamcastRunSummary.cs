@@ -921,6 +921,9 @@ public sealed record DreamcastGdromSummary(
     bool HasMedia,
     int? SectorSize,
     ulong? SectorCount,
+    uint? LeadoutFad,
+    string? LeadoutFadHex,
+    IReadOnlyList<DreamcastMediaTrackSummary> MediaTracks,
     int ReadCommandCount,
     int SuccessfulReadCommandCount,
     int FailedReadCommandCount,
@@ -944,6 +947,9 @@ public sealed record DreamcastGdromSummary(
             snapshot.HasMedia,
             snapshot.SectorSize,
             snapshot.SectorCount,
+            snapshot.LeadoutFad,
+            snapshot.LeadoutFadHex,
+            snapshot.MediaTracks.Select(DreamcastMediaTrackSummary.FromTrack).ToArray(),
             snapshot.ReadCommands.Count,
             snapshot.ReadCommands.Count(command => command.Success),
             snapshot.ReadCommands.Count(command => !command.Success),
@@ -961,6 +967,17 @@ public sealed record DreamcastGdromSummary(
             snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray(),
             snapshot.StatusCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromStatusCommandSummary.FromCommand).ToArray(),
             snapshot.SectorModeCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromSectorModeCommandSummary.FromCommand).ToArray());
+}
+
+public sealed record DreamcastMediaTrackSummary(
+    int TrackNumber,
+    uint StartFad,
+    string StartFadHex,
+    int Control,
+    ulong SectorCount)
+{
+    public static DreamcastMediaTrackSummary FromTrack(DreamcastMediaTrackInfo track) =>
+        new(track.TrackNumber, track.StartFad, track.StartFadHex, track.Control, track.SectorCount);
 }
 
 public sealed record DreamcastGdromReadCommandSummary(

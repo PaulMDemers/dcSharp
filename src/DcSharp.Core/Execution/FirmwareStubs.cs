@@ -34,7 +34,6 @@ internal static class FirmwareStubs
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
         private const uint GdromCommandGetToc2 = 19;
-        private const uint GdromDataTrackStartFad = 45_000;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
@@ -147,22 +146,28 @@ internal static class FirmwareStubs
                 memory.WriteUInt32(buffer + ((uint)i * 4), 0);
             }
 
-            var leadoutFad = CalculateLeadoutFad(snapshot.SectorCount ?? 0);
-            memory.WriteUInt32(buffer + 8, PackTocEntry(4, GdromDataTrackStartFad));
-            memory.WriteUInt32(buffer + 396, 3u << 16);
-            memory.WriteUInt32(buffer + 400, 3u << 16);
+            var firstTrack = snapshot.MediaTracks.Min(track => track.TrackNumber);
+            var lastTrack = snapshot.MediaTracks.Max(track => track.TrackNumber);
+            var dataTrackStartFad = snapshot.MediaTracks
+                .Where(track => track.Control == 4)
+                .OrderBy(track => track.TrackNumber)
+                .Last()
+                .StartFad;
+            var leadoutFad = snapshot.LeadoutFad ?? 0;
+            foreach (var track in snapshot.MediaTracks.Where(track => track.TrackNumber is >= 1 and <= 99))
+            {
+                memory.WriteUInt32(buffer + ((uint)(track.TrackNumber - 1) * 4), PackTocEntry((uint)track.Control, track.StartFad));
+            }
+
+            memory.WriteUInt32(buffer + 396, (uint)firstTrack << 16);
+            memory.WriteUInt32(buffer + 400, (uint)lastTrack << 16);
             memory.WriteUInt32(buffer + 404, PackTocEntry(0, leadoutFad));
-            memory.RecordGdromTocCommand(parameters, buffer, 3, 3, GdromDataTrackStartFad, leadoutFad, true, "TOC written");
+            memory.RecordGdromTocCommand(parameters, buffer, firstTrack, lastTrack, dataTrackStartFad, leadoutFad, true, "TOC written");
             return GdromQueuedCommand.Completed(0, 0, 0, 0);
         }
 
         private static uint PackTocEntry(uint control, uint fad) =>
             ((control & 0xFu) << 28) | (fad & 0x00FF_FFFFu);
-
-        private static uint CalculateLeadoutFad(ulong sectorCount) =>
-            sectorCount > GdromDataTrackStartFad
-                ? (uint)Math.Min(sectorCount, uint.MaxValue)
-                : GdromDataTrackStartFad + (uint)Math.Min(sectorCount, uint.MaxValue - GdromDataTrackStartFad);
 
         private uint CheckCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {

@@ -202,6 +202,11 @@ public class DreamcastMediaImageLoaderTests
 
             Assert.Equal(2048, media.SectorSize);
             Assert.Equal(45002ul, media.SectorCount);
+            Assert.Equal(45002u, media.LeadoutFad);
+            var track = Assert.Single(media.Tracks);
+            Assert.Equal(3, track.TrackNumber);
+            Assert.Equal(45000u, track.StartFad);
+            Assert.Equal(2ul, track.SectorCount);
 
             Span<byte> sector = stackalloc byte[2048];
             Assert.False(media.TryReadSector(44999, sector, out var bytesRead));
@@ -216,6 +221,68 @@ public class DreamcastMediaImageLoaderTests
             Assert.Equal(2048, bytesRead);
             Assert.Equal(0xB0, sector[0]);
             Assert.Equal(0xB1, sector[1]);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadFromGdiMapsMultipleDataTracksByAbsoluteFad()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var track3Path = Path.Combine(tempRoot, "track03.bin");
+        var track4Path = Path.Combine(tempRoot, "track04.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            File.WriteAllBytes(track3Path, Create2048Sector([0x33]).Concat(Create2048Sector([0x34])).ToArray());
+            File.WriteAllBytes(track4Path, Create2048Sector([0x44]).Concat(Create2048Sector([0x45])).ToArray());
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                2
+                3 45000 4 2048 {{Path.GetFileName(track3Path)}} 0
+                4 45150 4 2048 {{Path.GetFileName(track4Path)}} 0
+                """);
+
+            var media = DreamcastMediaImageLoader.LoadFromFile(gdiPath);
+
+            Assert.Equal(45152ul, media.SectorCount);
+            Assert.Equal(45152u, media.LeadoutFad);
+            Assert.Collection(
+                media.Tracks,
+                track =>
+                {
+                    Assert.Equal(3, track.TrackNumber);
+                    Assert.Equal(45000u, track.StartFad);
+                    Assert.Equal(2ul, track.SectorCount);
+                },
+                track =>
+                {
+                    Assert.Equal(4, track.TrackNumber);
+                    Assert.Equal(45150u, track.StartFad);
+                    Assert.Equal(2ul, track.SectorCount);
+                });
+
+            Span<byte> sector = stackalloc byte[2048];
+            Assert.True(media.TryReadSector(45000, sector, out var bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x33, sector[0]);
+
+            Assert.False(media.TryReadSector(45002, sector, out bytesRead));
+            Assert.Equal(0, bytesRead);
+
+            Assert.True(media.TryReadSector(45150, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x44, sector[0]);
+
+            Assert.True(media.TryReadSector(45151, sector, out bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x45, sector[0]);
         }
         finally
         {

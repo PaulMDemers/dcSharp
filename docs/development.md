@@ -40,6 +40,7 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_status_no_media
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_toc_no_media
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_out_of_range
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_raw_multisector
+wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_multitrack_toc_read
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_file
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_missing_file
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_dir
@@ -132,7 +133,7 @@ Run summaries also include scheduler diagnostics for synthetic VBlank events, ha
 
 Structured run summaries include aggregate device-access counts by domain and access kind, plus recent device accesses. Device domains currently include `pvr`, `aica`, `maple`, `asic`, `holly`, `scif`, `tmu`, `sh4`, `unmapped`, and `other`.
 
-GD-ROM summaries include whether media is loaded, media sector size/count, aggregate read command counts, successful/failed counts, total bytes read, and recent firmware read requests with parameter address, LBA, sector count, destination, bytes requested/read, success, and status text, plus recent TOC requests with buffer address, first/last track, data-track FAD, leadout FAD, success, and status text. The firmware syscall HLE also tracks queued command ids, reports completed reads with transferred byte counts, records `CMD_GETTOC2` diagnostics, and maps no-media read failures into the status word KOS uses for `ERR_NO_DISC`. These diagnostics are shown in CLI fixture output and the desktop GD-ROM diagnostics tab.
+GD-ROM summaries include whether media is loaded, media sector size/count, leadout FAD, loaded track mappings, aggregate read command counts, successful/failed counts, total bytes read, and recent firmware read requests with parameter address, LBA, sector count, destination, bytes requested/read, success, and status text, plus recent TOC requests with buffer address, first/last track, data-track FAD, leadout FAD, success, and status text. The firmware syscall HLE also tracks queued command ids, reports completed reads with transferred byte counts, records `CMD_GETTOC2` diagnostics, and maps no-media read failures into the status word KOS uses for `ERR_NO_DISC`. These diagnostics are shown in CLI fixture output and the desktop GD-ROM diagnostics tab.
 
 ASIC summaries include current event ACK registers, IRQ9/IRQB/IRQD masks, per-level pending masks, and the currently deliverable ASIC interrupt event/level/source bit. Unit tests cover A/B/C event-bank source decoding and independent ACK clearing.
 
@@ -192,6 +193,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_gdrom_toc_no_media.elf`: attempts `cdrom_read_toc()` without loaded media, observes the KOS-visible failure, verifies the TOC buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_out_of_range.elf`: attempts a raw `cdrom_read_sectors()` call past the generated media leadout, observes the KOS-visible failure, verifies the destination buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_raw_multisector.elf`: reads three contiguous sectors from generated local GDI media with one `cdrom_read_sectors()` call, verifies `BIG.BIN` bytes and zero padding, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_multitrack_toc_read.elf`: reads the TOC from generated two-track local GDI media, discovers the last data track through `cdrom_locate_data_track()`, reads its sentinel sector at FAD 45150, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_file.elf`: opens `/cd/README.TXT` from the generated local ISO9660-in-GDI media, reads the file text through KOS `fs_iso9660`, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_missing_file.elf`: attempts to open a missing `/cd/MISSING.TXT`, observes the expected VFS failure, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_dir.elf`: enumerates `/cd`, observes `readme.txt` and `data` through KOS `fs_iso9660` directory traversal, shuts down, and reports `ProgramExit`.

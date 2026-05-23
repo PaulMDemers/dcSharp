@@ -281,6 +281,45 @@
       }
     },
     {
+      "name": "gdrom_multitrack_toc_read",
+      "sample": "samples/kos/gdrom_multitrack_toc_read",
+      "artifact": "dcsharp_gdrom_multitrack_toc_read.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom_multitrack.gdi",
+      "instructions": 90000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM multitrack toc=0 read=0 first=3 last=4 located=45150 leadout=45170 sentinel=4d544b34",
+        "dcSharp GD-ROM multitrack probe done"
+      ],
+      "minGdromTocCommands": 1,
+      "minGdromReadCommands": 1,
+      "minGdromBytesRead": 2048,
+      "gdromTocs": [
+        {
+          "firstTrack": 3,
+          "lastTrack": 4,
+          "dataTrackStartFad": "0x0000B05E",
+          "leadoutFad": "0x0000B072",
+          "success": true,
+          "status": "TOC written"
+        }
+      ],
+      "gdromReads": [
+        {
+          "sector": "0x0000B05E",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_file",
       "sample": "samples/kos/gdrom_file",
       "artifact": "dcsharp_gdrom_file.elf",

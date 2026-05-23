@@ -174,7 +174,7 @@ static void RunElf(string path, string[] args)
 
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
-    Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, sectorSize={gdrom.SectorSize?.ToString(CultureInfo.InvariantCulture) ?? "none"}, sectors={gdrom.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, bytes={gdrom.ReadCommands.Sum(command => command.BytesRead)}, tocs={gdrom.TocCommands.Count}");
+    Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, sectorSize={gdrom.SectorSize?.ToString(CultureInfo.InvariantCulture) ?? "none"}, sectors={gdrom.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, leadout={gdrom.LeadoutFadHex ?? "none"}, tracks={gdrom.MediaTracks.Count}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, bytes={gdrom.ReadCommands.Sum(command => command.BytesRead)}, tocs={gdrom.TocCommands.Count}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, idleTicks={result.Scheduler.IdleAdvanceTicks}, idleBatches={result.Scheduler.IdleAdvanceBatches}, maxIdleBatch={result.Scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{result.Scheduler.IdleTimerWakeCount}/vblank:{result.Scheduler.IdleVBlankWakeCount}/input:{result.Scheduler.IdleInputWakeCount}, cpuFastForward={result.Scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={result.Scheduler.CpuFastForwardBatches}, maxCpuFastForward={result.Scheduler.MaxCpuFastForwardBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
     var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
         ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
@@ -225,6 +225,11 @@ static void RunElf(string path, string[] args)
     foreach (var read in gdrom.ReadCommands.TakeLast(8))
     {
         Console.WriteLine($"  GD-ROM read: sector={read.SectorHex ?? "none"}, count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, dest={read.DestinationHex ?? "none"}, bytes={read.BytesRead}/{read.BytesRequested}, ok={read.Success}, status={read.Status}");
+    }
+
+    foreach (var track in gdrom.MediaTracks)
+    {
+        Console.WriteLine($"  GD-ROM track: number={track.TrackNumber}, start={track.StartFadHex}, control={track.Control}, sectors={track.SectorCount}");
     }
 
     foreach (var toc in gdrom.TocCommands.TakeLast(4))
@@ -410,6 +415,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Gdrom.RecentSectorModeCommands.Count > 0)
                 {
                     Console.WriteLine($"  gdromSectorModes={FormatGdromSectorModes(result.Summary.Gdrom.RecentSectorModeCommands)}");
+                }
+
+                if (result.Summary.Gdrom.MediaTracks.Count > 0)
+                {
+                    Console.WriteLine($"  gdromTracks={FormatGdromTracks(result.Summary.Gdrom.MediaTracks)}");
                 }
             }
 
@@ -808,6 +818,10 @@ static string FormatGdromStatuses(IReadOnlyList<DreamcastGdromStatusCommandSumma
 static string FormatGdromSectorModes(IReadOnlyList<DreamcastGdromSectorModeCommandSummary> modes) =>
     string.Join(", ", modes.Select(mode =>
         $"params={mode.ParameterAddressHex} request={mode.Request}/{mode.RequestName} part={mode.SectorPartHex} cdxa={mode.CdXa} size={mode.SectorSize} ok={mode.Success} status={mode.Status}"));
+
+static string FormatGdromTracks(IReadOnlyList<DreamcastMediaTrackSummary> tracks) =>
+    string.Join(", ", tracks.Select(track =>
+        $"track={track.TrackNumber} start={track.StartFadHex} control={track.Control} sectors={track.SectorCount}"));
 
 static string FormatFloat(float value) =>
     value.ToString("0.###", CultureInfo.InvariantCulture);

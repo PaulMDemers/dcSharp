@@ -409,7 +409,7 @@ internal sealed class MainForm : Form
             $"PVR: registers={summary.Video.PvrRegisterAccessCount:N0}, taWrites={summary.Video.PvrTaCommandWriteCount:N0}, strips={summary.Video.PvrTaStrips.Count:N0}",
             $"AICA: registers={summary.Audio.RegisterAccessCount:N0}, channels={summary.Audio.Channels.Count:N0}, active={summary.Audio.ActiveChannelCount:N0}",
             $"Maple: transfers={summary.Maple.TransferCount:N0}, dmaBatches={summary.Maple.DmaBatchCount:N0}",
-            $"GD-ROM: media={summary.Gdrom.HasMedia}, statuses={summary.Gdrom.StatusCommandCount:N0}, modes={summary.Gdrom.SectorModeCommandCount:N0}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
+            $"GD-ROM: media={summary.Gdrom.HasMedia}, tracks={summary.Gdrom.MediaTracks.Count:N0}, statuses={summary.Gdrom.StatusCommandCount:N0}, modes={summary.Gdrom.SectorModeCommandCount:N0}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
             $"Scheduler: vblanks={summary.Scheduler.VBlankEventsRaised:N0}, hardwareTicks={summary.Scheduler.HardwareAdvanceTicks:N0}, fastForward={summary.Scheduler.CpuFastForwardInstructions:N0}"
         };
 
@@ -473,6 +473,7 @@ internal sealed class MainForm : Form
             $"  Loaded: {gdrom.HasMedia}",
             $"  Sector size: {gdrom.SectorSize?.ToString("N0") ?? "none"}",
             $"  Sectors: {gdrom.SectorCount?.ToString("N0") ?? "none"}",
+            $"  Leadout: {gdrom.LeadoutFadHex ?? "none"}",
             "",
             "Command totals:",
             $"  Reads: {gdrom.ReadCommandCount:N0}",
@@ -483,6 +484,17 @@ internal sealed class MainForm : Form
             $"  Status probes: {gdrom.StatusCommandCount:N0}",
             $"  Sector modes: {gdrom.SectorModeCommandCount:N0}"
         };
+
+        lines.Add("");
+        lines.Add("Tracks:");
+        if (gdrom.MediaTracks.Count == 0)
+        {
+            lines.Add("  none");
+        }
+        else
+        {
+            lines.AddRange(gdrom.MediaTracks.Select(FormatGdromTrack));
+        }
 
         lines.Add("");
         lines.Add("Recent reads:");
@@ -559,6 +571,9 @@ internal sealed class MainForm : Form
         var outcome = mode.Success ? "OK  " : "FAIL";
         return $"  [{outcome}] params={mode.ParameterAddressHex} request={mode.Request}/{mode.RequestName} part={mode.SectorPartHex} cdxa={mode.CdXa} size={mode.SectorSize} status={mode.Status}";
     }
+
+    private static string FormatGdromTrack(DreamcastMediaTrackSummary track) =>
+        $"  track={track.TrackNumber} start={track.StartFadHex} control={track.Control} sectors={track.SectorCount:N0}";
 
     private static string DisplayPath(string path) =>
         string.IsNullOrWhiteSpace(path) ? "<none>" : path;

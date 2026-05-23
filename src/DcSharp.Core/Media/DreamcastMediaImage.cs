@@ -7,7 +7,20 @@ public interface IDreamcastMediaImage
 {
     int SectorSize { get; }
     ulong SectorCount { get; }
+    uint LeadoutFad { get; }
+    IReadOnlyList<DreamcastMediaTrackInfo> Tracks { get; }
     bool TryReadSector(uint sector, Span<byte> destination, out int bytesRead);
+}
+
+public sealed record DreamcastMediaTrackInfo(
+    int TrackNumber,
+    uint StartFad,
+    string StartFadHex,
+    int Control,
+    ulong SectorCount)
+{
+    public static DreamcastMediaTrackInfo Data(int trackNumber, uint startFad, ulong sectorCount) =>
+        new(trackNumber, startFad, $"0x{startFad:X8}", 4, sectorCount);
 }
 
 public static class DreamcastMediaImageLoader
@@ -208,7 +221,8 @@ public static class DreamcastMediaImageLoader
                 return false;
             }
 
-            if (!uint.TryParse(tokens[1], out var startLba)
+            if (!int.TryParse(tokens[0], out var trackNumber)
+                || !uint.TryParse(tokens[1], out var startLba)
                 || !int.TryParse(tokens[2], out var flags)
                 || !int.TryParse(tokens[3], out var sourceSectorSize)
                 || !long.TryParse(tokens[5], out var fileOffset))
@@ -252,7 +266,7 @@ public static class DreamcastMediaImageLoader
                 return false;
             }
 
-            tracks.Add(new GdiMediaTrack(startLba, sourceSectorSize, fileOffset, data));
+            tracks.Add(new GdiMediaTrack(trackNumber, startLba, sourceSectorSize, fileOffset, data));
         }
 
         if (tracks.Count == 0)
@@ -276,6 +290,8 @@ public static class DreamcastMediaImageLoader
 
 public sealed class RawSectorMediaImage : IDreamcastMediaImage
 {
+    private const uint DefaultDataTrackStartFad = 45_000;
+
     private readonly byte[] data;
     private readonly int sectorSize;
 
@@ -287,6 +303,8 @@ public sealed class RawSectorMediaImage : IDreamcastMediaImage
 
     public int SectorSize => sectorSize;
     public ulong SectorCount => (ulong)data.Length / (uint)sectorSize;
+    public uint LeadoutFad => DefaultDataTrackStartFad + (uint)Math.Min(SectorCount, uint.MaxValue - DefaultDataTrackStartFad);
+    public IReadOnlyList<DreamcastMediaTrackInfo> Tracks => [DreamcastMediaTrackInfo.Data(3, DefaultDataTrackStartFad, SectorCount)];
 
     public bool TryReadSector(uint sector, Span<byte> destination, out int bytesRead)
     {
@@ -310,12 +328,15 @@ public sealed class RawSectorMediaImage : IDreamcastMediaImage
 
 public sealed class RawSectorFromCdImage(byte[] data) : IDreamcastMediaImage
 {
+    private const uint DefaultDataTrackStartFad = 45_000;
     private const int UserDataBytes = 2048;
     private const int CdSectorSize = 2352;
     private const int CdSectorPayloadOffset = 16;
 
     public int SectorSize => UserDataBytes;
     public ulong SectorCount => (ulong)data.Length / CdSectorSize;
+    public uint LeadoutFad => DefaultDataTrackStartFad + (uint)Math.Min(SectorCount, uint.MaxValue - DefaultDataTrackStartFad);
+    public IReadOnlyList<DreamcastMediaTrackInfo> Tracks => [DreamcastMediaTrackInfo.Data(3, DefaultDataTrackStartFad, SectorCount)];
 
     public bool TryReadSector(uint sector, Span<byte> destination, out int bytesRead)
     {
@@ -354,6 +375,10 @@ public sealed class GdiMediaImage : IDreamcastMediaImage
     public int SectorSize => DreamcastMediaImageLoader.DefaultSectorSize;
 
     public ulong SectorCount => tracks.Max(track => (ulong)track.StartLba + track.SectorCount);
+    public uint LeadoutFad => (uint)Math.Min(SectorCount, uint.MaxValue);
+    public IReadOnlyList<DreamcastMediaTrackInfo> Tracks => tracks
+        .Select(track => DreamcastMediaTrackInfo.Data(track.TrackNumber, track.StartLba, track.SectorCount))
+        .ToArray();
 
     public bool TryReadSector(uint sector, Span<byte> destination, out int bytesRead)
     {
@@ -379,7 +404,7 @@ public sealed class GdiMediaTrack
     private readonly long fileOffset;
     private readonly int payloadOffset;
 
-    public GdiMediaTrack(uint startLba, int sourceSectorSize, long fileOffset, byte[] data)
+    public GdiMediaTrack(int trackNumber, uint startLba, int sourceSectorSize, long fileOffset, byte[] data)
     {
         if (sourceSectorSize is not DreamcastMediaImageLoader.DefaultSectorSize and not 2352)
         {
@@ -391,6 +416,7 @@ public sealed class GdiMediaTrack
             throw new ArgumentOutOfRangeException(nameof(fileOffset), fileOffset, "File offset must point inside the track data.");
         }
 
+        TrackNumber = trackNumber;
         StartLba = startLba;
         SourceSectorSize = sourceSectorSize;
         this.fileOffset = fileOffset;
@@ -399,6 +425,8 @@ public sealed class GdiMediaTrack
     }
 
     public uint StartLba { get; }
+
+    public int TrackNumber { get; }
 
     public int SourceSectorSize { get; }
 
