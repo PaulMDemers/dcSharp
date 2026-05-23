@@ -95,6 +95,28 @@
       }
     },
     {
+      "name": "gdrom_toc_no_media",
+      "sample": "samples/kos/gdrom_toc_no_media",
+      "artifact": "dcsharp_gdrom_toc_no_media.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM TOC no media status=1 unchanged=102 words=102 first=0xa5a5a5a5 leadout=0xa5a5a5a5",
+        "dcSharp GD-ROM TOC no media probe done"
+      ],
+      "minGdromTocCommands": 1,
+      "gdromTocs": [
+        {
+          "success": false,
+          "status": "no media image loaded"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_out_of_range",
       "sample": "samples/kos/gdrom_out_of_range",
       "artifact": "dcsharp_gdrom_out_of_range.elf",
