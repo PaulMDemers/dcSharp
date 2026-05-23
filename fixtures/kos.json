@@ -123,6 +123,34 @@
       }
     },
     {
+      "name": "gdrom_sector_mode",
+      "sample": "samples/kos/gdrom_sector_mode",
+      "artifact": "dcsharp_gdrom_sector_mode.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM sector mode rv=0 part=0x2000 cdxa=2048 size=2048",
+        "dcSharp GD-ROM sector mode probe done"
+      ],
+      "minGdromSectorModeCommands": 1,
+      "gdromSectorModes": [
+        {
+          "request": 0,
+          "requestName": "set",
+          "sectorPart": "0x00002000",
+          "cdXa": 2048,
+          "sectorSize": 2048,
+          "success": true,
+          "status": "sector mode set"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_no_media",
       "sample": "samples/kos/gdrom_no_media",
       "artifact": "dcsharp_gdrom_no_media.elf",

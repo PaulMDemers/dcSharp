@@ -931,9 +931,13 @@ public sealed record DreamcastGdromSummary(
     int StatusCommandCount,
     int SuccessfulStatusCommandCount,
     int FailedStatusCommandCount,
+    int SectorModeCommandCount,
+    int SuccessfulSectorModeCommandCount,
+    int FailedSectorModeCommandCount,
     IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands,
     IReadOnlyList<DreamcastGdromTocCommandSummary> RecentTocCommands,
-    IReadOnlyList<DreamcastGdromStatusCommandSummary> RecentStatusCommands)
+    IReadOnlyList<DreamcastGdromStatusCommandSummary> RecentStatusCommands,
+    IReadOnlyList<DreamcastGdromSectorModeCommandSummary> RecentSectorModeCommands)
 {
     public static DreamcastGdromSummary FromSnapshot(DreamcastGdromSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -950,9 +954,13 @@ public sealed record DreamcastGdromSummary(
             snapshot.StatusCommands.Count,
             snapshot.StatusCommands.Count(command => command.Success),
             snapshot.StatusCommands.Count(command => !command.Success),
+            snapshot.SectorModeCommands.Count,
+            snapshot.SectorModeCommands.Count(command => command.Success),
+            snapshot.SectorModeCommands.Count(command => !command.Success),
             snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray(),
             snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray(),
-            snapshot.StatusCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromStatusCommandSummary.FromCommand).ToArray());
+            snapshot.StatusCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromStatusCommandSummary.FromCommand).ToArray(),
+            snapshot.SectorModeCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromSectorModeCommandSummary.FromCommand).ToArray());
 }
 
 public sealed record DreamcastGdromReadCommandSummary(
@@ -1033,6 +1041,32 @@ public sealed record DreamcastGdromStatusCommandSummary(
             command.StatusName,
             command.DiscType,
             command.DiscTypeName,
+            command.Success,
+            command.Status);
+}
+
+public sealed record DreamcastGdromSectorModeCommandSummary(
+    uint ParameterAddress,
+    string ParameterAddressHex,
+    int Request,
+    string RequestName,
+    int SectorPart,
+    string SectorPartHex,
+    int CdXa,
+    int SectorSize,
+    bool Success,
+    string Status)
+{
+    public static DreamcastGdromSectorModeCommandSummary FromCommand(DreamcastGdromSectorModeCommand command) =>
+        new(
+            command.ParameterAddress,
+            command.ParameterAddressHex,
+            command.Request,
+            command.RequestName,
+            command.SectorPart,
+            command.SectorPartHex,
+            command.CdXa,
+            command.SectorSize,
             command.Success,
             command.Status);
 }

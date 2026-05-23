@@ -59,6 +59,7 @@ public sealed class DreamcastFixtureDefinition
     public bool RequireNoMapleDescriptorLimitHits { get; set; }
     public int? MinGdromTocCommands { get; set; }
     public int? MinGdromStatusCommands { get; set; }
+    public int? MinGdromSectorModeCommands { get; set; }
     public int? MinGdromReadCommands { get; set; }
     public int? MinGdromBytesRead { get; set; }
     public ulong? MinVblankEvents { get; set; }
@@ -91,6 +92,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
     public List<DreamcastFixtureGdromTocExpectation> GdromTocs { get; set; } = [];
     public List<DreamcastFixtureGdromStatusExpectation> GdromStatuses { get; set; } = [];
+    public List<DreamcastFixtureGdromSectorModeExpectation> GdromSectorModes { get; set; } = [];
     public List<DreamcastFixtureGdromReadExpectation> GdromReads { get; set; } = [];
 
     internal void Validate()
@@ -159,6 +161,19 @@ public sealed class DreamcastFixtureGdromStatusExpectation
     public string? StatusName { get; set; }
     public int? DiscType { get; set; }
     public string? DiscTypeName { get; set; }
+    public bool? Success { get; set; }
+    public string? Status { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixtureGdromSectorModeExpectation
+{
+    public string? Parameters { get; set; }
+    public int? Request { get; set; }
+    public string? RequestName { get; set; }
+    public string? SectorPart { get; set; }
+    public int? CdXa { get; set; }
+    public int? SectorSize { get; set; }
     public bool? Success { get; set; }
     public string? Status { get; set; }
     public int MinCount { get; set; } = 1;

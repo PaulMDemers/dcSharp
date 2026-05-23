@@ -240,6 +240,19 @@ public class DreamcastFixtureRunnerTests
                     Status = "drive status reported"
                 }
             ],
+            GdromSectorModes =
+            [
+                new DreamcastFixtureGdromSectorModeExpectation
+                {
+                    Request = 0,
+                    RequestName = "set",
+                    SectorPart = "0x00002000",
+                    CdXa = 2048,
+                    SectorSize = 2048,
+                    Success = true,
+                    Status = "sector mode set"
+                }
+            ],
             GdromReads =
             [
                 new DreamcastFixtureGdromReadExpectation
@@ -640,7 +653,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], []),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -816,6 +829,9 @@ public class DreamcastFixtureRunnerTests
             1,
             1,
             0,
+            1,
+            1,
+            0,
             [
                 new DreamcastGdromReadCommandSummary(
                     0x8C01_0000,
@@ -856,6 +872,19 @@ public class DreamcastFixtureRunnerTests
                     "CD-ROM XA",
                     true,
                     "drive status reported")
+            ],
+            [
+                new DreamcastGdromSectorModeCommandSummary(
+                    0x8C01_0400,
+                    "0x8C010400",
+                    0,
+                    "set",
+                    0x2000,
+                    "0x00002000",
+                    2048,
+                    2048,
+                    true,
+                    "sector mode set")
             ]);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(

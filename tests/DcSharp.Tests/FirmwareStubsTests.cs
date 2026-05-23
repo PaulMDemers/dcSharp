@@ -12,6 +12,7 @@ public class FirmwareStubsTests
     private const uint GdromCheckCommand = 1;
     private const uint GdromAbortCommand = 3;
     private const uint GdromCheckDrive = 4;
+    private const uint GdromSectorMode = 10;
     private const uint GdromCommandPioRead = 16;
     private const uint GdromCommandGetToc2 = 19;
     private const uint GdromCommandNop = 29;
@@ -154,6 +155,53 @@ public class FirmwareStubsTests
         Assert.True(status.Success);
     }
 
+    [Fact]
+    public void GdromSectorModeRecordsSetParameters()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(ParameterAddress, 0);
+        memory.WriteUInt32(ParameterAddress + 4, 0x2000);
+        memory.WriteUInt32(ParameterAddress + 8, 2048);
+        memory.WriteUInt32(ParameterAddress + 12, 2048);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var response = SectorMode(handler, memory);
+        var mode = Assert.Single(memory.CreateGdromSnapshot().SectorModeCommands);
+
+        Assert.Equal(0u, response);
+        Assert.Equal(0, mode.Request);
+        Assert.Equal("set", mode.RequestName);
+        Assert.Equal(0x2000, mode.SectorPart);
+        Assert.Equal(2048, mode.CdXa);
+        Assert.Equal(2048, mode.SectorSize);
+        Assert.True(mode.Success);
+        Assert.Equal("sector mode set", mode.Status);
+    }
+
+    [Fact]
+    public void GdromSectorModeReportsCurrentDefaults()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(ParameterAddress, 1);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var response = SectorMode(handler, memory);
+        var mode = Assert.Single(memory.CreateGdromSnapshot().SectorModeCommands);
+
+        Assert.Equal(0u, response);
+        Assert.Equal(1u, memory.ReadUInt32(ParameterAddress));
+        Assert.Equal(0x2000u, memory.ReadUInt32(ParameterAddress + 4));
+        Assert.Equal(2048u, memory.ReadUInt32(ParameterAddress + 8));
+        Assert.Equal(2048u, memory.ReadUInt32(ParameterAddress + 12));
+        Assert.Equal(1, mode.Request);
+        Assert.Equal("get", mode.RequestName);
+        Assert.Equal(0x2000, mode.SectorPart);
+        Assert.Equal(2048, mode.CdXa);
+        Assert.Equal(2048, mode.SectorSize);
+        Assert.True(mode.Success);
+        Assert.Equal("sector mode reported", mode.Status);
+    }
+
     private static uint SendGdromCommand(
         FirmwareStubs.FirmwareTrapHandler handler,
         DreamcastMemory memory,
@@ -195,6 +243,16 @@ public class FirmwareStubsTests
     {
         var state = CreateGdromState(GdromCheckDrive);
         state.R[4] = StatusAddress;
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
+    }
+
+    private static uint SectorMode(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory)
+    {
+        var state = CreateGdromState(GdromSectorMode);
+        state.R[4] = ParameterAddress;
         Assert.True(handler.TryHandle(state, memory, out _));
         return state.R[0];
     }

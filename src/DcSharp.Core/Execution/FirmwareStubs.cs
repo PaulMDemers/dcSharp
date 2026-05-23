@@ -207,11 +207,24 @@ internal static class FirmwareStubs
         private static uint SectorMode(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
             var parameters = state.R[4];
-            if (parameters != 0 && memory.ReadUInt32(parameters) == 1)
+            if (parameters == 0)
             {
-                WriteWords(memory, parameters, 1, 0x2000, 2048, 2048);
+                memory.RecordGdromSectorModeCommand(0, -1, 0, 0, 0, false, "missing parameter block");
+                return 0;
             }
 
+            var request = unchecked((int)memory.ReadUInt32(parameters));
+            if (request == 1)
+            {
+                WriteWords(memory, parameters, 1, 0x2000, 2048, 2048);
+                memory.RecordGdromSectorModeCommand(parameters, request, 0x2000, 2048, 2048, true, "sector mode reported");
+                return 0;
+            }
+
+            var sectorPart = unchecked((int)memory.ReadUInt32(parameters + 4));
+            var cdXa = unchecked((int)memory.ReadUInt32(parameters + 8));
+            var sectorSize = unchecked((int)memory.ReadUInt32(parameters + 12));
+            memory.RecordGdromSectorModeCommand(parameters, request, sectorPart, cdXa, sectorSize, true, "sector mode set");
             return 0;
         }
 

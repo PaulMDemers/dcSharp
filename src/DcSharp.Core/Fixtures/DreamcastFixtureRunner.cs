@@ -177,6 +177,11 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected at least {minGdromStatusCommands} GD-ROM status commands, got {summary.Gdrom.StatusCommandCount}");
         }
 
+        if (fixture.MinGdromSectorModeCommands is { } minGdromSectorModeCommands && summary.Gdrom.SectorModeCommandCount < minGdromSectorModeCommands)
+        {
+            failures.Add($"expected at least {minGdromSectorModeCommands} GD-ROM sector-mode commands, got {summary.Gdrom.SectorModeCommandCount}");
+        }
+
         if (fixture.MinGdromReadCommands is { } minGdromReadCommands && summary.Gdrom.ReadCommandCount < minGdromReadCommands)
         {
             failures.Add($"expected at least {minGdromReadCommands} GD-ROM read commands, got {summary.Gdrom.ReadCommandCount}");
@@ -426,6 +431,11 @@ public static class DreamcastFixtureRunner
             ValidateGdromStatus(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.GdromSectorModes)
+        {
+            ValidateGdromSectorMode(failures, summary, expected);
+        }
+
         return failures;
     }
 
@@ -540,6 +550,43 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "statusName", expected.StatusName);
         AddOptionalDetail(details, "discType", expected.DiscType);
         AddOptionalDetail(details, "discTypeName", expected.DiscTypeName);
+        AddOptionalDetail(details, "success", expected.Success);
+        AddOptionalDetail(details, "status", expected.Status);
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidateGdromSectorMode(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixtureGdromSectorModeExpectation expected)
+    {
+        uint? expectedParameters = expected.Parameters is null ? null : ParseHex32(expected.Parameters, "GD-ROM sector-mode parameters");
+        int? expectedSectorPart = expected.SectorPart is null ? null : unchecked((int)ParseHex32(expected.SectorPart, "GD-ROM sector-mode sector part"));
+        var count = summary.Gdrom.RecentSectorModeCommands.Count(mode =>
+            (expectedParameters is null || mode.ParameterAddress == expectedParameters)
+            && (expected.Request is null || mode.Request == expected.Request)
+            && (expected.RequestName is null || string.Equals(mode.RequestName, expected.RequestName, StringComparison.Ordinal))
+            && (expectedSectorPart is null || mode.SectorPart == expectedSectorPart)
+            && (expected.CdXa is null || mode.CdXa == expected.CdXa)
+            && (expected.SectorSize is null || mode.SectorSize == expected.SectorSize)
+            && (expected.Success is null || mode.Success == expected.Success)
+            && (expected.Status is null || string.Equals(mode.Status, expected.Status, StringComparison.Ordinal)));
+
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} GD-ROM sector-mode {DescribeGdromSectorModeExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static string DescribeGdromSectorModeExpectation(DreamcastFixtureGdromSectorModeExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "parameters", expected.Parameters);
+        AddOptionalDetail(details, "request", expected.Request);
+        AddOptionalDetail(details, "requestName", expected.RequestName);
+        AddOptionalDetail(details, "sectorPart", expected.SectorPart);
+        AddOptionalDetail(details, "cdXa", expected.CdXa);
+        AddOptionalDetail(details, "sectorSize", expected.SectorSize);
         AddOptionalDetail(details, "success", expected.Success);
         AddOptionalDetail(details, "status", expected.Status);
         return details.Count == 0 ? "<any>" : string.Join(" ", details);

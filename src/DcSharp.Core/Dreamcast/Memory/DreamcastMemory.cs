@@ -85,6 +85,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
     private readonly List<DreamcastGdromTocCommand> gdromTocCommands = [];
     private readonly List<DreamcastGdromStatusCommand> gdromStatusCommands = [];
+    private readonly List<DreamcastGdromSectorModeCommand> gdromSectorModeCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
@@ -570,7 +571,8 @@ public sealed class DreamcastMemory
             mediaImage?.SectorCount,
             gdromReadCommands.ToArray(),
             gdromTocCommands.ToArray(),
-            gdromStatusCommands.ToArray());
+            gdromStatusCommands.ToArray(),
+            gdromSectorModeCommands.ToArray());
 
     public void RecordGdromTocCommand(
         uint parameterAddress,
@@ -592,6 +594,26 @@ public sealed class DreamcastMemory
             dataTrackStartFad is { } startValue ? $"0x{startValue:X8}" : null,
             leadoutFad,
             leadoutFad is { } leadoutValue ? $"0x{leadoutValue:X8}" : null,
+            success,
+            status));
+
+    public void RecordGdromSectorModeCommand(
+        uint parameterAddress,
+        int request,
+        int sectorPart,
+        int cdXa,
+        int sectorSize,
+        bool success,
+        string status) =>
+        gdromSectorModeCommands.Add(new DreamcastGdromSectorModeCommand(
+            parameterAddress,
+            $"0x{parameterAddress:X8}",
+            request,
+            request == 0 ? "set" : request == 1 ? "get" : "unknown",
+            sectorPart,
+            $"0x{sectorPart:X8}",
+            cdXa,
+            sectorSize,
             success,
             status));
 
