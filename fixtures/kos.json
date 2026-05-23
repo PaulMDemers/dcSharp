@@ -69,6 +69,35 @@
       }
     },
     {
+      "name": "gdrom_raw_multisector",
+      "sample": "samples/kos/gdrom_raw_multisector",
+      "artifact": "dcsharp_gdrom_raw_multisector.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM raw multi read status=0 bytes=6144 checksum=0xb9dc mismatches=0 padding=0",
+        "dcSharp GD-ROM raw multi edges s0=0x07 s1=0x07 s2=0x07 last=0x60 pad0=0x00 padLast=0x00",
+        "dcSharp GD-ROM raw multi probe done"
+      ],
+      "minGdromReadCommands": 1,
+      "minGdromBytesRead": 6144,
+      "gdromReads": [
+        {
+          "sector": "0x0000AFD2",
+          "sectorCount": 3,
+          "bytesRequested": 6144,
+          "bytesRead": 6144,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_file",
       "sample": "samples/kos/gdrom_file",
       "artifact": "dcsharp_gdrom_file.elf",
