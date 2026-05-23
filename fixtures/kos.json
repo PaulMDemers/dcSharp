@@ -69,6 +69,32 @@
       }
     },
     {
+      "name": "gdrom_no_media",
+      "sample": "samples/kos/gdrom_no_media",
+      "artifact": "dcsharp_gdrom_no_media.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM no media status=1 unchanged=2048 first=0xa5 last=0xa5",
+        "dcSharp GD-ROM no media probe done"
+      ],
+      "minGdromReadCommands": 1,
+      "gdromReads": [
+        {
+          "sector": "0x0000AFC8",
+          "sectorCount": 1,
+          "bytesRequested": 0,
+          "bytesRead": 0,
+          "success": false,
+          "status": "no media image loaded"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_raw_multisector",
       "sample": "samples/kos/gdrom_raw_multisector",
       "artifact": "dcsharp_gdrom_raw_multisector.elf",
