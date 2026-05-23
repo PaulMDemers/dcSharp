@@ -10,7 +10,8 @@ int main(int argc, char **argv) {
     DIR *dir;
     struct dirent *entry;
     int entries = 0;
-    int found = 0;
+    int found_readme = 0;
+    int found_data = 0;
 
     (void)argc;
     (void)argv;
@@ -30,15 +31,22 @@ int main(int argc, char **argv) {
                entry->d_type);
 
         if(strcmp(entry->d_name, "readme.txt") == 0) {
-            found = 1;
+            found_readme = 1;
+        }
+
+        if(strcmp(entry->d_name, "data") == 0) {
+            found_data = 1;
         }
     }
 
     closedir(dir);
 
-    printf("dcSharp GD-ROM dir probe entries=%d found=%d\n", entries, found);
-    if(!found) {
-        printf("dcSharp GD-ROM dir probe missing readme.txt\n");
+    printf("dcSharp GD-ROM dir probe entries=%d readme=%d data=%d\n",
+           entries,
+           found_readme,
+           found_data);
+    if(!found_readme || !found_data) {
+        printf("dcSharp GD-ROM dir probe missing expected entries\n");
         return 2;
     }
 
