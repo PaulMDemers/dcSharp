@@ -32,6 +32,7 @@ Build individual KOS samples:
 wsl -e bash tools/kos/build-sample.sh samples/kos/minimal
 wsl -e bash tools/kos/build-sample.sh samples/kos/hello
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_read
+wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_toc
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_no_media
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_toc_no_media
 wsl -e bash tools/kos/build-sample.sh samples/kos/gdrom_out_of_range
@@ -180,6 +181,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
 - `dcsharp_probe.elf`: reaches default KOS `main()`, prints probe text, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_read.elf`: reads one sector from generated local GDI media through `cdrom_read_sectors()`, observes the `DCSH` sentinel in RAM, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_toc.elf`: reads the TOC from generated local GDI media through `cdrom_read_toc()`, verifies the first/last track, data track FAD, leadout FAD, and `cdrom_locate_data_track()` result, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_no_media.elf`: attempts a raw `cdrom_read_sectors()` call without loaded media, observes the KOS-visible failure, verifies the destination buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_toc_no_media.elf`: attempts `cdrom_read_toc()` without loaded media, observes the KOS-visible failure, verifies the TOC buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_out_of_range.elf`: attempts a raw `cdrom_read_sectors()` call past the generated media leadout, observes the KOS-visible failure, verifies the destination buffer is unchanged, shuts down, and reports `ProgramExit`.
