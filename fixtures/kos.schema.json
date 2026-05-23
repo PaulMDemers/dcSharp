@@ -123,6 +123,9 @@
         "requireNoMapleDescriptorLimitHits": {
           "type": "boolean"
         },
+        "minGdromTocCommands": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
         "minGdromReadCommands": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
@@ -244,6 +247,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/videoSample"
+          }
+        },
+        "gdromTocs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gdromToc"
           }
         },
         "gdromReads": {
@@ -939,6 +948,38 @@
         },
         "bytesRead": {
           "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "gdromToc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "buffer": {
+          "$ref": "#/$defs/hex32"
+        },
+        "firstTrack": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "lastTrack": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "dataTrackStartFad": {
+          "$ref": "#/$defs/hex32"
+        },
+        "leadoutFad": {
+          "$ref": "#/$defs/hex32"
         },
         "success": {
           "type": "boolean"

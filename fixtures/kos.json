@@ -81,8 +81,19 @@
         "dcSharp GD-ROM file text=dcSharp ISO9660 fixture says hello from /cd.",
         "dcSharp GD-ROM file probe done"
       ],
+      "minGdromTocCommands": 1,
       "minGdromReadCommands": 5,
       "minGdromBytesRead": 10240,
+      "gdromTocs": [
+        {
+          "firstTrack": 3,
+          "lastTrack": 3,
+          "dataTrackStartFad": "0x0000AFC8",
+          "leadoutFad": "0x0000AFDC",
+          "success": true,
+          "status": "TOC written"
+        }
+      ],
       "gdromReads": [
         {
           "sector": "0x0000AFD8",

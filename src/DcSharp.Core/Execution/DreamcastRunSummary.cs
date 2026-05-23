@@ -925,7 +925,11 @@ public sealed record DreamcastGdromSummary(
     int SuccessfulReadCommandCount,
     int FailedReadCommandCount,
     int BytesRead,
-    IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands)
+    int TocCommandCount,
+    int SuccessfulTocCommandCount,
+    int FailedTocCommandCount,
+    IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands,
+    IReadOnlyList<DreamcastGdromTocCommandSummary> RecentTocCommands)
 {
     public static DreamcastGdromSummary FromSnapshot(DreamcastGdromSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -936,7 +940,11 @@ public sealed record DreamcastGdromSummary(
             snapshot.ReadCommands.Count(command => command.Success),
             snapshot.ReadCommands.Count(command => !command.Success),
             snapshot.ReadCommands.Sum(command => command.BytesRead),
-            snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray());
+            snapshot.TocCommands.Count,
+            snapshot.TocCommands.Count(command => command.Success),
+            snapshot.TocCommands.Count(command => !command.Success),
+            snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray(),
+            snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray());
 }
 
 public sealed record DreamcastGdromReadCommandSummary(
@@ -965,6 +973,36 @@ public sealed record DreamcastGdromReadCommandSummary(
             command.SectorSize,
             command.BytesRequested,
             command.BytesRead,
+            command.Success,
+            command.Status);
+}
+
+public sealed record DreamcastGdromTocCommandSummary(
+    uint ParameterAddress,
+    string ParameterAddressHex,
+    uint? BufferAddress,
+    string? BufferAddressHex,
+    int? FirstTrack,
+    int? LastTrack,
+    uint? DataTrackStartFad,
+    string? DataTrackStartFadHex,
+    uint? LeadoutFad,
+    string? LeadoutFadHex,
+    bool Success,
+    string Status)
+{
+    public static DreamcastGdromTocCommandSummary FromCommand(DreamcastGdromTocCommand command) =>
+        new(
+            command.ParameterAddress,
+            command.ParameterAddressHex,
+            command.BufferAddress,
+            command.BufferAddressHex,
+            command.FirstTrack,
+            command.LastTrack,
+            command.DataTrackStartFad,
+            command.DataTrackStartFadHex,
+            command.LeadoutFad,
+            command.LeadoutFadHex,
             command.Success,
             command.Status);
 }

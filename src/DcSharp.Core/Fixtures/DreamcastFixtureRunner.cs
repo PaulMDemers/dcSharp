@@ -167,6 +167,11 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected no Maple descriptor-limit hits, got {summary.Maple.DescriptorLimitHitCount}");
         }
 
+        if (fixture.MinGdromTocCommands is { } minGdromTocCommands && summary.Gdrom.TocCommandCount < minGdromTocCommands)
+        {
+            failures.Add($"expected at least {minGdromTocCommands} GD-ROM TOC commands, got {summary.Gdrom.TocCommandCount}");
+        }
+
         if (fixture.MinGdromReadCommands is { } minGdromReadCommands && summary.Gdrom.ReadCommandCount < minGdromReadCommands)
         {
             failures.Add($"expected at least {minGdromReadCommands} GD-ROM read commands, got {summary.Gdrom.ReadCommandCount}");
@@ -406,6 +411,11 @@ public static class DreamcastFixtureRunner
             ValidateGdromRead(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.GdromTocs)
+        {
+            ValidateGdromToc(failures, summary, expected);
+        }
+
         return failures;
     }
 
@@ -450,6 +460,42 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "sectorCount", expected.SectorCount);
         AddOptionalDetail(details, "bytesRequested", expected.BytesRequested);
         AddOptionalDetail(details, "bytesRead", expected.BytesRead);
+        AddOptionalDetail(details, "success", expected.Success);
+        AddOptionalDetail(details, "status", expected.Status);
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidateGdromToc(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixtureGdromTocExpectation expected)
+    {
+        uint? expectedBuffer = expected.Buffer is null ? null : ParseHex32(expected.Buffer, "GD-ROM TOC buffer");
+        uint? expectedDataTrackStartFad = expected.DataTrackStartFad is null ? null : ParseHex32(expected.DataTrackStartFad, "GD-ROM TOC data track start FAD");
+        uint? expectedLeadoutFad = expected.LeadoutFad is null ? null : ParseHex32(expected.LeadoutFad, "GD-ROM TOC leadout FAD");
+        var count = summary.Gdrom.RecentTocCommands.Count(toc =>
+            (expectedBuffer is null || toc.BufferAddress == expectedBuffer)
+            && (expected.FirstTrack is null || toc.FirstTrack == expected.FirstTrack)
+            && (expected.LastTrack is null || toc.LastTrack == expected.LastTrack)
+            && (expectedDataTrackStartFad is null || toc.DataTrackStartFad == expectedDataTrackStartFad)
+            && (expectedLeadoutFad is null || toc.LeadoutFad == expectedLeadoutFad)
+            && (expected.Success is null || toc.Success == expected.Success)
+            && (expected.Status is null || string.Equals(toc.Status, expected.Status, StringComparison.Ordinal)));
+
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} GD-ROM TOC {DescribeGdromTocExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static string DescribeGdromTocExpectation(DreamcastFixtureGdromTocExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "buffer", expected.Buffer);
+        AddOptionalDetail(details, "firstTrack", expected.FirstTrack);
+        AddOptionalDetail(details, "lastTrack", expected.LastTrack);
+        AddOptionalDetail(details, "dataTrackStartFad", expected.DataTrackStartFad);
+        AddOptionalDetail(details, "leadoutFad", expected.LeadoutFad);
         AddOptionalDetail(details, "success", expected.Success);
         AddOptionalDetail(details, "status", expected.Status);
         return details.Count == 0 ? "<any>" : string.Join(" ", details);

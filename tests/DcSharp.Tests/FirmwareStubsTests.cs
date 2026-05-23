@@ -84,12 +84,17 @@ public class FirmwareStubsTests
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
         var response = CheckGdromCommand(handler, memory, commandId);
+        var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
 
         Assert.Equal(GdromCompleted, response);
         Assert.Equal(0x4000_AFC8u, memory.ReadUInt32(TocAddress + 8));
         Assert.Equal(3u, (memory.ReadUInt32(TocAddress + 396) >> 16) & 0xFF);
         Assert.Equal(3u, (memory.ReadUInt32(TocAddress + 400) >> 16) & 0xFF);
         Assert.Equal(0x0000_AFCBu, memory.ReadUInt32(TocAddress + 404));
+        Assert.True(toc.Success);
+        Assert.Equal(0x0000_AFC8u, toc.DataTrackStartFad);
+        Assert.Equal(0x0000_AFCBu, toc.LeadoutFad);
+        Assert.Equal("TOC written", toc.Status);
     }
 
     [Fact]
@@ -102,9 +107,12 @@ public class FirmwareStubsTests
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
         var response = CheckGdromCommand(handler, memory, commandId);
+        var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
 
         Assert.Equal(unchecked((uint)-1), response);
         Assert.Equal(2u, memory.ReadUInt32(StatusAddress));
+        Assert.False(toc.Success);
+        Assert.Equal("no media image loaded", toc.Status);
     }
 
     private static uint SendGdromCommand(

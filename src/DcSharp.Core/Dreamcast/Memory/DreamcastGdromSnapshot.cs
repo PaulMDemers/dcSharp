@@ -4,9 +4,10 @@ public sealed record DreamcastGdromSnapshot(
     bool HasMedia,
     int? SectorSize,
     ulong? SectorCount,
-    IReadOnlyList<DreamcastGdromReadCommand> ReadCommands)
+    IReadOnlyList<DreamcastGdromReadCommand> ReadCommands,
+    IReadOnlyList<DreamcastGdromTocCommand> TocCommands)
 {
-    public static DreamcastGdromSnapshot Empty { get; } = new(false, null, null, []);
+    public static DreamcastGdromSnapshot Empty { get; } = new(false, null, null, [], []);
 }
 
 public sealed record DreamcastGdromReadCommand(
@@ -20,5 +21,19 @@ public sealed record DreamcastGdromReadCommand(
     int? SectorSize,
     int BytesRequested,
     int BytesRead,
+    bool Success,
+    string Status);
+
+public sealed record DreamcastGdromTocCommand(
+    uint ParameterAddress,
+    string ParameterAddressHex,
+    uint? BufferAddress,
+    string? BufferAddressHex,
+    int? FirstTrack,
+    int? LastTrack,
+    uint? DataTrackStartFad,
+    string? DataTrackStartFadHex,
+    uint? LeadoutFad,
+    string? LeadoutFadHex,
     bool Success,
     string Status);

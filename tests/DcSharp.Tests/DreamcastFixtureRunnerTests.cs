@@ -75,6 +75,7 @@ public class DreamcastFixtureRunnerTests
             MinMapleGetConditionTransfers = 5,
             MinMapleDmaBatches = 2,
             RequireNoMapleDescriptorLimitHits = true,
+            MinGdromTocCommands = 1,
             MinGdromReadCommands = 1,
             MinGdromBytesRead = 2048,
             MinVblankEvents = 2,
@@ -213,6 +214,18 @@ public class DreamcastFixtureRunnerTests
                     Active = false,
                     KeyOn = false,
                     KeyOnExecute = true
+                }
+            ],
+            GdromTocs =
+            [
+                new DreamcastFixtureGdromTocExpectation
+                {
+                    FirstTrack = 3,
+                    LastTrack = 3,
+                    DataTrackStartFad = "0x0000AFC8",
+                    LeadoutFad = "0x0000AFC9",
+                    Success = true,
+                    Status = "TOC written"
                 }
             ],
             GdromReads =
@@ -615,7 +628,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, 0, 0, 0, 0, 0, 0, 0, [], []),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -785,6 +798,9 @@ public class DreamcastFixtureRunnerTests
             1,
             0,
             2048,
+            1,
+            1,
+            0,
             [
                 new DreamcastGdromReadCommandSummary(
                     0x8C01_0000,
@@ -799,6 +815,21 @@ public class DreamcastFixtureRunnerTests
                     2048,
                     true,
                     "media read completed")
+            ],
+            [
+                new DreamcastGdromTocCommandSummary(
+                    0x8C01_0100,
+                    "0x8C010100",
+                    0x8C02_1000,
+                    "0x8C021000",
+                    3,
+                    3,
+                    0x0000_AFC8,
+                    "0x0000AFC8",
+                    0x0000_AFC9,
+                    "0x0000AFC9",
+                    true,
+                    "TOC written")
             ]);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(

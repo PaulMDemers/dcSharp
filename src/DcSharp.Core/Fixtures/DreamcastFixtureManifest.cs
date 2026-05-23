@@ -57,6 +57,7 @@ public sealed class DreamcastFixtureDefinition
     public int? MinMapleGetConditionTransfers { get; set; }
     public int? MinMapleDmaBatches { get; set; }
     public bool RequireNoMapleDescriptorLimitHits { get; set; }
+    public int? MinGdromTocCommands { get; set; }
     public int? MinGdromReadCommands { get; set; }
     public int? MinGdromBytesRead { get; set; }
     public ulong? MinVblankEvents { get; set; }
@@ -87,6 +88,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
+    public List<DreamcastFixtureGdromTocExpectation> GdromTocs { get; set; } = [];
     public List<DreamcastFixtureGdromReadExpectation> GdromReads { get; set; } = [];
 
     internal void Validate()
@@ -131,6 +133,18 @@ public sealed class DreamcastFixtureGdromReadExpectation
     public uint? SectorCount { get; set; }
     public int? BytesRequested { get; set; }
     public int? BytesRead { get; set; }
+    public bool? Success { get; set; }
+    public string? Status { get; set; }
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixtureGdromTocExpectation
+{
+    public string? Buffer { get; set; }
+    public int? FirstTrack { get; set; }
+    public int? LastTrack { get; set; }
+    public string? DataTrackStartFad { get; set; }
+    public string? LeadoutFad { get; set; }
     public bool? Success { get; set; }
     public string? Status { get; set; }
     public int MinCount { get; set; } = 1;

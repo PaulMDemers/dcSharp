@@ -406,7 +406,7 @@ internal sealed class MainForm : Form
             $"PVR: registers={summary.Video.PvrRegisterAccessCount:N0}, taWrites={summary.Video.PvrTaCommandWriteCount:N0}, strips={summary.Video.PvrTaStrips.Count:N0}",
             $"AICA: registers={summary.Audio.RegisterAccessCount:N0}, channels={summary.Audio.Channels.Count:N0}, active={summary.Audio.ActiveChannelCount:N0}",
             $"Maple: transfers={summary.Maple.TransferCount:N0}, dmaBatches={summary.Maple.DmaBatchCount:N0}",
-            $"GD-ROM: media={summary.Gdrom.HasMedia}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
+            $"GD-ROM: media={summary.Gdrom.HasMedia}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
             $"Scheduler: vblanks={summary.Scheduler.VBlankEventsRaised:N0}, hardwareTicks={summary.Scheduler.HardwareAdvanceTicks:N0}, fastForward={summary.Scheduler.CpuFastForwardInstructions:N0}"
         };
 
@@ -434,6 +434,14 @@ internal sealed class MainForm : Form
             lines.Add("GD-ROM reads:");
             lines.AddRange(summary.Gdrom.RecentReadCommands.TakeLast(8).Select(read =>
                 $"  sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString() ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead}/{read.BytesRequested} ok={read.Success} status={read.Status}"));
+        }
+
+        if (summary.Gdrom.RecentTocCommands.Count > 0)
+        {
+            lines.Add("");
+            lines.Add("GD-ROM TOCs:");
+            lines.AddRange(summary.Gdrom.RecentTocCommands.TakeLast(4).Select(toc =>
+                $"  buffer={toc.BufferAddressHex ?? "none"} first={toc.FirstTrack?.ToString() ?? "none"} last={toc.LastTrack?.ToString() ?? "none"} data={toc.DataTrackStartFadHex ?? "none"} leadout={toc.LeadoutFadHex ?? "none"} ok={toc.Success} status={toc.Status}"));
         }
 
         return string.Join(Environment.NewLine, lines);

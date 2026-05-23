@@ -83,6 +83,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
+    private readonly List<DreamcastGdromTocCommand> gdromTocCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
@@ -566,7 +567,31 @@ public sealed class DreamcastMemory
             mediaImage is not null,
             mediaImage?.SectorSize,
             mediaImage?.SectorCount,
-            gdromReadCommands.ToArray());
+            gdromReadCommands.ToArray(),
+            gdromTocCommands.ToArray());
+
+    public void RecordGdromTocCommand(
+        uint parameterAddress,
+        uint? bufferAddress,
+        int? firstTrack,
+        int? lastTrack,
+        uint? dataTrackStartFad,
+        uint? leadoutFad,
+        bool success,
+        string status) =>
+        gdromTocCommands.Add(new DreamcastGdromTocCommand(
+            parameterAddress,
+            $"0x{parameterAddress:X8}",
+            bufferAddress,
+            bufferAddress is { } bufferValue ? $"0x{bufferValue:X8}" : null,
+            firstTrack,
+            lastTrack,
+            dataTrackStartFad,
+            dataTrackStartFad is { } startValue ? $"0x{startValue:X8}" : null,
+            leadoutFad,
+            leadoutFad is { } leadoutValue ? $"0x{leadoutValue:X8}" : null,
+            success,
+            status));
 
     public DreamcastAsicSnapshot CreateAsicSnapshot()
     {

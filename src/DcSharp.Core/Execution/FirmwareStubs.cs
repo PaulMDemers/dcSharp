@@ -127,14 +127,16 @@ internal static class FirmwareStubs
         private static GdromQueuedCommand WriteToc2(uint parameters, DreamcastMemory memory)
         {
             var snapshot = memory.CreateGdromSnapshot();
+            var buffer = parameters == 0 ? 0 : memory.ReadUInt32(parameters + 4);
             if (!snapshot.HasMedia)
             {
+                memory.RecordGdromTocCommand(parameters, buffer == 0 ? null : buffer, null, null, null, null, false, "no media image loaded");
                 return GdromQueuedCommand.Failed(GdromNoDiscStatus, 0, 0, 0);
             }
 
-            var buffer = parameters == 0 ? 0 : memory.ReadUInt32(parameters + 4);
             if (buffer == 0)
             {
+                memory.RecordGdromTocCommand(parameters, null, null, null, null, null, false, "missing TOC buffer");
                 return GdromQueuedCommand.Failed(0, 0, 0, 0);
             }
 
@@ -143,16 +145,22 @@ internal static class FirmwareStubs
                 memory.WriteUInt32(buffer + ((uint)i * 4), 0);
             }
 
-            var sectorCount = snapshot.SectorCount ?? 0;
+            var leadoutFad = CalculateLeadoutFad(snapshot.SectorCount ?? 0);
             memory.WriteUInt32(buffer + 8, PackTocEntry(4, GdromDataTrackStartFad));
             memory.WriteUInt32(buffer + 396, 3u << 16);
             memory.WriteUInt32(buffer + 400, 3u << 16);
-            memory.WriteUInt32(buffer + 404, PackTocEntry(0, GdromDataTrackStartFad + (uint)Math.Min(sectorCount, uint.MaxValue - GdromDataTrackStartFad)));
+            memory.WriteUInt32(buffer + 404, PackTocEntry(0, leadoutFad));
+            memory.RecordGdromTocCommand(parameters, buffer, 3, 3, GdromDataTrackStartFad, leadoutFad, true, "TOC written");
             return GdromQueuedCommand.Completed(0, 0, 0, 0);
         }
 
         private static uint PackTocEntry(uint control, uint fad) =>
             ((control & 0xFu) << 28) | (fad & 0x00FF_FFFFu);
+
+        private static uint CalculateLeadoutFad(ulong sectorCount) =>
+            sectorCount > GdromDataTrackStartFad
+                ? (uint)Math.Min(sectorCount, uint.MaxValue)
+                : GdromDataTrackStartFad + (uint)Math.Min(sectorCount, uint.MaxValue - GdromDataTrackStartFad);
 
         private uint CheckCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
