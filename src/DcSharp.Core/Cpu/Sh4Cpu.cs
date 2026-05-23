@@ -227,6 +227,21 @@ public sealed class Sh4Cpu
             return $"pref @r{n}";
         }
 
+        if ((opcode & 0xF0FF) == 0x0093)
+        {
+            return $"ocbi @r{n}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x00A3)
+        {
+            return $"ocbp @r{n}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x00B3)
+        {
+            return $"ocbwb @r{n}";
+        }
+
         if ((opcode & 0xF0FF) == 0x0029)
         {
             State.R[n] = State.T ? 1u : 0u;

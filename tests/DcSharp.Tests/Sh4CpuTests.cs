@@ -65,6 +65,24 @@ public class Sh4CpuTests
         Assert.Equal(1u, cpu.State.InstructionsExecuted);
     }
 
+    [Theory]
+    [InlineData(0x0483, "pref @r4")]
+    [InlineData(0x0493, "ocbi @r4")]
+    [InlineData(0x04A3, "ocbp @r4")]
+    [InlineData(0x04B3, "ocbwb @r4")]
+    public void ExecutesCacheMaintenanceAsNoOp(ushort opcode, string expectedTrace)
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, opcode);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[4] = 0x8C02_0000;
+
+        var step = cpu.Step();
+
+        Assert.Equal(expectedTrace, step.Trace);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsMaskedCountedIdleLoop()
     {

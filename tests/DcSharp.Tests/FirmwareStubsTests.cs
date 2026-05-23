@@ -12,12 +12,14 @@ public class FirmwareStubsTests
     private const uint GdromCheckCommand = 1;
     private const uint GdromAbortCommand = 3;
     private const uint GdromCommandPioRead = 16;
+    private const uint GdromCommandGetToc2 = 19;
     private const uint GdromCommandNop = 29;
     private const uint GdromCompleted = 2;
     private const uint GdromNoActive = 0;
     private const uint Sector = 1;
     private const uint ParameterAddress = 0x8C01_0000;
     private const uint StatusAddress = 0x8C01_0100;
+    private const uint TocAddress = 0x8C01_0200;
     private const uint DestinationAddress = 0x8C02_0000;
 
     [Fact]
@@ -70,6 +72,39 @@ public class FirmwareStubsTests
         Assert.Equal(GdromNoActive, unknownResponse);
         Assert.Equal(GdromCompleted, nopResponse);
         Assert.Equal(GdromNoActive, abortedResponse);
+    }
+
+    [Fact]
+    public void GdromGetToc2WritesSingleDataTrackToc()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));
+        memory.WriteUInt32(ParameterAddress, 0);
+        memory.WriteUInt32(ParameterAddress + 4, TocAddress);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        var response = CheckGdromCommand(handler, memory, commandId);
+
+        Assert.Equal(GdromCompleted, response);
+        Assert.Equal(0x4000_AFC8u, memory.ReadUInt32(TocAddress + 8));
+        Assert.Equal(3u, (memory.ReadUInt32(TocAddress + 396) >> 16) & 0xFF);
+        Assert.Equal(3u, (memory.ReadUInt32(TocAddress + 400) >> 16) & 0xFF);
+        Assert.Equal(0x0000_AFCBu, memory.ReadUInt32(TocAddress + 404));
+    }
+
+    [Fact]
+    public void GdromGetToc2FailsWhenNoMediaIsLoaded()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(ParameterAddress, 0);
+        memory.WriteUInt32(ParameterAddress + 4, TocAddress);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        var response = CheckGdromCommand(handler, memory, commandId);
+
+        Assert.Equal(unchecked((uint)-1), response);
+        Assert.Equal(2u, memory.ReadUInt32(StatusAddress));
     }
 
     private static uint SendGdromCommand(

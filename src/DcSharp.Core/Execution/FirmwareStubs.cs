@@ -33,6 +33,9 @@ internal static class FirmwareStubs
         private const uint SuperFunctionGdrom = 0;
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
+        private const uint GdromCommandGetToc2 = 19;
+        private const uint GdromDataTrackStartFad = 45_000;
+        private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
         private const int GdromCompleted = 2;
@@ -110,11 +113,46 @@ internal static class FirmwareStubs
                     : GdromQueuedCommand.Failed(MapReadFailureStatus(read), 0, read?.BytesRead ?? 0, 0);
             }
 
+            if (command == GdromCommandGetToc2)
+            {
+                return WriteToc2(parameters, memory);
+            }
+
             return GdromQueuedCommand.Completed(0, 0, 0, 0);
         }
 
         private static int MapReadFailureStatus(DreamcastGdromReadCommand? read) =>
             read?.Status == "no media image loaded" ? GdromNoDiscStatus : 0;
+
+        private static GdromQueuedCommand WriteToc2(uint parameters, DreamcastMemory memory)
+        {
+            var snapshot = memory.CreateGdromSnapshot();
+            if (!snapshot.HasMedia)
+            {
+                return GdromQueuedCommand.Failed(GdromNoDiscStatus, 0, 0, 0);
+            }
+
+            var buffer = parameters == 0 ? 0 : memory.ReadUInt32(parameters + 4);
+            if (buffer == 0)
+            {
+                return GdromQueuedCommand.Failed(0, 0, 0, 0);
+            }
+
+            for (var i = 0; i < GdromTocWords; i++)
+            {
+                memory.WriteUInt32(buffer + ((uint)i * 4), 0);
+            }
+
+            var sectorCount = snapshot.SectorCount ?? 0;
+            memory.WriteUInt32(buffer + 8, PackTocEntry(4, GdromDataTrackStartFad));
+            memory.WriteUInt32(buffer + 396, 3u << 16);
+            memory.WriteUInt32(buffer + 400, 3u << 16);
+            memory.WriteUInt32(buffer + 404, PackTocEntry(0, GdromDataTrackStartFad + (uint)Math.Min(sectorCount, uint.MaxValue - GdromDataTrackStartFad)));
+            return GdromQueuedCommand.Completed(0, 0, 0, 0);
+        }
+
+        private static uint PackTocEntry(uint control, uint fad) =>
+            ((control & 0xFu) << 28) | (fad & 0x00FF_FFFFu);
 
         private uint CheckCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {

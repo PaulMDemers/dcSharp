@@ -69,6 +69,52 @@
       }
     },
     {
+      "name": "gdrom_file",
+      "sample": "samples/kos/gdrom_file",
+      "artifact": "dcsharp_gdrom_file.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 90000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM file probe bytes=45",
+        "dcSharp GD-ROM file text=dcSharp ISO9660 fixture says hello from /cd.",
+        "dcSharp GD-ROM file probe done"
+      ],
+      "minGdromReadCommands": 5,
+      "minGdromBytesRead": 10240,
+      "gdromReads": [
+        {
+          "sector": "0x0000AFD8",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDA",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDB",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed",
+          "minCount": 2
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "timer",
       "sample": "samples/kos/timer",
       "artifact": "dcsharp_timer.elf",
