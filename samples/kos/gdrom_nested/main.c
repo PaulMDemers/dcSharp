@@ -13,7 +13,8 @@ int main(int argc, char **argv) {
     char buffer[128];
     size_t bytes;
     int entries = 0;
-    int found = 0;
+    int found_second = 0;
+    int found_big = 0;
 
     (void)argc;
     (void)argv;
@@ -33,15 +34,22 @@ int main(int argc, char **argv) {
                entry->d_type);
 
         if(strcmp(entry->d_name, "second.txt") == 0) {
-            found = 1;
+            found_second = 1;
+        }
+
+        if(strcmp(entry->d_name, "big.bin") == 0) {
+            found_big = 1;
         }
     }
 
     closedir(dir);
 
-    printf("dcSharp GD-ROM nested dir entries=%d found=%d\n", entries, found);
-    if(!found) {
-        printf("dcSharp GD-ROM nested probe missing second.txt\n");
+    printf("dcSharp GD-ROM nested dir entries=%d second=%d big=%d\n",
+           entries,
+           found_second,
+           found_big);
+    if(!found_second || !found_big) {
+        printf("dcSharp GD-ROM nested probe missing expected entries\n");
         return 2;
     }
 

@@ -217,6 +217,22 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ExecutesPostIncrementWordLoad()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x6255);
+        memory.WriteUInt16(0x8C02_0004, 0xFF80);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[5] = 0x8C02_0004;
+
+        cpu.Step();
+
+        Assert.Equal(0xFFFF_FF80u, cpu.State.R[2]);
+        Assert.Equal(0x8C02_0006u, cpu.State.R[5]);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void StoresFloatingPointRegisterToMemory()
     {
         var memory = new DreamcastMemory();

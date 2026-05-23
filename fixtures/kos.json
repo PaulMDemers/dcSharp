@@ -267,7 +267,8 @@
         "dcSharp GD-ROM nested entry 1 name=. type=4",
         "dcSharp GD-ROM nested entry 2 name=.. type=4",
         "dcSharp GD-ROM nested entry 3 name=second.txt type=8",
-        "dcSharp GD-ROM nested dir entries=3 found=1",
+        "dcSharp GD-ROM nested entry 4 name=big.bin type=8",
+        "dcSharp GD-ROM nested dir entries=4 second=1 big=1",
         "dcSharp GD-ROM nested file bytes=57",
         "dcSharp GD-ROM nested file text=dcSharp ISO9660 nested fixture from /cd/DATA/SECOND.TXT.",
         "dcSharp GD-ROM nested probe done"
@@ -296,6 +297,102 @@
         },
         {
           "sector": "0x0000AFD7",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD8",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD9",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDA",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDB",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
+      "name": "gdrom_multisector",
+      "sample": "samples/kos/gdrom_multisector",
+      "artifact": "dcsharp_gdrom_multisector.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 90000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM multisector bytes=5000 chunks=7 checksum=0xb9dc mismatches=0",
+        "dcSharp GD-ROM multisector edges first=0x07 boundary=0x07 last=0x60",
+        "dcSharp GD-ROM multisector probe done"
+      ],
+      "minGdromTocCommands": 1,
+      "minGdromReadCommands": 8,
+      "minGdromBytesRead": 16384,
+      "gdromTocs": [
+        {
+          "firstTrack": 3,
+          "lastTrack": 3,
+          "dataTrackStartFad": "0x0000AFC8",
+          "leadoutFad": "0x0000AFDC",
+          "success": true,
+          "status": "TOC written"
+        }
+      ],
+      "gdromReads": [
+        {
+          "sector": "0x0000AFD2",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD3",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD4",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD6",
           "sectorCount": 1,
           "bytesRequested": 2048,
           "bytesRead": 2048,

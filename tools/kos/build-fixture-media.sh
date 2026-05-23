@@ -13,6 +13,8 @@ import sys
 SECTOR_SIZE = 2048
 TRACK_START_FAD = 45000
 TRACK_SECTORS = 20
+BIG_FILE_SECTOR = 10
+BIG_FILE_SIZE = 5000
 SUBDIR_SECTOR = 14
 NESTED_FILE_SECTOR = 15
 ROOT_SECTOR = 18
@@ -22,6 +24,8 @@ FILE_CONTENT = b"dcSharp ISO9660 fixture says hello from /cd.\n"
 SUBDIR_NAME = b"DATA"
 NESTED_FILE_NAME = b"SECOND.TXT;1"
 NESTED_FILE_CONTENT = b"dcSharp ISO9660 nested fixture from /cd/DATA/SECOND.TXT.\n"
+BIG_FILE_NAME = b"BIG.BIN;1"
+BIG_FILE_CONTENT = bytes(((index * 31 + 7) & 0xFF) for index in range(BIG_FILE_SIZE))
 
 
 def write_733(buffer, offset, value):
@@ -67,6 +71,7 @@ track[32:36] = bytes([0x44, 0x43, 0x53, 0x48])
 
 track[FILE_SECTOR * SECTOR_SIZE:FILE_SECTOR * SECTOR_SIZE + len(FILE_CONTENT)] = FILE_CONTENT
 track[NESTED_FILE_SECTOR * SECTOR_SIZE:NESTED_FILE_SECTOR * SECTOR_SIZE + len(NESTED_FILE_CONTENT)] = NESTED_FILE_CONTENT
+track[BIG_FILE_SECTOR * SECTOR_SIZE:BIG_FILE_SECTOR * SECTOR_SIZE + len(BIG_FILE_CONTENT)] = BIG_FILE_CONTENT
 
 root_record = dir_record(kos_extent(ROOT_SECTOR), SECTOR_SIZE, 2, b"\x00")
 parent_record = dir_record(kos_extent(ROOT_SECTOR), SECTOR_SIZE, 2, b"\x01")
@@ -84,12 +89,15 @@ track[subdir_offset:subdir_offset + len(subdir_record)] = subdir_record
 subdir_self_record = dir_record(kos_extent(SUBDIR_SECTOR), SECTOR_SIZE, 2, b"\x00")
 subdir_parent_record = dir_record(kos_extent(ROOT_SECTOR), SECTOR_SIZE, 2, b"\x01")
 nested_file_record = dir_record(kos_extent(NESTED_FILE_SECTOR), len(NESTED_FILE_CONTENT), 0, NESTED_FILE_NAME)
+big_file_record = dir_record(kos_extent(BIG_FILE_SECTOR), len(BIG_FILE_CONTENT), 0, BIG_FILE_NAME)
 
 subdir_data_offset = SUBDIR_SECTOR * SECTOR_SIZE
 track[subdir_data_offset:subdir_data_offset + len(subdir_self_record)] = subdir_self_record
 track[subdir_data_offset + len(subdir_self_record):subdir_data_offset + len(subdir_self_record) + len(subdir_parent_record)] = subdir_parent_record
 nested_file_offset = subdir_data_offset + len(subdir_self_record) + len(subdir_parent_record)
 track[nested_file_offset:nested_file_offset + len(nested_file_record)] = nested_file_record
+big_file_offset = nested_file_offset + len(nested_file_record)
+track[big_file_offset:big_file_offset + len(big_file_record)] = big_file_record
 
 pvd_offset = 16 * SECTOR_SIZE
 track[pvd_offset] = 1

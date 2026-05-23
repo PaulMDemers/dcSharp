@@ -865,6 +865,13 @@ public sealed class Sh4Cpu
             return $"mov.b @r{m}+,r{n} ; r{n}=0x{State.R[n]:X8}";
         }
 
+        if (highNibble == 0x6 && lowNibble == 0x5)
+        {
+            State.R[n] = (uint)(short)memory.ReadUInt16(State.R[m]);
+            State.R[m] += 2;
+            return $"mov.w @r{m}+,r{n} ; r{n}=0x{State.R[n]:X8}";
+        }
+
         if (highNibble == 0x6 && lowNibble == 0x7)
         {
             State.R[n] = ~State.R[m];
