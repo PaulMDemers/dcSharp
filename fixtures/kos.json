@@ -189,6 +189,72 @@
       }
     },
     {
+      "name": "gdrom_dir",
+      "sample": "samples/kos/gdrom_dir",
+      "artifact": "dcsharp_gdrom_dir.elf",
+      "mediaPath": "artifacts/media/dcsharp_gdrom.gdi",
+      "instructions": 90000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp GD-ROM dir entry 1 name=. type=4",
+        "dcSharp GD-ROM dir entry 2 name=.. type=4",
+        "dcSharp GD-ROM dir entry 3 name=readme.txt type=8",
+        "dcSharp GD-ROM dir probe entries=3 found=1",
+        "dcSharp GD-ROM dir probe done"
+      ],
+      "minGdromTocCommands": 1,
+      "minGdromReadCommands": 4,
+      "minGdromBytesRead": 8192,
+      "gdromTocs": [
+        {
+          "firstTrack": 3,
+          "lastTrack": 3,
+          "dataTrackStartFad": "0x0000AFC8",
+          "leadoutFad": "0x0000AFDC",
+          "success": true,
+          "status": "TOC written"
+        }
+      ],
+      "gdromReads": [
+        {
+          "sector": "0x0000AFD8",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFD9",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDA",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        },
+        {
+          "sector": "0x0000AFDB",
+          "sectorCount": 1,
+          "bytesRequested": 2048,
+          "bytesRead": 2048,
+          "success": true,
+          "status": "media read completed"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "timer",
       "sample": "samples/kos/timer",
       "artifact": "dcsharp_timer.elf",
