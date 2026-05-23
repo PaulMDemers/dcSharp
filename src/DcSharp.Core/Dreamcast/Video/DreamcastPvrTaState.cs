@@ -121,7 +121,7 @@ public sealed class DreamcastPvrTaState
         }
 
         var color = vertex.Rgb565;
-        if (currentVertices.Count > 0 && currentVertices[0].Rgb565 != color)
+        if (!IsGouraudHeader(currentHeaderValue) && currentVertices.Count > 0 && currentVertices[0].Rgb565 != color)
         {
             ResetStrip();
             return null;
@@ -134,6 +134,7 @@ public sealed class DreamcastPvrTaState
         }
 
         var canRender = currentVertices.Count >= 3;
+        var stripColor = currentVertices[0].Rgb565;
         var strip = canRender
             ? new DreamcastPvrTaStrip(
                 write.Region,
@@ -142,8 +143,8 @@ public sealed class DreamcastPvrTaState
                 currentHeaderValue,
                 $"0x{currentHeaderValue:X8}",
                 currentHeaderPayload,
-                color,
-                $"0x{color:X4}",
+                stripColor,
+                $"0x{stripColor:X4}",
                 currentVertices.ToArray())
             : null;
         if (strip is not null)
@@ -171,6 +172,9 @@ public sealed class DreamcastPvrTaState
     private static bool IsOpaqueInput(DreamcastPvrTaCommandWrite write) =>
         string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
         && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
+
+    private static bool IsGouraudHeader(uint value) =>
+        (value & 0x0000_0002u) != 0;
 
     private void ResetStrip()
     {
@@ -218,7 +222,10 @@ public sealed record DreamcastPvrTaStrip(
     DreamcastPvrTaPolygonHeaderPayload? HeaderPayload,
     ushort Rgb565,
     string Rgb565Hex,
-    IReadOnlyList<DreamcastPvrTaVertex> Vertices);
+    IReadOnlyList<DreamcastPvrTaVertex> Vertices)
+{
+    public bool Gouraud => (HeaderValue & 0x0000_0002u) != 0;
+}
 
 public sealed record DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip Strip)
 {

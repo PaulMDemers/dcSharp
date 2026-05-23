@@ -190,17 +190,18 @@ public static class DreamcastPvrPreviewRenderer
             || payload.Mode3Fields.VqEnabled
             || payload.Mode3Fields.MipMapEnabled)
         {
-            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
+            return new DreamcastPvrPreviewSourceSample(VertexColor(strip, vertices, point, a, b, c), null);
         }
 
         var width = TextureSize(payload.Mode2Fields.TextureUSize);
         var height = TextureSize(payload.Mode2Fields.TextureVSize);
         if (width <= 0 || height <= 0)
         {
-            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
+            return new DreamcastPvrPreviewSourceSample(VertexColor(strip, vertices, point, a, b, c), null);
         }
 
         var (weightA, weightB, weightC) = Barycentric(point, a, b, c);
+        var vertexColor = VertexColor(strip, vertices, weightA, weightB, weightC);
         var u = TextureCoordinate(
             (vertices[0].U * weightA) + (vertices[1].U * weightB) + (vertices[2].U * weightC),
             payload.Mode2Fields.UClamp,
@@ -212,10 +213,48 @@ public static class DreamcastPvrPreviewRenderer
         var textureSample = SampleTexture(payload, vram, u, v, width, height);
         if (textureSample is null)
         {
-            return new DreamcastPvrPreviewSourceSample(strip.Rgb565, null);
+            return new DreamcastPvrPreviewSourceSample(vertexColor, null);
         }
 
-        return ApplyTextureShading(strip.Rgb565, textureSample, payload.Mode2Fields.TextureShadingName);
+        return ApplyTextureShading(vertexColor, textureSample, payload.Mode2Fields.TextureShadingName);
+    }
+
+    private static ushort VertexColor(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        Vector2 point,
+        Vector2 a,
+        Vector2 b,
+        Vector2 c)
+    {
+        if (!strip.Gouraud)
+        {
+            return strip.Rgb565;
+        }
+
+        var (weightA, weightB, weightC) = Barycentric(point, a, b, c);
+        return VertexColor(strip, vertices, weightA, weightB, weightC);
+    }
+
+    private static ushort VertexColor(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        float weightA,
+        float weightB,
+        float weightC)
+    {
+        if (!strip.Gouraud)
+        {
+            return strip.Rgb565;
+        }
+
+        var (redA, greenA, blueA) = Rgb565ToRgb888(vertices[0].Rgb565);
+        var (redB, greenB, blueB) = Rgb565ToRgb888(vertices[1].Rgb565);
+        var (redC, greenC, blueC) = Rgb565ToRgb888(vertices[2].Rgb565);
+        return Rgb888ToRgb565(
+            ClampToByte((redA * weightA) + (redB * weightB) + (redC * weightC)),
+            ClampToByte((greenA * weightA) + (greenB * weightB) + (greenC * weightC)),
+            ClampToByte((blueA * weightA) + (blueB * weightB) + (blueC * weightC)));
     }
 
     private static DreamcastPvrPreviewSourceSample? SampleTexture(

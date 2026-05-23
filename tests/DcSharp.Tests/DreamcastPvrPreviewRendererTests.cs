@@ -138,6 +138,24 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void InterpolatesGouraudVertexColors()
+    {
+        var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xF800,
+                [(1, 1), (3, 1), (1, 3)],
+                gouraud: true,
+                vertexColors: [0xF800, 0x07E0, 0x001F]),
+            vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 2));
+    }
+
+    [Fact]
     public void SamplesRgb565TextureWhenModeEnablesSimpleTexture()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -441,13 +459,15 @@ public class DreamcastPvrPreviewRendererTests
         uint textureVSize = 0,
         uint pixelFormat = 1,
         uint textureBase = 0,
-        IReadOnlyList<(float U, float V)>? uvs = null) =>
+        IReadOnlyList<(float U, float V)>? uvs = null,
+        bool gouraud = false,
+        IReadOnlyList<ushort>? vertexColors = null) =>
         new(
             "TA_INPUT",
             0,
             "OpaquePolygon",
-            0x8084_0000,
-            "0x80840000",
+            gouraud ? 0x8084_0002u : 0x8084_0000u,
+            gouraud ? "0x80840002" : "0x80840000",
             CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, textureUSize, textureVSize, pixelFormat, textureBase),
             color,
             $"0x{color:X4}",
@@ -464,16 +484,19 @@ public class DreamcastPvrPreviewRendererTests
                 SingleToUInt32Bits(VertexV(point, points, uvs, index)),
                 $"0x{SingleToUInt32Bits(VertexV(point, points, uvs, index)):X8}",
                 index == points.Count - 1,
-                color,
-                $"0x{color:X4}",
+                VertexColorAt(color, vertexColors, index),
+                $"0x{VertexColorAt(color, vertexColors, index):X4}",
                 index == points.Count - 1 ? 0xF000_0000 : 0xE000_0000,
                 index == points.Count - 1 ? "0xF0000000" : "0xE0000000",
                 (uint)point.X << 16,
                 $"0x{(uint)point.X << 16:X8}",
                 (uint)point.Y << 16,
                 $"0x{(uint)point.Y << 16:X8}",
-                argb ?? color,
-                $"0x{argb ?? color:X8}")).ToArray());
+                argb ?? VertexColorAt(color, vertexColors, index),
+                $"0x{argb ?? VertexColorAt(color, vertexColors, index):X8}")).ToArray());
+
+    private static ushort VertexColorAt(ushort color, IReadOnlyList<ushort>? vertexColors, int index) =>
+        vertexColors is null ? color : vertexColors[index];
 
     private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(
         string? culling,

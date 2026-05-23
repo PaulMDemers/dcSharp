@@ -153,6 +153,34 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void CompletesGouraudRealPvrVertexStripWithMixedColors()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0002)));
+        for (var index = 0; index < 7; index++)
+        {
+            Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        }
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0xFFFF_0000));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0xFF00_FF00));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0xFF00_00FF);
+
+        Assert.NotNull(render);
+        Assert.Equal(0xF800, render.Rgb565);
+        var strip = Assert.Single(state.CompletedStrips);
+        Assert.True(strip.Gouraud);
+        Assert.Equal("0x80840002", strip.HeaderValueHex);
+        Assert.Equal(0xF800, strip.Rgb565);
+        Assert.Collection(
+            strip.Vertices,
+            vertex => Assert.Equal(0xF800, vertex.Rgb565),
+            vertex => Assert.Equal(0x07E0, vertex.Rgb565),
+            vertex => Assert.Equal(0x001F, vertex.Rgb565));
+    }
+
+    [Fact]
     public void IgnoresIncompleteOrMismatchedStrips()
     {
         var state = new DreamcastPvrTaState();
