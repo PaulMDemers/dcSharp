@@ -170,20 +170,31 @@ public sealed class Sh4Cpu
     {
         var nextPc = pc + 2;
         var branchTargetAfterSlot = delayedBranchTarget;
+        var isDelaySlot = branchTargetAfterSlot is not null;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
-        var trace = ExecuteInstruction(pc, opcode, nextPc);
+        var trace = ExecuteInstruction(pc, opcode, nextPc, isDelaySlot);
 
-        State.Pc = branchTargetAfterSlot ?? immediateBranchTarget ?? nextPc;
+        State.Pc = immediateBranchTarget ?? branchTargetAfterSlot ?? nextPc;
         return trace;
     }
 
-    private string ExecuteInstruction(uint pc, ushort opcode, uint nextPc)
+    private string ExecuteInstruction(uint pc, ushort opcode, uint nextPc, bool isDelaySlot)
     {
         var highNibble = opcode >> 12;
         var n = (opcode >> 8) & 0xF;
         var m = (opcode >> 4) & 0xF;
         var lowNibble = opcode & 0xF;
+
+        if (opcode == 0xFFFD)
+        {
+            var savedPc = isDelaySlot ? pc - 2 : pc;
+            var eventCode = isDelaySlot ? 0x0000_01A0u : 0x0000_0180u;
+            EnterGeneralException(savedPc, eventCode);
+            return isDelaySlot
+                ? $"slot illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}"
+                : $"general illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}";
+        }
 
         if (opcode == 0x0009)
         {
@@ -1157,6 +1168,15 @@ public sealed class Sh4Cpu
         }
 
         throw new UnsupportedInstructionException(pc, opcode);
+    }
+
+    private void EnterGeneralException(uint savedPc, uint eventCode)
+    {
+        State.Spc = savedPc;
+        State.Ssr = State.Sr;
+        memory.WriteUInt32(0xFF00_0024, eventCode);
+        State.Sr |= Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit;
+        immediateBranchTarget = State.Vbr + 0x100;
     }
 
     private static int SignExtend12(int value) => (value & 0x800) != 0 ? value | unchecked((int)0xFFFF_F000) : value;

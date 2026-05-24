@@ -15,6 +15,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/hello`: default KOS init fixture that now reaches `main()` after Maple startup.
   - `samples/kos/minimal`: minimal init fixture that reaches `main()` and exits via the firmware-exit trap.
   - `samples/kos/trap_exception`: bare-metal SH fixture that executes `trapa`, returns through `rte`, and exposes exception registers.
+  - `samples/kos/illegal_instruction`: bare-metal SH fixture that exercises general and slot illegal instruction exceptions.
   - `samples/kos/timer`: default KOS fixture that exercises `timer_ms_gettime64()` and `thd_sleep()`.
   - `samples/kos/timer_callback`: default KOS fixture that chains a TMU0 primary timer callback.
   - `samples/kos/timer_vblank`: default KOS fixture that observes TMU callback delivery while VBlank IRQ9 is enabled.

@@ -19,7 +19,7 @@
 
 - Implement core integer/register model. Done for the current KOS fixtures.
 - Decode 16-bit opcodes with trace formatting. Done for the current KOS fixtures.
-- Support branches, delay slots, loads/stores, arithmetic, comparisons, basic system registers, `trapa` entry, and `rte` return. Done for the current KOS fixtures, with a bare-metal trap fixture pinning exception diagnostics.
+- Support branches, delay slots, loads/stores, arithmetic, comparisons, basic system registers, `trapa` entry, modeled `0xFFFD` illegal-instruction exceptions, and `rte` return. Done for the current KOS fixtures, with bare-metal trap and illegal-instruction fixtures pinning exception diagnostics.
 - Stop cleanly on unsupported opcode or exception. Done.
 - Keep adding opcodes only when a fixture or focused unit test exposes the missing behavior.
 
