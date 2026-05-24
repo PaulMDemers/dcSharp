@@ -159,6 +159,50 @@ public class DreamcastPvrTaStreamDecoderTests
             });
     }
 
+    [Theory]
+    [InlineData(0xA084_0000u, "SpriteHeader", "Mode1", "Mode2", "Mode3", "Parameter0", "Parameter3")]
+    [InlineData(0x8000_0000u, "ModifierVolume", "Mode1", "Mode2", "Mode3", "Parameter0", "Parameter3")]
+    [InlineData(0x2000_0000u, "UserClip", "Clip0", "Clip1", "Clip2", "Clip3", "Clip6")]
+    public void TracksKnownNonPolygonHeaderPayloadWords(
+        uint controlValue,
+        string controlKind,
+        string payload0Name,
+        string payload1Name,
+        string payload2Name,
+        string payload3Name,
+        string payload6Name)
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", controlValue),
+            CreateWrite("TA_INPUT", 0x1111_1111),
+            CreateWrite("TA_INPUT", 0x2222_2222),
+            CreateWrite("TA_INPUT", 0x3333_3333),
+            CreateWrite("TA_INPUT", 0x4444_4444),
+            CreateWrite("TA_INPUT", 0x5555_5555),
+            CreateWrite("TA_INPUT", 0x6666_6666),
+            CreateWrite("TA_INPUT", 0x7777_7777)
+        };
+
+        var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
+
+        Assert.Equal(8, decoded.Count);
+        Assert.Equal("Control", decoded[0].Role);
+        Assert.Equal(controlKind, decoded[0].ControlKind);
+        Assert.Equal(7, decoded[0].PayloadWordsRemaining);
+        Assert.Null(decoded[0].PayloadWordName);
+        Assert.Equal("Payload", decoded[1].Role);
+        Assert.Equal(controlKind, decoded[1].ControlKind);
+        Assert.Equal(0, decoded[1].PayloadWordIndex);
+        Assert.Equal(6, decoded[1].PayloadWordsRemaining);
+        Assert.Equal(payload0Name, decoded[1].PayloadWordName);
+        Assert.Equal(payload1Name, decoded[2].PayloadWordName);
+        Assert.Equal(payload2Name, decoded[3].PayloadWordName);
+        Assert.Equal(payload3Name, decoded[4].PayloadWordName);
+        Assert.Equal(payload6Name, decoded[7].PayloadWordName);
+        Assert.Equal(0, decoded[7].PayloadWordsRemaining);
+    }
+
     [Fact]
     public void TracksGenericVertexPayloadWords()
     {

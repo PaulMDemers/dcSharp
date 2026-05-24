@@ -2300,6 +2300,101 @@
       }
     },
     {
+      "name": "pvr_sprite",
+      "sample": "samples/kos/pvr_sprite",
+      "artifact": "dcsharp_pvr_sprite.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR sprite probe",
+        "header=0xa0840000",
+        "param0=0x3f800000",
+        "param3=0x40800000",
+        "ta_init=0x80000000"
+      ],
+      "minPvrRegisterAccesses": 5,
+      "minPvrTaCommandWrites": 8,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaCommands": [
+        {
+          "kind": "SpriteHeader",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xA0840000",
+          "minCount": 1
+        }
+      ],
+      "pvrTaStreamWrites": [
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "SpriteHeader",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840000",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840000",
+          "payloadWordIndex": 0,
+          "payloadWordsRemaining": 6,
+          "payloadWordName": "Mode1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x3F800000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840000",
+          "payloadWordIndex": 3,
+          "payloadWordsRemaining": 3,
+          "payloadWordName": "Parameter0",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x40800000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840000",
+          "payloadWordIndex": 6,
+          "payloadWordsRemaining": 0,
+          "payloadWordName": "Parameter3",
+          "minCount": 1
+        }
+      ],
+      "pvrTaParameterHeaders": [
+        {
+          "kind": "SpriteHeader",
+          "region": "TA_INPUT",
+          "parameterType": 5,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "value": "0xA0840000",
+          "expectedPayloadWords": 7,
+          "hasKnownPayloadLength": true,
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "pvr_culling",
       "sample": "samples/kos/pvr_culling",
       "artifact": "dcsharp_pvr_culling.elf",
