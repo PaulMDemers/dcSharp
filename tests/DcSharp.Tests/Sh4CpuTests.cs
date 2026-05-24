@@ -537,8 +537,7 @@ public class Sh4CpuTests
     {
         var memory = new DreamcastMemory();
         WriteInstruction(memory, 0x8C01_0000, 0x0009);
-        memory.WriteUInt32(0xA05F_6930, 1u << 3);
-        memory.RaiseVBlankBegin();
+        RaiseVBlankIrq9(memory);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Vbr = 0x8C02_0000;
 
@@ -551,6 +550,115 @@ public class Sh4CpuTests
         Assert.Equal(0u, cpu.State.Ssr);
         Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
         Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0x90u, cpu.State.Sr);
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C020600", step.Trace);
+    }
+
+    [Fact]
+    public void DoesNotAcceptExternalInterruptWhenBlockBitIsSet()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = Sh4State.SrBlockBit;
+
+        var step = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, step.Pc);
+        Assert.Equal(0x0009, step.Opcode);
+        Assert.Equal("nop", step.Trace);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+        Assert.Equal(0u, cpu.State.Spc);
+        Assert.Equal(0u, cpu.State.Ssr);
+        Assert.Equal(0u, memory.ReadUInt32(0xFF00_0028));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+    }
+
+    [Fact]
+    public void DoesNotAcceptExternalInterruptAtOrBelowInterruptMask()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = 9u << 4;
+
+        var step = cpu.Step();
+
+        Assert.Equal(0x0009, step.Opcode);
+        Assert.Equal("nop", step.Trace);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0xFF00_0028));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+    }
+
+    [Fact]
+    public void DefersExternalInterruptUntilAfterBranchDelaySlot()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x402B);
+        WriteInstruction(memory, 0x8C01_0002, 0x0009);
+        WriteInstruction(memory, 0x8C01_0020, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[0] = 0x8C01_0020;
+        cpu.State.Vbr = 0x8C02_0000;
+
+        cpu.Step();
+        RaiseVBlankIrq9(memory);
+        var delaySlotStep = cpu.Step();
+
+        Assert.Equal(0x8C01_0002u, delaySlotStep.Pc);
+        Assert.Equal(0x0009, delaySlotStep.Opcode);
+        Assert.Equal("nop", delaySlotStep.Trace);
+        Assert.Equal(0x8C01_0020u, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0xFF00_0028));
+
+        var interruptStep = cpu.Step();
+
+        Assert.Equal(0x8C01_0020u, interruptStep.Pc);
+        Assert.Equal(0, interruptStep.Opcode);
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0020u, cpu.State.Spc);
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C020600", interruptStep.Trace);
+    }
+
+    [Fact]
+    public void ReturnFromExceptionDefersRestoredInterruptUntilAfterDelaySlot()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x002B);
+        WriteInstruction(memory, 0x8C01_0002, 0x0009);
+        WriteInstruction(memory, 0x8C01_0020, 0x0009);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Spc = 0x8C01_0020;
+        cpu.State.Ssr = 0;
+        cpu.State.Sr = Sh4State.SrBlockBit;
+        cpu.State.Vbr = 0x8C02_0000;
+
+        cpu.Step();
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+        Assert.Equal(0u, cpu.State.Sr);
+
+        var delaySlotStep = cpu.Step();
+
+        Assert.Equal(0x8C01_0002u, delaySlotStep.Pc);
+        Assert.Equal(0x0009, delaySlotStep.Opcode);
+        Assert.Equal(0x8C01_0020u, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0xFF00_0028));
+
+        var interruptStep = cpu.Step();
+
+        Assert.Equal(0x8C01_0020u, interruptStep.Pc);
+        Assert.Equal(0, interruptStep.Opcode);
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0020u, cpu.State.Spc);
     }
 
     [Fact]
@@ -610,6 +718,12 @@ public class Sh4CpuTests
     private static void WriteInstruction(DreamcastMemory memory, uint address, ushort opcode)
     {
         memory.Write(address, [(byte)opcode, (byte)(opcode >> 8)]);
+    }
+
+    private static void RaiseVBlankIrq9(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
     }
 
     private static double ReadDouble(Sh4Cpu cpu, int register)
