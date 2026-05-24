@@ -741,6 +741,62 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void PendingExternalInterruptDoesNotNestUntilReturnFromExceptionCompletes()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C02_0600, 0x0009);
+        WriteInstruction(memory, 0x8C02_0602, 0x002B);
+        WriteInstruction(memory, 0x8C02_0604, 0x0009);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+
+        var firstInterrupt = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, firstInterrupt.Pc);
+        Assert.Equal(0, firstInterrupt.Opcode);
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0u, cpu.State.Ssr);
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0x90u, cpu.State.Sr);
+
+        var blockedNestedInterrupt = cpu.Step();
+
+        Assert.Equal(0x8C02_0600u, blockedNestedInterrupt.Pc);
+        Assert.Equal(0x0009, blockedNestedInterrupt.Opcode);
+        Assert.Equal("nop", blockedNestedInterrupt.Trace);
+        Assert.Equal(0x8C02_0602u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var pendingEventCode, out var pendingLevel));
+        Assert.Equal(0x0320u, pendingEventCode);
+        Assert.Equal(9, pendingLevel);
+
+        var returnStep = cpu.Step();
+
+        Assert.Equal(0x8C02_0602u, returnStep.Pc);
+        Assert.Equal(0x002B, returnStep.Opcode);
+        Assert.Equal(0x8C02_0604u, cpu.State.Pc);
+        Assert.Equal(0u, cpu.State.Sr);
+
+        var returnDelaySlot = cpu.Step();
+
+        Assert.Equal(0x8C02_0604u, returnDelaySlot.Pc);
+        Assert.Equal(0x0009, returnDelaySlot.Opcode);
+        Assert.Equal("nop", returnDelaySlot.Trace);
+        Assert.Equal(0x8C01_0000u, cpu.State.Pc);
+
+        var secondInterrupt = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, secondInterrupt.Pc);
+        Assert.Equal(0, secondInterrupt.Opcode);
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C020600", secondInterrupt.Trace);
+    }
+
+    [Fact]
     public void DoesNotAcceptExternalInterruptAtOrBelowInterruptMask()
     {
         var memory = new DreamcastMemory();
