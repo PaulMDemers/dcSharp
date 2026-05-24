@@ -2,6 +2,7 @@ using DcSharp.Core.Dreamcast;
 using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
+using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Media;
 using System.Numerics;
@@ -694,6 +695,47 @@ public sealed class DreamcastMemory
             pendingInterrupt);
     }
 
+    public DreamcastTimerSnapshot CreateTimerSnapshot()
+    {
+        var channels = Enumerable.Range(0, 3)
+            .Select(channel =>
+            {
+                var constant = p4Registers.GetValueOrDefault(TimerConstantAddress(channel));
+                var counter = p4Registers.GetValueOrDefault(TimerCounterAddress(channel));
+                var control = p4Registers.GetValueOrDefault(TimerControlAddress(channel));
+                var priority = TimerInterruptPriority(channel);
+                return new DreamcastTimerChannelSnapshot(
+                    channel,
+                    constant,
+                    $"0x{constant:X8}",
+                    counter,
+                    $"0x{counter:X8}",
+                    control,
+                    $"0x{control:X8}",
+                    priority,
+                    (p4Registers.GetValueOrDefault(TimerStart) & (1u << channel)) != 0,
+                    (control & TimerUnderflow) != 0,
+                    (control & TimerUnderflowInterruptEnable) != 0);
+            })
+            .ToArray();
+
+        var pendingInterrupt = TryGetPendingTimerInterrupt(out var pendingEventCode, out var pendingPriority, out var pendingChannel)
+            ? new DreamcastTimerPendingInterruptSnapshot(
+                pendingEventCode,
+                $"0x{pendingEventCode:X4}",
+                pendingChannel,
+                pendingPriority)
+            : null;
+
+        return new DreamcastTimerSnapshot(
+            channels,
+            pendingInterrupt?.EventCode,
+            pendingInterrupt?.EventCodeHex,
+            pendingInterrupt?.Channel,
+            pendingInterrupt?.Priority,
+            pendingInterrupt);
+    }
+
     private IReadOnlyList<DreamcastVideoSample> CreateVideoSamples()
     {
         (string Name, uint Offset)[] offsets =
@@ -775,7 +817,7 @@ public sealed class DreamcastMemory
 
     public bool TryGetPendingExternalInterrupt(out uint eventCode, out int level)
     {
-        var hasTimer = TryGetPendingTimerInterrupt(out var timerEventCode, out var timerLevel);
+        var hasTimer = TryGetPendingTimerInterrupt(out var timerEventCode, out var timerLevel, out _);
         var hasAsic = TryGetPendingAsicInterrupt(out var asicPending);
         if (hasTimer && (!hasAsic || timerLevel >= asicPending.Level))
         {
@@ -869,10 +911,14 @@ public sealed class DreamcastMemory
         return ticks;
     }
 
-    private bool TryGetPendingTimerInterrupt(out uint eventCode, out int level)
+    private bool TryGetPendingTimerInterrupt(out uint eventCode, out int level) =>
+        TryGetPendingTimerInterrupt(out eventCode, out level, out _);
+
+    private bool TryGetPendingTimerInterrupt(out uint eventCode, out int level, out int pendingChannel)
     {
         eventCode = 0;
         level = 0;
+        pendingChannel = -1;
         for (var channel = 0; channel < 3; channel++)
         {
             var control = p4Registers.GetValueOrDefault(TimerControlAddress(channel));
@@ -899,6 +945,7 @@ public sealed class DreamcastMemory
                 _ => 0x0440
             };
             level = priority;
+            pendingChannel = channel;
         }
 
         return level != 0;

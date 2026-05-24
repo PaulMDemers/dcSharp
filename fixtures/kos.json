@@ -3997,6 +3997,7 @@
       ],
       "minVblankEvents": 1,
       "requireNoAsicPendingInterrupt": true,
+      "requireNoTimerPendingInterrupt": true,
       "cpu": {
         "pc": "0x8C010030",
         "sr": "0x00000001",
@@ -4034,6 +4035,7 @@
       ],
       "minVblankEvents": 1,
       "requireNoAsicPendingInterrupt": true,
+      "requireNoTimerPendingInterrupt": true,
       "cpu": {
         "pc": "0x8C01006C",
         "sr": "0x00000001",
@@ -4051,6 +4053,32 @@
           "ack": "0x00000000",
           "irq9Mask": "0x00000000",
           "pendingIrq9": "0x00000000"
+        }
+      ],
+      "timerChannels": [
+        {
+          "channel": 0,
+          "control": "0x00000020",
+          "priority": 10,
+          "running": false,
+          "underflowPending": false,
+          "interruptEnabled": true
+        },
+        {
+          "channel": 1,
+          "control": "0x00000000",
+          "priority": 0,
+          "running": false,
+          "underflowPending": false,
+          "interruptEnabled": false
+        },
+        {
+          "channel": 2,
+          "control": "0x00000000",
+          "priority": 0,
+          "running": false,
+          "underflowPending": false,
+          "interruptEnabled": false
         }
       ],
       "minDeviceAccessDomains": {

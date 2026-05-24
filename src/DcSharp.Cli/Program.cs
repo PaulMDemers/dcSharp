@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
@@ -193,6 +194,11 @@ static void RunElf(string path, string[] args)
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, sectorSize={gdrom.SectorSize?.ToString(CultureInfo.InvariantCulture) ?? "none"}, sectors={gdrom.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, leadout={gdrom.LeadoutFadHex ?? "none"}, tracks={gdrom.MediaTracks.Count}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, bytes={gdrom.ReadCommands.Sum(command => command.BytesRead)}, tocs={gdrom.TocCommands.Count}");
     Console.WriteLine($"Scheduler: vblanks={result.Scheduler.VBlankEventsRaised}, nextVBlank={result.Scheduler.NextVBlankInstruction}, hardwareTicks={result.Scheduler.HardwareAdvanceTicks}, hardwareBatches={result.Scheduler.HardwareAdvanceBatches}, maxHardwareBatch={result.Scheduler.MaxHardwareAdvanceBatch}, idleTicks={result.Scheduler.IdleAdvanceTicks}, idleBatches={result.Scheduler.IdleAdvanceBatches}, maxIdleBatch={result.Scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{result.Scheduler.IdleTimerWakeCount}/vblank:{result.Scheduler.IdleVBlankWakeCount}/input:{result.Scheduler.IdleInputWakeCount}, cpuFastForward={result.Scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={result.Scheduler.CpuFastForwardBatches}, maxCpuFastForward={result.Scheduler.MaxCpuFastForwardBatch}, inputChanges={result.Scheduler.ControllerScriptChanges}");
+    var timerSummary = DreamcastTimerSummary.FromSnapshot(result.Timer ?? DreamcastTimerSnapshot.Empty);
+    var timerSource = timerSummary.PendingInterrupt is { } pendingTimer
+        ? $", channel={pendingTimer.Channel}, priority={pendingTimer.Priority}"
+        : string.Empty;
+    Console.WriteLine($"TMU: pending={timerSummary.PendingEventCodeHex ?? "none"}{timerSource}");
     var asicSource = result.Asic.PendingInterrupt is { } pendingAsic
         ? $", source={pendingAsic.LevelName}:{pendingAsic.RegisterName}{pendingAsic.Bit}"
         : string.Empty;
@@ -383,7 +389,7 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, timerPending={result.Summary.Timer.PendingEventCodeHex ?? "none"}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
@@ -948,6 +954,9 @@ internal sealed record FixtureReport(
     int? MapleTransferCount,
     int? MapleDeviceInfoCount,
     int? MapleGetConditionCount,
+    string? TimerPendingEventCode,
+    int? TimerPendingChannel,
+    int? TimerPendingPriority,
     string? AsicPendingEventCode,
     int? AsicPendingLevel,
     ulong? VBlankEventsRaised,
@@ -986,6 +995,9 @@ internal sealed record FixtureReport(
             result.Summary?.Maple.TransferCount,
             result.Summary?.Maple.DeviceInfoCount,
             result.Summary?.Maple.GetConditionCount,
+            result.Summary?.Timer.PendingEventCodeHex,
+            result.Summary?.Timer.PendingChannel,
+            result.Summary?.Timer.PendingPriority,
             result.Summary?.Asic.PendingEventCodeHex,
             result.Summary?.Asic.PendingLevel,
             result.Summary?.Scheduler.VBlankEventsRaised,

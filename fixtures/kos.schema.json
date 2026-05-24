@@ -99,6 +99,9 @@
         "requireNoAsicPendingInterrupt": {
           "type": "boolean"
         },
+        "requireNoTimerPendingInterrupt": {
+          "type": "boolean"
+        },
         "minPvrRegisterAccesses": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
@@ -202,6 +205,15 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/asicEventRegister"
+          }
+        },
+        "timerPendingInterrupt": {
+          "$ref": "#/$defs/timerPendingInterrupt"
+        },
+        "timerChannels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/timerChannel"
           }
         },
         "aicaChannels": {
@@ -393,6 +405,62 @@
         },
         "pendingIrqD": {
           "$ref": "#/$defs/hex32"
+        }
+      }
+    },
+    "timerPendingInterrupt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eventCode": {
+          "$ref": "#/$defs/hex32"
+        },
+        "channel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        }
+      }
+    },
+    "timerChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel"
+      ],
+      "properties": {
+        "channel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "constant": {
+          "$ref": "#/$defs/hex32"
+        },
+        "counter": {
+          "$ref": "#/$defs/hex32"
+        },
+        "control": {
+          "$ref": "#/$defs/hex32"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "underflowPending": {
+          "type": "boolean"
+        },
+        "interruptEnabled": {
+          "type": "boolean"
         }
       }
     },

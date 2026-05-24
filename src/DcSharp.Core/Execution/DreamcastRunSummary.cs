@@ -3,6 +3,7 @@ using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Media;
 using System.Text;
@@ -38,6 +39,7 @@ public sealed record DreamcastRunSummary(
     DreamcastAudioSummary Audio,
     DreamcastMapleSummary Maple,
     DreamcastGdromSummary Gdrom,
+    DreamcastTimerSummary Timer,
     DreamcastSchedulerSummary Scheduler,
     DreamcastCpuSummary Cpu)
 {
@@ -91,6 +93,7 @@ public sealed record DreamcastRunSummary(
             DreamcastAudioSummary.FromSnapshot(result.Audio),
             DreamcastMapleSummary.FromSnapshot(result.Maple),
             DreamcastGdromSummary.FromSnapshot(result.Gdrom ?? DreamcastGdromSnapshot.Empty),
+            DreamcastTimerSummary.FromSnapshot(result.Timer ?? DreamcastTimerSnapshot.Empty),
             DreamcastSchedulerSummary.FromSnapshot(result.Scheduler),
             DreamcastCpuSummary.FromSnapshot(result.Cpu));
     }
@@ -351,6 +354,66 @@ public sealed record DreamcastAsicEventRegisterSummary(
             register.PendingIrqBHex,
             register.PendingIrqD,
             register.PendingIrqDHex);
+}
+
+public sealed record DreamcastTimerSummary(
+    IReadOnlyList<DreamcastTimerChannelSummary> Channels,
+    uint? PendingEventCode,
+    string? PendingEventCodeHex,
+    int? PendingChannel,
+    int? PendingPriority,
+    DreamcastTimerPendingInterruptSummary? PendingInterrupt)
+{
+    public static DreamcastTimerSummary FromSnapshot(DreamcastTimerSnapshot snapshot) =>
+        new(
+            snapshot.Channels.Select(DreamcastTimerChannelSummary.FromChannel).ToArray(),
+            snapshot.PendingEventCode,
+            snapshot.PendingEventCodeHex,
+            snapshot.PendingChannel,
+            snapshot.PendingPriority,
+            snapshot.PendingInterrupt is { } pending ? DreamcastTimerPendingInterruptSummary.FromInterrupt(pending) : null);
+}
+
+public sealed record DreamcastTimerPendingInterruptSummary(
+    uint EventCode,
+    string EventCodeHex,
+    int Channel,
+    int Priority)
+{
+    public static DreamcastTimerPendingInterruptSummary FromInterrupt(DreamcastTimerPendingInterruptSnapshot interrupt) =>
+        new(
+            interrupt.EventCode,
+            interrupt.EventCodeHex,
+            interrupt.Channel,
+            interrupt.Priority);
+}
+
+public sealed record DreamcastTimerChannelSummary(
+    int Channel,
+    uint Constant,
+    string ConstantHex,
+    uint Counter,
+    string CounterHex,
+    uint Control,
+    string ControlHex,
+    int Priority,
+    bool Running,
+    bool UnderflowPending,
+    bool InterruptEnabled)
+{
+    public static DreamcastTimerChannelSummary FromChannel(DreamcastTimerChannelSnapshot channel) =>
+        new(
+            channel.Channel,
+            channel.Constant,
+            channel.ConstantHex,
+            channel.Counter,
+            channel.CounterHex,
+            channel.Control,
+            channel.ControlHex,
+            channel.Priority,
+            channel.Running,
+            channel.UnderflowPending,
+            channel.InterruptEnabled);
 }
 
 public sealed record DreamcastVideoSummary(

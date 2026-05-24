@@ -3,6 +3,7 @@ using DcSharp.Core.Dreamcast.Asic;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Loading;
 using DcSharp.Core.Media;
@@ -59,25 +60,25 @@ public sealed class DreamcastRunner
                 }
             }
 
-            return DreamcastRunResult.InstructionLimit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot());
+            return DreamcastRunResult.InstructionLimit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot());
         }
         catch (UnsupportedInstructionException ex)
         {
             var serialOutput = memory.SerialOutput.ToArray();
             if (HasKosExitBanner(serialOutput) && !IsInExecutableSegment(load, ex.Pc))
             {
-                return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), serialOutput, memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), ex.Pc, ex.Opcode, ex.Message);
+                return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), serialOutput, memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message);
             }
 
-            return DreamcastRunResult.UnsupportedInstruction(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), ex.Pc, ex.Opcode, ex.Message);
+            return DreamcastRunResult.UnsupportedInstruction(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message);
         }
         catch (MemoryMapException ex)
         {
-            return DreamcastRunResult.MemoryFault(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), ex.Message);
+            return DreamcastRunResult.MemoryFault(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message);
         }
         catch (DreamcastFirmwareExitException ex)
         {
-            return DreamcastRunResult.FirmwareExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), ex.Message);
+            return DreamcastRunResult.FirmwareExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message);
         }
     }
 
@@ -236,7 +237,8 @@ public sealed record DreamcastRunResult(
     string StopDetail,
     uint? StopPc,
     ushort? StopOpcode,
-    DreamcastGdromSnapshot? Gdrom = null)
+    DreamcastGdromSnapshot? Gdrom = null,
+    DreamcastTimerSnapshot? Timer = null)
 {
     public static DreamcastRunResult InstructionLimit(
         ElfLoadResult load,
@@ -251,8 +253,9 @@ public sealed record DreamcastRunResult(
         DreamcastAudioSnapshot audio,
         DreamcastMapleSnapshot maple,
         DreamcastSchedulerSnapshot scheduler,
-        DreamcastGdromSnapshot gdrom) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.InstructionLimit, "Instruction limit reached", null, null, gdrom);
+        DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer) =>
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.InstructionLimit, "Instruction limit reached", null, null, gdrom, timer);
 
     public static DreamcastRunResult UnsupportedInstruction(
         ElfLoadResult load,
@@ -268,10 +271,11 @@ public sealed record DreamcastRunResult(
         DreamcastMapleSnapshot maple,
         DreamcastSchedulerSnapshot scheduler,
         DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
         uint pc,
         ushort opcode,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.UnsupportedInstruction, detail, pc, opcode, gdrom);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.UnsupportedInstruction, detail, pc, opcode, gdrom, timer);
 
     public static DreamcastRunResult ProgramExit(
         ElfLoadResult load,
@@ -287,10 +291,11 @@ public sealed record DreamcastRunResult(
         DreamcastMapleSnapshot maple,
         DreamcastSchedulerSnapshot scheduler,
         DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
         uint pc,
         ushort opcode,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS shutdown at 0x{pc:X8}: {detail}", pc, opcode, gdrom);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS shutdown at 0x{pc:X8}: {detail}", pc, opcode, gdrom, timer);
 
     public static DreamcastRunResult MemoryFault(
         ElfLoadResult load,
@@ -306,8 +311,9 @@ public sealed record DreamcastRunResult(
         DreamcastMapleSnapshot maple,
         DreamcastSchedulerSnapshot scheduler,
         DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.MemoryFault, detail, state.Pc, null, gdrom);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.MemoryFault, detail, state.Pc, null, gdrom, timer);
 
     public static DreamcastRunResult FirmwareExit(
         ElfLoadResult load,
@@ -323,8 +329,9 @@ public sealed record DreamcastRunResult(
         DreamcastMapleSnapshot maple,
         DreamcastSchedulerSnapshot scheduler,
         DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.FirmwareExit, detail, state.Pc, null, gdrom);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.FirmwareExit, detail, state.Pc, null, gdrom, timer);
 }
 
 public sealed record Sh4StateSnapshot(

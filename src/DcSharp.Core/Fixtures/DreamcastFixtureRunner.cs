@@ -109,6 +109,11 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected no pending ASIC interrupt, got {summary.Asic.PendingEventCodeHex} level {summary.Asic.PendingLevel}");
         }
 
+        if (fixture.RequireNoTimerPendingInterrupt && summary.Timer.PendingEventCode is not null)
+        {
+            failures.Add($"expected no pending timer interrupt, got {summary.Timer.PendingEventCodeHex} channel {summary.Timer.PendingChannel} priority {summary.Timer.PendingPriority}");
+        }
+
         if (fixture.Cpu is { } expectedCpu)
         {
             ValidateCpu(failures, summary.Cpu, expectedCpu);
@@ -129,6 +134,21 @@ public static class DreamcastFixtureRunner
                 ValidateString(failures, "ASIC pending interrupt register", expectedPending.RegisterName, pending.RegisterName);
                 ValidateInt(failures, "ASIC pending interrupt bit", expectedPending.Bit, pending.Bit);
                 ValidateHex32(failures, "ASIC pending interrupt bit mask", expectedPending.BitMask, pending.BitMask, pending.BitMaskHex);
+            }
+        }
+
+        if (fixture.TimerPendingInterrupt is { } expectedTimerPending)
+        {
+            var pending = summary.Timer.PendingInterrupt;
+            if (pending is null)
+            {
+                failures.Add("missing pending timer interrupt");
+            }
+            else
+            {
+                ValidateHex32(failures, "timer pending interrupt event code", expectedTimerPending.EventCode, pending.EventCode, pending.EventCodeHex);
+                ValidateInt(failures, "timer pending interrupt channel", expectedTimerPending.Channel, pending.Channel);
+                ValidateInt(failures, "timer pending interrupt priority", expectedTimerPending.Priority, pending.Priority);
             }
         }
 
@@ -365,6 +385,24 @@ public static class DreamcastFixtureRunner
             ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQ9", expected.PendingIrq9, register.PendingIrq9, register.PendingIrq9Hex);
             ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQB", expected.PendingIrqB, register.PendingIrqB, register.PendingIrqBHex);
             ValidateHex32(failures, $"ASIC event register {expected.Name} pending IRQD", expected.PendingIrqD, register.PendingIrqD, register.PendingIrqDHex);
+        }
+
+        foreach (var expected in fixture.TimerChannels)
+        {
+            var channel = summary.Timer.Channels.SingleOrDefault(channel => channel.Channel == expected.Channel);
+            if (channel is null)
+            {
+                failures.Add($"missing timer channel: {expected.Channel}");
+                continue;
+            }
+
+            ValidateHex32(failures, $"timer channel {expected.Channel} constant", expected.Constant, channel.Constant, channel.ConstantHex);
+            ValidateHex32(failures, $"timer channel {expected.Channel} counter", expected.Counter, channel.Counter, channel.CounterHex);
+            ValidateHex32(failures, $"timer channel {expected.Channel} control", expected.Control, channel.Control, channel.ControlHex);
+            ValidateInt(failures, $"timer channel {expected.Channel} priority", expected.Priority, channel.Priority);
+            ValidateBool(failures, $"timer channel {expected.Channel} running", expected.Running, channel.Running);
+            ValidateBool(failures, $"timer channel {expected.Channel} underflow pending", expected.UnderflowPending, channel.UnderflowPending);
+            ValidateBool(failures, $"timer channel {expected.Channel} interrupt enabled", expected.InterruptEnabled, channel.InterruptEnabled);
         }
 
         foreach (var (registerName, expectedValueText) in fixture.AicaRegisters)

@@ -416,6 +416,7 @@ internal sealed class MainForm : Form
             $"AICA: registers={summary.Audio.RegisterAccessCount:N0}, channels={summary.Audio.Channels.Count:N0}, active={summary.Audio.ActiveChannelCount:N0}",
             $"Maple: transfers={summary.Maple.TransferCount:N0}, dmaBatches={summary.Maple.DmaBatchCount:N0}",
             $"GD-ROM: media={summary.Gdrom.HasMedia}, tracks={summary.Gdrom.MediaTracks.Count:N0}, statuses={summary.Gdrom.StatusCommandCount:N0}, modes={summary.Gdrom.SectorModeCommandCount:N0}, tocs={summary.Gdrom.TocCommandCount:N0}, reads={summary.Gdrom.ReadCommandCount:N0}, failed={summary.Gdrom.FailedReadCommandCount:N0}, bytes={summary.Gdrom.BytesRead:N0}",
+            $"TMU: pending={summary.Timer.PendingEventCodeHex ?? "none"}, channels={summary.Timer.Channels.Count:N0}",
             $"Scheduler: vblanks={summary.Scheduler.VBlankEventsRaised:N0}, hardwareTicks={summary.Scheduler.HardwareAdvanceTicks:N0}, fastForward={summary.Scheduler.CpuFastForwardInstructions:N0}"
         };
 

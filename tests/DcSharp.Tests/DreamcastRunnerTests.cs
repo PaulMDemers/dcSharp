@@ -96,6 +96,8 @@ public class DreamcastRunnerTests
         Assert.Single(summary.RecentDeviceAccesses);
         Assert.Equal(2, summary.TraceTail.Count);
         Assert.Equal(result.Asic.PendingEventCodeHex, summary.Asic.PendingEventCodeHex);
+        Assert.Equal(result.Timer?.PendingEventCodeHex, summary.Timer.PendingEventCodeHex);
+        Assert.Equal(3, summary.Timer.Channels.Count);
         Assert.Equal(result.Video.Fnv1A32Hex, summary.Video.Fnv1A32Hex);
         Assert.Equal(result.Scheduler.VBlankEventsRaised, summary.Scheduler.VBlankEventsRaised);
         Assert.Equal(result.Scheduler.HardwareAdvanceTicks, summary.Scheduler.HardwareAdvanceTicks);

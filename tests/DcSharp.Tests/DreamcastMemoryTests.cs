@@ -709,6 +709,42 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void TimerSnapshotReportsChannelsAndPendingInterrupt()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 10);
+        memory.WriteUInt32(0xFFD8_0008, 0x1234);
+        memory.WriteUInt32(0xFFD8_000C, 0x5678);
+        memory.Write(0xFFD8_0004, [0x01]);
+
+        var snapshot = memory.CreateTimerSnapshot();
+
+        Assert.Equal(0x0400u, snapshot.PendingEventCode);
+        Assert.Equal("0x0400", snapshot.PendingEventCodeHex);
+        Assert.Equal(0, snapshot.PendingChannel);
+        Assert.Equal(10, snapshot.PendingPriority);
+        Assert.NotNull(snapshot.PendingInterrupt);
+        Assert.Equal(0, snapshot.PendingInterrupt.Channel);
+        Assert.Equal(10, snapshot.PendingInterrupt.Priority);
+
+        var channel0 = Assert.Single(snapshot.Channels, channel => channel.Channel == 0);
+        Assert.Equal(0x1234u, channel0.Constant);
+        Assert.Equal("0x00001234", channel0.ConstantHex);
+        Assert.Equal(0x5678u, channel0.Counter);
+        Assert.Equal("0x00005678", channel0.CounterHex);
+        Assert.Equal(0x0120u, channel0.Control);
+        Assert.True(channel0.Running);
+        Assert.True(channel0.UnderflowPending);
+        Assert.True(channel0.InterruptEnabled);
+        Assert.Equal(10, channel0.Priority);
+
+        var channel1 = Assert.Single(snapshot.Channels, channel => channel.Channel == 1);
+        Assert.Equal(0u, channel1.Control);
+        Assert.False(channel1.Running);
+    }
+
+    [Fact]
     public void AsicInterruptPriorityBeatsLowerPriorityTimer()
     {
         var memory = new DreamcastMemory();

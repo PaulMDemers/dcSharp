@@ -93,6 +93,7 @@ public class DreamcastFixtureRunnerTests
             MaxCpuFastForwardBatch = 7,
             MinControllerScriptChanges = 1,
             RequireNoAsicPendingInterrupt = true,
+            RequireNoTimerPendingInterrupt = true,
             AsicPendingInterrupt = null,
             MinDeviceAccessDomains =
             {
@@ -114,6 +115,18 @@ public class DreamcastFixtureRunnerTests
                     Ack = "0x00000000",
                     Irq9Mask = "0x00000008",
                     PendingIrq9 = "0x00000000"
+                }
+            ],
+            TimerChannels =
+            [
+                new DreamcastFixtureTimerChannelExpectation
+                {
+                    Channel = 0,
+                    Control = "0x00000020",
+                    Priority = 10,
+                    Running = false,
+                    UnderflowPending = false,
+                    InterruptEnabled = true
                 }
             ],
             PvrRegisters =
@@ -297,6 +310,22 @@ public class DreamcastFixtureRunnerTests
             mapleGetConditionTransfers: 5,
             mapleDmaBatches: 2,
             asic: CreateAsicSummary(),
+            timer: CreateTimerSummary(
+                channels:
+                [
+                    new DreamcastTimerChannelSummary(
+                        0,
+                        0,
+                        "0x00000000",
+                        0,
+                        "0x00000000",
+                        0x00000020,
+                        "0x00000020",
+                        10,
+                        false,
+                        false,
+                        true)
+                ]),
             gdrom: CreateGdromSummary(),
             cpu: CreateCpuSummary(vbr: 0x8C010000, spc: 0x8C010006, tra: 0x000000A8, expevt: 0x00000160),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
@@ -377,6 +406,7 @@ public class DreamcastFixtureRunnerTests
             MaxCpuFastForwardBatch = 6,
             MinControllerScriptChanges = 2,
             RequireNoAsicPendingInterrupt = true,
+            RequireNoTimerPendingInterrupt = true,
             AsicPendingInterrupt = new DreamcastFixtureAsicPendingInterruptExpectation
             {
                 EventCode = "0x0360",
@@ -385,6 +415,12 @@ public class DreamcastFixtureRunnerTests
                 RegisterName = "A",
                 Bit = 12,
                 BitMask = "0x00001000"
+            },
+            TimerPendingInterrupt = new DreamcastFixtureTimerPendingInterruptExpectation
+            {
+                EventCode = "0x00000420",
+                Channel = 1,
+                Priority = 11
             },
             MinDeviceAccessDomains =
             {
@@ -406,6 +442,21 @@ public class DreamcastFixtureRunnerTests
                 {
                     Name = "B",
                     Ack = "0x00000000"
+                }
+            ],
+            TimerChannels =
+            [
+                new DreamcastFixtureTimerChannelExpectation
+                {
+                    Channel = 0,
+                    Control = "0x00000020",
+                    Priority = 9,
+                    UnderflowPending = false
+                },
+                new DreamcastFixtureTimerChannelExpectation
+                {
+                    Channel = 1,
+                    Control = "0x00000020"
                 }
             ],
             PvrRegisters =
@@ -554,6 +605,25 @@ public class DreamcastFixtureRunnerTests
             mapleDmaBatches: 1,
             mapleDescriptorLimitHits: 1,
             asic: CreateAsicSummary(pendingEventCode: 0x0320, pendingLevel: 9, ack: 0x00000008, irq9Mask: 0x00000008),
+            timer: CreateTimerSummary(
+                pendingEventCode: 0x0400,
+                pendingChannel: 0,
+                pendingPriority: 10,
+                channels:
+                [
+                    new DreamcastTimerChannelSummary(
+                        0,
+                        0,
+                        "0x00000000",
+                        0,
+                        "0x00000000",
+                        0x00000120,
+                        "0x00000120",
+                        10,
+                        false,
+                        true,
+                        true)
+                ]),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800006, "0x00800006")],
             pvrTaCommandWrites:
             [
@@ -596,6 +666,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected no Maple descriptor-limit hits, got 1", failures);
         Assert.Contains("expected at least 3 tmu device accesses, got 2", failures);
         Assert.Contains("expected no pending ASIC interrupt, got 0x0320 level 9", failures);
+        Assert.Contains("expected no pending timer interrupt, got 0x0400 channel 0 priority 10", failures);
         Assert.Contains("ASIC pending interrupt event code expected 0x00000360, got 0x0320", failures);
         Assert.Contains("ASIC pending interrupt level expected 11, got 9", failures);
         Assert.Contains("ASIC pending interrupt level name expected IRQB, got IRQ9", failures);
@@ -603,6 +674,13 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("ASIC pending interrupt bit mask expected 0x00001000, got 0x00000008", failures);
         Assert.Contains("ASIC event register A ack expected 0x00000000, got 0x00000008", failures);
         Assert.Contains("missing ASIC event register: B", failures);
+        Assert.Contains("timer pending interrupt event code expected 0x00000420, got 0x0400", failures);
+        Assert.Contains("timer pending interrupt channel expected 1, got 0", failures);
+        Assert.Contains("timer pending interrupt priority expected 11, got 10", failures);
+        Assert.Contains("timer channel 0 control expected 0x00000020, got 0x00000120", failures);
+        Assert.Contains("timer channel 0 priority expected 9, got 10", failures);
+        Assert.Contains("timer channel 0 underflow pending expected False, got True", failures);
+        Assert.Contains("missing timer channel: 1", failures);
         Assert.Contains("PVR register PVR_FB_CFG_1 expected 0x00800005, got 0x00800006", failures);
         Assert.Contains("missing PVR register: PVR_FB_SIZE", failures);
         Assert.Contains("expected at least 1 PVR TA PolygonHeader region=TA_INPUT list=OpaquePolygon endOfStrip=False value=0x80840001 commands, got 0", failures);
@@ -661,6 +739,7 @@ public class DreamcastFixtureRunnerTests
         IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
         IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null,
+        DreamcastTimerSummary? timer = null,
         DreamcastCpuSummary? cpu = null) =>
         new(
             DreamcastStopReason.ProgramExit,
@@ -698,6 +777,7 @@ public class DreamcastFixtureRunnerTests
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
             gdrom ?? new DreamcastGdromSummary(false, null, null, null, null, [], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], []),
+            timer ?? CreateTimerSummary(),
             new DreamcastSchedulerSummary(
                 0,
                 0,
@@ -716,6 +796,21 @@ public class DreamcastFixtureRunnerTests
                 maxCpuFastForwardBatch,
                 controllerScriptChanges),
             cpu ?? CreateCpuSummary());
+
+    private static DreamcastTimerSummary CreateTimerSummary(
+        uint? pendingEventCode = null,
+        int? pendingChannel = null,
+        int? pendingPriority = null,
+        IReadOnlyList<DreamcastTimerChannelSummary>? channels = null) =>
+            new(
+                channels ?? [],
+                pendingEventCode,
+                pendingEventCode is { } pendingEvent ? $"0x{pendingEvent:X4}" : null,
+                pendingChannel,
+                pendingPriority,
+                pendingEventCode is { } eventCode && pendingChannel is { } channel && pendingPriority is { } priority
+                    ? new DreamcastTimerPendingInterruptSummary(eventCode, $"0x{eventCode:X4}", channel, priority)
+                    : null);
 
     private static DreamcastCpuSummary CreateCpuSummary(
         uint pc = 0,

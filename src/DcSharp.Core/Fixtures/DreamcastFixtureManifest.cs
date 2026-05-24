@@ -49,6 +49,7 @@ public sealed class DreamcastFixtureDefinition
     public List<string> SerialContains { get; set; } = [];
     public bool RequireVideoNonZero { get; set; }
     public bool RequireNoAsicPendingInterrupt { get; set; }
+    public bool RequireNoTimerPendingInterrupt { get; set; }
     public int? MinPvrRegisterAccesses { get; set; }
     public int? MinPvrTaCommandWrites { get; set; }
     public int? MinAicaRegisterAccesses { get; set; }
@@ -82,6 +83,8 @@ public sealed class DreamcastFixtureDefinition
     public Dictionary<string, string> AicaRegisters { get; set; } = [];
     public DreamcastFixtureAsicPendingInterruptExpectation? AsicPendingInterrupt { get; set; }
     public List<DreamcastFixtureAsicEventRegisterExpectation> AsicEventRegisters { get; set; } = [];
+    public DreamcastFixtureTimerPendingInterruptExpectation? TimerPendingInterrupt { get; set; }
+    public List<DreamcastFixtureTimerChannelExpectation> TimerChannels { get; set; } = [];
     public List<DreamcastFixtureAicaChannelExpectation> AicaChannels { get; set; } = [];
     public List<DreamcastFixturePvrTaCommandExpectation> PvrTaCommands { get; set; } = [];
     public List<DreamcastFixturePvrTaStreamWriteExpectation> PvrTaStreamWrites { get; set; } = [];
@@ -363,6 +366,25 @@ public sealed class DreamcastFixtureAsicPendingInterruptExpectation
     public string? RegisterName { get; set; }
     public int? Bit { get; set; }
     public string? BitMask { get; set; }
+}
+
+public sealed class DreamcastFixtureTimerPendingInterruptExpectation
+{
+    public string? EventCode { get; set; }
+    public int? Channel { get; set; }
+    public int? Priority { get; set; }
+}
+
+public sealed class DreamcastFixtureTimerChannelExpectation
+{
+    public int Channel { get; set; }
+    public string? Constant { get; set; }
+    public string? Counter { get; set; }
+    public string? Control { get; set; }
+    public int? Priority { get; set; }
+    public bool? Running { get; set; }
+    public bool? UnderflowPending { get; set; }
+    public bool? InterruptEnabled { get; set; }
 }
 
 public sealed class DreamcastFixtureAicaChannelExpectation
