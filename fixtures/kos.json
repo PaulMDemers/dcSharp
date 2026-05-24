@@ -3985,6 +3985,43 @@
       }
     },
     {
+      "name": "interrupt_nesting",
+      "sample": "samples/kos/interrupt_nesting",
+      "artifact": "dcsharp_interrupt_nesting.elf",
+      "instructions": 1000000,
+      "traceTail": 24,
+      "vblankInterval": 5000,
+      "expectedStopReason": "UnsupportedInstruction",
+      "serialContains": [
+        "dcSharp interrupt nesting probe done"
+      ],
+      "minVblankEvents": 1,
+      "requireNoAsicPendingInterrupt": true,
+      "cpu": {
+        "pc": "0x8C010030",
+        "sr": "0x00000001",
+        "vbr": "0x8C010000",
+        "spc": "0x8C010018",
+        "ssr": "0x00000001",
+        "fpscr": "0x00040001",
+        "tra": "0x00000000",
+        "expevt": "0x00000000",
+        "intevt": "0x00000320"
+      },
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000000",
+          "irq9Mask": "0x00000000",
+          "pendingIrq9": "0x00000000"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "vblank_idle",
       "sample": "samples/kos/vblank_idle",
       "artifact": "dcsharp_vblank_idle.elf",
