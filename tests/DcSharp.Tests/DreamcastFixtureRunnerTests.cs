@@ -98,6 +98,14 @@ public class DreamcastFixtureRunnerTests
             {
                 ["tmu"] = 3
             },
+            Cpu = new DreamcastFixtureCpuExpectation
+            {
+                Vbr = "0x8C010000",
+                Spc = "0x8C010006",
+                Tra = "0x000000A8",
+                Expevt = "0x00000160",
+                Intevt = "0x00000000"
+            },
             AsicEventRegisters =
             [
                 new DreamcastFixtureAsicEventRegisterExpectation
@@ -290,6 +298,7 @@ public class DreamcastFixtureRunnerTests
             mapleDmaBatches: 2,
             asic: CreateAsicSummary(),
             gdrom: CreateGdromSummary(),
+            cpu: CreateCpuSummary(vbr: 0x8C010000, spc: 0x8C010006, tra: 0x000000A8, expevt: 0x00000160),
             pvrRegisters: [new DreamcastPvrRegisterValueSummary(0x0044, "0x0044", "PVR_FB_CFG_1", 0x00800005, "0x00800005")],
             pvrTaCommandWrites:
             [
@@ -380,6 +389,10 @@ public class DreamcastFixtureRunnerTests
             MinDeviceAccessDomains =
             {
                 ["tmu"] = 3
+            },
+            Cpu = new DreamcastFixtureCpuExpectation
+            {
+                Tra = "0x000000A8"
             },
             AsicEventRegisters =
             [
@@ -575,6 +588,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected at least 3 CPU fast-forward batches, got 2", failures);
         Assert.Contains("expected max CPU fast-forward batch at most 6, got 7", failures);
         Assert.Contains("expected at least 2 controller script changes, got 1", failures);
+        Assert.Contains("CPU TRA expected 0x000000A8, got 0x00000000", failures);
         Assert.Contains("expected at least 10 Maple transfers, got 9", failures);
         Assert.Contains("expected at least 5 Maple DeviceInfo transfers, got 4", failures);
         Assert.Contains("expected at least 6 Maple GetCondition transfers, got 5", failures);
@@ -646,7 +660,8 @@ public class DreamcastFixtureRunnerTests
         IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites = null,
         IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
-        IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null) =>
+        IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null,
+        DreamcastCpuSummary? cpu = null) =>
         new(
             DreamcastStopReason.ProgramExit,
             string.Empty,
@@ -700,29 +715,43 @@ public class DreamcastFixtureRunnerTests
                 cpuFastForwardBatches,
                 maxCpuFastForwardBatch,
                 controllerScriptChanges),
-            new DreamcastCpuSummary(
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000",
-                0,
-                "0x00000000"));
+            cpu ?? CreateCpuSummary());
+
+    private static DreamcastCpuSummary CreateCpuSummary(
+        uint pc = 0,
+        uint pr = 0,
+        uint sr = 0,
+        uint gbr = 0,
+        uint vbr = 0,
+        uint spc = 0,
+        uint ssr = 0,
+        uint fpscr = 0,
+        uint tra = 0,
+        uint expevt = 0,
+        uint intevt = 0) =>
+            new(
+                pc,
+                $"0x{pc:X8}",
+                pr,
+                $"0x{pr:X8}",
+                sr,
+                $"0x{sr:X8}",
+                gbr,
+                $"0x{gbr:X8}",
+                vbr,
+                $"0x{vbr:X8}",
+                spc,
+                $"0x{spc:X8}",
+                ssr,
+                $"0x{ssr:X8}",
+                fpscr,
+                $"0x{fpscr:X8}",
+                tra,
+                $"0x{tra:X8}",
+                expevt,
+                $"0x{expevt:X8}",
+                intevt,
+                $"0x{intevt:X8}");
 
     private static DreamcastVideoSummary CreateVideoSummary(
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters,

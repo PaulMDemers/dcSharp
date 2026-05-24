@@ -186,6 +186,9 @@
             "$ref": "#/$defs/nonNegativeInteger"
           }
         },
+        "cpu": {
+          "$ref": "#/$defs/cpu"
+        },
         "pvrRegisters": {
           "$ref": "#/$defs/hexMap"
         },
@@ -278,6 +281,45 @@
           "items": {
             "$ref": "#/$defs/gdromRead"
           }
+        }
+      }
+    },
+    "cpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pc": {
+          "$ref": "#/$defs/hex32"
+        },
+        "pr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "sr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "gbr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "vbr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "spc": {
+          "$ref": "#/$defs/hex32"
+        },
+        "ssr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "fpscr": {
+          "$ref": "#/$defs/hex32"
+        },
+        "tra": {
+          "$ref": "#/$defs/hex32"
+        },
+        "expevt": {
+          "$ref": "#/$defs/hex32"
+        },
+        "intevt": {
+          "$ref": "#/$defs/hex32"
         }
       }
     },

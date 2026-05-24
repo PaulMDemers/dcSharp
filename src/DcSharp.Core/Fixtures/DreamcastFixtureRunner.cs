@@ -109,6 +109,11 @@ public static class DreamcastFixtureRunner
             failures.Add($"expected no pending ASIC interrupt, got {summary.Asic.PendingEventCodeHex} level {summary.Asic.PendingLevel}");
         }
 
+        if (fixture.Cpu is { } expectedCpu)
+        {
+            ValidateCpu(failures, summary.Cpu, expectedCpu);
+        }
+
         if (fixture.AsicPendingInterrupt is { } expectedPending)
         {
             var pending = summary.Asic.PendingInterrupt;
@@ -467,6 +472,21 @@ public static class DreamcastFixtureRunner
         }
 
         return failures;
+    }
+
+    private static void ValidateCpu(List<string> failures, DreamcastCpuSummary cpu, DreamcastFixtureCpuExpectation expected)
+    {
+        ValidateHex32(failures, "CPU PC", expected.Pc, cpu.Pc, cpu.PcHex);
+        ValidateHex32(failures, "CPU PR", expected.Pr, cpu.Pr, cpu.PrHex);
+        ValidateHex32(failures, "CPU SR", expected.Sr, cpu.Sr, cpu.SrHex);
+        ValidateHex32(failures, "CPU GBR", expected.Gbr, cpu.Gbr, cpu.GbrHex);
+        ValidateHex32(failures, "CPU VBR", expected.Vbr, cpu.Vbr, cpu.VbrHex);
+        ValidateHex32(failures, "CPU SPC", expected.Spc, cpu.Spc, cpu.SpcHex);
+        ValidateHex32(failures, "CPU SSR", expected.Ssr, cpu.Ssr, cpu.SsrHex);
+        ValidateHex32(failures, "CPU FPSCR", expected.Fpscr, cpu.Fpscr, cpu.FpscrHex);
+        ValidateHex32(failures, "CPU TRA", expected.Tra, cpu.Tra, cpu.TraHex);
+        ValidateHex32(failures, "CPU EXPEVT", expected.Expevt, cpu.Expevt, cpu.ExpevtHex);
+        ValidateHex32(failures, "CPU INTEVT", expected.Intevt, cpu.Intevt, cpu.IntevtHex);
     }
 
     private static ushort ParseHex16(string text, string description)

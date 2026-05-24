@@ -77,6 +77,7 @@ public sealed class DreamcastFixtureDefinition
     public ulong? MaxCpuFastForwardBatch { get; set; }
     public ulong? MinControllerScriptChanges { get; set; }
     public Dictionary<string, int> MinDeviceAccessDomains { get; set; } = [];
+    public DreamcastFixtureCpuExpectation? Cpu { get; set; }
     public Dictionary<string, string> PvrRegisters { get; set; } = [];
     public Dictionary<string, string> AicaRegisters { get; set; } = [];
     public DreamcastFixtureAsicPendingInterruptExpectation? AsicPendingInterrupt { get; set; }
@@ -122,6 +123,21 @@ public sealed class DreamcastFixtureDefinition
             throw new InvalidDataException($"Fixture '{Name}' trace tail must be zero or greater.");
         }
     }
+}
+
+public sealed class DreamcastFixtureCpuExpectation
+{
+    public string? Pc { get; set; }
+    public string? Pr { get; set; }
+    public string? Sr { get; set; }
+    public string? Gbr { get; set; }
+    public string? Vbr { get; set; }
+    public string? Spc { get; set; }
+    public string? Ssr { get; set; }
+    public string? Fpscr { get; set; }
+    public string? Tra { get; set; }
+    public string? Expevt { get; set; }
+    public string? Intevt { get; set; }
 }
 
 public sealed class DreamcastFixtureVideoSampleExpectation
