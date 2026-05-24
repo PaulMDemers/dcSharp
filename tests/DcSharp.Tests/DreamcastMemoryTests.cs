@@ -668,6 +668,69 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void TimerControlLowByteWritePreservesUnderflowFlag()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 10);
+        memory.Write(0xFFD8_0010, [0x20]);
+
+        Assert.Equal(0x0120, memory.ReadUInt16(0xFFD8_0010));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(10, level);
+    }
+
+    [Fact]
+    public void TimerControlLowByteWriteCanDisableInterruptWithoutClearingUnderflow()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 10);
+        memory.Write(0xFFD8_0010, [0x00]);
+
+        Assert.Equal(0x0100, memory.ReadUInt16(0xFFD8_0010));
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+    }
+
+    [Fact]
+    public void TimerControlHighByteWriteClearsUnderflowAndPreservesInterruptEnable()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 10);
+        memory.Write(0xFFD8_0011, [0x00]);
+
+        Assert.Equal(0x0020, memory.ReadUInt16(0xFFD8_0010));
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+    }
+
+    [Fact]
+    public void TimerControlWordWriteClearsUnderflowAndKeepsInterruptEnable()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 10);
+        memory.WriteUInt16(0xFFD8_0010, 0x0020);
+
+        Assert.Equal(0x0020, memory.ReadUInt16(0xFFD8_0010));
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+    }
+
+    [Fact]
+    public void TimerControlLongWriteUsesLowControlWordOnly()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xFFD8_0010, 0xFFFF_0020);
+
+        var channel = Assert.Single(memory.CreateTimerSnapshot().Channels, channel => channel.Channel == 0);
+        Assert.Equal(0x0020u, channel.Control);
+        Assert.True(channel.InterruptEnabled);
+        Assert.False(channel.UnderflowPending);
+    }
+
+    [Fact]
     public void TimerInterruptPriorityPrefersHighestPendingChannel()
     {
         var memory = new DreamcastMemory();

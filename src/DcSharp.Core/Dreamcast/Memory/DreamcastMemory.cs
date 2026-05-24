@@ -1382,7 +1382,8 @@ public sealed class DreamcastMemory
         var value = ToValue(data);
 
         var existing = p4Registers.GetValueOrDefault(aligned);
-        p4Registers[aligned] = (existing & ~mask) | ((value << shift) & mask);
+        var written = (existing & ~mask) | ((value << shift) & mask);
+        p4Registers[aligned] = IsTimerControl(aligned) ? written & 0xFFFFu : written;
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
 
         if (address == ScifTransmitData && data.Length == 1)
