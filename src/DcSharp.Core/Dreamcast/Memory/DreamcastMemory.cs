@@ -862,6 +862,8 @@ public sealed class DreamcastMemory
 
     private bool TryGetPendingTimerInterrupt(out uint eventCode, out int level)
     {
+        eventCode = 0;
+        level = 0;
         for (var channel = 0; channel < 3; channel++)
         {
             var control = p4Registers.GetValueOrDefault(TimerControlAddress(channel));
@@ -876,6 +878,11 @@ public sealed class DreamcastMemory
                 continue;
             }
 
+            if (priority <= level)
+            {
+                continue;
+            }
+
             eventCode = channel switch
             {
                 0 => 0x0400,
@@ -883,12 +890,9 @@ public sealed class DreamcastMemory
                 _ => 0x0440
             };
             level = priority;
-            return true;
         }
 
-        eventCode = 0;
-        level = 0;
-        return false;
+        return level != 0;
     }
 
     private uint ReadExternal(uint originalAddress, uint externalAddress, int size)

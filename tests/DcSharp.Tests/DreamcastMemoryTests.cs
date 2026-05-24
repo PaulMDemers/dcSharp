@@ -654,7 +654,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
-        memory.WriteUInt16(0xFFD0_0004, 15 << 12);
+        SetTimerPriority(memory, 0, 15);
         memory.WriteUInt32(0xFFD8_0008, 1);
         memory.WriteUInt32(0xFFD8_000C, 1);
         memory.WriteUInt16(0xFFD8_0010, 0x0020);
@@ -665,6 +665,33 @@ public class DreamcastMemoryTests
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
         Assert.Equal(0x0400u, eventCode);
         Assert.Equal(15, level);
+    }
+
+    [Fact]
+    public void TimerInterruptPriorityPrefersHighestPendingChannel()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 4);
+        RaiseTimerUnderflow(memory, 1, 12);
+        RaiseTimerUnderflow(memory, 2, 8);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0420u, eventCode);
+        Assert.Equal(12, level);
+    }
+
+    [Fact]
+    public void TimerInterruptPriorityKeepsLowerChannelWhenPrioritiesTie()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 7);
+        RaiseTimerUnderflow(memory, 1, 7);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(7, level);
     }
 
     [Fact]
@@ -772,23 +799,43 @@ public class DreamcastMemoryTests
         var memory = new DreamcastMemory();
         memory.WriteUInt32(0xA05F_6930, 1u << 3);
         memory.RaiseVBlankBegin();
-        memory.WriteUInt16(0xFFD0_0004, 8 << 12);
-        memory.WriteUInt32(0xFFD8_0008, 1);
-        memory.WriteUInt32(0xFFD8_000C, 1);
-        memory.WriteUInt16(0xFFD8_0010, 0x0020);
-        memory.Write(0xFFD8_0004, [0x01]);
-
-        memory.AdvanceHardware(2);
+        RaiseTimerUnderflow(memory, 0, 8);
 
         Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
         Assert.Equal(0x0320u, eventCode);
         Assert.Equal(9, level);
 
-        memory.WriteUInt16(0xFFD0_0004, 15 << 12);
+        SetTimerPriority(memory, 0, 15);
 
         Assert.True(memory.TryGetPendingExternalInterrupt(out eventCode, out level));
         Assert.Equal(0x0400u, eventCode);
         Assert.Equal(15, level);
+    }
+
+    [Fact]
+    public void ExternalInterruptPriorityPrefersTimerWhenTimerAndAsicAreEqual()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+        RaiseTimerUnderflow(memory, 0, 9);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(9, level);
+    }
+
+    [Fact]
+    public void ExternalInterruptPriorityIgnoresZeroPriorityTimer()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+        RaiseTimerUnderflow(memory, 0, 0);
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
     }
 
     [Fact]
@@ -1034,6 +1081,33 @@ public class DreamcastMemoryTests
         Assert.True(summaryBatch.HitDescriptorLimit);
         Assert.False(summaryBatch.Completed);
     }
+
+    private static void RaiseTimerUnderflow(DreamcastMemory memory, int channel, int priority)
+    {
+        SetTimerPriority(memory, channel, priority);
+        memory.WriteUInt16(TimerControlAddress(channel), 0x0120);
+    }
+
+    private static void SetTimerPriority(DreamcastMemory memory, int channel, int priority)
+    {
+        var shift = channel switch
+        {
+            0 => 12,
+            1 => 8,
+            _ => 4
+        };
+        var current = memory.ReadUInt16(0xFFD0_0004);
+        var mask = 0xFu << shift;
+        var value = (ushort)((current & ~mask) | (((uint)priority & 0xF) << shift));
+        memory.WriteUInt16(0xFFD0_0004, value);
+    }
+
+    private static uint TimerControlAddress(int channel) => channel switch
+    {
+        0 => 0xFFD8_0010,
+        1 => 0xFFD8_001C,
+        _ => 0xFFD8_0028
+    };
 
     private static byte[] CreateMediaData(int sectors)
     {
