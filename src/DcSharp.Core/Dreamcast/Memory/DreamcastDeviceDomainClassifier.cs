@@ -38,6 +38,11 @@ public static class DreamcastDeviceDomainClassifier
             return Sh4;
         }
 
+        if (address is 0xFF00_0024 or 0xFF00_0028)
+        {
+            return Sh4;
+        }
+
         if (physical is >= 0x1000_0000 and < 0x1100_0000)
         {
             return Pvr;
