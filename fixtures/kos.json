@@ -2893,6 +2893,235 @@
       }
     },
     {
+      "name": "pvr_sprite_texture_alpha_argb4444",
+      "sample": "samples/kos/pvr_sprite_texture_alpha_argb4444",
+      "artifact": "dcsharp_pvr_sprite_texture_alpha_argb4444.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR sprite texture alpha ARGB4444 probe",
+        "texture_base=0x0000b000",
+        "texture_mode2=0x94118000",
+        "texture_mode3=0x1400b000",
+        "auv=0x00000000",
+        "cuv=0x3f803f80",
+        "ta_init=0x80000000"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x8BA0"
+        },
+        {
+          "name": "pixel_2_0",
+          "rgb565": "0x8BA0"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x8BA0"
+        }
+      ],
+      "minPvrRegisterAccesses": 5,
+      "minPvrTaCommandWrites": 48,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaCommands": [
+        {
+          "kind": "SpriteHeader",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "minCount": 1
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
+          "minCount": 1
+        }
+      ],
+      "pvrTaStreamWrites": [
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "SpriteHeader",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840001",
+          "payloadWordsRemaining": 7,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x02000000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840001",
+          "payloadWordIndex": 0,
+          "payloadWordsRemaining": 6,
+          "payloadWordName": "Mode1",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x94118000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840001",
+          "payloadWordIndex": 1,
+          "payloadWordsRemaining": 5,
+          "payloadWordName": "Mode2",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x1400B000",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840001",
+          "payloadWordIndex": 2,
+          "payloadWordsRemaining": 4,
+          "payloadWordName": "Mode3",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0xFFFFFFFF",
+          "controlKind": "SpriteHeader",
+          "controlValue": "0xA0840001",
+          "payloadWordIndex": 3,
+          "payloadWordsRemaining": 3,
+          "payloadWordName": "Argb",
+          "minCount": 1
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "VertexEndOfStrip",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordsRemaining": 15,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordIndex": 12,
+          "payloadWordsRemaining": 2,
+          "payloadWordName": "Auv",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x3F800000",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordIndex": 13,
+          "payloadWordsRemaining": 1,
+          "payloadWordName": "Buv",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x3F803F80",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordIndex": 14,
+          "payloadWordsRemaining": 0,
+          "payloadWordName": "Cuv",
+          "minCount": 1
+        }
+      ],
+      "pvrTaParameterHeaders": [
+        {
+          "kind": "SpriteHeader",
+          "region": "TA_INPUT",
+          "parameterType": 5,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": false,
+          "expectedPayloadWords": 7,
+          "hasKnownPayloadLength": true,
+          "minCount": 1
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "parameterType": 7,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
+          "hasKnownPayloadLength": false,
+          "minCount": 1
+        }
+      ],
+      "pvrTaSprites": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0xA0840000",
+          "controlValue": "0xF0000000",
+          "argb": "0xFF00FF00",
+          "rgb565": "0x07E0",
+          "minVertices": 4,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0xA0840001",
+          "controlValue": "0xF0000000",
+          "argb": "0xFFFFFFFF",
+          "rgb565": "0xFFFF",
+          "minVertices": 4,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1,
+              "u": 0,
+              "v": 0
+            },
+            {
+              "x": 3,
+              "y": 1,
+              "u": 1,
+              "v": 0
+            },
+            {
+              "x": 3,
+              "y": 3,
+              "u": 1,
+              "v": 1
+            },
+            {
+              "x": 1,
+              "y": 3,
+              "u": 0,
+              "v": 1
+            }
+          ],
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "pvr_culling",
       "sample": "samples/kos/pvr_culling",
       "artifact": "dcsharp_pvr_culling.elf",

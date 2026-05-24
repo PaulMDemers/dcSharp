@@ -27,25 +27,40 @@ public static class DreamcastPvrPreviewRenderer
         {
             for (var x = 0; x <= maxX - minX; x++)
             {
-                WriteRgb565Pixel(vram, PreviewPixelIndex(x, y), SpriteSourceColor(sprite, vram, x, y, maxX - minX, maxY - minY));
+                var pixelIndex = PreviewPixelIndex(x, y);
+                var source = SpriteSourceSample(sprite, vram, x, y, maxX - minX, maxY - minY);
+                if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
+                {
+                    source = source with
+                    {
+                        Rgb565 = BlendRgb565(
+                            source.Rgb565,
+                            ReadRgb565Pixel(vram, pixelIndex),
+                            SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex),
+                            sprite.HeaderPayload.Mode2Fields.BlendSrcName,
+                            sprite.HeaderPayload.Mode2Fields.BlendDstName)
+                    };
+                }
+
+                WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
             }
         }
     }
 
-    private static ushort SpriteSourceColor(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, int x, int y, int width, int height)
+    private static DreamcastPvrPreviewSourceSample SpriteSourceSample(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, int x, int y, int width, int height)
     {
         if (!sprite.HeaderPayload.Mode1Fields.TextureEnabled
             || sprite.HeaderPayload.Mode3Fields.VqEnabled
             || sprite.HeaderPayload.Mode3Fields.MipMapEnabled)
         {
-            return sprite.Rgb565;
+            return new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null);
         }
 
         var textureWidth = TextureSize(sprite.HeaderPayload.Mode2Fields.TextureUSize);
         var textureHeight = TextureSize(sprite.HeaderPayload.Mode2Fields.TextureVSize);
         if (textureWidth <= 0 || textureHeight <= 0)
         {
-            return sprite.Rgb565;
+            return new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null);
         }
 
         var tx = width <= 0 ? 0.0f : x / (float)width;
@@ -61,7 +76,9 @@ public static class DreamcastPvrPreviewRenderer
         var u = TextureCoordinate(Lerp(topU, bottomU, ty), sprite.HeaderPayload.Mode2Fields.UClamp, sprite.HeaderPayload.Mode2Fields.UFlip);
         var v = TextureCoordinate(Lerp(topV, bottomV, ty), sprite.HeaderPayload.Mode2Fields.VClamp, sprite.HeaderPayload.Mode2Fields.VFlip);
         var textureSample = SampleTexture(sprite.HeaderPayload.Mode2Fields, sprite.HeaderPayload.Mode3Fields, vram, u, v, textureWidth, textureHeight);
-        return textureSample?.Rgb565 ?? sprite.Rgb565;
+        return textureSample is null
+            ? new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null)
+            : ApplyTextureShading(sprite.Rgb565, textureSample, sprite.HeaderPayload.Mode2Fields.TextureShadingName);
     }
 
     private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
@@ -563,9 +580,14 @@ public static class DreamcastPvrPreviewRenderer
     private static byte SourceAlpha(
         IReadOnlyList<DreamcastPvrTaVertex> vertices,
         byte? textureAlpha,
+        bool textureAlphaMultipliesVertex) =>
+        SourceAlpha(vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24), textureAlpha, textureAlphaMultipliesVertex);
+
+    private static byte SourceAlpha(
+        byte vertexAlpha,
+        byte? textureAlpha,
         bool textureAlphaMultipliesVertex)
     {
-        var vertexAlpha = vertices.Count == 0 ? byte.MaxValue : (byte)(vertices[0].ColorValue >> 24);
         if (textureAlpha is null)
         {
             return vertexAlpha;

@@ -274,6 +274,40 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void UsesArgb4444TextureAlphaForSpriteSourceBlend()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0x8F00);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                argb: 0xFF00_FF00),
+            vram);
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0xFFFF,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                argb: 0xFFFF_FFFF,
+                alphaEnabled: true,
+                blendSrc: "SrcAlpha",
+                blendDst: "InverseSrcAlpha",
+                textureEnabled: true,
+                nonTwiddled: true,
+                pixelFormat: 2,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void SamplesTwiddledRgb565TextureWhenModeUsesTwiddledLayout()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -595,13 +629,20 @@ public class DreamcastPvrPreviewRendererTests
     private static DreamcastPvrTaSprite CreateSprite(
         ushort color,
         IReadOnlyList<(int X, int Y, float U, float V)> points,
+        uint argb = 0xFFFF_FFFF,
+        bool alphaEnabled = false,
+        string blendSrc = "One",
+        string blendDst = "Zero",
         bool textureEnabled = false,
         bool nonTwiddled = false,
         uint pixelFormat = 1,
         uint textureBase = 0)
     {
         var mode1 = textureEnabled ? 0x0200_0000u : 0;
-        var mode2 = textureEnabled ? 0x0001_8000u : 0;
+        var mode2 = (BlendBits(blendSrc) << 29)
+            | (BlendBits(blendDst) << 26)
+            | (textureEnabled ? 0x0001_8000u : 0)
+            | (alphaEnabled ? 0x0010_0000u : 0);
         var mode3 = textureBase | (pixelFormat << 27) | (nonTwiddled ? 0x0400_0000u : 0);
         var header = new DreamcastPvrTaCommandWrite(
             0x1000_0000,
@@ -614,7 +655,7 @@ public class DreamcastPvrPreviewRendererTests
             4,
             0xA084_0001,
             "0xA0840001");
-        var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [mode1, mode2, mode3, 0xFFFF_FFFF, 0, 0, 0]);
+        var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [mode1, mode2, mode3, argb, 0, 0, 0]);
         return new DreamcastPvrTaSprite(
             "TA_INPUT",
             0,
