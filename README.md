@@ -198,7 +198,7 @@ Next targets:
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Expand real PVR vertex parameter payload coverage beyond the current packed-color fixture shape.
-- Extend silence-safe AICA playback timing into looping, ADPCM, stereo/pan, and optional WAV-dump diagnostics.
+- Extend silence-safe AICA playback timing into PCM8, ADPCM, stereo/pan, and optional WAV-dump diagnostics.
 
 ## Development Bias
 

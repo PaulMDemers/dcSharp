@@ -496,6 +496,8 @@ public class DreamcastFixtureRunnerTests
                     Pitch = "0x00001AC0",
                     Volume = 64,
                     PlaybackPosition = 64,
+                    MinPlaybackPosition = 1,
+                    MaxPlaybackPosition = 63,
                     MinPlaybackSamplesAdvanced = 10,
                     PlaybackStoppedAtLoopEnd = true
                 },
@@ -591,6 +593,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
         Assert.Contains("AICA channel 0 volume expected 64, got 63", failures);
         Assert.Contains("AICA channel 0 playback position expected 64, got 0 (0x00000000)", failures);
+        Assert.Contains("AICA channel 0 expected playback position at least 1, got 0 (0x00000000)", failures);
         Assert.Contains("AICA channel 0 expected at least 10 playback samples advanced, got 0", failures);
         Assert.Contains("AICA channel 0 playback stopped at loop end expected True, got False", failures);
         Assert.Contains("missing AICA channel: 1", failures);

@@ -364,6 +364,8 @@ public sealed class DreamcastFixtureAicaChannelExpectation
     public bool? KeyOn { get; set; }
     public bool? KeyOnExecute { get; set; }
     public ulong? PlaybackPosition { get; set; }
+    public ulong? MinPlaybackPosition { get; set; }
+    public ulong? MaxPlaybackPosition { get; set; }
     public ulong? MinPlaybackSamplesAdvanced { get; set; }
     public bool? PlaybackStoppedAtLoopEnd { get; set; }
 }

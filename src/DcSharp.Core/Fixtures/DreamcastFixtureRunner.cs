@@ -399,6 +399,16 @@ public static class DreamcastFixtureRunner
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOn", expected.KeyOn, channel.KeyOn);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOnExecute", expected.KeyOnExecute, channel.KeyOnExecute);
             ValidateUlong(failures, $"AICA channel {expected.Channel} playback position", expected.PlaybackPosition, channel.PlaybackPosition, channel.PlaybackPositionHex);
+            if (expected.MinPlaybackPosition is { } minPlaybackPosition && channel.PlaybackPosition < minPlaybackPosition)
+            {
+                failures.Add($"AICA channel {expected.Channel} expected playback position at least {minPlaybackPosition}, got {channel.PlaybackPosition} ({channel.PlaybackPositionHex})");
+            }
+
+            if (expected.MaxPlaybackPosition is { } maxPlaybackPosition && channel.PlaybackPosition > maxPlaybackPosition)
+            {
+                failures.Add($"AICA channel {expected.Channel} expected playback position at most {maxPlaybackPosition}, got {channel.PlaybackPosition} ({channel.PlaybackPositionHex})");
+            }
+
             if (expected.MinPlaybackSamplesAdvanced is { } minPlaybackSamplesAdvanced && channel.PlaybackSamplesAdvanced < minPlaybackSamplesAdvanced)
             {
                 failures.Add($"AICA channel {expected.Channel} expected at least {minPlaybackSamplesAdvanced} playback samples advanced, got {channel.PlaybackSamplesAdvanced}");

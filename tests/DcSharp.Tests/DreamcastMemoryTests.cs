@@ -432,6 +432,42 @@ public class DreamcastMemoryTests
         Assert.False(channel.PlaybackStoppedAtLoopEnd);
     }
 
+    [Fact]
+    public void AdvanceHardwareWrapsAicaPlaybackAtExactLoopBoundary()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0004);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C200);
+
+        memory.AdvanceHardware(36_282);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.True(channel.Active);
+        Assert.Equal(4UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.False(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
+    public void AdvanceHardwareStopsAicaPlaybackWhenLoopRangeIsInvalid()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0008);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C200);
+
+        memory.AdvanceHardware(200_000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.False(channel.Active);
+        Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.True(channel.PlaybackStoppedAtLoopEnd);
+    }
+
     [Theory]
     [InlineData(0x0000_0080u, "Pcm8", false)]
     [InlineData(0x0000_0100u, "Adpcm", false)]
