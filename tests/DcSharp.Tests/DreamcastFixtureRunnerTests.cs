@@ -879,6 +879,7 @@ public class DreamcastFixtureRunnerTests
             taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),
             pvrTaStrips ?? [],
+            [],
             taWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)

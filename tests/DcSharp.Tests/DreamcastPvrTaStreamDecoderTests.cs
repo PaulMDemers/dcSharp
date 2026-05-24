@@ -160,8 +160,8 @@ public class DreamcastPvrTaStreamDecoderTests
     }
 
     [Theory]
-    [InlineData(0xA084_0000u, "SpriteHeader", "Mode1", "Mode2", "Mode3", "Parameter0", "Parameter3")]
-    [InlineData(0x8000_0000u, "ModifierVolume", "Mode1", "Mode2", "Mode3", "Parameter0", "Parameter3")]
+    [InlineData(0xA084_0000u, "SpriteHeader", "Mode1", "Mode2", "Mode3", "Argb", "Dummy1")]
+    [InlineData(0x8000_0000u, "ModifierVolume", "Mode1", "Dummy0", "Dummy1", "Dummy2", "Dummy5")]
     [InlineData(0x2000_0000u, "UserClip", "Clip0", "Clip1", "Clip2", "Clip3", "Clip6")]
     public void TracksKnownNonPolygonHeaderPayloadWords(
         uint controlValue,

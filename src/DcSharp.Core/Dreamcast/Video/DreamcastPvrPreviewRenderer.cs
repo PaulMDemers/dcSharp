@@ -12,6 +12,26 @@ public static class DreamcastPvrPreviewRenderer
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
         RenderStrip(strip, vram, depthBuffer, useDepth: true);
 
+    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram)
+    {
+        if (sprite.Vertices.Count < 4)
+        {
+            return;
+        }
+
+        var minX = sprite.Vertices.Min(vertex => vertex.X);
+        var minY = sprite.Vertices.Min(vertex => vertex.Y);
+        var maxX = sprite.Vertices.Max(vertex => vertex.X);
+        var maxY = sprite.Vertices.Max(vertex => vertex.Y);
+        for (var y = 0; y <= maxY - minY; y++)
+        {
+            for (var x = 0; x <= maxX - minX; x++)
+            {
+                WriteRgb565Pixel(vram, PreviewPixelIndex(x, y), sprite.Rgb565);
+            }
+        }
+    }
+
     private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
     {
         var vertices = strip.Vertices.Take(3).ToArray();

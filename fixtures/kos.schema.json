@@ -264,6 +264,12 @@
             "$ref": "#/$defs/pvrTaStrip"
           }
         },
+        "pvrTaSprites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaSprite"
+          }
+        },
         "videoSamples": {
           "type": "array",
           "items": {
@@ -1038,6 +1044,46 @@
         },
         "y": {
           "type": "integer"
+        }
+      }
+    },
+    "pvrTaSprite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "listTypeName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headerValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "controlValue": {
+          "$ref": "#/$defs/hex32"
+        },
+        "argb": {
+          "$ref": "#/$defs/hex32"
+        },
+        "rgb565": {
+          "$ref": "#/$defs/hex16"
+        },
+        "minVertices": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "vertices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pvrTaStripVertex"
+          }
+        },
+        "minCount": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },

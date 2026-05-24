@@ -22,10 +22,28 @@ int main(int argc, char **argv) {
         0x00000000u,
         0x00000000u,
         0x00000000u,
+        0xff00ff00u,
+        0x00000000u,
+        0x00000000u,
+        0x00000000u
+    };
+    const uint32_t vertices[16] = {
+        0xf0000000u,
         0x3f800000u,
-        0x40000000u,
+        0x3f800000u,
+        0x3f800000u,
         0x40400000u,
-        0x40800000u
+        0x3f800000u,
+        0x3f800000u,
+        0x3f800000u,
+        0x40400000u,
+        0x3f800000u,
+        0x40400000u,
+        0x40400000u,
+        0x00000000u,
+        0x00000000u,
+        0x00000000u,
+        0x00000000u
     };
 
     PVR_REG(0x0124) = 0x00100000u;
@@ -35,11 +53,12 @@ int main(int argc, char **argv) {
     PVR_REG(0x0144) = 0x80000000u;
 
     write_words(sprite, 8);
+    write_words(vertices, 16);
 
-    printf("dcSharp PVR sprite probe: header=0x%08lx param0=0x%08lx param3=0x%08lx ta_init=0x%08lx\n",
+    printf("dcSharp PVR sprite probe: header=0x%08lx argb=0x%08lx vertex=0x%08lx ta_init=0x%08lx\n",
            (unsigned long)sprite[0],
            (unsigned long)sprite[4],
-           (unsigned long)sprite[7],
+           (unsigned long)vertices[0],
            (unsigned long)PVR_REG(0x0144));
 
     return 0;

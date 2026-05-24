@@ -353,12 +353,72 @@ public class DreamcastMemoryTests
         Assert.Equal(3, strip.Vertices[1].X);
     }
 
+    [Fact]
+    public void KnownSpriteWritesVisiblePreviewPixels()
+    {
+        var memory = new DreamcastMemory();
+
+        WritePvrSpritePacket(memory);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.True(snapshot.NonZeroBytes >= 9);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
+        var sprite = Assert.Single(snapshot.PvrTaSprites);
+        Assert.Equal("OpaquePolygon", sprite.ListTypeName);
+        Assert.Equal("0xFF00FF00", sprite.HeaderPayload.ArgbHex);
+        Assert.Equal(0x07E0, sprite.Rgb565);
+        Assert.Equal(4, sprite.Vertices.Count);
+        Assert.Equal(3, sprite.Vertices[3].X);
+        Assert.Equal(3, sprite.Vertices[3].Y);
+    }
+
     private static void WritePvrVertexPacket(DreamcastMemory memory, bool endOfStrip, int x, int y, ushort color)
     {
         memory.WriteUInt32(0x1000_0000, endOfStrip ? 0xF000_0000 : 0xE000_0000);
         memory.WriteUInt32(0x1000_0000, (uint)x << 16);
         memory.WriteUInt32(0x1000_0000, (uint)y << 16);
         memory.WriteUInt32(0x1000_0000, color);
+    }
+
+    private static void WritePvrSpritePacket(DreamcastMemory memory)
+    {
+        uint[] words =
+        [
+            0xA084_0000,
+            0x0000_0000,
+            0x0000_0000,
+            0x0000_0000,
+            0xFF00_FF00,
+            0x0000_0000,
+            0x0000_0000,
+            0x0000_0000,
+            0xF000_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x4040_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x4040_0000,
+            0x3F80_0000,
+            0x4040_0000,
+            0x4040_0000,
+            0x0000_0000,
+            0x0000_0000,
+            0x0000_0000,
+            0x0000_0000
+        ];
+
+        foreach (var word in words)
+        {
+            memory.WriteUInt32(0x1000_0000, word);
+        }
     }
 
     [Fact]

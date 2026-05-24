@@ -353,6 +353,11 @@ public static class DreamcastFixtureRunner
             ValidatePvrTaStrip(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.PvrTaSprites)
+        {
+            ValidatePvrTaSprite(failures, summary, expected);
+        }
+
         foreach (var (registerName, expectedValueText) in fixture.PvrRegisters)
         {
             var register = summary.Video.PvrRegisters.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
@@ -1278,6 +1283,63 @@ public static class DreamcastFixtureRunner
             details.Add($"minVertices={expected.MinVertices}");
         }
 
+        if (expected.Vertices.Count > 0)
+        {
+            details.Add($"vertices={string.Join("/", expected.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}");
+        }
+
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidatePvrTaSprite(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixturePvrTaSpriteExpectation expected)
+    {
+        uint? expectedHeaderValue = expected.HeaderValue is null ? null : ParseHex32(expected.HeaderValue, "PVR TA sprite header value");
+        uint? expectedControlValue = expected.ControlValue is null ? null : ParseHex32(expected.ControlValue, "PVR TA sprite control value");
+        uint? expectedArgb = expected.Argb is null ? null : ParseHex32(expected.Argb, "PVR TA sprite ARGB");
+        ushort? expectedColor = expected.Rgb565 is null ? null : ParseHex16(expected.Rgb565, "PVR TA sprite color");
+        var count = summary.Video.PvrTaSprites.Count(sprite =>
+            (expected.Region is null || string.Equals(sprite.Region, expected.Region, StringComparison.Ordinal))
+            && (expected.ListTypeName is null || string.Equals(sprite.ListTypeName, expected.ListTypeName, StringComparison.Ordinal))
+            && (expectedHeaderValue is null || sprite.HeaderValue == expectedHeaderValue)
+            && (expectedControlValue is null || sprite.ControlValue == expectedControlValue)
+            && (expectedArgb is null || sprite.HeaderPayload.Argb == expectedArgb)
+            && (expectedColor is null || sprite.Rgb565 == expectedColor)
+            && (expected.MinVertices is null || sprite.VertexCount >= expected.MinVertices)
+            && MatchesPvrTaSpriteVertices(sprite, expected.Vertices));
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} PVR TA sprite {DescribePvrTaSpriteExpectation(expected)} matches, got {count}");
+        }
+    }
+
+    private static bool MatchesPvrTaSpriteVertices(
+        DreamcastPvrTaSpriteSummary sprite,
+        IReadOnlyList<DreamcastFixturePvrTaVertexExpectation> expectedVertices)
+    {
+        if (expectedVertices.Count == 0)
+        {
+            return true;
+        }
+
+        return sprite.Vertices.Count == expectedVertices.Count
+            && sprite.Vertices
+                .Zip(expectedVertices)
+                .All(pair => pair.First.X == pair.Second.X && pair.First.Y == pair.Second.Y);
+    }
+
+    private static string DescribePvrTaSpriteExpectation(DreamcastFixturePvrTaSpriteExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "region", expected.Region);
+        AddOptionalDetail(details, "list", expected.ListTypeName);
+        AddOptionalDetail(details, "header", expected.HeaderValue);
+        AddOptionalDetail(details, "control", expected.ControlValue);
+        AddOptionalDetail(details, "argb", expected.Argb);
+        AddOptionalDetail(details, "rgb565", expected.Rgb565);
+        AddOptionalDetail(details, "minVertices", expected.MinVertices);
         if (expected.Vertices.Count > 0)
         {
             details.Add($"vertices={string.Join("/", expected.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}");

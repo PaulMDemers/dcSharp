@@ -2309,12 +2309,35 @@
       "serialContains": [
         "dcSharp PVR sprite probe",
         "header=0xa0840000",
-        "param0=0x3f800000",
-        "param3=0x40800000",
+        "argb=0xff00ff00",
+        "vertex=0xf0000000",
         "ta_init=0x80000000"
       ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_2_0",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x07E0"
+        }
+      ],
       "minPvrRegisterAccesses": 5,
-      "minPvrTaCommandWrites": 8,
+      "minPvrTaCommandWrites": 24,
       "pvrRegisters": {
         "PVR_TA_OPB_START": "0x00100000",
         "PVR_TA_VERTBUF_START": "0x00200000",
@@ -2329,6 +2352,14 @@
           "listTypeName": "OpaquePolygon",
           "endOfStrip": false,
           "value": "0xA0840000",
+          "minCount": 1
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
           "minCount": 1
         }
       ],
@@ -2356,23 +2387,32 @@
         {
           "role": "Payload",
           "region": "TA_INPUT",
-          "value": "0x3F800000",
+          "value": "0xFF00FF00",
           "controlKind": "SpriteHeader",
           "controlValue": "0xA0840000",
           "payloadWordIndex": 3,
           "payloadWordsRemaining": 3,
-          "payloadWordName": "Parameter0",
+          "payloadWordName": "Argb",
           "minCount": 1
         },
         {
           "role": "Payload",
           "region": "TA_INPUT",
-          "value": "0x40800000",
+          "value": "0x00000000",
           "controlKind": "SpriteHeader",
           "controlValue": "0xA0840000",
           "payloadWordIndex": 6,
           "payloadWordsRemaining": 0,
-          "payloadWordName": "Parameter3",
+          "payloadWordName": "Dummy1",
+          "minCount": 1
+        },
+        {
+          "role": "Control",
+          "region": "TA_INPUT",
+          "kind": "VertexEndOfStrip",
+          "controlKind": "VertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordsRemaining": 7,
           "minCount": 1
         }
       ],
@@ -2386,6 +2426,46 @@
           "value": "0xA0840000",
           "expectedPayloadWords": 7,
           "hasKnownPayloadLength": true,
+          "minCount": 1
+        },
+        {
+          "kind": "VertexEndOfStrip",
+          "region": "TA_INPUT",
+          "parameterType": 7,
+          "listTypeName": "OpaquePolygon",
+          "endOfStrip": true,
+          "value": "0xF0000000",
+          "hasKnownPayloadLength": false,
+          "minCount": 1
+        }
+      ],
+      "pvrTaSprites": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0xA0840000",
+          "controlValue": "0xF0000000",
+          "argb": "0xFF00FF00",
+          "rgb565": "0x07E0",
+          "minVertices": 4,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 3,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 3
+            }
+          ],
           "minCount": 1
         }
       ],

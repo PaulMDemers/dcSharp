@@ -193,6 +193,56 @@ public class DreamcastPvrTaStateTests
         Assert.Null(AcceptVertexPacket(state, "VertexEndOfStrip", 1, 1, 0xF800));
     }
 
+    [Fact]
+    public void CompletesSpritePacketWithHeaderFaceColor()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("SpriteHeader", 0xA084_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFFF_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        var render = AcceptSpritePacket(state);
+
+        Assert.NotNull(render);
+        Assert.Equal(0xF800, render.Rgb565);
+        var sprite = Assert.Single(state.CompletedSprites);
+        Assert.Equal("0xA0840000", sprite.HeaderValueHex);
+        Assert.Equal("0xFFFF0000", sprite.HeaderPayload.ArgbHex);
+        Assert.Equal("0xF0000000", sprite.ControlValueHex);
+        Assert.True(sprite.EndOfStrip);
+        Assert.Collection(
+            sprite.Vertices,
+            vertex =>
+            {
+                Assert.Equal("A", vertex.Name);
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(1, vertex.Y);
+            },
+            vertex =>
+            {
+                Assert.Equal("B", vertex.Name);
+                Assert.Equal(3, vertex.X);
+                Assert.Equal(1, vertex.Y);
+            },
+            vertex =>
+            {
+                Assert.Equal("C", vertex.Name);
+                Assert.Equal(1, vertex.X);
+                Assert.Equal(3, vertex.Y);
+            },
+            vertex =>
+            {
+                Assert.Equal("D", vertex.Name);
+                Assert.Equal(3, vertex.X);
+                Assert.Equal(3, vertex.Y);
+            });
+    }
+
     private static DreamcastPvrTaRenderCommand? AcceptVertexPacket(
         DreamcastPvrTaState state,
         string kind,
@@ -220,6 +270,26 @@ public class DreamcastPvrTaStateTests
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
         Assert.Null(state.Accept(CreateWrite("Unknown", argb)));
+        return state.Accept(CreateWrite("Unknown", 0));
+    }
+
+    private static DreamcastPvrTaRenderCommand? AcceptSpritePacket(DreamcastPvrTaState state)
+    {
+        Assert.Null(state.Accept(CreateWrite("VertexEndOfStrip", 0xF000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
         return state.Accept(CreateWrite("Unknown", 0));
     }
 

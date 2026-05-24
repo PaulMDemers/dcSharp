@@ -152,6 +152,12 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR TA strips: {FormatPvrTaStrips(pvrTaStrips)}");
     }
 
+    var pvrTaSprites = videoSummary.PvrTaSprites;
+    if (pvrTaSprites.Count > 0)
+    {
+        Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(pvrTaSprites)}");
+    }
+
     if (videoSummary.RecentPvrTaParameterHeaders.Count > 0)
     {
         Console.WriteLine($"PVR TA params: {FormatPvrTaParameterHeaders(videoSummary.RecentPvrTaParameterHeaders)}");
@@ -389,7 +395,7 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, timerPending={result.Summary.Timer.PendingEventCodeHex ?? "none"}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, taSprites={result.Summary.Video.PvrTaSprites.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, timerPending={result.Summary.Timer.PendingEventCodeHex ?? "none"}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
@@ -398,6 +404,11 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.PvrTaStrips.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaStrips={FormatPvrTaStrips(result.Summary.Video.PvrTaStrips)}");
+                }
+
+                if (result.Summary.Video.PvrTaSprites.Count > 0)
+                {
+                    Console.WriteLine($"  pvrTaSprites={FormatPvrTaSprites(result.Summary.Video.PvrTaSprites)}");
                 }
 
                 if (result.Summary.Video.RecentPvrTaParameterHeaders.Count > 0)
@@ -796,6 +807,9 @@ static string FormatPvrTaLists(IReadOnlyList<DreamcastPvrTaListSummary> lists) =
 static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips) =>
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
+static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
+    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}"))}"));
+
 static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
     payload is null
         ? string.Empty
@@ -946,6 +960,7 @@ internal sealed record FixtureReport(
     int? PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaListSummary>? PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary>? PvrTaStrips,
+    IReadOnlyList<DreamcastPvrTaSpriteSummary>? PvrTaSprites,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary>? RecentPvrTaStreamWrites,
     IReadOnlyList<DreamcastPvrTaPolygonHeaderPayloadSummary>? PvrTaPolygonHeaderPayloads,
     IReadOnlyList<DreamcastPvrTaRealVertexPayloadSummary>? PvrTaRealVertexPayloads,
@@ -987,6 +1002,7 @@ internal sealed record FixtureReport(
             result.Summary?.Video.PvrTaCommandWriteCount,
             result.Summary?.Video.PvrTaLists,
             result.Summary?.Video.PvrTaStrips,
+            result.Summary?.Video.PvrTaSprites,
             result.Summary?.Video.RecentPvrTaStreamWrites,
             result.Summary?.Video.PvrTaPolygonHeaderPayloads,
             result.Summary?.Video.PvrTaRealVertexPayloads,

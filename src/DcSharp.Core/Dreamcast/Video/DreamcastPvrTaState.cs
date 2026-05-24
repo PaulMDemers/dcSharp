@@ -2,21 +2,26 @@ namespace DcSharp.Core.Dreamcast.Video;
 
 public sealed class DreamcastPvrTaState
 {
-    private const int PolygonHeaderPayloadWords = DreamcastPvrTaPolygonHeaderPayloadDecoder.PayloadWordCount;
+    private const int ParameterHeaderPayloadWords = DreamcastPvrTaPolygonHeaderPayloadDecoder.PayloadWordCount;
     private bool inRenderableOpaqueList;
     private bool awaitingHeaderPayloadOrShortcut;
+    private bool awaitingSpriteVertex;
     private bool inRealStream;
     private int headerPayloadWordsRemaining;
     private DreamcastPvrTaCommandWrite? currentHeader;
     private uint currentHeaderValue;
-    private readonly uint[] currentHeaderPayloadWords = new uint[PolygonHeaderPayloadWords];
+    private readonly uint[] currentHeaderPayloadWords = new uint[ParameterHeaderPayloadWords];
     private DreamcastPvrTaPolygonHeaderPayload? currentHeaderPayload;
+    private DreamcastPvrTaSpriteHeaderPayload? currentSpriteHeaderPayload;
     private readonly DreamcastPvrTaDiagnosticVertexPacketDecoder diagnosticVertexDecoder = new();
     private readonly DreamcastPvrTaRealVertexPacketDecoder realVertexDecoder = new();
+    private readonly DreamcastPvrTaSpritePacketDecoder spritePacketDecoder = new();
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
     private readonly List<DreamcastPvrTaStrip> completedStrips = [];
+    private readonly List<DreamcastPvrTaSprite> completedSprites = [];
 
     public IReadOnlyList<DreamcastPvrTaStrip> CompletedStrips => completedStrips;
+    public IReadOnlyList<DreamcastPvrTaSprite> CompletedSprites => completedSprites;
 
     public DreamcastPvrTaRenderCommand? Accept(DreamcastPvrTaCommandWrite write)
     {
@@ -33,7 +38,7 @@ public sealed class DreamcastPvrTaState
             {
                 inRealStream = true;
                 currentHeaderPayloadWords[0] = write.Value;
-                headerPayloadWordsRemaining = PolygonHeaderPayloadWords - 1;
+                headerPayloadWordsRemaining = ParameterHeaderPayloadWords - 1;
                 CompleteHeaderPayloadIfReady();
                 return null;
             }
@@ -41,11 +46,16 @@ public sealed class DreamcastPvrTaState
 
         if (headerPayloadWordsRemaining > 0)
         {
-            var wordIndex = PolygonHeaderPayloadWords - headerPayloadWordsRemaining;
+            var wordIndex = ParameterHeaderPayloadWords - headerPayloadWordsRemaining;
             currentHeaderPayloadWords[wordIndex] = write.Value;
             headerPayloadWordsRemaining--;
             CompleteHeaderPayloadIfReady();
             return null;
+        }
+
+        if (spritePacketDecoder.HasPending)
+        {
+            return AcceptSpritePayload(write);
         }
 
         if (realVertexDecoder.HasPending)
@@ -58,6 +68,23 @@ public sealed class DreamcastPvrTaState
             return AcceptDiagnosticVertexPayload(write);
         }
 
+        if (awaitingSpriteVertex)
+        {
+            if (IsOpaqueInput(write) && IsVertexControl(write) && currentHeader is not null && currentSpriteHeaderPayload is not null)
+            {
+                awaitingSpriteVertex = false;
+                spritePacketDecoder.Begin(
+                    currentHeader,
+                    currentSpriteHeaderPayload,
+                    write,
+                    string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal));
+                return null;
+            }
+
+            ResetStrip();
+            return null;
+        }
+
         if (IsOpaqueInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
         {
             ResetStrip();
@@ -65,6 +92,17 @@ public sealed class DreamcastPvrTaState
             currentHeader = write;
             currentHeaderValue = write.Value;
             awaitingHeaderPayloadOrShortcut = true;
+            return null;
+        }
+
+        if (IsOpaqueInput(write) && string.Equals(write.Kind, "SpriteHeader", StringComparison.Ordinal))
+        {
+            ResetStrip();
+            inRenderableOpaqueList = true;
+            inRealStream = true;
+            currentHeader = write;
+            currentHeaderValue = write.Value;
+            headerPayloadWordsRemaining = ParameterHeaderPayloadWords;
             return null;
         }
 
@@ -100,6 +138,25 @@ public sealed class DreamcastPvrTaState
         }
 
         return AcceptVertex(write, vertex);
+    }
+
+    private DreamcastPvrTaRenderCommand? AcceptSpritePayload(DreamcastPvrTaCommandWrite write)
+    {
+        if (!spritePacketDecoder.AcceptPayload(write.Value, out var sprite))
+        {
+            return null;
+        }
+
+        if (sprite is null || sprite.Rgb565 == 0)
+        {
+            ResetStrip();
+            return null;
+        }
+
+        completedSprites.Add(sprite);
+        var result = new DreamcastPvrTaRenderCommand(sprite);
+        ResetStrip();
+        return result;
     }
 
     private DreamcastPvrTaRenderCommand? AcceptRealVertexPayload(DreamcastPvrTaCommandWrite write)
@@ -161,7 +218,15 @@ public sealed class DreamcastPvrTaState
     {
         if (headerPayloadWordsRemaining == 0 && currentHeader is not null)
         {
-            currentHeaderPayload = DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(currentHeader, currentHeaderPayloadWords);
+            if (string.Equals(currentHeader.Kind, "PolygonHeader", StringComparison.Ordinal))
+            {
+                currentHeaderPayload = DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(currentHeader, currentHeaderPayloadWords);
+            }
+            else if (string.Equals(currentHeader.Kind, "SpriteHeader", StringComparison.Ordinal))
+            {
+                currentSpriteHeaderPayload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(currentHeader, currentHeaderPayloadWords);
+                awaitingSpriteVertex = true;
+            }
         }
     }
 
@@ -179,14 +244,61 @@ public sealed class DreamcastPvrTaState
     private void ResetStrip()
     {
         awaitingHeaderPayloadOrShortcut = false;
+        awaitingSpriteVertex = false;
         inRealStream = false;
         headerPayloadWordsRemaining = 0;
         currentHeader = null;
         currentHeaderPayload = null;
+        currentSpriteHeaderPayload = null;
         diagnosticVertexDecoder.Reset();
         realVertexDecoder.Reset();
+        spritePacketDecoder.Reset();
         currentVertices.Clear();
     }
+}
+
+public sealed record DreamcastPvrTaSpriteHeaderPayload(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    uint Mode1,
+    string Mode1Hex,
+    uint Mode2,
+    string Mode2Hex,
+    uint Mode3,
+    string Mode3Hex,
+    uint Argb,
+    string ArgbHex,
+    uint OffsetArgb,
+    string OffsetArgbHex,
+    uint Dummy0,
+    string Dummy0Hex,
+    uint Dummy1,
+    string Dummy1Hex)
+{
+    public static DreamcastPvrTaSpriteHeaderPayload FromPayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words) =>
+        new(
+            header.Region,
+            header.ListType,
+            header.ListTypeName,
+            header.Value,
+            header.ValueHex,
+            words[0],
+            $"0x{words[0]:X8}",
+            words[1],
+            $"0x{words[1]:X8}",
+            words[2],
+            $"0x{words[2]:X8}",
+            words[3],
+            $"0x{words[3]:X8}",
+            words[4],
+            $"0x{words[4]:X8}",
+            words[5],
+            $"0x{words[5]:X8}",
+            words[6],
+            $"0x{words[6]:X8}");
 }
 
 public sealed record DreamcastPvrTaVertex(
@@ -227,7 +339,43 @@ public sealed record DreamcastPvrTaStrip(
     public bool Gouraud => (HeaderValue & 0x0000_0002u) != 0;
 }
 
-public sealed record DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip Strip)
+public sealed record DreamcastPvrTaSpriteVertex(
+    string Name,
+    int X,
+    int Y,
+    float Z,
+    uint ZValue,
+    string ZValueHex,
+    uint XValue,
+    string XValueHex,
+    uint YValue,
+    string YValueHex);
+
+public sealed record DreamcastPvrTaSprite(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    DreamcastPvrTaSpriteHeaderPayload HeaderPayload,
+    uint ControlValue,
+    string ControlValueHex,
+    bool EndOfStrip,
+    ushort Rgb565,
+    string Rgb565Hex,
+    IReadOnlyList<DreamcastPvrTaSpriteVertex> Vertices);
+
+public sealed record DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip? Strip, DreamcastPvrTaSprite? Sprite)
 {
-    public ushort Rgb565 => Strip.Rgb565;
+    public DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip strip)
+        : this(strip, null)
+    {
+    }
+
+    public DreamcastPvrTaRenderCommand(DreamcastPvrTaSprite sprite)
+        : this(null, sprite)
+    {
+    }
+
+    public ushort Rgb565 => Strip?.Rgb565 ?? Sprite?.Rgb565 ?? 0;
 }

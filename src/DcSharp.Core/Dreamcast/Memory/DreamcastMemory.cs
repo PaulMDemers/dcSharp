@@ -545,6 +545,7 @@ public sealed class DreamcastMemory
             pvrRegisterAccesses.ToArray(),
             pvrTaCommandWrites.ToArray(),
             pvrTaState.CompletedStrips.ToArray(),
+            pvrTaState.CompletedSprites.ToArray(),
             (byte[])pvrVram.Clone());
     }
 
@@ -1436,7 +1437,14 @@ public sealed class DreamcastMemory
         pvrTaCommandWrites.Add(write);
         if (pvrTaState.Accept(write) is { } renderCommand)
         {
-            DreamcastPvrPreviewRenderer.RenderStrip(renderCommand.Strip, pvrVram, pvrPreviewDepth);
+            if (renderCommand.Strip is { } strip)
+            {
+                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth);
+            }
+            else if (renderCommand.Sprite is { } sprite)
+            {
+                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram);
+            }
         }
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));

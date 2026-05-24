@@ -69,12 +69,14 @@ public static class DreamcastPvrTaStreamDecoder
     private static string? PayloadWordName(string controlKind, int payloadWordIndex) =>
         controlKind switch
         {
-            "PolygonHeader" or "SpriteHeader" or "ModifierVolume" => ParameterHeaderPayloadWordName(payloadWordIndex),
+            "PolygonHeader" => PolygonHeaderPayloadWordName(payloadWordIndex),
+            "SpriteHeader" => SpriteHeaderPayloadWordName(payloadWordIndex),
+            "ModifierVolume" => ModifierVolumePayloadWordName(payloadWordIndex),
             "UserClip" => UserClipPayloadWordName(payloadWordIndex),
             _ => null
         };
 
-    private static string? ParameterHeaderPayloadWordName(int payloadWordIndex) =>
+    private static string? PolygonHeaderPayloadWordName(int payloadWordIndex) =>
         payloadWordIndex switch
         {
             0 => "Mode1",
@@ -84,6 +86,32 @@ public static class DreamcastPvrTaStreamDecoder
             4 => "Parameter1",
             5 => "Parameter2",
             6 => "Parameter3",
+            _ => null
+        };
+
+    private static string? SpriteHeaderPayloadWordName(int payloadWordIndex) =>
+        payloadWordIndex switch
+        {
+            0 => "Mode1",
+            1 => "Mode2",
+            2 => "Mode3",
+            3 => "Argb",
+            4 => "OffsetArgb",
+            5 => "Dummy0",
+            6 => "Dummy1",
+            _ => null
+        };
+
+    private static string? ModifierVolumePayloadWordName(int payloadWordIndex) =>
+        payloadWordIndex switch
+        {
+            0 => "Mode1",
+            1 => "Dummy0",
+            2 => "Dummy1",
+            3 => "Dummy2",
+            4 => "Dummy3",
+            5 => "Dummy4",
+            6 => "Dummy5",
             _ => null
         };
 

@@ -435,6 +435,7 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrTaParameterHeaderSummary> RecentPvrTaParameterHeaders,
     IReadOnlyList<DreamcastPvrTaListSummary> PvrTaLists,
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
+    IReadOnlyList<DreamcastPvrTaSpriteSummary> PvrTaSprites,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
@@ -482,6 +483,7 @@ public sealed record DreamcastVideoSummary(
                     group.Count(write => string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal))))
                 .ToArray(),
             snapshot.PvrTaStrips.Select(DreamcastPvrTaStripSummary.FromStrip).ToArray(),
+            snapshot.PvrTaSprites.Select(DreamcastPvrTaSpriteSummary.FromSprite).ToArray(),
             snapshot.PvrTaCommandWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -841,6 +843,98 @@ public sealed record DreamcastPvrTaStripSummary(
             strip.Rgb565Hex,
             strip.Vertices.Count,
             strip.Vertices.Select(DreamcastPvrTaVertexSummary.FromVertex).ToArray());
+}
+
+public sealed record DreamcastPvrTaSpriteHeaderPayloadSummary(
+    uint Mode1,
+    string Mode1Hex,
+    uint Mode2,
+    string Mode2Hex,
+    uint Mode3,
+    string Mode3Hex,
+    uint Argb,
+    string ArgbHex,
+    uint OffsetArgb,
+    string OffsetArgbHex,
+    uint Dummy0,
+    string Dummy0Hex,
+    uint Dummy1,
+    string Dummy1Hex)
+{
+    public static DreamcastPvrTaSpriteHeaderPayloadSummary FromPayload(DreamcastPvrTaSpriteHeaderPayload payload) =>
+        new(
+            payload.Mode1,
+            payload.Mode1Hex,
+            payload.Mode2,
+            payload.Mode2Hex,
+            payload.Mode3,
+            payload.Mode3Hex,
+            payload.Argb,
+            payload.ArgbHex,
+            payload.OffsetArgb,
+            payload.OffsetArgbHex,
+            payload.Dummy0,
+            payload.Dummy0Hex,
+            payload.Dummy1,
+            payload.Dummy1Hex);
+}
+
+public sealed record DreamcastPvrTaSpriteVertexSummary(
+    string Name,
+    int X,
+    int Y,
+    float Z,
+    uint ZValue,
+    string ZValueHex,
+    uint XValue,
+    string XValueHex,
+    uint YValue,
+    string YValueHex)
+{
+    public static DreamcastPvrTaSpriteVertexSummary FromVertex(DreamcastPvrTaSpriteVertex vertex) =>
+        new(
+            vertex.Name,
+            vertex.X,
+            vertex.Y,
+            vertex.Z,
+            vertex.ZValue,
+            vertex.ZValueHex,
+            vertex.XValue,
+            vertex.XValueHex,
+            vertex.YValue,
+            vertex.YValueHex);
+}
+
+public sealed record DreamcastPvrTaSpriteSummary(
+    string Region,
+    int? ListType,
+    string? ListTypeName,
+    uint HeaderValue,
+    string HeaderValueHex,
+    DreamcastPvrTaSpriteHeaderPayloadSummary HeaderPayload,
+    uint ControlValue,
+    string ControlValueHex,
+    bool EndOfStrip,
+    ushort Rgb565,
+    string Rgb565Hex,
+    int VertexCount,
+    IReadOnlyList<DreamcastPvrTaSpriteVertexSummary> Vertices)
+{
+    public static DreamcastPvrTaSpriteSummary FromSprite(DreamcastPvrTaSprite sprite) =>
+        new(
+            sprite.Region,
+            sprite.ListType,
+            sprite.ListTypeName,
+            sprite.HeaderValue,
+            sprite.HeaderValueHex,
+            DreamcastPvrTaSpriteHeaderPayloadSummary.FromPayload(sprite.HeaderPayload),
+            sprite.ControlValue,
+            sprite.ControlValueHex,
+            sprite.EndOfStrip,
+            sprite.Rgb565,
+            sprite.Rgb565Hex,
+            sprite.Vertices.Count,
+            sprite.Vertices.Select(DreamcastPvrTaSpriteVertexSummary.FromVertex).ToArray());
 }
 
 public sealed record DreamcastPvrTaCommandKindSummary(string Kind, int Count);
