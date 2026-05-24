@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
@@ -71,6 +72,11 @@ static void RunElf(string path, string[] args)
     if (options.FramebufferDumpPath is not null)
     {
         DumpFramebuffer(result, options);
+    }
+
+    if (options.AudioWavPath is not null)
+    {
+        DumpAudioWav(result, options.AudioWavPath);
     }
 
     if (options.TraceLogPath is not null)
@@ -468,6 +474,19 @@ static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
     DreamcastFramebufferPngWriter.WriteRgb565Png(stream, result.Video.Vram, options.FramebufferWidth, options.FramebufferHeight);
 }
 
+static void DumpAudioWav(DreamcastRunResult result, string path)
+{
+    var fullPath = Path.GetFullPath(path);
+    var directory = Path.GetDirectoryName(fullPath);
+    if (!string.IsNullOrEmpty(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    using var stream = File.Create(fullPath);
+    DreamcastAudioWavWriter.WritePcm16Stereo(stream, result.Audio);
+}
+
 static void DumpTraceLog(DreamcastRunResult result, string path)
 {
     using var writer = CreateTextLog(path);
@@ -536,6 +555,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? framebufferDumpPath = null;
     var framebufferWidth = 320;
     var framebufferHeight = 240;
+    string? audioWavPath = null;
     string? traceLogPath = null;
     uint? traceStartPc = null;
     uint? traceEndPc = null;
@@ -597,6 +617,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 index++;
                 break;
             case "--pixel-format" when index + 1 < args.Length && string.Equals(args[index + 1], "rgb565", StringComparison.OrdinalIgnoreCase):
+                index++;
+                break;
+            case "--audio-wav" when index + 1 < args.Length:
+                audioWavPath = args[index + 1];
                 index++;
                 break;
             case "--trace-log" when index + 1 < args.Length:
@@ -675,6 +699,7 @@ static CliRunOptions ParseRunOptions(string[] args)
         framebufferDumpPath,
         framebufferWidth,
         framebufferHeight,
+        audioWavPath,
         traceLogPath,
         deviceLogPath,
         deviceKind,
@@ -849,13 +874,14 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
     Console.WriteLine("    Example controller map entry: --controller b0:b,ltrig=7");
     Console.WriteLine("    Example controller script: --controller-script \"a0:0:none;200000:start,a\"");
     Console.WriteLine("    Framebuffer dumps currently use RGB565.");
+    Console.WriteLine("    Audio WAV dumps currently synthesize modeled PCM16/PCM8 diagnostic playback only.");
 }
 
 static string? FindRepoRoot(string startPath)
@@ -885,6 +911,7 @@ internal sealed record CliRunOptions(
     string? FramebufferDumpPath,
     int FramebufferWidth,
     int FramebufferHeight,
+    string? AudioWavPath,
     string? TraceLogPath,
     string? DeviceLogPath,
     MemoryAccessKind? DeviceKind,

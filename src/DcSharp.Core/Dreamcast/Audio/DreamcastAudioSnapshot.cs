@@ -9,7 +9,8 @@ public sealed record DreamcastAudioSnapshot(
     string Fnv1A32Hex,
     IReadOnlyList<DreamcastAicaRegisterValue> Registers,
     IReadOnlyList<DreamcastAicaRegisterAccess> RegisterAccesses,
-    IReadOnlyList<DreamcastAicaChannelSnapshot> Channels);
+    IReadOnlyList<DreamcastAicaChannelSnapshot> Channels,
+    byte[] AudioRam);
 
 public sealed record DreamcastAicaRegisterValue(
     uint Offset,

@@ -164,6 +164,43 @@ public class DcSharpCliMediaLoadingIntegrationTests
         }
     }
 
+    [Fact]
+    public void RunCommandWritesAudioWav()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
+        var outputDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(outputDirectory);
+        var wavPath = Path.Combine(outputDirectory, "audio.wav");
+
+        try
+        {
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "run",
+                elfPath,
+                "--audio-wav",
+                wavPath,
+                "--instructions",
+                "8",
+                "--trace-tail",
+                "0");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.True(File.Exists(wavPath));
+            var header = File.ReadAllBytes(wavPath);
+            Assert.True(header.Length >= 44);
+            Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(header, 0, 4));
+            Assert.Equal("WAVE", System.Text.Encoding.ASCII.GetString(header, 8, 4));
+        }
+        finally
+        {
+            Directory.Delete(outputDirectory, recursive: true);
+        }
+    }
+
     private static string FindCliAssembly(string repoRoot)
     {
         var debugAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", "Debug", "net10.0", "DcSharp.Cli.dll");

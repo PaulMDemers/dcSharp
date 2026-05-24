@@ -562,7 +562,8 @@ public sealed class DreamcastMemory
             $"0x{hash:X8}",
             CreateAicaRegisterValues(),
             aicaRegisterAccesses.ToArray(),
-            CreateAicaChannelSnapshots());
+            CreateAicaChannelSnapshots(),
+            (byte[])aicaRam.Clone());
     }
 
     public DreamcastMapleSnapshot CreateMapleSnapshot() =>
