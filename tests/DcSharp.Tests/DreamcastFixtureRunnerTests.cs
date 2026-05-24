@@ -205,6 +205,8 @@ public class DreamcastFixtureRunnerTests
                     Channel = 0,
                     Control = "0x00008000",
                     SampleFormat = "Pcm16",
+                    Compressed = false,
+                    Streamed = false,
                     SampleAddress = "0x00001234",
                     LoopStart = "0x00000008",
                     LoopEnd = "0x00000040",
@@ -495,6 +497,8 @@ public class DreamcastFixtureRunnerTests
                     Channel = 0,
                     Pitch = "0x00001AC0",
                     Volume = 64,
+                    Compressed = true,
+                    Streamed = true,
                     SampleStrideBytes = 1,
                     PanSendLevel = 1,
                     PanPosition = 1,
@@ -599,6 +603,8 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
         Assert.Contains("AICA channel 0 volume expected 64, got 63", failures);
+        Assert.Contains("AICA channel 0 compressed expected True, got False", failures);
+        Assert.Contains("AICA channel 0 streamed expected True, got False", failures);
         Assert.Contains("AICA channel 0 pan send level expected 1, got 0", failures);
         Assert.Contains("AICA channel 0 pan position expected 1, got 15", failures);
         Assert.Contains("AICA channel 0 left balance expected 14, got 0", failures);
@@ -917,6 +923,8 @@ public class DreamcastFixtureRunnerTests
         int channel = 0,
         uint control = 0x00008000,
         string sampleFormat = "Pcm16",
+        bool compressed = false,
+        bool streamed = false,
         uint sampleAddress = 0x00001234,
         uint loopStart = 0x00000008,
         uint loopEnd = 0x00000040,
@@ -941,6 +949,8 @@ public class DreamcastFixtureRunnerTests
             control,
             $"0x{control:X8}",
             sampleFormat,
+            compressed,
+            streamed,
             false,
             sampleAddress,
             $"0x{sampleAddress:X8}",

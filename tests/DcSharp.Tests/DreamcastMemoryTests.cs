@@ -382,6 +382,8 @@ public class DreamcastMemoryTests
         var channel = Assert.Single(snapshot.Channels);
         Assert.Equal(0, channel.Channel);
         Assert.Equal("Pcm16", channel.SampleFormat);
+        Assert.False(channel.Compressed);
+        Assert.False(channel.Streamed);
         Assert.False(channel.LoopEnabled);
         Assert.Equal(0x1234u, channel.SampleAddress);
         Assert.True(channel.KeyOn);
@@ -522,6 +524,32 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AdvanceHardwareDoesNotAdvanceCompressedAicaPlaybackWithoutDecoder()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0004);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C100);
+
+        memory.AdvanceHardware(200_000);
+        memory.WriteUInt32(0xA070_0000, 0x0000_8000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.Equal(0x0000_8000u, channel.Control);
+        Assert.Equal("Adpcm", channel.SampleFormat);
+        Assert.True(channel.Compressed);
+        Assert.False(channel.Streamed);
+        Assert.Equal(0, channel.SampleStrideBytes);
+        Assert.False(channel.Active);
+        Assert.Equal(0UL, channel.PlaybackPosition);
+        Assert.Equal(0UL, channel.PlaybackBytePosition);
+        Assert.Equal(0UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(0UL, channel.PlaybackBytesAdvanced);
+        Assert.False(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
     public void AdvanceHardwareWrapsAicaPlaybackAtExactLoopBoundary()
     {
         var memory = new DreamcastMemory();
@@ -575,6 +603,24 @@ public class DreamcastMemoryTests
 
         Assert.Equal(expectedFormat, channel.SampleFormat);
         Assert.Equal(expectedLoop, channel.LoopEnabled);
+    }
+
+    [Theory]
+    [InlineData(0x0000_0000u, false, false, 2)]
+    [InlineData(0x0000_0080u, false, false, 1)]
+    [InlineData(0x0000_0100u, true, false, 0)]
+    [InlineData(0x0000_0180u, true, true, 0)]
+    public void AudioSnapshotReportsAicaCompressionMetadata(uint controlBits, bool expectedCompressed, bool expectedStreamed, int expectedStride)
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0000, controlBits);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+
+        Assert.Equal(expectedCompressed, channel.Compressed);
+        Assert.Equal(expectedStreamed, channel.Streamed);
+        Assert.Equal(expectedStride, channel.SampleStrideBytes);
     }
 
     [Fact]

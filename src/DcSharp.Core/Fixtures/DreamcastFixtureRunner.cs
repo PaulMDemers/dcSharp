@@ -389,6 +389,8 @@ public static class DreamcastFixtureRunner
 
             ValidateHex32(failures, $"AICA channel {expected.Channel} control", expected.Control, channel.Control, channel.ControlHex);
             ValidateString(failures, $"AICA channel {expected.Channel} sample format", expected.SampleFormat, channel.SampleFormat);
+            ValidateBool(failures, $"AICA channel {expected.Channel} compressed", expected.Compressed, channel.Compressed);
+            ValidateBool(failures, $"AICA channel {expected.Channel} streamed", expected.Streamed, channel.Streamed);
             ValidateHex32(failures, $"AICA channel {expected.Channel} sample address", expected.SampleAddress, channel.SampleAddress, channel.SampleAddressHex);
             ValidateHex32(failures, $"AICA channel {expected.Channel} loop start", expected.LoopStart, channel.LoopStart, channel.LoopStartHex);
             ValidateHex32(failures, $"AICA channel {expected.Channel} loop end", expected.LoopEnd, channel.LoopEnd, channel.LoopEndHex);

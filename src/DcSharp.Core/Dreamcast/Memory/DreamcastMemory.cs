@@ -1591,6 +1591,8 @@ public sealed class DreamcastMemory
                 control,
                 $"0x{control:X8}",
                 AicaSampleFormatName(sampleFormatMode),
+                AicaSampleFormatIsCompressed(sampleFormatMode),
+                AicaSampleFormatIsStreamed(sampleFormatMode),
                 (control & 0x0200) != 0,
                 sampleAddress,
                 $"0x{sampleAddress:X8}",
@@ -1661,6 +1663,11 @@ public sealed class DreamcastMemory
             if ((control & 0xC000) != 0xC000)
             {
                 playback.Playing = false;
+                continue;
+            }
+
+            if (AicaSampleFormatIsCompressed(playback.SampleFormatMode))
+            {
                 continue;
             }
 
@@ -1740,6 +1747,10 @@ public sealed class DreamcastMemory
         1 => 1,
         _ => 0
     };
+
+    private static bool AicaSampleFormatIsCompressed(uint mode) => mode is 2 or 3;
+
+    private static bool AicaSampleFormatIsStreamed(uint mode) => mode == 3;
 
     private uint ReadAicaChannelRegister(int channel, uint channelOffset) =>
         aicaRegisters.GetValueOrDefault(AicaRegisterBase + ((uint)channel * 0x80u) + (channelOffset & 0xFFFF_FFFCu));

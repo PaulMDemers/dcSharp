@@ -4124,6 +4124,64 @@
         "aica": 1,
         "scif": 1
       }
+    },
+    {
+      "name": "aica_adpcm_metadata",
+      "sample": "samples/kos/aica_adpcm_metadata",
+      "artifact": "dcsharp_aica_adpcm_metadata.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp AICA ADPCM metadata probe start",
+        "ctrl=0x0000c300",
+        "loop=4-32",
+        "pan=0x2a",
+        "vol=80",
+        "dcSharp AICA ADPCM metadata probe done"
+      ],
+      "minAicaRegisterAccesses": 8,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "aicaRegisters": {
+        "AICA_CH0_CONTROL": "0x00008000",
+        "AICA_CH0_SAMPLE_ADDR_LOW": "0x00000020",
+        "AICA_CH0_LOOP_START": "0x00000004",
+        "AICA_CH0_LOOP_END": "0x00000020",
+        "AICA_MASTER_VOLUME": "0x0000000F"
+      },
+      "aicaChannels": [
+        {
+          "channel": 0,
+          "control": "0x00008000",
+          "sampleFormat": "Adpcm",
+          "compressed": true,
+          "streamed": false,
+          "sampleStrideBytes": 0,
+          "sampleAddress": "0x00000020",
+          "loopStart": "0x00000004",
+          "loopEnd": "0x00000020",
+          "pitch": "0x00000000",
+          "pan": 42,
+          "panSendLevel": 2,
+          "panPosition": 10,
+          "leftBalance": 5,
+          "rightBalance": 10,
+          "volume": 80,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true,
+          "playbackPosition": 0,
+          "playbackBytePosition": 0,
+          "minPlaybackSamplesAdvanced": 0,
+          "minPlaybackBytesAdvanced": 0,
+          "playbackStoppedAtLoopEnd": false
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "scif": 1
+      }
     }
   ]
 }

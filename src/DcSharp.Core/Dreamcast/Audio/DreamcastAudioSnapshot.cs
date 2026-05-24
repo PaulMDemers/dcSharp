@@ -36,6 +36,8 @@ public sealed record DreamcastAicaChannelSnapshot(
     uint Control,
     string ControlHex,
     string SampleFormat,
+    bool Compressed,
+    bool Streamed,
     bool LoopEnabled,
     uint SampleAddress,
     string SampleAddressHex,

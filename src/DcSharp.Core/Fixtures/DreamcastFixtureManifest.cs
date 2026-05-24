@@ -354,6 +354,8 @@ public sealed class DreamcastFixtureAicaChannelExpectation
     public int Channel { get; set; }
     public string? Control { get; set; }
     public string? SampleFormat { get; set; }
+    public bool? Compressed { get; set; }
+    public bool? Streamed { get; set; }
     public string? SampleAddress { get; set; }
     public string? LoopStart { get; set; }
     public string? LoopEnd { get; set; }
