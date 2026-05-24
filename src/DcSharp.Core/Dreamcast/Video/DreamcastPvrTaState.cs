@@ -276,10 +276,15 @@ public sealed record DreamcastPvrTaSpriteHeaderPayload(
     uint Dummy0,
     string Dummy0Hex,
     uint Dummy1,
-    string Dummy1Hex)
+    string Dummy1Hex,
+    DreamcastPvrTaPolygonHeaderMode1 Mode1Fields,
+    DreamcastPvrTaPolygonHeaderMode2 Mode2Fields,
+    DreamcastPvrTaPolygonHeaderMode3 Mode3Fields)
 {
-    public static DreamcastPvrTaSpriteHeaderPayload FromPayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words) =>
-        new(
+    public static DreamcastPvrTaSpriteHeaderPayload FromPayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words)
+    {
+        var decodedModes = DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, words);
+        return new(
             header.Region,
             header.ListType,
             header.ListTypeName,
@@ -298,7 +303,11 @@ public sealed record DreamcastPvrTaSpriteHeaderPayload(
             words[5],
             $"0x{words[5]:X8}",
             words[6],
-            $"0x{words[6]:X8}");
+            $"0x{words[6]:X8}",
+            decodedModes.Mode1Fields,
+            decodedModes.Mode2Fields,
+            decodedModes.Mode3Fields);
+    }
 }
 
 public sealed record DreamcastPvrTaVertex(
@@ -349,7 +358,11 @@ public sealed record DreamcastPvrTaSpriteVertex(
     uint XValue,
     string XValueHex,
     uint YValue,
-    string YValueHex);
+    string YValueHex,
+    float U,
+    float V,
+    uint UvValue,
+    string UvValueHex);
 
 public sealed record DreamcastPvrTaSprite(
     string Region,

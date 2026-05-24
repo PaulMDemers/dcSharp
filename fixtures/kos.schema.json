@@ -1044,6 +1044,12 @@
         },
         "y": {
           "type": "integer"
+        },
+        "u": {
+          "type": "number"
+        },
+        "v": {
+          "type": "number"
         }
       }
     },

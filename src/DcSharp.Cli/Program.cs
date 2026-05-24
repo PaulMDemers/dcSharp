@@ -808,7 +808,7 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
 static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
-    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}"))}"));
+    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}"))}"));
 
 static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
     payload is null

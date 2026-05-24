@@ -859,7 +859,10 @@ public sealed record DreamcastPvrTaSpriteHeaderPayloadSummary(
     uint Dummy0,
     string Dummy0Hex,
     uint Dummy1,
-    string Dummy1Hex)
+    string Dummy1Hex,
+    DreamcastPvrTaPolygonHeaderMode1 Mode1Fields,
+    DreamcastPvrTaPolygonHeaderMode2 Mode2Fields,
+    DreamcastPvrTaPolygonHeaderMode3 Mode3Fields)
 {
     public static DreamcastPvrTaSpriteHeaderPayloadSummary FromPayload(DreamcastPvrTaSpriteHeaderPayload payload) =>
         new(
@@ -876,7 +879,10 @@ public sealed record DreamcastPvrTaSpriteHeaderPayloadSummary(
             payload.Dummy0,
             payload.Dummy0Hex,
             payload.Dummy1,
-            payload.Dummy1Hex);
+            payload.Dummy1Hex,
+            payload.Mode1Fields,
+            payload.Mode2Fields,
+            payload.Mode3Fields);
 }
 
 public sealed record DreamcastPvrTaSpriteVertexSummary(
@@ -889,7 +895,11 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
     uint XValue,
     string XValueHex,
     uint YValue,
-    string YValueHex)
+    string YValueHex,
+    float U,
+    float V,
+    uint UvValue,
+    string UvValueHex)
 {
     public static DreamcastPvrTaSpriteVertexSummary FromVertex(DreamcastPvrTaSpriteVertex vertex) =>
         new(
@@ -902,7 +912,11 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
             vertex.XValue,
             vertex.XValueHex,
             vertex.YValue,
-            vertex.YValueHex);
+            vertex.YValueHex,
+            vertex.U,
+            vertex.V,
+            vertex.UvValue,
+            vertex.UvValueHex);
 }
 
 public sealed record DreamcastPvrTaSpriteSummary(

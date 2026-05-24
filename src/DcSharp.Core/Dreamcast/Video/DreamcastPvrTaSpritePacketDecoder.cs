@@ -151,6 +151,13 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
         public DreamcastPvrTaSprite ToSprite()
         {
             var rgb565 = Argb8888ToRgb565(HeaderPayload.Argb);
+            var textured = HeaderPayload.Mode1Fields.TextureEnabled;
+            (float U, float V, uint Value) aUv = textured ? DecodePackedUv(Dummy1 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) bUv = textured ? DecodePackedUv(Dummy2 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) cUv = textured ? DecodePackedUv(Dummy3 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) dUv = textured
+                ? (aUv.U + cUv.U - bUv.U, aUv.V + cUv.V - bUv.V, 0u)
+                : (0.0f, 0.0f, 0u);
             return new DreamcastPvrTaSprite(
                 Header.Region,
                 Header.ListType,
@@ -164,14 +171,14 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
                 rgb565,
                 $"0x{rgb565:X4}",
                 [
-                    CreateVertex(AxValue ?? 0, AyValue ?? 0, AzValue ?? 0, "A"),
-                    CreateVertex(BxValue ?? 0, ByValue ?? 0, BzValue ?? 0, "B"),
-                    CreateVertex(CxValue ?? 0, CyValue ?? 0, CzValue ?? 0, "C"),
-                    CreateVertex(DxValue ?? 0, DyValue ?? 0, InterpolateDz(AzValue ?? 0, BzValue ?? 0, CzValue ?? 0), "D")
+                    CreateVertex(AxValue ?? 0, AyValue ?? 0, AzValue ?? 0, "A", aUv.U, aUv.V, aUv.Value),
+                    CreateVertex(BxValue ?? 0, ByValue ?? 0, BzValue ?? 0, "B", bUv.U, bUv.V, bUv.Value),
+                    CreateVertex(CxValue ?? 0, CyValue ?? 0, CzValue ?? 0, "C", cUv.U, cUv.V, cUv.Value),
+                    CreateVertex(DxValue ?? 0, DyValue ?? 0, InterpolateDz(AzValue ?? 0, BzValue ?? 0, CzValue ?? 0), "D", dUv.U, dUv.V, dUv.Value)
                 ]);
         }
 
-        private static DreamcastPvrTaSpriteVertex CreateVertex(uint xValue, uint yValue, uint zValue, string name) =>
+        private static DreamcastPvrTaSpriteVertex CreateVertex(uint xValue, uint yValue, uint zValue, string name, float u, float v, uint uvValue) =>
             new(
                 name,
                 DecodeFloatCoordinate(xValue),
@@ -182,7 +189,18 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
                 xValue,
                 $"0x{xValue:X8}",
                 yValue,
-                $"0x{yValue:X8}");
+                $"0x{yValue:X8}",
+                u,
+                v,
+                uvValue,
+                $"0x{uvValue:X8}");
+
+        private static (float U, float V, uint Value) DecodePackedUv(uint value)
+        {
+            var u = BitConverter.UInt32BitsToSingle(value & 0xFFFF_0000u);
+            var v = BitConverter.UInt32BitsToSingle((value & 0x0000_FFFFu) << 16);
+            return (u, v, value);
+        }
 
         private static uint InterpolateDz(uint azValue, uint bzValue, uint czValue)
         {

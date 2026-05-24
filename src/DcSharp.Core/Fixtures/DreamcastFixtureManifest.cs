@@ -345,6 +345,8 @@ public sealed class DreamcastFixturePvrTaVertexExpectation
 {
     public int X { get; set; }
     public int Y { get; set; }
+    public float? U { get; set; }
+    public float? V { get; set; }
 }
 
 public sealed class DreamcastFixturePvrTaSpriteExpectation

@@ -1327,7 +1327,11 @@ public static class DreamcastFixtureRunner
         return sprite.Vertices.Count == expectedVertices.Count
             && sprite.Vertices
                 .Zip(expectedVertices)
-                .All(pair => pair.First.X == pair.Second.X && pair.First.Y == pair.Second.Y);
+                .All(pair =>
+                    pair.First.X == pair.Second.X
+                    && pair.First.Y == pair.Second.Y
+                    && (pair.Second.U is null || FloatsEqual(pair.First.U, pair.Second.U.Value))
+                    && (pair.Second.V is null || FloatsEqual(pair.First.V, pair.Second.V.Value)));
     }
 
     private static string DescribePvrTaSpriteExpectation(DreamcastFixturePvrTaSpriteExpectation expected)
@@ -1342,11 +1346,20 @@ public static class DreamcastFixtureRunner
         AddOptionalDetail(details, "minVertices", expected.MinVertices);
         if (expected.Vertices.Count > 0)
         {
-            details.Add($"vertices={string.Join("/", expected.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}");
+            details.Add($"vertices={string.Join("/", expected.Vertices.Select(DescribePvrTaVertexExpectation))}");
         }
 
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
+
+    private static string DescribePvrTaVertexExpectation(DreamcastFixturePvrTaVertexExpectation vertex)
+    {
+        var uv = vertex.U is null && vertex.V is null ? string.Empty : $":{vertex.U?.ToString(CultureInfo.InvariantCulture) ?? "any"},{vertex.V?.ToString(CultureInfo.InvariantCulture) ?? "any"}";
+        return $"{vertex.X},{vertex.Y}{uv}";
+    }
+
+    private static bool FloatsEqual(float actual, float expected) =>
+        MathF.Abs(actual - expected) <= 0.0001f;
 
     private static uint ParseHex32(string text, string description)
     {

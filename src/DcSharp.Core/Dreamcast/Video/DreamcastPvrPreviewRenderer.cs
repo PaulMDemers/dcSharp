@@ -27,9 +27,41 @@ public static class DreamcastPvrPreviewRenderer
         {
             for (var x = 0; x <= maxX - minX; x++)
             {
-                WriteRgb565Pixel(vram, PreviewPixelIndex(x, y), sprite.Rgb565);
+                WriteRgb565Pixel(vram, PreviewPixelIndex(x, y), SpriteSourceColor(sprite, vram, x, y, maxX - minX, maxY - minY));
             }
         }
+    }
+
+    private static ushort SpriteSourceColor(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, int x, int y, int width, int height)
+    {
+        if (!sprite.HeaderPayload.Mode1Fields.TextureEnabled
+            || sprite.HeaderPayload.Mode3Fields.VqEnabled
+            || sprite.HeaderPayload.Mode3Fields.MipMapEnabled)
+        {
+            return sprite.Rgb565;
+        }
+
+        var textureWidth = TextureSize(sprite.HeaderPayload.Mode2Fields.TextureUSize);
+        var textureHeight = TextureSize(sprite.HeaderPayload.Mode2Fields.TextureVSize);
+        if (textureWidth <= 0 || textureHeight <= 0)
+        {
+            return sprite.Rgb565;
+        }
+
+        var tx = width <= 0 ? 0.0f : x / (float)width;
+        var ty = height <= 0 ? 0.0f : y / (float)height;
+        var a = sprite.Vertices[0];
+        var b = sprite.Vertices[1];
+        var c = sprite.Vertices[2];
+        var d = sprite.Vertices[3];
+        var topU = Lerp(a.U, b.U, tx);
+        var topV = Lerp(a.V, b.V, tx);
+        var bottomU = Lerp(d.U, c.U, tx);
+        var bottomV = Lerp(d.V, c.V, tx);
+        var u = TextureCoordinate(Lerp(topU, bottomU, ty), sprite.HeaderPayload.Mode2Fields.UClamp, sprite.HeaderPayload.Mode2Fields.UFlip);
+        var v = TextureCoordinate(Lerp(topV, bottomV, ty), sprite.HeaderPayload.Mode2Fields.VClamp, sprite.HeaderPayload.Mode2Fields.VFlip);
+        var textureSample = SampleTexture(sprite.HeaderPayload.Mode2Fields, sprite.HeaderPayload.Mode3Fields, vram, u, v, textureWidth, textureHeight);
+        return textureSample?.Rgb565 ?? sprite.Rgb565;
     }
 
     private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
@@ -284,12 +316,23 @@ public static class DreamcastPvrPreviewRenderer
         float v,
         int width,
         int height) =>
-        string.Equals(payload.Mode2Fields.FilterModeName, "Bilinear", StringComparison.Ordinal)
-            ? SampleBilinearTexture(payload, vram, u, v, width, height)
-            : SampleNearestTexture(payload, vram, u, v, width, height);
+        SampleTexture(payload.Mode2Fields, payload.Mode3Fields, vram, u, v, width, height);
+
+    private static DreamcastPvrPreviewSourceSample? SampleTexture(
+        DreamcastPvrTaPolygonHeaderMode2 mode2,
+        DreamcastPvrTaPolygonHeaderMode3 mode3,
+        ReadOnlySpan<byte> vram,
+        float u,
+        float v,
+        int width,
+        int height) =>
+        string.Equals(mode2.FilterModeName, "Bilinear", StringComparison.Ordinal)
+            ? SampleBilinearTexture(mode2, mode3, vram, u, v, width, height)
+            : SampleNearestTexture(mode2, mode3, vram, u, v, width, height);
 
     private static DreamcastPvrPreviewSourceSample? SampleNearestTexture(
-        DreamcastPvrTaPolygonHeaderPayload payload,
+        DreamcastPvrTaPolygonHeaderMode2 mode2,
+        DreamcastPvrTaPolygonHeaderMode3 mode3,
         ReadOnlySpan<byte> vram,
         float u,
         float v,
@@ -298,11 +341,12 @@ public static class DreamcastPvrPreviewRenderer
     {
         var texelX = Math.Clamp((int)MathF.Round(u * (width - 1)), 0, width - 1);
         var texelY = Math.Clamp((int)MathF.Round(v * (height - 1)), 0, height - 1);
-        return ReadTextureSample(payload, vram, width, texelX, texelY);
+        return ReadTextureSample(mode2, mode3, vram, width, texelX, texelY);
     }
 
     private static DreamcastPvrPreviewSourceSample? SampleBilinearTexture(
-        DreamcastPvrTaPolygonHeaderPayload payload,
+        DreamcastPvrTaPolygonHeaderMode2 mode2,
+        DreamcastPvrTaPolygonHeaderMode3 mode3,
         ReadOnlySpan<byte> vram,
         float u,
         float v,
@@ -318,29 +362,30 @@ public static class DreamcastPvrPreviewRenderer
         var xWeight = texelX - x0;
         var yWeight = texelY - y0;
 
-        var topLeft = ReadTextureSample(payload, vram, width, x0, y0);
-        var topRight = ReadTextureSample(payload, vram, width, x1, y0);
-        var bottomLeft = ReadTextureSample(payload, vram, width, x0, y1);
-        var bottomRight = ReadTextureSample(payload, vram, width, x1, y1);
+        var topLeft = ReadTextureSample(mode2, mode3, vram, width, x0, y0);
+        var topRight = ReadTextureSample(mode2, mode3, vram, width, x1, y0);
+        var bottomLeft = ReadTextureSample(mode2, mode3, vram, width, x0, y1);
+        var bottomRight = ReadTextureSample(mode2, mode3, vram, width, x1, y1);
         return topLeft is null || topRight is null || bottomLeft is null || bottomRight is null
             ? null
             : InterpolateSamples(topLeft, topRight, bottomLeft, bottomRight, xWeight, yWeight);
     }
 
     private static DreamcastPvrPreviewSourceSample? ReadTextureSample(
-        DreamcastPvrTaPolygonHeaderPayload payload,
+        DreamcastPvrTaPolygonHeaderMode2 mode2,
+        DreamcastPvrTaPolygonHeaderMode3 mode3,
         ReadOnlySpan<byte> vram,
         int width,
         int x,
         int y)
     {
-        var texelIndex = payload.Mode3Fields.NonTwiddled
+        var texelIndex = mode3.NonTwiddled
             ? (y * width) + x
             : TwiddledTextureIndex(x, y);
-        var textureOffset = checked((int)payload.Mode3Fields.TextureBase + (texelIndex * 2));
+        var textureOffset = checked((int)mode3.TextureBase + (texelIndex * 2));
         var texel = ReadRgb565Pixel(vram, textureOffset / 2);
-        var textureAlphaEnabled = !payload.Mode2Fields.TextureAlphaDisabled;
-        return payload.Mode3Fields.PixelFormatName switch
+        var textureAlphaEnabled = !mode2.TextureAlphaDisabled;
+        return mode3.PixelFormatName switch
         {
             "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
             "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
