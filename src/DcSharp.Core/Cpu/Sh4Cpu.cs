@@ -186,14 +186,18 @@ public sealed class Sh4Cpu
         var m = (opcode >> 4) & 0xF;
         var lowNibble = opcode & 0xF;
 
+        if (isDelaySlot && (opcode == 0xFFFD || IsIllegalInDelaySlot(opcode)))
+        {
+            const uint eventCode = 0x0000_01A0;
+            EnterGeneralException(pc - 2, eventCode);
+            return $"slot illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}";
+        }
+
         if (opcode == 0xFFFD)
         {
-            var savedPc = isDelaySlot ? pc - 2 : pc;
-            var eventCode = isDelaySlot ? 0x0000_01A0u : 0x0000_0180u;
-            EnterGeneralException(savedPc, eventCode);
-            return isDelaySlot
-                ? $"slot illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}"
-                : $"general illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}";
+            const uint eventCode = 0x0000_0180;
+            EnterGeneralException(pc, eventCode);
+            return $"general illegal instruction ; expevt=0x{eventCode:X8}, target=0x{immediateBranchTarget:X8}";
         }
 
         if (opcode == 0x0009)
@@ -1177,6 +1181,36 @@ public sealed class Sh4Cpu
         memory.WriteUInt32(0xFF00_0024, eventCode);
         State.Sr |= Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit;
         immediateBranchTarget = State.Vbr + 0x100;
+    }
+
+    private static bool IsIllegalInDelaySlot(ushort opcode)
+    {
+        if (opcode is 0x000B or 0x002B)
+        {
+            return true;
+        }
+
+        if ((opcode & 0xFF00) is 0x8900 or 0x8B00 or 0x8D00 or 0x8F00 or 0xC300)
+        {
+            return true;
+        }
+
+        if ((opcode & 0xF000) is 0xA000 or 0xB000)
+        {
+            return true;
+        }
+
+        if ((opcode & 0xF0FF) is 0x400B or 0x402B or 0x400E)
+        {
+            return true;
+        }
+
+        if ((opcode & 0xF0FF) == 0x0007)
+        {
+            return true;
+        }
+
+        return (opcode & 0xF0FF) is 0x0003 or 0x0023;
     }
 
     private static int SignExtend12(int value) => (value & 0x800) != 0 ? value | unchecked((int)0xFFFF_F000) : value;

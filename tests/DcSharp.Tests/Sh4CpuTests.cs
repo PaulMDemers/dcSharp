@@ -630,6 +630,68 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void BranchInstructionInDelaySlotEntersSlotIllegalInstructionException()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xA00E);
+        WriteInstruction(memory, 0x8C01_0002, 0xA000);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = 0x0000_0041;
+
+        cpu.Step();
+        var delaySlotStep = cpu.Step();
+
+        Assert.Equal(0x8C01_0002u, delaySlotStep.Pc);
+        Assert.Equal(0xA000, delaySlotStep.Opcode);
+        Assert.Equal("slot illegal instruction ; expevt=0x000001A0, target=0x8C020100", delaySlotStep.Trace);
+        Assert.Equal(0x8C02_0100u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0x0000_0041u, cpu.State.Ssr);
+        Assert.Equal(0x0000_01A0u, memory.ReadUInt32(0xFF00_0024));
+    }
+
+    [Fact]
+    public void TrapInstructionInDelaySlotEntersSlotIllegalInstructionExceptionWithoutWritingTrapEvent()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xA00E);
+        WriteInstruction(memory, 0x8C01_0002, 0xC32A);
+        memory.WriteUInt32(0xFF00_0020, 0x0000_00F0);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+
+        cpu.Step();
+        cpu.Step();
+
+        Assert.Equal(0x8C02_0100u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0x0000_00F0u, memory.ReadUInt32(0xFF00_0020));
+        Assert.Equal(0x0000_01A0u, memory.ReadUInt32(0xFF00_0024));
+    }
+
+    [Fact]
+    public void StatusRegisterLoadInDelaySlotEntersSlotIllegalInstructionExceptionWithoutLoadingStatusRegister()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xA00E);
+        WriteInstruction(memory, 0x8C01_0002, 0x400E);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[0] = 0;
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = 0x0000_0051;
+
+        cpu.Step();
+        cpu.Step();
+
+        Assert.Equal(0x8C02_0100u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0x0000_0051u, cpu.State.Ssr);
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0x51u, cpu.State.Sr);
+        Assert.Equal(0x0000_01A0u, memory.ReadUInt32(0xFF00_0024));
+    }
+
+    [Fact]
     public void AcceptsEnabledExternalInterruptBeforeFetchingInstruction()
     {
         var memory = new DreamcastMemory();

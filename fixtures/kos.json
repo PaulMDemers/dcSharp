@@ -90,6 +90,31 @@
       }
     },
     {
+      "name": "slot_illegal_branch",
+      "sample": "samples/kos/slot_illegal_branch",
+      "artifact": "dcsharp_slot_illegal_branch.elf",
+      "instructions": 1000,
+      "traceTail": 16,
+      "expectedStopReason": "UnsupportedInstruction",
+      "serialContains": [
+        "dcSharp slot illegal branch probe done"
+      ],
+      "cpu": {
+        "pc": "0x8C01001E",
+        "sr": "0x00000001",
+        "vbr": "0x8C010000",
+        "spc": "0x8C01000E",
+        "ssr": "0x00000000",
+        "fpscr": "0x00040001",
+        "tra": "0x00000000",
+        "expevt": "0x000001A0",
+        "intevt": "0x00000000"
+      },
+      "minDeviceAccessDomains": {
+        "scif": 1
+      }
+    },
+    {
       "name": "gdrom_read",
       "sample": "samples/kos/gdrom_read",
       "artifact": "dcsharp_gdrom_read.elf",
