@@ -308,6 +308,131 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void ModulatesTextureColorForSprite()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                argb: 0xFF00_FF00,
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureShading: "Modulate",
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
+    public void DecalsTextureAlphaForSprite()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x8F00);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0x8F00);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                argb: 0xFF00_FF00,
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureShading: "Decal",
+                pixelFormat: 2,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x8BA0, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
+    public void ModulatesTextureAlphaForSprite()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0xFFFF);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                argb: 0xFF00_FF00,
+                textureEnabled: true,
+                nonTwiddled: true,
+                textureShading: "ModulateAlpha",
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
+    public void RepeatsUnclampedTextureCoordinatesForSprite()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 2, 0, 0xF800);
+        WriteTexturePixel(vram, textureBase, 0, 2, 0x001F);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0xFFFF,
+                [(1, 1, 1.25f, 0.0f), (3, 1, 1.25f, 0.0f), (3, 3, 0.0f, 1.25f), (1, 3, 0.0f, 1.25f)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                uClamp: false,
+                vClamp: false,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0xF800, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 1, 2));
+    }
+
+    [Fact]
+    public void FlipsClampedTextureCoordinatesForSprite()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 7, 7, 0xF800);
+        WriteTexturePixel(vram, textureBase, 0, 7, 0x07E0);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0xFFFF,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                textureEnabled: true,
+                nonTwiddled: true,
+                uFlip: true,
+                vFlip: true,
+                textureBase: textureBase),
+            vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0xFFFF, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void SamplesTwiddledRgb565TextureWhenModeUsesTwiddledLayout()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 4];
@@ -635,13 +760,22 @@ public class DreamcastPvrPreviewRendererTests
         string blendDst = "Zero",
         bool textureEnabled = false,
         bool nonTwiddled = false,
+        bool uClamp = true,
+        bool vClamp = true,
+        bool uFlip = false,
+        bool vFlip = false,
+        string textureShading = "Replace",
         uint pixelFormat = 1,
         uint textureBase = 0)
     {
         var mode1 = textureEnabled ? 0x0200_0000u : 0;
         var mode2 = (BlendBits(blendSrc) << 29)
             | (BlendBits(blendDst) << 26)
-            | (textureEnabled ? 0x0001_8000u : 0)
+            | (TextureShadingBits(textureShading) << 6)
+            | (textureEnabled && vClamp ? 0x0000_8000u : 0)
+            | (textureEnabled && uClamp ? 0x0001_0000u : 0)
+            | (textureEnabled && vFlip ? 0x0002_0000u : 0)
+            | (textureEnabled && uFlip ? 0x0004_0000u : 0)
             | (alphaEnabled ? 0x0010_0000u : 0);
         var mode3 = textureBase | (pixelFormat << 27) | (nonTwiddled ? 0x0400_0000u : 0);
         var header = new DreamcastPvrTaCommandWrite(
