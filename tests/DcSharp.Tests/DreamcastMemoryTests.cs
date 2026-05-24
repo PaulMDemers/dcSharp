@@ -396,7 +396,27 @@ public class DreamcastMemoryTests
         Assert.Equal(0x1234u, channel.SampleAddressLow);
         Assert.Equal(0x1AC0u, channel.Pitch);
         Assert.Equal(0x0F, channel.Pan);
+        Assert.Equal(0, channel.PanSendLevel);
+        Assert.Equal(15, channel.PanPosition);
+        Assert.Equal(0, channel.LeftBalance);
+        Assert.Equal(15, channel.RightBalance);
         Assert.Equal(0x40, channel.Volume);
+    }
+
+    [Fact]
+    public void AudioSnapshotDecodesAicaPanSendBalance()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.Write(0xA070_0024, [0x3A]);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+
+        Assert.Equal(0x3A, channel.Pan);
+        Assert.Equal(3, channel.PanSendLevel);
+        Assert.Equal(10, channel.PanPosition);
+        Assert.Equal(5, channel.LeftBalance);
+        Assert.Equal(10, channel.RightBalance);
     }
 
     [Fact]
@@ -460,6 +480,45 @@ public class DreamcastMemoryTests
         Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
         Assert.Equal(8UL, channel.PlaybackBytesAdvanced);
         Assert.True(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
+    public void AdvanceHardwareTracksMultipleAicaChannels()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.Write(0xA070_0024, [0x10]);
+        memory.Write(0xA070_0029, [0x30]);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C000);
+        memory.WriteUInt32(0xA070_0084, 0x0000_0040);
+        memory.WriteUInt32(0xA070_008C, 0x0000_0004);
+        memory.Write(0xA070_00A4, [0x2F]);
+        memory.Write(0xA070_00A9, [0x60]);
+        memory.WriteUInt32(0xA070_0080, 0x0000_C000);
+
+        memory.AdvanceHardware(200_000);
+
+        var channels = memory.CreateAudioSnapshot().Channels;
+        var channel0 = channels.Single(channel => channel.Channel == 0);
+        var channel1 = channels.Single(channel => channel.Channel == 1);
+        Assert.False(channel0.Active);
+        Assert.False(channel1.Active);
+        Assert.Equal(8UL, channel0.PlaybackPosition);
+        Assert.Equal(4UL, channel1.PlaybackPosition);
+        Assert.Equal(16UL, channel0.PlaybackBytePosition);
+        Assert.Equal(8UL, channel1.PlaybackBytePosition);
+        Assert.Equal(1, channel0.PanSendLevel);
+        Assert.Equal(0, channel0.PanPosition);
+        Assert.Equal(15, channel0.LeftBalance);
+        Assert.Equal(0, channel0.RightBalance);
+        Assert.Equal(0x30, channel0.Volume);
+        Assert.Equal(2, channel1.PanSendLevel);
+        Assert.Equal(15, channel1.PanPosition);
+        Assert.Equal(0, channel1.LeftBalance);
+        Assert.Equal(15, channel1.RightBalance);
+        Assert.Equal(0x60, channel1.Volume);
+        Assert.Equal(0x40u, channel1.SampleAddress);
     }
 
     [Fact]

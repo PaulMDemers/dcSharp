@@ -1575,6 +1575,8 @@ public sealed class DreamcastMemory
             var loopEnd = ReadAicaChannelRegister(channel, 0x0C);
             var pitch = ReadAicaChannelRegister(channel, 0x18);
             var pan = (byte)(ReadAicaChannelRegister(channel, 0x24) & 0xFF);
+            var panSendLevel = (byte)((pan >> 4) & 0x0F);
+            var panPosition = (byte)(pan & 0x0F);
             var volume = (byte)((ReadAicaChannelRegister(channel, 0x28) >> 8) & 0xFF);
             var sampleAddress = ((control & 0x7Fu) << 16) | (sampleLow & 0xFFFFu);
             var keyOn = (control & 0x4000) != 0;
@@ -1601,6 +1603,10 @@ public sealed class DreamcastMemory
                 pitch,
                 $"0x{pitch:X8}",
                 pan,
+                panSendLevel,
+                panPosition,
+                (byte)(0x0F - panPosition),
+                panPosition,
                 volume,
                 playback.Playing,
                 keyOn,

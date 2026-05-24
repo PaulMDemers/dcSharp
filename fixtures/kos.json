@@ -4046,6 +4046,84 @@
         "aica": 1,
         "scif": 1
       }
+    },
+    {
+      "name": "aica_stereo_pan",
+      "sample": "samples/kos/aica_stereo_pan",
+      "artifact": "dcsharp_aica_stereo_pan.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp AICA stereo pan probe start",
+        "ch0_pan=0x10",
+        "ch1_pan=0x2f",
+        "ch0_vol=48",
+        "ch1_vol=96",
+        "dcSharp AICA stereo pan probe done"
+      ],
+      "minAicaRegisterAccesses": 15,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "aicaRegisters": {
+        "AICA_CH0_CONTROL": "0x00008000",
+        "AICA_CH1_CONTROL": "0x00008000",
+        "AICA_MASTER_VOLUME": "0x0000000F"
+      },
+      "aicaChannels": [
+        {
+          "channel": 0,
+          "control": "0x00008000",
+          "sampleFormat": "Pcm16",
+          "sampleStrideBytes": 2,
+          "sampleAddress": "0x00000000",
+          "loopStart": "0x00000000",
+          "loopEnd": "0x00000020",
+          "pitch": "0x00000000",
+          "pan": 16,
+          "panSendLevel": 1,
+          "panPosition": 0,
+          "leftBalance": 15,
+          "rightBalance": 0,
+          "volume": 48,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true,
+          "playbackPosition": 32,
+          "playbackBytePosition": 64,
+          "minPlaybackSamplesAdvanced": 32,
+          "minPlaybackBytesAdvanced": 64,
+          "playbackStoppedAtLoopEnd": true
+        },
+        {
+          "channel": 1,
+          "control": "0x00008000",
+          "sampleFormat": "Pcm16",
+          "sampleStrideBytes": 2,
+          "sampleAddress": "0x00000040",
+          "loopStart": "0x00000000",
+          "loopEnd": "0x00000020",
+          "pitch": "0x00000000",
+          "pan": 47,
+          "panSendLevel": 2,
+          "panPosition": 15,
+          "leftBalance": 0,
+          "rightBalance": 15,
+          "volume": 96,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true,
+          "playbackPosition": 32,
+          "playbackBytePosition": 64,
+          "minPlaybackSamplesAdvanced": 32,
+          "minPlaybackBytesAdvanced": 64,
+          "playbackStoppedAtLoopEnd": true
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "scif": 1
+      }
     }
   ]
 }

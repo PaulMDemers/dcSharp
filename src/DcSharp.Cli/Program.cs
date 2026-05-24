@@ -174,7 +174,7 @@ static void RunElf(string path, string[] args)
 
     foreach (var channel in result.Audio.Channels.Take(8))
     {
-        Console.WriteLine($"  AICA channel {channel.Channel}: active={channel.Active}, format={channel.SampleFormat}, stride={channel.SampleStrideBytes}, sample={channel.SampleAddressHex}, loop={channel.LoopStartHex}-{channel.LoopEndHex}, position={channel.PlaybackPosition}, bytePosition={channel.PlaybackBytePosition}, advanced={channel.PlaybackSamplesAdvanced}, bytesAdvanced={channel.PlaybackBytesAdvanced}, stoppedAtLoopEnd={channel.PlaybackStoppedAtLoopEnd}");
+        Console.WriteLine($"  AICA channel {channel.Channel}: active={channel.Active}, format={channel.SampleFormat}, stride={channel.SampleStrideBytes}, sample={channel.SampleAddressHex}, loop={channel.LoopStartHex}-{channel.LoopEndHex}, pan={channel.Pan} send={channel.PanSendLevel} pos={channel.PanPosition} balance={channel.LeftBalance}/{channel.RightBalance}, volume={channel.Volume}, position={channel.PlaybackPosition}, bytePosition={channel.PlaybackBytePosition}, advanced={channel.PlaybackSamplesAdvanced}, bytesAdvanced={channel.PlaybackBytesAdvanced}, stoppedAtLoopEnd={channel.PlaybackStoppedAtLoopEnd}");
     }
 
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");

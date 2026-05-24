@@ -394,6 +394,10 @@ public static class DreamcastFixtureRunner
             ValidateHex32(failures, $"AICA channel {expected.Channel} loop end", expected.LoopEnd, channel.LoopEnd, channel.LoopEndHex);
             ValidateHex32(failures, $"AICA channel {expected.Channel} pitch", expected.Pitch, channel.Pitch, channel.PitchHex);
             ValidateByte(failures, $"AICA channel {expected.Channel} pan", expected.Pan, channel.Pan);
+            ValidateByte(failures, $"AICA channel {expected.Channel} pan send level", expected.PanSendLevel, channel.PanSendLevel);
+            ValidateByte(failures, $"AICA channel {expected.Channel} pan position", expected.PanPosition, channel.PanPosition);
+            ValidateByte(failures, $"AICA channel {expected.Channel} left balance", expected.LeftBalance, channel.LeftBalance);
+            ValidateByte(failures, $"AICA channel {expected.Channel} right balance", expected.RightBalance, channel.RightBalance);
             ValidateByte(failures, $"AICA channel {expected.Channel} volume", expected.Volume, channel.Volume);
             ValidateBool(failures, $"AICA channel {expected.Channel} active", expected.Active, channel.Active);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOn", expected.KeyOn, channel.KeyOn);

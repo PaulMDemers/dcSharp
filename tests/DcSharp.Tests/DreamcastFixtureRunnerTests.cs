@@ -496,6 +496,10 @@ public class DreamcastFixtureRunnerTests
                     Pitch = "0x00001AC0",
                     Volume = 64,
                     SampleStrideBytes = 1,
+                    PanSendLevel = 1,
+                    PanPosition = 1,
+                    LeftBalance = 14,
+                    RightBalance = 1,
                     PlaybackPosition = 64,
                     PlaybackBytePosition = 128,
                     MinPlaybackPosition = 1,
@@ -595,6 +599,10 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
         Assert.Contains("AICA channel 0 volume expected 64, got 63", failures);
+        Assert.Contains("AICA channel 0 pan send level expected 1, got 0", failures);
+        Assert.Contains("AICA channel 0 pan position expected 1, got 15", failures);
+        Assert.Contains("AICA channel 0 left balance expected 14, got 0", failures);
+        Assert.Contains("AICA channel 0 right balance expected 1, got 15", failures);
         Assert.Contains("AICA channel 0 sample stride bytes expected 1, got 2", failures);
         Assert.Contains("AICA channel 0 playback position expected 64, got 0 (0x00000000)", failures);
         Assert.Contains("AICA channel 0 playback byte position expected 128, got 0 (0x00000000)", failures);
@@ -914,6 +922,10 @@ public class DreamcastFixtureRunnerTests
         uint loopEnd = 0x00000040,
         uint pitch = 0x00001AC0,
         byte pan = 15,
+        byte panSendLevel = 0,
+        byte panPosition = 15,
+        byte leftBalance = 0,
+        byte rightBalance = 15,
         byte volume = 64,
         bool active = false,
         bool keyOn = false,
@@ -941,6 +953,10 @@ public class DreamcastFixtureRunnerTests
             pitch,
             $"0x{pitch:X8}",
             pan,
+            panSendLevel,
+            panPosition,
+            leftBalance,
+            rightBalance,
             volume,
             active,
             keyOn,

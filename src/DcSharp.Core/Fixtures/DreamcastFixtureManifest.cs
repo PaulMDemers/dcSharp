@@ -359,6 +359,10 @@ public sealed class DreamcastFixtureAicaChannelExpectation
     public string? LoopEnd { get; set; }
     public string? Pitch { get; set; }
     public byte? Pan { get; set; }
+    public byte? PanSendLevel { get; set; }
+    public byte? PanPosition { get; set; }
+    public byte? LeftBalance { get; set; }
+    public byte? RightBalance { get; set; }
     public byte? Volume { get; set; }
     public bool? Active { get; set; }
     public bool? KeyOn { get; set; }
