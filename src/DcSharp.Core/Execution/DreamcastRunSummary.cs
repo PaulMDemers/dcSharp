@@ -38,7 +38,8 @@ public sealed record DreamcastRunSummary(
     DreamcastAudioSummary Audio,
     DreamcastMapleSummary Maple,
     DreamcastGdromSummary Gdrom,
-    DreamcastSchedulerSummary Scheduler)
+    DreamcastSchedulerSummary Scheduler,
+    DreamcastCpuSummary Cpu)
 {
     public static DreamcastRunSummary FromResult(DreamcastRunResult result, DreamcastRunOptions? options = null, int recentDeviceAccessCount = 16)
     {
@@ -90,7 +91,8 @@ public sealed record DreamcastRunSummary(
             DreamcastAudioSummary.FromSnapshot(result.Audio),
             DreamcastMapleSummary.FromSnapshot(result.Maple),
             DreamcastGdromSummary.FromSnapshot(result.Gdrom ?? DreamcastGdromSnapshot.Empty),
-            DreamcastSchedulerSummary.FromSnapshot(result.Scheduler));
+            DreamcastSchedulerSummary.FromSnapshot(result.Scheduler),
+            DreamcastCpuSummary.FromSnapshot(result.Cpu));
     }
 
     private static string Hex32(uint value) => $"0x{value:X8}";
@@ -100,6 +102,56 @@ public sealed record DreamcastRunSummary(
 
     private static DreamcastControllerState? ControllerFromMap(DreamcastRunOptions? options, byte address) =>
         options?.Controllers?.GetValueOrDefault(address);
+}
+
+public sealed record DreamcastCpuSummary(
+    uint Pc,
+    string PcHex,
+    uint Pr,
+    string PrHex,
+    uint Sr,
+    string SrHex,
+    uint Gbr,
+    string GbrHex,
+    uint Vbr,
+    string VbrHex,
+    uint Spc,
+    string SpcHex,
+    uint Ssr,
+    string SsrHex,
+    uint Fpscr,
+    string FpscrHex,
+    uint Tra,
+    string TraHex,
+    uint Expevt,
+    string ExpevtHex,
+    uint Intevt,
+    string IntevtHex)
+{
+    public static DreamcastCpuSummary FromSnapshot(Sh4StateSnapshot snapshot) =>
+        new(
+            snapshot.Pc,
+            $"0x{snapshot.Pc:X8}",
+            snapshot.Pr,
+            $"0x{snapshot.Pr:X8}",
+            snapshot.Sr,
+            $"0x{snapshot.Sr:X8}",
+            snapshot.Gbr,
+            $"0x{snapshot.Gbr:X8}",
+            snapshot.Vbr,
+            $"0x{snapshot.Vbr:X8}",
+            snapshot.Spc,
+            $"0x{snapshot.Spc:X8}",
+            snapshot.Ssr,
+            $"0x{snapshot.Ssr:X8}",
+            snapshot.Fpscr,
+            $"0x{snapshot.Fpscr:X8}",
+            snapshot.Tra,
+            $"0x{snapshot.Tra:X8}",
+            snapshot.Expevt,
+            $"0x{snapshot.Expevt:X8}",
+            snapshot.Intevt,
+            $"0x{snapshot.Intevt:X8}");
 }
 
 public sealed record DreamcastLoadSummary(

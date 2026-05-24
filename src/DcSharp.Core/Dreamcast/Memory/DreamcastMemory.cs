@@ -37,6 +37,9 @@ public sealed class DreamcastMemory
     private const uint ScifStatus = 0xFFE8_0010;
     private const uint ScifTransmitData = 0xFFE8_000C;
     private const uint InterruptPriorityA = 0xFFD0_0004;
+    private const uint Sh4Tra = 0xFF00_0020;
+    private const uint Sh4Expevt = 0xFF00_0024;
+    private const uint Sh4Intevt = 0xFF00_0028;
     private const uint TimerStart = 0xFFD8_0004;
     private const uint TimerConstant0 = 0xFFD8_0008;
     private const uint TimerCounter0 = 0xFFD8_000C;
@@ -119,6 +122,12 @@ public sealed class DreamcastMemory
     public int PvrVramBytes => pvrVram.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
+
+    public DreamcastSh4EventRegistersSnapshot CreateSh4EventRegistersSnapshot() =>
+        new(
+            p4Registers.GetValueOrDefault(Sh4Tra),
+            p4Registers.GetValueOrDefault(Sh4Expevt),
+            p4Registers.GetValueOrDefault(Sh4Intevt));
     public DreamcastControllerState ControllerA
     {
         get => mapleControllers.GetValueOrDefault(MaplePortAUnit0Address, DreamcastControllerState.Neutral);
@@ -1863,6 +1872,11 @@ internal sealed class DreamcastAicaPlaybackState
     public bool HasLatchedFormat { get; set; }
     public bool StoppedAtLoopEnd { get; set; }
 }
+
+public sealed record DreamcastSh4EventRegistersSnapshot(
+    uint Tra,
+    uint Expevt,
+    uint Intevt);
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 

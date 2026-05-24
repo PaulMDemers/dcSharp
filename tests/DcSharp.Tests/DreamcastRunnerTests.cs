@@ -55,6 +55,29 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesTrapExceptionRegistersInCpuSnapshot()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateTrapElf()));
+
+        var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(InstructionLimit: 10, TraceTailLength: 4));
+
+        Assert.Equal(DreamcastStopReason.UnsupportedInstruction, result.StopReason);
+        Assert.Equal(0x8C01_0100u, result.StopPc);
+        Assert.Equal(0x8C01_0006u, result.Cpu.Spc);
+        Assert.Equal(0u, result.Cpu.Ssr);
+        Assert.Equal(0x0000_0014u, result.Cpu.Tra);
+        Assert.Equal(0x0000_0160u, result.Cpu.Expevt);
+        Assert.Equal(0u, result.Cpu.Intevt);
+
+        var summary = DreamcastRunSummary.FromResult(result);
+
+        Assert.Equal("0x8C010006", summary.Cpu.SpcHex);
+        Assert.Equal("0x00000014", summary.Cpu.TraHex);
+        Assert.Equal("0x00000160", summary.Cpu.ExpevtHex);
+        Assert.Equal("0x00000000", summary.Cpu.IntevtHex);
+    }
+
+    [Fact]
     public void BuildsStructuredRunSummary()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateKosExitFallthroughElf()));
@@ -93,7 +116,20 @@ public class DreamcastRunnerTests
             Symbols: [symbol]);
         var result = new DreamcastRunResult(
             load,
-            new Sh4StateSnapshot(new uint[16], 0x8C01_0008, 0, 0, 0, 0, 0, 4),
+            new Sh4StateSnapshot(
+                new uint[16],
+                0x8C01_0008,
+                0x8C02_0000,
+                0x4000_00F0,
+                0x8C03_0000,
+                0x8C04_0000,
+                0x0004_0001,
+                4,
+                Spc: 0x8C01_0002,
+                Ssr: 0x0000_00F1,
+                Tra: 0x0000_00F0,
+                Expevt: 0x0000_0160,
+                Intevt: 0x0000_0320),
             [new Sh4StepResult(0x8C01_0004, 0x0009, "nop")],
             [],
             [],
@@ -113,6 +149,17 @@ public class DreamcastRunnerTests
         Assert.Equal(1, summary.Load.SymbolCount);
         Assert.Equal("main+0x6", summary.StopSymbol?.Display);
         Assert.Equal("main+0x4", Assert.Single(summary.TraceTail).Symbol?.Display);
+        Assert.Equal("0x8C010008", summary.Cpu.PcHex);
+        Assert.Equal("0x8C020000", summary.Cpu.PrHex);
+        Assert.Equal("0x400000F0", summary.Cpu.SrHex);
+        Assert.Equal("0x8C030000", summary.Cpu.GbrHex);
+        Assert.Equal("0x8C040000", summary.Cpu.VbrHex);
+        Assert.Equal("0x8C010002", summary.Cpu.SpcHex);
+        Assert.Equal("0x000000F1", summary.Cpu.SsrHex);
+        Assert.Equal("0x00040001", summary.Cpu.FpscrHex);
+        Assert.Equal("0x000000F0", summary.Cpu.TraHex);
+        Assert.Equal("0x00000160", summary.Cpu.ExpevtHex);
+        Assert.Equal("0x00000320", summary.Cpu.IntevtHex);
     }
 
     [Fact]
@@ -324,6 +371,18 @@ public class DreamcastRunnerTests
         WriteUInt32(bytes, 0x28, 0x8CFF_FFF2);
         Encoding.ASCII.GetBytes("\narch: exit return code 0\n\0").CopyTo(bytes, 0x2C);
 
+        return CreateElfWithSegment(bytes);
+    }
+
+    private static byte[] CreateTrapElf()
+    {
+        var bytes = new byte[0x102];
+        WriteUInt16(bytes, 0x00, 0xD002); // mov.l @(0x02,pc),r0
+        WriteUInt16(bytes, 0x02, 0x402E); // ldc r0,vbr
+        WriteUInt16(bytes, 0x04, 0xC305); // trapa #5
+        WriteUInt16(bytes, 0x06, 0x0009); // nop
+        WriteUInt32(bytes, 0x0C, 0x8C01_0000);
+        WriteUInt16(bytes, 0x100, 0xFFFF);
         return CreateElfWithSegment(bytes);
     }
 

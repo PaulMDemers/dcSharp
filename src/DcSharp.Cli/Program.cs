@@ -112,6 +112,12 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"PC: 0x{result.Cpu.Pc:X8}");
     Console.WriteLine($"PR: 0x{result.Cpu.Pr:X8}");
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
+    Console.WriteLine($"GBR: 0x{result.Cpu.Gbr:X8}");
+    Console.WriteLine($"VBR: 0x{result.Cpu.Vbr:X8}");
+    Console.WriteLine($"SPC: 0x{result.Cpu.Spc:X8}");
+    Console.WriteLine($"SSR: 0x{result.Cpu.Ssr:X8}");
+    Console.WriteLine($"FPSCR: 0x{result.Cpu.Fpscr:X8}");
+    Console.WriteLine($"Events: TRA=0x{result.Cpu.Tra:X8}, EXPEVT=0x{result.Cpu.Expevt:X8}, INTEVT=0x{result.Cpu.Intevt:X8}");
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
     if (result.StopPc is { } stopPc)

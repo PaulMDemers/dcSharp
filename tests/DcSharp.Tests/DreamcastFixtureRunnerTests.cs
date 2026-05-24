@@ -699,7 +699,30 @@ public class DreamcastFixtureRunnerTests
                 cpuFastForwardInstructions,
                 cpuFastForwardBatches,
                 maxCpuFastForwardBatch,
-                controllerScriptChanges));
+                controllerScriptChanges),
+            new DreamcastCpuSummary(
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000",
+                0,
+                "0x00000000"));
 
     private static DreamcastVideoSummary CreateVideoSummary(
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters,
