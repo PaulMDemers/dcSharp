@@ -33,6 +33,7 @@ public sealed class DreamcastMemory
     private const uint AicaRegisterLimit = 0x0071_0000;
     private const uint AicaRamBase = 0x0080_0000;
     private const uint AicaRamBytes = 2 * 1024 * 1024;
+    private const uint AicaOutputSampleRateHz = 44_100;
     private const uint ScifStatus = 0xFFE8_0010;
     private const uint ScifTransmitData = 0xFFE8_000C;
     private const uint InterruptPriorityA = 0xFFD0_0004;
@@ -75,6 +76,7 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly Dictionary<uint, uint> aicaRegisters = [];
+    private readonly DreamcastAicaPlaybackState[] aicaPlayback = CreateAicaPlaybackStates();
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
@@ -162,6 +164,8 @@ public sealed class DreamcastMemory
         {
             AdvanceTimer(channel, instructions);
         }
+
+        AdvanceAicaPlayback(instructions);
     }
 
     public bool TryGetSystemRamOffset(uint address, int length, out int offset)
@@ -1510,6 +1514,12 @@ public sealed class DreamcastMemory
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, originalAddress, data.Length, value));
         LogAicaRegisterAccess(MemoryAccessKind.Write, originalAddress, aicaAddress, data.Length, value);
+
+        var offset = aicaAddress - AicaRegisterBase;
+        if (TryGetAicaChannel(offset, out var channel, out var channelOffset) && channelOffset < 4)
+        {
+            SyncAicaPlaybackKeyState(channel);
+        }
     }
 
     private void LogAicaRegisterAccess(MemoryAccessKind kind, uint originalAddress, uint aicaAddress, int size, uint value)
@@ -1569,6 +1579,7 @@ public sealed class DreamcastMemory
             var sampleAddress = ((control & 0x7Fu) << 16) | (sampleLow & 0xFFFFu);
             var keyOn = (control & 0x4000) != 0;
             var keyOnExecute = (control & 0x8000) != 0;
+            var playback = aicaPlayback[channel];
             return new DreamcastAicaChannelSnapshot(
                 channel,
                 control,
@@ -1587,10 +1598,115 @@ public sealed class DreamcastMemory
                 $"0x{pitch:X8}",
                 pan,
                 volume,
-                keyOn && keyOnExecute,
+                playback.Playing,
                 keyOn,
-                keyOnExecute);
+                keyOnExecute,
+                playback.Position,
+                $"0x{playback.Position:X8}",
+                playback.SamplesAdvanced,
+                playback.StoppedAtLoopEnd);
         }).ToArray();
+    }
+
+    private void SyncAicaPlaybackKeyState(int channel)
+    {
+        var control = ReadAicaChannelRegister(channel, 0x00);
+        var keyOn = (control & 0x4000) != 0;
+        var keyOnExecute = (control & 0x8000) != 0;
+        var playback = aicaPlayback[channel];
+
+        if (keyOn && keyOnExecute)
+        {
+            playback.Playing = true;
+            playback.Position = 0;
+            playback.SamplesAdvanced = 0;
+            playback.CpuTickRemainder = 0;
+            playback.StoppedAtLoopEnd = false;
+            return;
+        }
+
+        if (!keyOn)
+        {
+            playback.Playing = false;
+        }
+    }
+
+    private void AdvanceAicaPlayback(ulong ticks)
+    {
+        for (var channel = 0; channel < aicaPlayback.Length; channel++)
+        {
+            var playback = aicaPlayback[channel];
+            if (!playback.Playing)
+            {
+                continue;
+            }
+
+            var control = ReadAicaChannelRegister(channel, 0x00);
+            if ((control & 0xC000) != 0xC000)
+            {
+                playback.Playing = false;
+                continue;
+            }
+
+            var wholeSeconds = ticks / HardwareProfile.CpuClockHz;
+            var tickRemainder = ticks % HardwareProfile.CpuClockHz;
+            var baseSamples = wholeSeconds > ulong.MaxValue / AicaOutputSampleRateHz
+                ? ulong.MaxValue
+                : wholeSeconds * AicaOutputSampleRateHz;
+            var numerator = playback.CpuTickRemainder + (tickRemainder * AicaOutputSampleRateHz);
+            var samples = SaturatingAdd(baseSamples, numerator / HardwareProfile.CpuClockHz);
+            playback.CpuTickRemainder = numerator % HardwareProfile.CpuClockHz;
+            if (samples == 0)
+            {
+                continue;
+            }
+
+            AdvanceAicaChannelSamples(channel, samples);
+        }
+    }
+
+    private void AdvanceAicaChannelSamples(int channel, ulong samples)
+    {
+        var playback = aicaPlayback[channel];
+        var control = ReadAicaChannelRegister(channel, 0x00);
+        var loopEnabled = (control & 0x0200) != 0;
+        var loopStart = ReadAicaChannelRegister(channel, 0x08);
+        var loopEnd = ReadAicaChannelRegister(channel, 0x0C);
+        if (loopEnd == 0)
+        {
+            playback.Position = SaturatingAdd(playback.Position, samples);
+            playback.SamplesAdvanced = SaturatingAdd(playback.SamplesAdvanced, samples);
+            return;
+        }
+
+        if (playback.Position >= loopEnd)
+        {
+            playback.Playing = false;
+            playback.StoppedAtLoopEnd = true;
+            return;
+        }
+
+        var remaining = loopEnd - playback.Position;
+        if (samples < remaining)
+        {
+            playback.Position += samples;
+            playback.SamplesAdvanced = SaturatingAdd(playback.SamplesAdvanced, samples);
+            return;
+        }
+
+        if (!loopEnabled || loopStart >= loopEnd)
+        {
+            playback.Position = loopEnd;
+            playback.SamplesAdvanced = SaturatingAdd(playback.SamplesAdvanced, remaining);
+            playback.Playing = false;
+            playback.StoppedAtLoopEnd = true;
+            return;
+        }
+
+        var loopLength = loopEnd - loopStart;
+        var loopSamples = samples - remaining;
+        playback.Position = loopStart + (loopSamples % loopLength);
+        playback.SamplesAdvanced = SaturatingAdd(playback.SamplesAdvanced, samples);
     }
 
     private static string AicaSampleFormatName(uint mode) => mode switch
@@ -1604,6 +1720,23 @@ public sealed class DreamcastMemory
 
     private uint ReadAicaChannelRegister(int channel, uint channelOffset) =>
         aicaRegisters.GetValueOrDefault(AicaRegisterBase + ((uint)channel * 0x80u) + (channelOffset & 0xFFFF_FFFCu));
+
+    private static DreamcastAicaPlaybackState[] CreateAicaPlaybackStates()
+    {
+        var states = new DreamcastAicaPlaybackState[64];
+        for (var index = 0; index < states.Length; index++)
+        {
+            states[index] = new DreamcastAicaPlaybackState();
+        }
+
+        return states;
+    }
+
+    private static ulong SaturatingAdd(ulong left, ulong right)
+    {
+        var result = left + right;
+        return result < left ? ulong.MaxValue : result;
+    }
 
     private static bool TryGetAicaChannel(uint offset, out int channel, out uint channelOffset)
     {
@@ -1669,6 +1802,15 @@ public sealed class DreamcastMemory
     }
 
     private static byte ToUnsignedAxis(sbyte value) => (byte)(value + 128);
+}
+
+internal sealed class DreamcastAicaPlaybackState
+{
+    public bool Playing { get; set; }
+    public ulong Position { get; set; }
+    public ulong SamplesAdvanced { get; set; }
+    public ulong CpuTickRemainder { get; set; }
+    public bool StoppedAtLoopEnd { get; set; }
 }
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);

@@ -172,6 +172,11 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"AICA current: {string.Join(", ", currentAicaRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
+    foreach (var channel in result.Audio.Channels.Take(8))
+    {
+        Console.WriteLine($"  AICA channel {channel.Channel}: active={channel.Active}, format={channel.SampleFormat}, sample={channel.SampleAddressHex}, loop={channel.LoopStartHex}-{channel.LoopEndHex}, position={channel.PlaybackPosition}, advanced={channel.PlaybackSamplesAdvanced}, stoppedAtLoopEnd={channel.PlaybackStoppedAtLoopEnd}");
+    }
+
     Console.WriteLine($"Maple: transfers={result.Maple.Transfers.Count}, deviceInfo={result.Maple.Transfers.Count(transfer => transfer.CommandName == "DeviceInfo")}, getCondition={result.Maple.Transfers.Count(transfer => transfer.CommandName == "GetCondition")}, dmaBatches={result.Maple.DmaBatches.Count}, descriptorLimitHits={result.Maple.DmaBatches.Count(batch => batch.HitDescriptorLimit)}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, sectorSize={gdrom.SectorSize?.ToString(CultureInfo.InvariantCulture) ?? "none"}, sectors={gdrom.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, leadout={gdrom.LeadoutFadHex ?? "none"}, tracks={gdrom.MediaTracks.Count}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, bytes={gdrom.ReadCommands.Sum(command => command.BytesRead)}, tocs={gdrom.TocCommands.Count}");

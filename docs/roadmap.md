@@ -57,7 +57,7 @@
 - Classify TA command writes before a full renderer. Started with first-word command kind, list type decoding, a real TA parameter decoder skeleton, a TA stream control/payload diagnostic view, real-shaped KOS polygon header/vertex fixtures with zero and nonzero mode payloads, a tiny diagnostic opaque strip assembler that consumes fixture-only control/X/Y/color vertex packets, and mixed-color Gouraud strip assembly for matching headers.
 - Add fixture expectations for PVR state. Started: manifests can assert current named PVR register values, RGB565 sentinel samples, TA command/list counts, and assembled TA strip matches.
 - Add fixture expectations for AICA state. Started: manifests can assert current named register values plus decoded channel control, sample, loop, pitch, pan, volume, and key-on fields.
-- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, current named register values, decoded sample format, loop state, key-on state, and touched channel snapshots are captured in audio summaries.
+- Add silence-safe AICA register/channel tracking before audible output. Started: AICA MMIO, sound RAM writes, current named register values, decoded sample format, loop state, key-on state, touched channel snapshots, and nominal 44.1 kHz PCM playback position/loop-end diagnostics are captured in audio summaries.
 
 ## Milestone 6: Media And Broader Compatibility
 

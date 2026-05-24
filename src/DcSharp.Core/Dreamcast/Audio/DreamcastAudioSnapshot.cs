@@ -51,4 +51,8 @@ public sealed record DreamcastAicaChannelSnapshot(
     byte Volume,
     bool Active,
     bool KeyOn,
-    bool KeyOnExecute);
+    bool KeyOnExecute,
+    ulong PlaybackPosition,
+    string PlaybackPositionHex,
+    ulong PlaybackSamplesAdvanced,
+    bool PlaybackStoppedAtLoopEnd);

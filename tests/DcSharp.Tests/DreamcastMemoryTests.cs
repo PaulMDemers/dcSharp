@@ -387,10 +387,49 @@ public class DreamcastMemoryTests
         Assert.True(channel.KeyOn);
         Assert.True(channel.KeyOnExecute);
         Assert.True(channel.Active);
+        Assert.Equal(0UL, channel.PlaybackPosition);
+        Assert.Equal(0UL, channel.PlaybackSamplesAdvanced);
+        Assert.False(channel.PlaybackStoppedAtLoopEnd);
         Assert.Equal(0x1234u, channel.SampleAddressLow);
         Assert.Equal(0x1AC0u, channel.Pitch);
         Assert.Equal(0x0F, channel.Pan);
         Assert.Equal(0x40, channel.Volume);
+    }
+
+    [Fact]
+    public void AdvanceHardwareTracksAicaPlaybackPositionAndStopsAtLoopEnd()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0004);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C000);
+
+        memory.AdvanceHardware(200_000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.False(channel.Active);
+        Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.True(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
+    public void AdvanceHardwareLoopsAicaPlaybackPosition()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0004);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C200);
+
+        memory.AdvanceHardware(200_000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.True(channel.Active);
+        Assert.Equal(4UL, channel.PlaybackPosition);
+        Assert.Equal(44UL, channel.PlaybackSamplesAdvanced);
+        Assert.False(channel.PlaybackStoppedAtLoopEnd);
     }
 
     [Theory]

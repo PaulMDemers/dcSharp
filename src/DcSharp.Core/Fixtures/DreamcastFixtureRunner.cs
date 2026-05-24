@@ -398,6 +398,13 @@ public static class DreamcastFixtureRunner
             ValidateBool(failures, $"AICA channel {expected.Channel} active", expected.Active, channel.Active);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOn", expected.KeyOn, channel.KeyOn);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOnExecute", expected.KeyOnExecute, channel.KeyOnExecute);
+            ValidateUlong(failures, $"AICA channel {expected.Channel} playback position", expected.PlaybackPosition, channel.PlaybackPosition, channel.PlaybackPositionHex);
+            if (expected.MinPlaybackSamplesAdvanced is { } minPlaybackSamplesAdvanced && channel.PlaybackSamplesAdvanced < minPlaybackSamplesAdvanced)
+            {
+                failures.Add($"AICA channel {expected.Channel} expected at least {minPlaybackSamplesAdvanced} playback samples advanced, got {channel.PlaybackSamplesAdvanced}");
+            }
+
+            ValidateBool(failures, $"AICA channel {expected.Channel} playback stopped at loop end", expected.PlaybackStoppedAtLoopEnd, channel.PlaybackStoppedAtLoopEnd);
         }
 
         foreach (var expected in fixture.VideoSamples)
@@ -627,6 +634,14 @@ public static class DreamcastFixtureRunner
         if (expected is not null && actual != expected)
         {
             failures.Add($"{label} expected {expected}, got {actual}");
+        }
+    }
+
+    private static void ValidateUlong(List<string> failures, string label, ulong? expected, ulong actual, string actualHex)
+    {
+        if (expected is not null && actual != expected)
+        {
+            failures.Add($"{label} expected {expected}, got {actual} ({actualHex})");
         }
     }
 

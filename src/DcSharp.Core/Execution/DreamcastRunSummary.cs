@@ -804,7 +804,11 @@ public sealed record DreamcastAicaChannelSummary(
     byte Volume,
     bool Active,
     bool KeyOn,
-    bool KeyOnExecute)
+    bool KeyOnExecute,
+    ulong PlaybackPosition,
+    string PlaybackPositionHex,
+    ulong PlaybackSamplesAdvanced,
+    bool PlaybackStoppedAtLoopEnd)
 {
     public static DreamcastAicaChannelSummary FromChannel(DreamcastAicaChannelSnapshot channel) =>
         new(
@@ -827,7 +831,11 @@ public sealed record DreamcastAicaChannelSummary(
             channel.Volume,
             channel.Active,
             channel.KeyOn,
-            channel.KeyOnExecute);
+            channel.KeyOnExecute,
+            channel.PlaybackPosition,
+            channel.PlaybackPositionHex,
+            channel.PlaybackSamplesAdvanced,
+            channel.PlaybackStoppedAtLoopEnd);
 }
 
 public sealed record DreamcastMapleSummary(

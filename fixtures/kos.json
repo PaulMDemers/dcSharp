@@ -3910,6 +3910,50 @@
         "aica": 1,
         "scif": 1
       }
+    },
+    {
+      "name": "aica_playback_position",
+      "sample": "samples/kos/aica_playback_position",
+      "artifact": "dcsharp_aica_playback_position.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp AICA playback probe start",
+        "loop_end=32",
+        "dcSharp AICA playback probe done"
+      ],
+      "minAicaRegisterAccesses": 8,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "aicaRegisters": {
+        "AICA_CH0_CONTROL": "0x00008000",
+        "AICA_CH0_LOOP_END": "0x00000020",
+        "AICA_MASTER_VOLUME": "0x0000000F"
+      },
+      "aicaChannels": [
+        {
+          "channel": 0,
+          "control": "0x00008000",
+          "sampleFormat": "Pcm16",
+          "sampleAddress": "0x00000000",
+          "loopStart": "0x00000000",
+          "loopEnd": "0x00000020",
+          "pitch": "0x00000000",
+          "pan": 15,
+          "volume": 64,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true,
+          "playbackPosition": 32,
+          "minPlaybackSamplesAdvanced": 32,
+          "playbackStoppedAtLoopEnd": true
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "scif": 1
+      }
     }
   ]
 }
