@@ -19,16 +19,35 @@ public static class DreamcastPvrPreviewRenderer
             return;
         }
 
-        var minX = sprite.Vertices.Min(vertex => vertex.X);
-        var minY = sprite.Vertices.Min(vertex => vertex.Y);
-        var maxX = sprite.Vertices.Max(vertex => vertex.X);
-        var maxY = sprite.Vertices.Max(vertex => vertex.Y);
-        for (var y = 0; y <= maxY - minY; y++)
+        var minX = sprite.Vertices.Take(4).Min(vertex => vertex.X);
+        var minY = sprite.Vertices.Take(4).Min(vertex => vertex.Y);
+        var vertices = sprite.Vertices
+            .Take(4)
+            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - minX, vertex.Y - minY, vertex.U, vertex.V))
+            .ToArray();
+        var centerX = vertices.Average(vertex => vertex.X);
+        var centerY = vertices.Average(vertex => vertex.Y);
+        var ordered = vertices
+            .OrderBy(vertex => MathF.Atan2(vertex.Y - centerY, vertex.X - centerX))
+            .ToArray();
+        var minPreviewX = Math.Clamp((int)MathF.Floor(ordered.Min(vertex => vertex.X)), 0, Width - 1);
+        var minPreviewY = Math.Max((int)MathF.Floor(ordered.Min(vertex => vertex.Y)), 0);
+        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(ordered.Max(vertex => vertex.X)), 0, Width - 1);
+        var maxPreviewY = Math.Max((int)MathF.Ceiling(ordered.Max(vertex => vertex.Y)), 0);
+
+        for (var y = minPreviewY; y <= maxPreviewY; y++)
         {
-            for (var x = 0; x <= maxX - minX; x++)
+            for (var x = minPreviewX; x <= maxPreviewX; x++)
             {
+                var point = new Vector2(x, y);
+                if (!TryInterpolateSpriteUv(point, ordered[0], ordered[1], ordered[2], out var sourceU, out var sourceV)
+                    && !TryInterpolateSpriteUv(point, ordered[0], ordered[2], ordered[3], out sourceU, out sourceV))
+                {
+                    continue;
+                }
+
                 var pixelIndex = PreviewPixelIndex(x, y);
-                var source = SpriteSourceSample(sprite, vram, x, y, maxX - minX, maxY - minY);
+                var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
                 if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
                 {
                     source = source with
@@ -47,7 +66,31 @@ public static class DreamcastPvrPreviewRenderer
         }
     }
 
-    private static DreamcastPvrPreviewSourceSample SpriteSourceSample(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, int x, int y, int width, int height)
+    private static bool TryInterpolateSpriteUv(
+        Vector2 point,
+        DreamcastPvrPreviewSpriteVertex a,
+        DreamcastPvrPreviewSpriteVertex b,
+        DreamcastPvrPreviewSpriteVertex c,
+        out float u,
+        out float v)
+    {
+        var pointA = new Vector2(a.X, a.Y);
+        var pointB = new Vector2(b.X, b.Y);
+        var pointC = new Vector2(c.X, c.Y);
+        if (!IsInsideTriangle(point, pointA, pointB, pointC))
+        {
+            u = 0.0f;
+            v = 0.0f;
+            return false;
+        }
+
+        var (weightA, weightB, weightC) = Barycentric(point, pointA, pointB, pointC);
+        u = (a.U * weightA) + (b.U * weightB) + (c.U * weightC);
+        v = (a.V * weightA) + (b.V * weightB) + (c.V * weightC);
+        return true;
+    }
+
+    private static DreamcastPvrPreviewSourceSample SpriteSourceSample(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, float sourceU, float sourceV)
     {
         if (!sprite.HeaderPayload.Mode1Fields.TextureEnabled
             || sprite.HeaderPayload.Mode3Fields.VqEnabled
@@ -63,18 +106,8 @@ public static class DreamcastPvrPreviewRenderer
             return new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null);
         }
 
-        var tx = width <= 0 ? 0.0f : x / (float)width;
-        var ty = height <= 0 ? 0.0f : y / (float)height;
-        var a = sprite.Vertices[0];
-        var b = sprite.Vertices[1];
-        var c = sprite.Vertices[2];
-        var d = sprite.Vertices[3];
-        var topU = Lerp(a.U, b.U, tx);
-        var topV = Lerp(a.V, b.V, tx);
-        var bottomU = Lerp(d.U, c.U, tx);
-        var bottomV = Lerp(d.V, c.V, tx);
-        var u = TextureCoordinate(Lerp(topU, bottomU, ty), sprite.HeaderPayload.Mode2Fields.UClamp, sprite.HeaderPayload.Mode2Fields.UFlip);
-        var v = TextureCoordinate(Lerp(topV, bottomV, ty), sprite.HeaderPayload.Mode2Fields.VClamp, sprite.HeaderPayload.Mode2Fields.VFlip);
+        var u = TextureCoordinate(sourceU, sprite.HeaderPayload.Mode2Fields.UClamp, sprite.HeaderPayload.Mode2Fields.UFlip);
+        var v = TextureCoordinate(sourceV, sprite.HeaderPayload.Mode2Fields.VClamp, sprite.HeaderPayload.Mode2Fields.VFlip);
         var textureSample = SampleTexture(sprite.HeaderPayload.Mode2Fields, sprite.HeaderPayload.Mode3Fields, vram, u, v, textureWidth, textureHeight);
         return textureSample is null
             ? new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null)
@@ -669,4 +702,10 @@ public static class DreamcastPvrPreviewRenderer
         ushort Rgb565,
         byte? Alpha,
         bool AlphaMultipliesVertex = true);
+
+    private sealed record DreamcastPvrPreviewSpriteVertex(
+        float X,
+        float Y,
+        float U,
+        float V);
 }
