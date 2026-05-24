@@ -203,6 +203,65 @@ public class DreamcastPvrTaStreamDecoderTests
         Assert.Equal(0, decoded[7].PayloadWordsRemaining);
     }
 
+    [Theory]
+    [InlineData(0x0000_0000u, "Dummy0", "Dummy1", "Dummy2", "Dummy3")]
+    [InlineData(0x0200_0000u, "Dummy", "Auv", "Buv", "Cuv")]
+    public void TracksSpriteVertexPayloadWordsAfterSpriteHeader(
+        uint mode1,
+        string payload11Name,
+        string payload12Name,
+        string payload13Name,
+        string payload14Name)
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0xA084_0000),
+            CreateWrite("TA_INPUT", mode1),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xFF00_FF00),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xF000_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x4040_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x4040_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x4040_0000),
+            CreateWrite("TA_INPUT", 0x4040_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000)
+        };
+
+        var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
+
+        Assert.Equal(24, decoded.Count);
+        Assert.Equal("Control", decoded[8].Role);
+        Assert.Equal("VertexEndOfStrip", decoded[8].Write.Kind);
+        Assert.Equal("SpriteVertexEndOfStrip", decoded[8].ControlKind);
+        Assert.Equal(15, decoded[8].PayloadWordsRemaining);
+        Assert.Equal("Payload", decoded[9].Role);
+        Assert.Equal("SpriteVertexEndOfStrip", decoded[9].ControlKind);
+        Assert.Equal(0, decoded[9].PayloadWordIndex);
+        Assert.Equal(14, decoded[9].PayloadWordsRemaining);
+        Assert.Equal("Ax", decoded[9].PayloadWordName);
+        Assert.Equal("Dy", decoded[19].PayloadWordName);
+        Assert.Equal(payload11Name, decoded[20].PayloadWordName);
+        Assert.Equal(payload12Name, decoded[21].PayloadWordName);
+        Assert.Equal(payload13Name, decoded[22].PayloadWordName);
+        Assert.Equal(payload14Name, decoded[23].PayloadWordName);
+        Assert.Equal(0, decoded[23].PayloadWordsRemaining);
+        Assert.DoesNotContain(decoded, write => string.Equals(write.Role, "Control", StringComparison.Ordinal) && string.Equals(write.ControlKind, "UserClip", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void TracksGenericVertexPayloadWords()
     {

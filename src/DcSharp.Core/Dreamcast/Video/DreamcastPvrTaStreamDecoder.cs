@@ -8,6 +8,7 @@ public static class DreamcastPvrTaStreamDecoder
 
         var decoded = new List<DreamcastPvrTaStreamWrite>(writes.Count);
         PayloadControl? payloadControl = null;
+        PendingSpriteHeader? pendingSpriteHeader = null;
         var payloadWordsRemaining = 0;
         var payloadWordIndex = 0;
 
@@ -23,16 +24,48 @@ public static class DreamcastPvrTaStreamDecoder
                     payloadControl.ValueHex,
                     payloadWordIndex,
                     payloadWordsRemaining - 1,
-                    PayloadWordName(payloadControl.Kind, payloadWordIndex)));
+                    PayloadWordName(payloadControl.Kind, payloadWordIndex, payloadControl.SpriteTextureEnabled)));
+                payloadControl.AddPayloadWord(write.Value);
                 payloadWordIndex++;
                 payloadWordsRemaining--;
                 if (payloadWordsRemaining == 0)
                 {
+                    if (string.Equals(payloadControl.Kind, "SpriteHeader", StringComparison.Ordinal))
+                    {
+                        pendingSpriteHeader = new PendingSpriteHeader(payloadControl.Region, SpriteHeaderTextureEnabled(payloadControl.PayloadWords));
+                    }
+
                     payloadControl = null;
                     payloadWordIndex = 0;
                 }
 
                 continue;
+            }
+
+            if (pendingSpriteHeader is not null)
+            {
+                if (string.Equals(write.Region, pendingSpriteHeader.Region, StringComparison.Ordinal) && IsVertexControl(write))
+                {
+                    var controlKind = string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal)
+                        ? "SpriteVertexEndOfStrip"
+                        : "SpriteVertex";
+                    decoded.Add(new DreamcastPvrTaStreamWrite(
+                        write,
+                        "Control",
+                        controlKind,
+                        write.Value,
+                        write.ValueHex,
+                        null,
+                        15,
+                        null));
+                    payloadControl = new PayloadControl(write.Region, controlKind, write.Value, write.ValueHex, pendingSpriteHeader.TextureEnabled);
+                    payloadWordsRemaining = 15;
+                    payloadWordIndex = 0;
+                    pendingSpriteHeader = null;
+                    continue;
+                }
+
+                pendingSpriteHeader = null;
             }
 
             var header = DreamcastPvrTaParameterDecoder.Decode(write.Region, write.Value);
@@ -66,11 +99,19 @@ public static class DreamcastPvrTaStreamDecoder
         header.ExpectedPayloadWords
         ?? (header.Kind is "Vertex" or "VertexEndOfStrip" ? 7 : null);
 
-    private static string? PayloadWordName(string controlKind, int payloadWordIndex) =>
+    private static bool IsVertexControl(DreamcastPvrTaCommandWrite write) =>
+        string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
+        || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
+
+    private static bool SpriteHeaderTextureEnabled(IReadOnlyList<uint> payloadWords) =>
+        payloadWords.Count > 0 && (payloadWords[0] & 0x0200_0000u) != 0;
+
+    private static string? PayloadWordName(string controlKind, int payloadWordIndex, bool? spriteTextureEnabled = null) =>
         controlKind switch
         {
             "PolygonHeader" => PolygonHeaderPayloadWordName(payloadWordIndex),
             "SpriteHeader" => SpriteHeaderPayloadWordName(payloadWordIndex),
+            "SpriteVertex" or "SpriteVertexEndOfStrip" => SpriteVertexPayloadWordName(payloadWordIndex, spriteTextureEnabled == true),
             "ModifierVolume" => ModifierVolumePayloadWordName(payloadWordIndex),
             "UserClip" => UserClipPayloadWordName(payloadWordIndex),
             _ => null
@@ -102,6 +143,27 @@ public static class DreamcastPvrTaStreamDecoder
             _ => null
         };
 
+    private static string? SpriteVertexPayloadWordName(int payloadWordIndex, bool textureEnabled) =>
+        payloadWordIndex switch
+        {
+            0 => "Ax",
+            1 => "Ay",
+            2 => "Az",
+            3 => "Bx",
+            4 => "By",
+            5 => "Bz",
+            6 => "Cx",
+            7 => "Cy",
+            8 => "Cz",
+            9 => "Dx",
+            10 => "Dy",
+            11 => textureEnabled ? "Dummy" : "Dummy0",
+            12 => textureEnabled ? "Auv" : "Dummy1",
+            13 => textureEnabled ? "Buv" : "Dummy2",
+            14 => textureEnabled ? "Cuv" : "Dummy3",
+            _ => null
+        };
+
     private static string? ModifierVolumePayloadWordName(int payloadWordIndex) =>
         payloadWordIndex switch
         {
@@ -129,7 +191,21 @@ public static class DreamcastPvrTaStreamDecoder
         };
 }
 
-internal sealed record PayloadControl(string Region, string Kind, uint Value, string ValueHex);
+internal sealed record PayloadControl(
+    string Region,
+    string Kind,
+    uint Value,
+    string ValueHex,
+    bool? SpriteTextureEnabled = null)
+{
+    private readonly List<uint> payloadWords = [];
+
+    public IReadOnlyList<uint> PayloadWords => payloadWords;
+
+    public void AddPayloadWord(uint value) => payloadWords.Add(value);
+}
+
+internal sealed record PendingSpriteHeader(string Region, bool TextureEnabled);
 
 public sealed record DreamcastPvrTaStreamWrite(
     DreamcastPvrTaCommandWrite Write,

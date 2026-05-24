@@ -2410,9 +2410,31 @@
           "role": "Control",
           "region": "TA_INPUT",
           "kind": "VertexEndOfStrip",
-          "controlKind": "VertexEndOfStrip",
+          "controlKind": "SpriteVertexEndOfStrip",
           "controlValue": "0xF0000000",
-          "payloadWordsRemaining": 7,
+          "payloadWordsRemaining": 15,
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x3F800000",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordIndex": 0,
+          "payloadWordsRemaining": 14,
+          "payloadWordName": "Ax",
+          "minCount": 1
+        },
+        {
+          "role": "Payload",
+          "region": "TA_INPUT",
+          "value": "0x00000000",
+          "controlKind": "SpriteVertexEndOfStrip",
+          "controlValue": "0xF0000000",
+          "payloadWordIndex": 14,
+          "payloadWordsRemaining": 0,
+          "payloadWordName": "Dummy3",
           "minCount": 1
         }
       ],
