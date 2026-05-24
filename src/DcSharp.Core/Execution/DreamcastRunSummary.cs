@@ -805,9 +805,13 @@ public sealed record DreamcastAicaChannelSummary(
     bool Active,
     bool KeyOn,
     bool KeyOnExecute,
+    int SampleStrideBytes,
     ulong PlaybackPosition,
     string PlaybackPositionHex,
+    ulong PlaybackBytePosition,
+    string PlaybackBytePositionHex,
     ulong PlaybackSamplesAdvanced,
+    ulong PlaybackBytesAdvanced,
     bool PlaybackStoppedAtLoopEnd)
 {
     public static DreamcastAicaChannelSummary FromChannel(DreamcastAicaChannelSnapshot channel) =>
@@ -832,9 +836,13 @@ public sealed record DreamcastAicaChannelSummary(
             channel.Active,
             channel.KeyOn,
             channel.KeyOnExecute,
+            channel.SampleStrideBytes,
             channel.PlaybackPosition,
             channel.PlaybackPositionHex,
+            channel.PlaybackBytePosition,
+            channel.PlaybackBytePositionHex,
             channel.PlaybackSamplesAdvanced,
+            channel.PlaybackBytesAdvanced,
             channel.PlaybackStoppedAtLoopEnd);
 }
 

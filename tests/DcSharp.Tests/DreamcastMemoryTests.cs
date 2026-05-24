@@ -387,8 +387,11 @@ public class DreamcastMemoryTests
         Assert.True(channel.KeyOn);
         Assert.True(channel.KeyOnExecute);
         Assert.True(channel.Active);
+        Assert.Equal(2, channel.SampleStrideBytes);
         Assert.Equal(0UL, channel.PlaybackPosition);
+        Assert.Equal(0UL, channel.PlaybackBytePosition);
         Assert.Equal(0UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(0UL, channel.PlaybackBytesAdvanced);
         Assert.False(channel.PlaybackStoppedAtLoopEnd);
         Assert.Equal(0x1234u, channel.SampleAddressLow);
         Assert.Equal(0x1AC0u, channel.Pitch);
@@ -410,7 +413,9 @@ public class DreamcastMemoryTests
         var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
         Assert.False(channel.Active);
         Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(16UL, channel.PlaybackBytePosition);
         Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(16UL, channel.PlaybackBytesAdvanced);
         Assert.True(channel.PlaybackStoppedAtLoopEnd);
     }
 
@@ -428,8 +433,33 @@ public class DreamcastMemoryTests
         var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
         Assert.True(channel.Active);
         Assert.Equal(4UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackBytePosition);
         Assert.Equal(44UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(88UL, channel.PlaybackBytesAdvanced);
         Assert.False(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
+    public void AdvanceHardwareReportsPcm8PlaybackByteCounters()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_000C, 0x0000_0008);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C080);
+
+        memory.AdvanceHardware(200_000);
+        memory.WriteUInt32(0xA070_0000, 0x0000_8000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.Equal(0x0000_8000u, channel.Control);
+        Assert.Equal("Pcm8", channel.SampleFormat);
+        Assert.Equal(1, channel.SampleStrideBytes);
+        Assert.False(channel.Active);
+        Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackBytePosition);
+        Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(8UL, channel.PlaybackBytesAdvanced);
+        Assert.True(channel.PlaybackStoppedAtLoopEnd);
     }
 
     [Fact]
@@ -446,7 +476,9 @@ public class DreamcastMemoryTests
         var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
         Assert.True(channel.Active);
         Assert.Equal(4UL, channel.PlaybackPosition);
+        Assert.Equal(8UL, channel.PlaybackBytePosition);
         Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(16UL, channel.PlaybackBytesAdvanced);
         Assert.False(channel.PlaybackStoppedAtLoopEnd);
     }
 
@@ -464,7 +496,9 @@ public class DreamcastMemoryTests
         var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
         Assert.False(channel.Active);
         Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(16UL, channel.PlaybackBytePosition);
         Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(16UL, channel.PlaybackBytesAdvanced);
         Assert.True(channel.PlaybackStoppedAtLoopEnd);
     }
 

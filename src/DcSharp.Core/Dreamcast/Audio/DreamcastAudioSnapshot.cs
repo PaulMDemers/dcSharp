@@ -52,7 +52,11 @@ public sealed record DreamcastAicaChannelSnapshot(
     bool Active,
     bool KeyOn,
     bool KeyOnExecute,
+    int SampleStrideBytes,
     ulong PlaybackPosition,
     string PlaybackPositionHex,
+    ulong PlaybackBytePosition,
+    string PlaybackBytePositionHex,
     ulong PlaybackSamplesAdvanced,
+    ulong PlaybackBytesAdvanced,
     bool PlaybackStoppedAtLoopEnd);

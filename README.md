@@ -178,7 +178,7 @@ Current state:
 - ASIC event ACK registers, IRQ masks, pending masks, and deliverable ASIC interrupt event/level/source bit are captured in run summaries.
 - Current PVR register values, PVR register writes, TA command writes, grouped TA lists, and assembled opaque TA strips are captured in the video summary with SDK-aligned names and first-pass TA command classification.
 - A tiny fixture-backed PVR preview raster path turns assembled opaque TA polygon strips into RGB565 VRAM samples, including flat color, Gouraud vertex color interpolation, depth checks, alpha blending, and selected RGB565/ARGB texture sampling behavior; this is not a general renderer yet.
-- Current AICA register values, register writes, sound RAM changes, decoded channel state, and silence-safe playback position counters are captured and can be asserted by fixtures without producing host audio yet.
+- Current AICA register values, register writes, sound RAM changes, decoded channel state, and silence-safe PCM playback sample/byte counters are captured and can be asserted by fixtures without producing host audio yet.
 - Maple DMA transfers are captured with command/response names, receive buffers, destination labels, response sizes, and controller state for condition reads.
 - Scheduler summaries report synthetic VBlank count, next VBlank boundary, hardware ticks, coalesced hardware advancement batches, max batch size, idle advance batches, idle wake reasons, CPU fast-forward batches, and controller script changes.
 - SH-4 `sleep`, side-effect-free self-branch waits, narrow read-only polling loops, controller-script wake boundaries, and masked counted idle loops use scheduler batching where the current fixtures expose safe patterns.
@@ -198,7 +198,7 @@ Next targets:
 - Add focused KOS fixtures for more timer/interrupt edge cases.
 - Build richer frame/input script formats around the instruction-indexed controller script model.
 - Expand real PVR vertex parameter payload coverage beyond the current packed-color fixture shape.
-- Extend silence-safe AICA playback timing into PCM8, ADPCM, stereo/pan, and optional WAV-dump diagnostics.
+- Extend silence-safe AICA playback timing into ADPCM, stereo/pan, and optional WAV-dump diagnostics.
 
 ## Development Bias
 

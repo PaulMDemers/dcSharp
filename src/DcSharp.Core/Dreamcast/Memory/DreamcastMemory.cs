@@ -1580,11 +1580,15 @@ public sealed class DreamcastMemory
             var keyOn = (control & 0x4000) != 0;
             var keyOnExecute = (control & 0x8000) != 0;
             var playback = aicaPlayback[channel];
+            var sampleFormatMode = playback.HasLatchedFormat ? playback.SampleFormatMode : (control >> 7) & 0x3;
+            var sampleStrideBytes = AicaSampleStrideBytes(sampleFormatMode);
+            var playbackBytePosition = SaturatingMultiply(playback.Position, (ulong)sampleStrideBytes);
+            var playbackBytesAdvanced = SaturatingMultiply(playback.SamplesAdvanced, (ulong)sampleStrideBytes);
             return new DreamcastAicaChannelSnapshot(
                 channel,
                 control,
                 $"0x{control:X8}",
-                AicaSampleFormatName((control >> 7) & 0x3),
+                AicaSampleFormatName(sampleFormatMode),
                 (control & 0x0200) != 0,
                 sampleAddress,
                 $"0x{sampleAddress:X8}",
@@ -1601,9 +1605,13 @@ public sealed class DreamcastMemory
                 playback.Playing,
                 keyOn,
                 keyOnExecute,
+                sampleStrideBytes,
                 playback.Position,
                 $"0x{playback.Position:X8}",
+                playbackBytePosition,
+                $"0x{playbackBytePosition:X8}",
                 playback.SamplesAdvanced,
+                playbackBytesAdvanced,
                 playback.StoppedAtLoopEnd);
         }).ToArray();
     }
@@ -1621,6 +1629,8 @@ public sealed class DreamcastMemory
             playback.Position = 0;
             playback.SamplesAdvanced = 0;
             playback.CpuTickRemainder = 0;
+            playback.SampleFormatMode = (control >> 7) & 0x3;
+            playback.HasLatchedFormat = true;
             playback.StoppedAtLoopEnd = false;
             return;
         }
@@ -1718,6 +1728,13 @@ public sealed class DreamcastMemory
         _ => "Unknown"
     };
 
+    private static int AicaSampleStrideBytes(uint mode) => mode switch
+    {
+        0 => 2,
+        1 => 1,
+        _ => 0
+    };
+
     private uint ReadAicaChannelRegister(int channel, uint channelOffset) =>
         aicaRegisters.GetValueOrDefault(AicaRegisterBase + ((uint)channel * 0x80u) + (channelOffset & 0xFFFF_FFFCu));
 
@@ -1736,6 +1753,16 @@ public sealed class DreamcastMemory
     {
         var result = left + right;
         return result < left ? ulong.MaxValue : result;
+    }
+
+    private static ulong SaturatingMultiply(ulong left, ulong right)
+    {
+        if (left == 0 || right == 0)
+        {
+            return 0;
+        }
+
+        return left > ulong.MaxValue / right ? ulong.MaxValue : left * right;
     }
 
     private static bool TryGetAicaChannel(uint offset, out int channel, out uint channelOffset)
@@ -1810,6 +1837,8 @@ internal sealed class DreamcastAicaPlaybackState
     public ulong Position { get; set; }
     public ulong SamplesAdvanced { get; set; }
     public ulong CpuTickRemainder { get; set; }
+    public uint SampleFormatMode { get; set; }
+    public bool HasLatchedFormat { get; set; }
     public bool StoppedAtLoopEnd { get; set; }
 }
 

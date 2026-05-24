@@ -398,7 +398,9 @@ public static class DreamcastFixtureRunner
             ValidateBool(failures, $"AICA channel {expected.Channel} active", expected.Active, channel.Active);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOn", expected.KeyOn, channel.KeyOn);
             ValidateBool(failures, $"AICA channel {expected.Channel} keyOnExecute", expected.KeyOnExecute, channel.KeyOnExecute);
+            ValidateInt(failures, $"AICA channel {expected.Channel} sample stride bytes", expected.SampleStrideBytes, channel.SampleStrideBytes);
             ValidateUlong(failures, $"AICA channel {expected.Channel} playback position", expected.PlaybackPosition, channel.PlaybackPosition, channel.PlaybackPositionHex);
+            ValidateUlong(failures, $"AICA channel {expected.Channel} playback byte position", expected.PlaybackBytePosition, channel.PlaybackBytePosition, channel.PlaybackBytePositionHex);
             if (expected.MinPlaybackPosition is { } minPlaybackPosition && channel.PlaybackPosition < minPlaybackPosition)
             {
                 failures.Add($"AICA channel {expected.Channel} expected playback position at least {minPlaybackPosition}, got {channel.PlaybackPosition} ({channel.PlaybackPositionHex})");
@@ -412,6 +414,11 @@ public static class DreamcastFixtureRunner
             if (expected.MinPlaybackSamplesAdvanced is { } minPlaybackSamplesAdvanced && channel.PlaybackSamplesAdvanced < minPlaybackSamplesAdvanced)
             {
                 failures.Add($"AICA channel {expected.Channel} expected at least {minPlaybackSamplesAdvanced} playback samples advanced, got {channel.PlaybackSamplesAdvanced}");
+            }
+
+            if (expected.MinPlaybackBytesAdvanced is { } minPlaybackBytesAdvanced && channel.PlaybackBytesAdvanced < minPlaybackBytesAdvanced)
+            {
+                failures.Add($"AICA channel {expected.Channel} expected at least {minPlaybackBytesAdvanced} playback bytes advanced, got {channel.PlaybackBytesAdvanced}");
             }
 
             ValidateBool(failures, $"AICA channel {expected.Channel} playback stopped at loop end", expected.PlaybackStoppedAtLoopEnd, channel.PlaybackStoppedAtLoopEnd);

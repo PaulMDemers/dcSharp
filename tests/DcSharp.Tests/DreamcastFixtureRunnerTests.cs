@@ -495,10 +495,13 @@ public class DreamcastFixtureRunnerTests
                     Channel = 0,
                     Pitch = "0x00001AC0",
                     Volume = 64,
+                    SampleStrideBytes = 1,
                     PlaybackPosition = 64,
+                    PlaybackBytePosition = 128,
                     MinPlaybackPosition = 1,
                     MaxPlaybackPosition = 63,
                     MinPlaybackSamplesAdvanced = 10,
+                    MinPlaybackBytesAdvanced = 10,
                     PlaybackStoppedAtLoopEnd = true
                 },
                 new DreamcastFixtureAicaChannelExpectation
@@ -592,9 +595,12 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
         Assert.Contains("AICA channel 0 volume expected 64, got 63", failures);
+        Assert.Contains("AICA channel 0 sample stride bytes expected 1, got 2", failures);
         Assert.Contains("AICA channel 0 playback position expected 64, got 0 (0x00000000)", failures);
+        Assert.Contains("AICA channel 0 playback byte position expected 128, got 0 (0x00000000)", failures);
         Assert.Contains("AICA channel 0 expected playback position at least 1, got 0 (0x00000000)", failures);
         Assert.Contains("AICA channel 0 expected at least 10 playback samples advanced, got 0", failures);
+        Assert.Contains("AICA channel 0 expected at least 10 playback bytes advanced, got 0", failures);
         Assert.Contains("AICA channel 0 playback stopped at loop end expected True, got False", failures);
         Assert.Contains("missing AICA channel: 1", failures);
     }
@@ -912,8 +918,11 @@ public class DreamcastFixtureRunnerTests
         bool active = false,
         bool keyOn = false,
         bool keyOnExecute = true,
+        int sampleStrideBytes = 2,
         ulong playbackPosition = 0,
+        ulong playbackBytePosition = 0,
         ulong playbackSamplesAdvanced = 0,
+        ulong playbackBytesAdvanced = 0,
         bool playbackStoppedAtLoopEnd = false) =>
         new(
             channel,
@@ -936,8 +945,12 @@ public class DreamcastFixtureRunnerTests
             active,
             keyOn,
             keyOnExecute,
+            sampleStrideBytes,
             playbackPosition,
             $"0x{playbackPosition:X8}",
+            playbackBytePosition,
+            $"0x{playbackBytePosition:X8}",
             playbackSamplesAdvanced,
+            playbackBytesAdvanced,
             playbackStoppedAtLoopEnd);
 }

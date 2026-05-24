@@ -3998,6 +3998,54 @@
         "aica": 1,
         "scif": 1
       }
+    },
+    {
+      "name": "aica_playback_pcm8",
+      "sample": "samples/kos/aica_playback_pcm8",
+      "artifact": "dcsharp_aica_playback_pcm8.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp AICA PCM8 playback probe start",
+        "ctrl=0x0000c080",
+        "loop_end=16",
+        "dcSharp AICA PCM8 playback probe done"
+      ],
+      "minAicaRegisterAccesses": 8,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "aicaRegisters": {
+        "AICA_CH0_CONTROL": "0x00008000",
+        "AICA_CH0_LOOP_END": "0x00000010",
+        "AICA_MASTER_VOLUME": "0x0000000F"
+      },
+      "aicaChannels": [
+        {
+          "channel": 0,
+          "control": "0x00008000",
+          "sampleFormat": "Pcm8",
+          "sampleStrideBytes": 1,
+          "sampleAddress": "0x00000000",
+          "loopStart": "0x00000000",
+          "loopEnd": "0x00000010",
+          "pitch": "0x00000000",
+          "pan": 15,
+          "volume": 64,
+          "active": false,
+          "keyOn": false,
+          "keyOnExecute": true,
+          "playbackPosition": 16,
+          "playbackBytePosition": 16,
+          "minPlaybackSamplesAdvanced": 16,
+          "minPlaybackBytesAdvanced": 16,
+          "playbackStoppedAtLoopEnd": true
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "aica": 1,
+        "scif": 1
+      }
     }
   ]
 }
