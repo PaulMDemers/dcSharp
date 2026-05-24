@@ -881,6 +881,55 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ReturnFromHigherPriorityTimerInterruptAcceptsPendingAsicAfterTimerClears()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C02_0600, 0x002B);
+        WriteInstruction(memory, 0x8C02_0602, 0x0009);
+        RaiseTimerUnderflow(memory, 0, 10);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+
+        var timerInterrupt = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, timerInterrupt.Pc);
+        Assert.Equal(0, timerInterrupt.Opcode);
+        Assert.Equal(0x0400u, memory.ReadUInt32(0xFF00_0028));
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0xA0u, cpu.State.Sr);
+        Assert.Equal("interrupt event=0x0400, level=10, target=0x8C020600", timerInterrupt.Trace);
+
+        memory.WriteUInt16(0xFFD8_0010, 0x0020);
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var pendingEventCode, out var pendingLevel));
+        Assert.Equal(0x0320u, pendingEventCode);
+        Assert.Equal(9, pendingLevel);
+
+        var returnStep = cpu.Step();
+
+        Assert.Equal(0x8C02_0600u, returnStep.Pc);
+        Assert.Equal(0x002B, returnStep.Opcode);
+        Assert.Equal(0x8C02_0602u, cpu.State.Pc);
+        Assert.Equal(0u, cpu.State.Sr);
+
+        var returnDelaySlot = cpu.Step();
+
+        Assert.Equal(0x8C02_0602u, returnDelaySlot.Pc);
+        Assert.Equal(0x0009, returnDelaySlot.Opcode);
+        Assert.Equal(0x8C01_0000u, cpu.State.Pc);
+
+        var asicInterrupt = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, asicInterrupt.Pc);
+        Assert.Equal(0, asicInterrupt.Opcode);
+        Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
+        Assert.Equal(0x8C02_0600u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C020600", asicInterrupt.Trace);
+    }
+
+    [Fact]
     public void ChangingStatusRegisterBankBitSwapsLowRegisters()
     {
         var state = new Sh4State();
@@ -944,6 +993,33 @@ public class Sh4CpuTests
         memory.WriteUInt32(0xA05F_6930, 1u << 3);
         memory.RaiseVBlankBegin();
     }
+
+    private static void RaiseTimerUnderflow(DreamcastMemory memory, int channel, int priority)
+    {
+        SetTimerPriority(memory, channel, priority);
+        memory.WriteUInt16(TimerControlAddress(channel), 0x0120);
+    }
+
+    private static void SetTimerPriority(DreamcastMemory memory, int channel, int priority)
+    {
+        var shift = channel switch
+        {
+            0 => 12,
+            1 => 8,
+            _ => 4
+        };
+        var current = memory.ReadUInt16(0xFFD0_0004);
+        var mask = 0xFu << shift;
+        var value = (ushort)((current & ~mask) | (((uint)priority & 0xF) << shift));
+        memory.WriteUInt16(0xFFD0_0004, value);
+    }
+
+    private static uint TimerControlAddress(int channel) => channel switch
+    {
+        0 => 0xFFD8_0010,
+        1 => 0xFFD8_001C,
+        _ => 0xFFD8_0028
+    };
 
     private static double ReadDouble(Sh4Cpu cpu, int register)
     {

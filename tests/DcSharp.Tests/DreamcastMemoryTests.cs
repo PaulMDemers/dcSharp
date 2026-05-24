@@ -695,6 +695,34 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void TimerInterruptPriorityBeatsAsicWhenPriorityTies()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 9);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0400u, eventCode);
+        Assert.Equal(9, level);
+    }
+
+    [Fact]
+    public void AsicInterruptPriorityBeatsLowerPriorityTimer()
+    {
+        var memory = new DreamcastMemory();
+
+        RaiseTimerUnderflow(memory, 0, 8);
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+        memory.RaiseVBlankBegin();
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+    }
+
+    [Fact]
     public void RaisedVBlankReportsPendingIrq9WhenEnabled()
     {
         var memory = new DreamcastMemory();
