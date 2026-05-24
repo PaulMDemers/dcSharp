@@ -284,6 +284,24 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCatchesHardwareUpWhenCountedIdleFastForwardReachesLimit()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateCountedIdleLoopElf()));
+
+        var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(
+            InstructionLimit: 15,
+            TraceTailLength: 0,
+            VBlankInterval: 0));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(15UL, result.Cpu.InstructionsExecuted);
+        Assert.Equal(15UL, result.Scheduler.HardwareAdvanceTicks);
+        Assert.Equal(9UL, result.Scheduler.CpuFastForwardInstructions);
+        Assert.Equal(1UL, result.Scheduler.CpuFastForwardBatches);
+        Assert.Equal(9UL, result.Scheduler.MaxCpuFastForwardBatch);
+    }
+
+    [Fact]
     public void DetectsSideEffectFreeIdleLoops()
     {
         var memory = new DreamcastMemory();
@@ -395,6 +413,21 @@ public class DreamcastRunnerTests
             0x00, 0x62, // mov.b @r0,r2
             0x28, 0x22, // tst r2,r2
             0xFC, 0x89  // bt 0x8C010000
+        ]);
+    }
+
+    private static byte[] CreateCountedIdleLoopElf()
+    {
+        return CreateElfWithSegment(
+        [
+            0xF0, 0xE0, // mov #-16,r0
+            0x0E, 0x40, // ldc r0,sr
+            0x03, 0xE1, // mov #3,r1
+            0x09, 0x00, // nop
+            0x10, 0x41, // dt r1
+            0xFC, 0x8F, // bf/s 0x8C010006
+            0x09, 0x00, // nop
+            0x09, 0x00  // fallthrough
         ]);
     }
 

@@ -107,6 +107,14 @@ public sealed class DreamcastEventScheduler
         maxCpuFastForwardBatch = Math.Max(maxCpuFastForwardBatch, instructions);
     }
 
+    public void AdvanceAfterCpuFastForward(ulong skippedInstructions, ulong instructionsExecuted)
+    {
+        RecordCpuFastForward(skippedInstructions);
+        ApplyInputScripts(instructionsExecuted);
+        RaiseDueVBlankEvents(instructionsExecuted);
+        AdvanceHardwareTo(instructionsExecuted);
+    }
+
     private void RecordIdleAdvance(ulong ticks, ulong? nextTimerInterrupt, ulong? nextVblank, ulong? nextInputChange)
     {
         idleAdvanceTicks += ticks;

@@ -41,7 +41,7 @@ public sealed class DreamcastRunner
                 {
                     if (cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))
                     {
-                        scheduler.RecordCpuFastForward(skippedInstructions);
+                        scheduler.AdvanceAfterCpuFastForward(skippedInstructions, cpu.State.InstructionsExecuted);
                     }
                 }
 
