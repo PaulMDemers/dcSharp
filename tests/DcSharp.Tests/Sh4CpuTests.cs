@@ -533,10 +533,61 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void TrapInstructionEntersGeneralExceptionHandler()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xC33C);
+        memory.WriteUInt32(0xFF00_0028, 0x0320);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = 0x0000_00F1;
+
+        var step = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, step.Pc);
+        Assert.Equal(0xC33C, step.Opcode);
+        Assert.Equal("trapa #0x3C ; tra=0x000000F0, target=0x8C020100", step.Trace);
+        Assert.Equal(0x8C02_0100u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0002u, cpu.State.Spc);
+        Assert.Equal(0x0000_00F1u, cpu.State.Ssr);
+        Assert.Equal(0x0000_00F0u, memory.ReadUInt32(0xFF00_0020));
+        Assert.Equal(0x0000_0160u, memory.ReadUInt32(0xFF00_0024));
+        Assert.Equal(0x0000_0320u, memory.ReadUInt32(0xFF00_0028));
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0xF1u, cpu.State.Sr);
+    }
+
+    [Fact]
+    public void ReturnFromTrapExceptionResumesAfterTrapInstruction()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xC305);
+        WriteInstruction(memory, 0x8C01_0002, 0x0009);
+        WriteInstruction(memory, 0x8C02_0100, 0x002B);
+        WriteInstruction(memory, 0x8C02_0102, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Vbr = 0x8C02_0000;
+        cpu.State.Sr = 0x0000_00A1;
+
+        cpu.Step();
+        Assert.Equal(0x8C02_0100u, cpu.State.Pc);
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0xA1u, cpu.State.Sr);
+
+        cpu.Step();
+        Assert.Equal(0x8C02_0102u, cpu.State.Pc);
+        Assert.Equal(0x0000_00A1u, cpu.State.Sr);
+
+        cpu.Step();
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+        Assert.Equal(0x0000_00A1u, cpu.State.Sr);
+    }
+
+    [Fact]
     public void AcceptsEnabledExternalInterruptBeforeFetchingInstruction()
     {
         var memory = new DreamcastMemory();
         WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        memory.WriteUInt32(0xFF00_0020, 0x0000_00F0);
+        memory.WriteUInt32(0xFF00_0024, 0x0000_0160);
         RaiseVBlankIrq9(memory);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Vbr = 0x8C02_0000;
@@ -548,6 +599,8 @@ public class Sh4CpuTests
         Assert.Equal(0x8C02_0600u, cpu.State.Pc);
         Assert.Equal(0x8C01_0000u, cpu.State.Spc);
         Assert.Equal(0u, cpu.State.Ssr);
+        Assert.Equal(0x0000_00F0u, memory.ReadUInt32(0xFF00_0020));
+        Assert.Equal(0x0000_0160u, memory.ReadUInt32(0xFF00_0024));
         Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
         Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0x90u, cpu.State.Sr);
         Assert.Equal("interrupt event=0x0320, level=9, target=0x8C020600", step.Trace);

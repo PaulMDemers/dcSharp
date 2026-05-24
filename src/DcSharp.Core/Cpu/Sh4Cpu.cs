@@ -1075,6 +1075,18 @@ public sealed class Sh4Cpu
             return $"tst #0x{opcode & 0xFF:X2},r0 ; t={(State.T ? 1 : 0)}";
         }
 
+        if ((opcode & 0xFF00) == 0xC300)
+        {
+            var immediate = (uint)(opcode & 0xFF);
+            State.Spc = nextPc;
+            State.Ssr = State.Sr;
+            memory.WriteUInt32(0xFF00_0020, immediate << 2);
+            memory.WriteUInt32(0xFF00_0024, 0x0000_0160);
+            State.Sr |= Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit;
+            immediateBranchTarget = State.Vbr + 0x100;
+            return $"trapa #0x{immediate:X2} ; tra=0x{immediate << 2:X8}, target=0x{immediateBranchTarget:X8}";
+        }
+
         if ((opcode & 0xF000) == 0xA000)
         {
             var displacement = SignExtend12(opcode & 0x0FFF) * 2;
