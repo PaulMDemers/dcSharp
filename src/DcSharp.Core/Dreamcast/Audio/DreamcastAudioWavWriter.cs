@@ -14,7 +14,7 @@ public static class DreamcastAudioWavWriter
         ArgumentNullException.ThrowIfNull(snapshot);
 
         var sampleCount = snapshot.Channels
-            .Where(IsModeledPcmChannel)
+            .Where(IsModeledChannel)
             .Select(channel => channel.PlaybackSamplesAdvanced)
             .DefaultIfEmpty(0UL)
             .Max();
@@ -25,7 +25,7 @@ public static class DreamcastAudioWavWriter
 
         var frames = (int)sampleCount;
         var pcm = new byte[frames * 4];
-        foreach (var channel in snapshot.Channels.Where(IsModeledPcmChannel))
+        foreach (var channel in snapshot.Channels.Where(IsModeledChannel))
         {
             MixChannel(snapshot.AudioRam, channel, pcm, frames);
         }
@@ -33,24 +33,20 @@ public static class DreamcastAudioWavWriter
         WriteWav(output, pcm, channels: 2, sampleRate: SampleRate, bitsPerSample: 16);
     }
 
-    private static bool IsModeledPcmChannel(DreamcastAicaChannelSnapshot channel) =>
-        !channel.Compressed
-        && channel.SampleStrideBytes is 1 or 2
-        && channel.PlaybackSamplesAdvanced > 0;
+    private static bool IsModeledChannel(DreamcastAicaChannelSnapshot channel) =>
+        channel.PlaybackSamplesAdvanced > 0
+        && (channel.Compressed || channel.SampleStrideBytes is 1 or 2);
 
     private static void MixChannel(byte[] audioRam, DreamcastAicaChannelSnapshot channel, byte[] pcm, int frames)
     {
         var channelFrames = (int)Math.Min((ulong)frames, channel.PlaybackSamplesAdvanced);
+        var adpcm = channel.Compressed ? new AicaAdpcmDecoder() : null;
         for (var frame = 0; frame < channelFrames; frame++)
         {
             var sourceIndex = ResolveSampleIndex(channel, (ulong)frame);
-            var sourceOffset = channel.SampleAddress + (sourceIndex * (uint)channel.SampleStrideBytes);
-            if (sourceOffset >= audioRam.Length || sourceOffset + (uint)channel.SampleStrideBytes > audioRam.Length)
-            {
-                break;
-            }
-
-            var sample = ReadSample(audioRam, (int)sourceOffset, channel.SampleStrideBytes);
+            var sample = adpcm is null
+                ? ReadPcmSample(audioRam, channel, sourceIndex)
+                : adpcm.DecodeNibble(AicaAdpcmDecoder.ReadNibble(audioRam, channel.SampleAddress, sourceIndex));
             var scaled = (sample * channel.Volume) / 255;
             var left = (scaled * channel.LeftBalance) / 15;
             var right = (scaled * channel.RightBalance) / 15;
@@ -69,6 +65,17 @@ public static class DreamcastAudioWavWriter
 
         var loopLength = channel.LoopEnd - channel.LoopStart;
         return channel.LoopStart + (uint)((frame - channel.LoopEnd) % loopLength);
+    }
+
+    private static int ReadPcmSample(byte[] audioRam, DreamcastAicaChannelSnapshot channel, uint sourceIndex)
+    {
+        var sourceOffset = channel.SampleAddress + (sourceIndex * (uint)channel.SampleStrideBytes);
+        if (sourceOffset >= audioRam.Length || sourceOffset + (uint)channel.SampleStrideBytes > audioRam.Length)
+        {
+            return 0;
+        }
+
+        return ReadSample(audioRam, (int)sourceOffset, channel.SampleStrideBytes);
     }
 
     private static int ReadSample(byte[] audioRam, int offset, int stride) =>

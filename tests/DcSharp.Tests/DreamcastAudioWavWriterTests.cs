@@ -52,12 +52,12 @@ public class DreamcastAudioWavWriterTests
     }
 
     [Fact]
-    public void WritePcm16StereoSkipsCompressedChannels()
+    public void WritePcm16StereoDecodesAdpcmChannels()
     {
         var memory = new DreamcastMemory();
-        memory.Write(0xA080_0000, [0x00, 0x10]);
-        memory.WriteUInt32(0xA070_000C, 0x0000_0001);
-        memory.Write(0xA070_0024, [0x0F]);
+        memory.Write(0xA080_0000, [0x21]);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0002);
+        memory.Write(0xA070_0024, [0x00]);
         memory.Write(0xA070_0029, [0xFF]);
         memory.WriteUInt32(0xA070_0000, 0x0000_C100);
         memory.AdvanceHardware(10_000);
@@ -66,8 +66,11 @@ public class DreamcastAudioWavWriterTests
         DreamcastAudioWavWriter.WritePcm16Stereo(stream, memory.CreateAudioSnapshot());
 
         var bytes = stream.ToArray();
-        Assert.Equal(44, bytes.Length);
-        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(40, 4)));
+        Assert.Equal(8, BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(40, 4)));
+        Assert.Equal(47, BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(44, 2)));
+        Assert.Equal(0, BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(46, 2)));
+        Assert.Equal(126, BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(48, 2)));
+        Assert.Equal(0, BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(50, 2)));
     }
 
     private static string ReadAscii(byte[] bytes, int offset, int length) =>
