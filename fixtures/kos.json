@@ -4022,6 +4022,45 @@
       }
     },
     {
+      "name": "timer_asic_arbitration",
+      "sample": "samples/kos/timer_asic_arbitration",
+      "artifact": "dcsharp_timer_asic_arbitration.elf",
+      "instructions": 1000000,
+      "traceTail": 32,
+      "vblankInterval": 5000,
+      "expectedStopReason": "UnsupportedInstruction",
+      "serialContains": [
+        "dcSharp timer ASIC arbitration probe done"
+      ],
+      "minVblankEvents": 1,
+      "requireNoAsicPendingInterrupt": true,
+      "cpu": {
+        "pc": "0x8C01006C",
+        "sr": "0x00000001",
+        "vbr": "0x8C010000",
+        "spc": "0x8C010038",
+        "ssr": "0x00000000",
+        "fpscr": "0x00040001",
+        "tra": "0x00000000",
+        "expevt": "0x00000000",
+        "intevt": "0x00000320"
+      },
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000000",
+          "irq9Mask": "0x00000000",
+          "pendingIrq9": "0x00000000"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "scif": 1,
+        "sh4": 1,
+        "tmu": 1
+      }
+    },
+    {
       "name": "vblank_idle",
       "sample": "samples/kos/vblank_idle",
       "artifact": "dcsharp_vblank_idle.elf",

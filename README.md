@@ -35,6 +35,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/asic_events`: default KOS fixture that observes and clears an ASIC VBlank event latch.
   - `samples/kos/asic_irq9_masked`: minimal KOS fixture that leaves VBlank IRQ9 pending while SH-4 interrupts are masked.
   - `samples/kos/interrupt_nesting`: bare-metal SH fixture that confirms `SR.BL` blocks nested IRQ9 delivery while a VBlank source remains pending in the interrupt handler.
+  - `samples/kos/timer_asic_arbitration`: bare-metal SH fixture that records TMU0 before IRQ9 when both are pending and TMU0 has higher priority.
   - `samples/kos/vblank_idle`: default KOS fixture that waits for a synthetic VBlank through a read-only idle polling loop.
   - `samples/kos/aica_registers`: default KOS fixture that writes AICA channel/global registers and sound RAM.
 - Generated artifacts: `artifacts/` (ignored)
@@ -97,6 +98,8 @@ wsl -e bash tools/kos/build-sample.sh samples/kos/vblank_idle
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_vblank_idle.elf --instructions 70000000 --vblank-interval 50000 --trace-tail 40
 wsl -e bash tools/kos/build-sample.sh samples/kos/interrupt_nesting
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_interrupt_nesting.elf --instructions 1000000 --vblank-interval 5000 --trace-tail 24
+wsl -e bash tools/kos/build-sample.sh samples/kos/timer_asic_arbitration
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_timer_asic_arbitration.elf --instructions 1000000 --vblank-interval 5000 --trace-tail 32
 wsl -e bash tools/kos/build-sample.sh samples/kos/aica_registers
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_aica_registers.elf --instructions 70000000 --trace-tail 40
 ```
