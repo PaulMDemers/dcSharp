@@ -29,6 +29,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/pvr_real_modes`: default KOS fixture that writes a real-shaped polygon header with nonzero mode payload bits.
   - `samples/kos/asic_irqb`: minimal KOS fixture that leaves a Maple DMA ASIC IRQB source pending.
   - `samples/kos/asic_events`: default KOS fixture that observes and clears an ASIC VBlank event latch.
+  - `samples/kos/asic_irq9_masked`: minimal KOS fixture that leaves VBlank IRQ9 pending while SH-4 interrupts are masked.
   - `samples/kos/vblank_idle`: default KOS fixture that waits for a synthetic VBlank through a read-only idle polling loop.
   - `samples/kos/aica_registers`: default KOS fixture that writes AICA channel/global registers and sound RAM.
 - Generated artifacts: `artifacts/` (ignored)

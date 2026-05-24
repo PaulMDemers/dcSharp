@@ -3840,6 +3840,44 @@
       }
     },
     {
+      "name": "asic_irq9_masked",
+      "sample": "samples/kos/asic_irq9_masked",
+      "artifact": "dcsharp_asic_irq9_masked.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "vblankInterval": 50000,
+      "expectedStopReason": "FirmwareExit",
+      "serialContains": [
+        "dcSharp ASIC IRQ9 masked probe: observed=0x00000008 pending=0x00000008 irq9=0x00000008",
+        "dcSharp ASIC IRQ9 masked probe complete",
+        "arch: exiting the system to the BIOS menu"
+      ],
+      "minVblankEvents": 1,
+      "minIdleAdvanceTicks": 1000,
+      "minIdleAdvanceBatches": 1,
+      "minIdleVBlankWakes": 1,
+      "asicPendingInterrupt": {
+        "eventCode": "0x0320",
+        "level": 9,
+        "levelName": "IRQ9",
+        "registerName": "A",
+        "bit": 3,
+        "bitMask": "0x00000008"
+      },
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000008",
+          "irq9Mask": "0x00000008",
+          "pendingIrq9": "0x00000008"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "vblank_idle",
       "sample": "samples/kos/vblank_idle",
       "artifact": "dcsharp_vblank_idle.elf",
