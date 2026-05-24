@@ -16,6 +16,7 @@ The first target is not retail-game compatibility. The first target is a determi
   - `samples/kos/minimal`: minimal init fixture that reaches `main()` and exits via the firmware-exit trap.
   - `samples/kos/timer`: default KOS fixture that exercises `timer_ms_gettime64()` and `thd_sleep()`.
   - `samples/kos/timer_callback`: default KOS fixture that chains a TMU0 primary timer callback.
+  - `samples/kos/timer_vblank`: default KOS fixture that observes TMU callback delivery while VBlank IRQ9 is enabled.
   - `samples/kos/maple_controller`: default KOS fixture that polls a virtual neutral controller.
   - `samples/kos/maple_controller_script`: raw Maple condition fixture that observes an instruction-indexed controller transition.
   - `samples/kos/input_idle`: raw Maple fixture that observes a scripted input transition across idle sleeps.

@@ -210,6 +210,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_gdrom_seek.elf`: seeks within `/cd/DATA/BIG.BIN`, reads across sector boundaries, rereads from later offsets, verifies tail/EOF behavior, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer.elf`: wakes from `thd_sleep()`, prints timer ticks, shuts down, and reports `ProgramExit`.
 - `dcsharp_timer_callback.elf`: chains the KOS TMU0 primary timer callback, observes three wakeups, shuts down, and reports `ProgramExit`.
+- `dcsharp_timer_vblank.elf`: runs the KOS TMU0 primary timer callback while ASIC VBlank IRQ9 is enabled, observes callback progress while the scheduler raises VBlank events, clears the VBlank source, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller.elf`: detects `dcSharp Virtual Controller`, reads neutral or scripted input state, shuts down, and reports `ProgramExit`.
 - `dcsharp_maple_controller_script.elf`: performs two raw Maple condition reads, observes a neutral first read and scripted second read, shuts down, and reports `ProgramExit`.
 - `dcsharp_input_idle.elf`: performs two raw Maple condition reads around repeated SH-4 `sleep` idle points, observes a scripted controller transition, exposes idle input wake diagnostics, shuts down, and reports `ProgramExit`.

@@ -863,6 +863,38 @@
       }
     },
     {
+      "name": "timer_vblank",
+      "sample": "samples/kos/timer_vblank",
+      "artifact": "dcsharp_timer_vblank.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "vblankInterval": 50000,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp timer+VBlank probe: callbacks=3",
+        "after_clear=0x00000000 irq9=0x00000000",
+        "dcSharp timer+VBlank probe done"
+      ],
+      "minVblankEvents": 1,
+      "minHardwareAdvanceTicks": 1000,
+      "requireNoAsicPendingInterrupt": true,
+      "asicEventRegisters": [
+        {
+          "name": "A",
+          "ack": "0x00000008",
+          "irq9Mask": "0x00000000",
+          "irqDMask": "0x00000000",
+          "pendingIrq9": "0x00000000",
+          "pendingIrqD": "0x00000000"
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "asic": 1,
+        "scif": 1,
+        "tmu": 1
+      }
+    },
+    {
       "name": "maple_controller_neutral",
       "sample": "samples/kos/maple_controller",
       "artifact": "dcsharp_maple_controller.elf",
