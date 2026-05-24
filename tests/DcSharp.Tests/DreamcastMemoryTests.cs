@@ -524,7 +524,7 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
-    public void AdvanceHardwareDoesNotAdvanceCompressedAicaPlaybackWithoutDecoder()
+    public void AdvanceHardwareTracksAdpcmPlaybackByNibbleAndPackedByte()
     {
         var memory = new DreamcastMemory();
 
@@ -542,10 +542,31 @@ public class DreamcastMemoryTests
         Assert.False(channel.Streamed);
         Assert.Equal(0, channel.SampleStrideBytes);
         Assert.False(channel.Active);
-        Assert.Equal(0UL, channel.PlaybackPosition);
-        Assert.Equal(0UL, channel.PlaybackBytePosition);
-        Assert.Equal(0UL, channel.PlaybackSamplesAdvanced);
-        Assert.Equal(0UL, channel.PlaybackBytesAdvanced);
+        Assert.Equal(8UL, channel.PlaybackPosition);
+        Assert.Equal(4UL, channel.PlaybackBytePosition);
+        Assert.Equal(8UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(4UL, channel.PlaybackBytesAdvanced);
+        Assert.True(channel.PlaybackStoppedAtLoopEnd);
+    }
+
+    [Fact]
+    public void AdvanceHardwareLoopsAdpcmPlaybackAtSampleBoundary()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA070_0008, 0x0000_0003);
+        memory.WriteUInt32(0xA070_000C, 0x0000_0007);
+        memory.WriteUInt32(0xA070_0000, 0x0000_C300);
+
+        memory.AdvanceHardware(200_000);
+
+        var channel = Assert.Single(memory.CreateAudioSnapshot().Channels);
+        Assert.True(channel.Active);
+        Assert.Equal("Adpcm", channel.SampleFormat);
+        Assert.Equal(4UL, channel.PlaybackPosition);
+        Assert.Equal(2UL, channel.PlaybackBytePosition);
+        Assert.Equal(44UL, channel.PlaybackSamplesAdvanced);
+        Assert.Equal(22UL, channel.PlaybackBytesAdvanced);
         Assert.False(channel.PlaybackStoppedAtLoopEnd);
     }
 

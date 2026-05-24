@@ -4544,10 +4544,10 @@
           "active": false,
           "keyOn": false,
           "keyOnExecute": true,
-          "playbackPosition": 0,
-          "playbackBytePosition": 0,
-          "minPlaybackSamplesAdvanced": 0,
-          "minPlaybackBytesAdvanced": 0,
+          "minPlaybackPosition": 4,
+          "maxPlaybackPosition": 31,
+          "minPlaybackSamplesAdvanced": 32,
+          "minPlaybackBytesAdvanced": 16,
           "playbackStoppedAtLoopEnd": false
         }
       ],

@@ -1646,8 +1646,8 @@ public sealed class DreamcastMemory
             var playback = aicaPlayback[channel];
             var sampleFormatMode = playback.HasLatchedFormat ? playback.SampleFormatMode : (control >> 7) & 0x3;
             var sampleStrideBytes = AicaSampleStrideBytes(sampleFormatMode);
-            var playbackBytePosition = SaturatingMultiply(playback.Position, (ulong)sampleStrideBytes);
-            var playbackBytesAdvanced = SaturatingMultiply(playback.SamplesAdvanced, (ulong)sampleStrideBytes);
+            var playbackBytePosition = AicaPlaybackBytesForSamples(playback.Position, sampleFormatMode);
+            var playbackBytesAdvanced = AicaPlaybackBytesForSamples(playback.SamplesAdvanced, sampleFormatMode);
             return new DreamcastAicaChannelSnapshot(
                 channel,
                 control,
@@ -1728,11 +1728,6 @@ public sealed class DreamcastMemory
                 continue;
             }
 
-            if (AicaSampleFormatIsCompressed(playback.SampleFormatMode))
-            {
-                continue;
-            }
-
             var wholeSeconds = ticks / HardwareProfile.CpuClockHz;
             var tickRemainder = ticks % HardwareProfile.CpuClockHz;
             var baseSamples = wholeSeconds > ulong.MaxValue / AicaOutputSampleRateHz
@@ -1809,6 +1804,16 @@ public sealed class DreamcastMemory
         1 => 1,
         _ => 0
     };
+
+    private static ulong AicaPlaybackBytesForSamples(ulong samples, uint mode)
+    {
+        if (AicaSampleFormatIsCompressed(mode))
+        {
+            return (samples / 2) + (samples % 2);
+        }
+
+        return SaturatingMultiply(samples, (ulong)AicaSampleStrideBytes(mode));
+    }
 
     private static bool AicaSampleFormatIsCompressed(uint mode) => mode is 2 or 3;
 
