@@ -4089,6 +4089,49 @@
       }
     },
     {
+      "name": "timer_irq_masked",
+      "sample": "samples/kos/timer_irq_masked",
+      "artifact": "dcsharp_timer_irq_masked.elf",
+      "instructions": 1000000,
+      "traceTail": 24,
+      "expectedStopReason": "UnsupportedInstruction",
+      "serialContains": [
+        "dcSharp timer IRQ masked probe done"
+      ],
+      "requireNoAsicPendingInterrupt": true,
+      "timerPendingInterrupt": {
+        "eventCode": "0x00000400",
+        "channel": 0,
+        "priority": 10
+      },
+      "cpu": {
+        "pc": "0x8C010024",
+        "sr": "0x000000F1",
+        "vbr": "0x8C010000",
+        "spc": "0x00000000",
+        "ssr": "0x00000000",
+        "fpscr": "0x00040001",
+        "tra": "0x00000000",
+        "expevt": "0x00000000",
+        "intevt": "0x00000000"
+      },
+      "timerChannels": [
+        {
+          "channel": 0,
+          "control": "0x00000120",
+          "priority": 10,
+          "running": false,
+          "underflowPending": true,
+          "interruptEnabled": true
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "scif": 1,
+        "sh4": 1,
+        "tmu": 1
+      }
+    },
+    {
       "name": "vblank_idle",
       "sample": "samples/kos/vblank_idle",
       "artifact": "dcsharp_vblank_idle.elf",
