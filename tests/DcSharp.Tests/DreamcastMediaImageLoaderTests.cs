@@ -469,6 +469,41 @@ public class DreamcastMediaImageLoaderTests
         }
     }
 
+    [Fact]
+    public void DreamcastBootScramblerRoundTripsData()
+    {
+        var original = Enumerable.Range(0, 4096).Select(value => (byte)value).ToArray();
+
+        var scrambled = DreamcastBootScrambler.Scramble(original);
+        var descrambled = DreamcastBootScrambler.Descramble(scrambled);
+
+        Assert.NotEqual(original, scrambled);
+        Assert.Equal(original, descrambled);
+    }
+
+    [Fact]
+    public void DreamcastBootScramblerRoundTripsLargeChunks()
+    {
+        var original = Enumerable.Range(0, (2048 * 1024) + 64).Select(value => (byte)value).ToArray();
+
+        var scrambled = DreamcastBootScrambler.Scramble(original);
+        var descrambled = DreamcastBootScrambler.Descramble(scrambled);
+
+        Assert.Equal(original, descrambled);
+    }
+
+    [Fact]
+    public void BootBinaryAnalyzerReportsOriginalStartupStub()
+    {
+        var data = CreateDreamcastStartupStubBinary();
+
+        var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, "1ST_READ.BIN", "test");
+
+        Assert.Equal("original", analysis.RecommendedLayout);
+        Assert.True(analysis.Original.HasDreamcastStartupStub);
+        Assert.Equal("0x8C010000", analysis.LoadAddressHex);
+    }
+
 
 
 
@@ -738,6 +773,33 @@ public class DreamcastMediaImageLoaderTests
         }
 
         return raw;
+    }
+
+    private static byte[] CreateDreamcastStartupStubBinary()
+    {
+        var data = new byte[256];
+        var words = new ushort[]
+        {
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0xD005,
+            0x6102,
+            0xD205,
+            0x2129,
+            0x9204,
+            0x212B
+        };
+
+        for (var index = 0; index < words.Length; index++)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(index * 2, 2), words[index]);
+        }
+
+        return data;
     }
 
     private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)

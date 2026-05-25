@@ -264,6 +264,34 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaAnalyzeBootCommandReportsStartupStub()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+        var descrambledPath = Path.Combine(mediaDirectory, "1ST_READ.descrambled.bin");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateDreamcastStartupStubBinary());
+
+            var result = RunCli(cli, repoRoot, "media", "analyze-boot", bootPath, "--out-descrambled", descrambledPath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Source kind: binary-file", result.StandardOutput);
+            Assert.Contains("Recommended layout: original", result.StandardOutput);
+            Assert.Contains("Dreamcast startup stub: True", result.StandardOutput);
+            Assert.True(File.Exists(descrambledPath));
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -397,6 +425,33 @@ public class DcSharpCliMediaLoadingIntegrationTests
         WriteDirectoryRecord(directory, offset, 21, (uint)bootData.Length, 0x00, System.Text.Encoding.ASCII.GetBytes($"{bootFile};1"));
         Array.Copy(bootData, 0, image, 21 * 2048, bootData.Length);
         return image;
+    }
+
+    private static byte[] CreateDreamcastStartupStubBinary()
+    {
+        var data = new byte[256];
+        var words = new ushort[]
+        {
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0x0009,
+            0xD005,
+            0x6102,
+            0xD205,
+            0x2129,
+            0x9204,
+            0x212B
+        };
+
+        for (var index = 0; index < words.Length; index++)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(index * 2, 2), words[index]);
+        }
+
+        return data;
     }
 
     private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)

@@ -31,6 +31,9 @@ try
         case "media" when args.Length >= 3 && args[1] == "extract-boot":
             ExtractBoot(args[2], args[3..]);
             return 0;
+        case "media" when args.Length >= 3 && args[1] == "analyze-boot":
+            AnalyzeBoot(args[2], args[3..]);
+            return 0;
         case "run" when args.Length >= 2:
             RunElf(args[1], args[2..]);
             return 0;
@@ -239,6 +242,97 @@ static void ExtractBoot(string path, string[] args)
             Console.WriteLine($"  {attempt}");
         }
     }
+}
+
+static void AnalyzeBoot(string path, string[] args)
+{
+    var emitJson = false;
+    var scanSectors = 1024;
+    string? descrambledOutputPath = null;
+    for (var index = 0; index < args.Length; index++)
+    {
+        switch (args[index])
+        {
+            case "--json":
+                emitJson = true;
+                break;
+            case "--out-descrambled" when index + 1 < args.Length:
+                descrambledOutputPath = args[index + 1];
+                index++;
+                break;
+            case "--scan-sectors" when index + 1 < args.Length && int.TryParse(args[index + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScanSectors):
+                scanSectors = parsedScanSectors;
+                index++;
+                break;
+            default:
+                throw new InvalidDataException($"Unknown or invalid media analyze-boot option: {args[index]}");
+        }
+    }
+
+    if (scanSectors < 0)
+    {
+        throw new InvalidDataException("--scan-sectors must be zero or greater.");
+    }
+
+    var (data, sourcePath, sourceKind) = ReadBootAnalysisInput(path, scanSectors);
+    var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, sourcePath, sourceKind);
+    if (!string.IsNullOrWhiteSpace(descrambledOutputPath))
+    {
+        var fullOutputPath = Path.GetFullPath(descrambledOutputPath);
+        var outputDirectory = Path.GetDirectoryName(fullOutputPath);
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        File.WriteAllBytes(fullOutputPath, DreamcastBootScrambler.Descramble(data));
+    }
+
+    if (emitJson)
+    {
+        Console.WriteLine(SerializeJson(analysis));
+        return;
+    }
+
+    Console.WriteLine($"Source: {analysis.SourcePath}");
+    Console.WriteLine($"Source kind: {analysis.SourceKind}");
+    Console.WriteLine($"Size: {analysis.Size}");
+    Console.WriteLine($"Load address: {analysis.LoadAddressHex}");
+    Console.WriteLine($"Recommended layout: {analysis.RecommendedLayout}");
+    PrintBootBinaryCandidate(analysis.Original);
+    PrintBootBinaryCandidate(analysis.Descrambled);
+    if (!string.IsNullOrWhiteSpace(descrambledOutputPath))
+    {
+        Console.WriteLine($"Descrambled output: {Path.GetFullPath(descrambledOutputPath)}");
+    }
+}
+
+static (byte[] Data, string SourcePath, string SourceKind) ReadBootAnalysisInput(string path, int scanSectors)
+{
+    if (IsMediaDescriptorPath(path))
+    {
+        var extraction = DreamcastBootExtractor.ExtractBootFile(path, scanSectors);
+        return (extraction.Data, extraction.SourcePath, "media-extracted");
+    }
+
+    var fullPath = Path.GetFullPath(path);
+    return (File.ReadAllBytes(fullPath), fullPath, "binary-file");
+}
+
+static bool IsMediaDescriptorPath(string path) =>
+    Path.GetExtension(path) is { } extension
+    && (string.Equals(extension, ".cue", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(extension, ".gdi", StringComparison.OrdinalIgnoreCase));
+
+static void PrintBootBinaryCandidate(DreamcastBootBinaryCandidate candidate)
+{
+    Console.WriteLine($"{candidate.Layout}:");
+    Console.WriteLine($"  ELF: {candidate.IsElf}");
+    Console.WriteLine($"  Dreamcast startup stub: {candidate.HasDreamcastStartupStub}");
+    Console.WriteLine($"  SH-4 opcode sample: {candidate.RecognizedOpcodeCount}/{candidate.TotalOpcodeCount} ({candidate.RecognizedOpcodeRatio:P1})");
+    Console.WriteLine($"  NOP/zero/fill opcodes: {candidate.NopCount}/{candidate.ZeroOpcodeCount}/{candidate.FillOpcodeCount}");
+    Console.WriteLine($"  First words: {candidate.FirstWordsHex}");
+    Console.WriteLine($"  First bytes: {candidate.FirstBytesHex}");
 }
 
 static void RunElf(string path, string[] args)
@@ -1080,6 +1174,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp media inspect <path-to-media> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
+    Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
