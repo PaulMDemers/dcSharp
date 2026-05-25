@@ -122,14 +122,29 @@ public static class DreamcastPvrPreviewRenderer
 
     private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
     {
-        var vertices = strip.Vertices.Take(3).ToArray();
-        if (vertices.Length < 3)
+        if (strip.Vertices.Count < 3)
         {
             return;
         }
 
-        var minX = vertices.Min(vertex => vertex.X);
-        var minY = vertices.Min(vertex => vertex.Y);
+        var minX = strip.Vertices.Min(vertex => vertex.X);
+        var minY = strip.Vertices.Min(vertex => vertex.Y);
+        for (var index = 0; index <= strip.Vertices.Count - 3; index++)
+        {
+            var vertices = strip.Vertices.Skip(index).Take(3).ToArray();
+            RenderTriangle(strip, vertices, minX, minY, vram, depthBuffer, useDepth);
+        }
+    }
+
+    private static void RenderTriangle(
+        DreamcastPvrTaStrip strip,
+        IReadOnlyList<DreamcastPvrTaVertex> vertices,
+        int minX,
+        int minY,
+        Span<byte> vram,
+        Span<float> depthBuffer,
+        bool useDepth)
+    {
         var a = new Vector2(vertices[0].X - minX, vertices[0].Y - minY);
         var b = new Vector2(vertices[1].X - minX, vertices[1].Y - minY);
         var c = new Vector2(vertices[2].X - minX, vertices[2].Y - minY);
@@ -138,12 +153,14 @@ public static class DreamcastPvrPreviewRenderer
             return;
         }
 
-        var maxX = (int)MathF.Max(a.X, MathF.Max(b.X, c.X));
-        var maxY = (int)MathF.Max(a.Y, MathF.Max(b.Y, c.Y));
+        var minPreviewX = Math.Clamp((int)MathF.Floor(MathF.Min(a.X, MathF.Min(b.X, c.X))), 0, Width - 1);
+        var minPreviewY = Math.Max((int)MathF.Floor(MathF.Min(a.Y, MathF.Min(b.Y, c.Y))), 0);
+        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(MathF.Max(a.X, MathF.Max(b.X, c.X))), 0, Width - 1);
+        var maxPreviewY = Math.Max((int)MathF.Ceiling(MathF.Max(a.Y, MathF.Max(b.Y, c.Y))), 0);
 
-        for (var y = 0; y <= maxY; y++)
+        for (var y = minPreviewY; y <= maxPreviewY; y++)
         {
-            for (var x = 0; x <= maxX; x++)
+            for (var x = minPreviewX; x <= maxPreviewX; x++)
             {
                 var point = new Vector2(x, y);
                 if (IsInsideTriangle(point, a, b, c))

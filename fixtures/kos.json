@@ -2300,6 +2300,125 @@
       }
     },
     {
+      "name": "pvr_strip_continuation",
+      "sample": "samples/kos/pvr_strip_continuation",
+      "artifact": "dcsharp_pvr_strip_continuation.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR strip continuation probe",
+        "vertices=4",
+        "argb=0xff00ff00",
+        "ta_init=0x80000000"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0x07E0"
+        },
+        {
+          "name": "pixel_2_2_320x240",
+          "rgb565": "0x07E0"
+        }
+      ],
+      "minPvrRegisterAccesses": 8,
+      "minPvrTaCommandWrites": 40,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaPolygonHeaderPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840000",
+          "mode1": "0x00000000",
+          "mode2": "0x00000000",
+          "mode3": "0x00000000",
+          "textureEnabled": false,
+          "minCount": 1
+        }
+      ],
+      "pvrTaRealVertexPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "argb": "0xFF00FF00",
+          "rgb565": "0x07E0",
+          "minCount": 4
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "xValue": "0x40400000",
+          "roundedX": 3,
+          "yValue": "0x40400000",
+          "roundedY": 3,
+          "endOfStrip": true,
+          "minCount": 1
+        }
+      ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minCommands": 1,
+          "minPolygonHeaders": 1,
+          "minVertices": 3,
+          "minVertexEndOfStrip": 1
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840000",
+          "mode1": "0x00000000",
+          "mode2": "0x00000000",
+          "mode3": "0x00000000",
+          "textureEnabled": false,
+          "rgb565": "0x07E0",
+          "minVertices": 4,
+          "vertices": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "x": 3,
+              "y": 1
+            },
+            {
+              "x": 1,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 3
+            }
+          ],
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "pvr_mixed_strip_sprite",
       "sample": "samples/kos/pvr_mixed_strip_sprite",
       "artifact": "dcsharp_pvr_mixed_strip_sprite.elf",
