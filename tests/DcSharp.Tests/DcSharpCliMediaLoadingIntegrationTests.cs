@@ -165,6 +165,40 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaInspectCommandReportsDreamcastBootSector()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var trackPath = Path.Combine(mediaDirectory, "track.bin");
+        var cuePath = Path.Combine(mediaDirectory, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, CreateCdSector(CreateBootSector("1ST_READ.BIN", "CLI MEDIA TEST")));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "track.bin" BINARY
+                  TRACK 03 MODE1/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = RunCli(cli, repoRoot, "media", "inspect", cuePath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Dreamcast boot sector: found", result.StandardOutput);
+            Assert.Contains("Boot file: 1ST_READ.BIN", result.StandardOutput);
+            Assert.Contains("Title: CLI MEDIA TEST", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -244,6 +278,40 @@ public class DcSharpCliMediaLoadingIntegrationTests
         value.Contains(' ') || value.Contains('"') || value.Contains('\'')
             ? $"\"{value.Replace("\"", "\\\"")}\""
             : value;
+
+    private static byte[] CreateCdSector(byte[] payload)
+    {
+        var sector = new byte[2352];
+        Array.Copy(payload, 0, sector, 16, payload.Length);
+        return sector;
+    }
+
+    private static byte[] CreateBootSector(string bootFile, string title)
+    {
+        var sector = new byte[2048];
+        WriteAscii(sector, 0x00, 0x10, "SEGA SEGAKATANA");
+        WriteAscii(sector, 0x10, 0x10, "SEGA ENTERPRISES");
+        WriteAscii(sector, 0x20, 0x10, "DCSH GD-ROM1/1");
+        WriteAscii(sector, 0x30, 0x08, "U");
+        WriteAscii(sector, 0x38, 0x08, "0799A10");
+        WriteAscii(sector, 0x40, 0x0A, "T0000N");
+        WriteAscii(sector, 0x4A, 0x06, "V1.000");
+        WriteAscii(sector, 0x50, 0x10, "20260525");
+        WriteAscii(sector, 0x60, 0x10, bootFile);
+        WriteAscii(sector, 0x70, 0x10, "DCSHARP");
+        WriteAscii(sector, 0x80, 0x80, title);
+        return sector;
+    }
+
+    private static void WriteAscii(byte[] data, int offset, int length, string text)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes(text);
+        Array.Copy(bytes, 0, data, offset, Math.Min(bytes.Length, length));
+        for (var index = bytes.Length; index < length; index++)
+        {
+            data[offset + index] = 0x20;
+        }
+    }
 
     private static string FindRepoRoot()
     {

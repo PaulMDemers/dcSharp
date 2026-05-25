@@ -181,6 +181,108 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void InspectFindsDreamcastBootSectorInRawCdData()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, CreateCdSector(CreateBootSector("1ST_READ.BIN", "TEST TITLE")));
+
+            var report = DreamcastMediaInspector.Inspect(path);
+
+            var boot = Assert.IsType<DreamcastBootSectorInfo>(report.BootSector);
+            Assert.Equal(0u, boot.Sector);
+            Assert.Equal("SEGA SEGAKATANA", boot.HardwareId);
+            Assert.Equal("1ST_READ.BIN", boot.BootFile);
+            Assert.Equal("TEST TITLE", boot.Title);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void InspectFindsDreamcastBootSectorAtGdiDataTrackStart()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var trackPath = Path.Combine(tempRoot, "track03.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, CreateCdSector(CreateBootSector("BOOT.BIN", "GDI TITLE")));
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                1
+                3 45000 4 2352 "{{Path.GetFileName(trackPath)}}" 0
+                """);
+
+            var report = DreamcastMediaInspector.Inspect(gdiPath);
+
+            var boot = Assert.IsType<DreamcastBootSectorInfo>(report.BootSector);
+            Assert.Equal(45000u, boot.Sector);
+            Assert.Equal("BOOT.BIN", boot.BootFile);
+            Assert.Equal("GDI TITLE", boot.Title);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void InspectReportsCueTrackLayout()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var audioPath = Path.Combine(tempRoot, "audio.bin");
+        var dataPath = Path.Combine(tempRoot, "data track.bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(audioPath, new byte[2352]);
+            File.WriteAllBytes(dataPath, CreateCdSector(CreateBootSector("1ST_READ.BIN", "CUE TITLE")));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "audio.bin" BINARY
+                  TRACK 01 AUDIO
+                    INDEX 01 00:00:00
+                FILE "data track.bin" BINARY
+                  TRACK 03 MODE1/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var report = DreamcastMediaInspector.Inspect(cuePath);
+
+            Assert.Collection(
+                report.CueTracks,
+                track =>
+                {
+                    Assert.Equal(1, track.TrackNumber);
+                    Assert.Equal("AUDIO", track.Type);
+                    Assert.False(track.IsData);
+                },
+                track =>
+                {
+                    Assert.Equal(3, track.TrackNumber);
+                    Assert.Equal("MODE1/2352", track.Type);
+                    Assert.True(track.IsData);
+                    Assert.Equal(dataPath, track.FilePath);
+                });
+            Assert.Equal("CUE TITLE", report.BootSector?.Title);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void LoadFromGdiMapsAbsoluteLbaFrom2352ByteDataTrack()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -374,6 +476,33 @@ public class DreamcastMediaImageLoaderTests
         var sector = new byte[2352];
         Array.Copy(payloadHeader, 0, sector, 16, payloadHeader.Length);
         return sector;
+    }
+
+    private static byte[] CreateBootSector(string bootFile, string title)
+    {
+        var sector = new byte[2048];
+        WriteAscii(sector, 0x00, 0x10, "SEGA SEGAKATANA");
+        WriteAscii(sector, 0x10, 0x10, "SEGA ENTERPRISES");
+        WriteAscii(sector, 0x20, 0x10, "DCSH GD-ROM1/1");
+        WriteAscii(sector, 0x30, 0x08, "U");
+        WriteAscii(sector, 0x38, 0x08, "0799A10");
+        WriteAscii(sector, 0x40, 0x0A, "T0000N");
+        WriteAscii(sector, 0x4A, 0x06, "V1.000");
+        WriteAscii(sector, 0x50, 0x10, "20260525");
+        WriteAscii(sector, 0x60, 0x10, bootFile);
+        WriteAscii(sector, 0x70, 0x10, "DCSHARP");
+        WriteAscii(sector, 0x80, 0x80, title);
+        return sector;
+    }
+
+    private static void WriteAscii(byte[] data, int offset, int length, string text)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes(text);
+        Array.Copy(bytes, 0, data, offset, Math.Min(bytes.Length, length));
+        for (var index = bytes.Length; index < length; index++)
+        {
+            data[offset + index] = 0x20;
+        }
     }
 
     private static byte[] Create2048Sector(byte[] payloadHeader)

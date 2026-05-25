@@ -25,6 +25,9 @@ try
         case "inspect" when args.Length == 2:
             InspectElf(args[1]);
             return 0;
+        case "media" when args.Length >= 3 && args[1] == "inspect":
+            InspectMedia(args[2], args[3..]);
+            return 0;
         case "run" when args.Length >= 2:
             RunElf(args[1], args[2..]);
             return 0;
@@ -61,6 +64,78 @@ static void InspectElf(string path)
     }
 
     Console.WriteLine("Dreamcast: yes, plausible SH-4/KallistiOS executable");
+}
+
+static void InspectMedia(string path, string[] args)
+{
+    var emitJson = false;
+    var scanSectors = 1024;
+    for (var index = 0; index < args.Length; index++)
+    {
+        switch (args[index])
+        {
+            case "--json":
+                emitJson = true;
+                break;
+            case "--scan-sectors" when index + 1 < args.Length && int.TryParse(args[index + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScanSectors):
+                scanSectors = parsedScanSectors;
+                index++;
+                break;
+            default:
+                throw new InvalidDataException($"Unknown or invalid media inspect option: {args[index]}");
+        }
+    }
+
+    if (scanSectors < 0)
+    {
+        throw new InvalidDataException("--scan-sectors must be zero or greater.");
+    }
+
+    var report = DreamcastMediaInspector.Inspect(path, scanSectors);
+    if (emitJson)
+    {
+        Console.WriteLine(SerializeJson(report));
+        return;
+    }
+
+    Console.WriteLine($"Path: {report.Path}");
+    Console.WriteLine($"Format: {report.Format}");
+    Console.WriteLine($"Sector size: {report.SectorSize}");
+    Console.WriteLine($"Sectors: {report.SectorCount}");
+    Console.WriteLine($"Leadout: {report.LeadoutFadHex}");
+    Console.WriteLine($"Tracks: {report.Tracks.Count}");
+    foreach (var track in report.Tracks)
+    {
+        Console.WriteLine($"  Track {track.TrackNumber}: start={track.StartFadHex}, control={track.Control}, sectors={track.SectorCount}");
+    }
+
+    if (report.CueTracks.Count > 0)
+    {
+        Console.WriteLine("CUE tracks:");
+        foreach (var track in report.CueTracks)
+        {
+            Console.WriteLine($"  Track {track.TrackNumber}: type={track.Type}, data={track.IsData}, file={track.FilePath}");
+        }
+    }
+
+    if (report.BootSector is not { } boot)
+    {
+        Console.WriteLine("Dreamcast boot sector: not found");
+        return;
+    }
+
+    Console.WriteLine($"Dreamcast boot sector: found at sector {boot.Sector} ({boot.SectorHex})");
+    Console.WriteLine($"  Hardware: {boot.HardwareId}");
+    Console.WriteLine($"  Maker: {boot.MakerId}");
+    Console.WriteLine($"  Device: {boot.DeviceInfo}");
+    Console.WriteLine($"  Area: {boot.AreaSymbols}");
+    Console.WriteLine($"  Peripherals: {boot.Peripherals}");
+    Console.WriteLine($"  Product: {boot.ProductNumber}");
+    Console.WriteLine($"  Version: {boot.Version}");
+    Console.WriteLine($"  Release: {boot.ReleaseDate}");
+    Console.WriteLine($"  Boot file: {boot.BootFile}");
+    Console.WriteLine($"  Software maker: {boot.SoftwareMaker}");
+    Console.WriteLine($"  Title: {boot.Title}");
 }
 
 static void RunElf(string path, string[] args)
@@ -900,6 +975,7 @@ static void PrintUsage()
 {
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
+    Console.WriteLine("  dcsharp media inspect <path-to-media> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");

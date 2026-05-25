@@ -116,6 +116,7 @@ dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --validate-on
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --filter input_idle
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
+dotnet run --project src/DcSharp.Cli -- media inspect path/to/disc.cue
 ```
 
 Useful run options:
@@ -132,6 +133,7 @@ Useful run options:
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
 - `--audio-wav artifacts/audio/probe.wav` writes a deterministic stereo PCM16 WAV from modeled AICA PCM16/PCM8 playback diagnostics plus Yamaha-style 4-bit ADPCM channel decode.
 - `--media path` accepts raw 2048-byte sector images, 2352-byte CD-sector dumps, simple CUE sheets, and GDI descriptors with local data tracks.
+- `media inspect path` loads raw/CUE/GDI media, reports synthesized GD-ROM geometry, lists CUE tracks when present, scans early candidate sectors for Dreamcast IP.BIN-style boot metadata, and prints fields such as area, product, version, boot file, software maker, and title. Use `--scan-sectors <count>` to widen or narrow the boot-sector scan and `--json` for structured output.
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.
