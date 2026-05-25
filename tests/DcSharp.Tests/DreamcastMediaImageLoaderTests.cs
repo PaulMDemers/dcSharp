@@ -150,6 +150,44 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void LoadFromCueUsesMode2PayloadOffset()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var trackPath = Path.Combine(tempRoot, "mode2.bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            var track = new byte[2352];
+            track[16] = 0x16;
+            track[24] = 0x24;
+            track[25] = 0x25;
+            File.WriteAllBytes(trackPath, track);
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(trackPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var media = DreamcastMediaImageLoader.LoadFromFile(cuePath);
+
+            Span<byte> sector = stackalloc byte[2048];
+            Assert.True(media.TryReadSector(0, sector, out var bytesRead));
+            Assert.Equal(2048, bytesRead);
+            Assert.Equal(0x24, sector[0]);
+            Assert.Equal(0x25, sector[1]);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+
+    [Fact]
     public void LoadFromCueWithoutDataTrackFails()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -319,6 +357,120 @@ public class DreamcastMediaImageLoaderTests
             Directory.Delete(tempRoot, recursive: true);
         }
     }
+
+    [Fact]
+    public void ExtractBootFileReadsIso9660BootBinary()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, CreateBootableIsoImage("1ST_READ.BIN", "BOOT DATA"u8.ToArray()));
+
+            var result = DreamcastBootExtractor.ExtractBootFile(path);
+
+            Assert.Equal("1ST_READ.BIN", result.BootSector.BootFile);
+            Assert.Equal("TEST ISO", result.VolumeIdentifier);
+            Assert.Equal("1ST_READ.BIN;1", result.File.Name);
+            Assert.Equal(21u, result.File.ExtentSector);
+            Assert.Equal("BOOT DATA"u8.ToArray(), result.Data);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ExtractBootFileMapsDreamcastAbsoluteIsoExtents()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(path, CreateBootableIsoImage("1ST_READ.BIN", "FAD BOOT"u8.ToArray(), extentBias: 45_000));
+
+            var result = DreamcastBootExtractor.ExtractBootFile(path);
+
+            Assert.Equal("1ST_READ.BIN", result.BootSector.BootFile);
+            Assert.Equal(21u, result.File.ExtentSector);
+            Assert.Equal("FAD BOOT"u8.ToArray(), result.Data);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ExtractBootFileContinuesAfterUnreadableAdjacentCandidate()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var cueDataPath = Path.Combine(tempRoot, "game.bin");
+        var shortTrackPath = Path.Combine(tempRoot, "game (Track 1).bin");
+        var usableTrackPath = Path.Combine(tempRoot, "game (Track 3).bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(shortTrackPath, ToCdSectors(CreateBootableIsoImage("1ST_READ.BIN", "BAD"u8.ToArray(), fileExtent: 200)));
+            File.WriteAllBytes(usableTrackPath, ToCdSectors(CreateBootableIsoImage("1ST_READ.BIN", "GOOD"u8.ToArray())));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = DreamcastBootExtractor.ExtractBootFile(cuePath);
+
+            Assert.Equal(usableTrackPath, result.SourcePath);
+            Assert.Equal("GOOD"u8.ToArray(), result.Data);
+            Assert.Contains(result.PriorAttempts, attempt => attempt.Contains("Failed to read ISO9660 sector", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ExtractBootFileCanUseCandidateMetadataWithPrimaryCueFilesystem()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var cueDataPath = Path.Combine(tempRoot, "game.bin");
+        var candidatePath = Path.Combine(tempRoot, "game (Track 3).bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            var primaryIso = CreateBootableIsoImage("1ST_READ.BIN", "PRIMARY"u8.ToArray());
+            Array.Clear(primaryIso, 0, 2048);
+            File.WriteAllBytes(cueDataPath, ToCdSectors(primaryIso, payloadOffset: 24));
+            File.WriteAllBytes(candidatePath, CreateCdSector(CreateBootSector("1ST_READ.BIN", "CANDIDATE")));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = DreamcastBootExtractor.ExtractBootFile(cuePath);
+
+            Assert.Equal(cuePath, result.SourcePath);
+            Assert.Equal("PRIMARY"u8.ToArray(), result.Data);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+
+
 
     [Fact]
     public void LoadFromGdiMapsAbsoluteLbaFrom2352ByteDataTrack()
@@ -548,5 +700,67 @@ public class DreamcastMediaImageLoaderTests
         var sector = new byte[2048];
         Array.Copy(payloadHeader, sector, payloadHeader.Length);
         return sector;
+    }
+
+    private static byte[] CreateBootableIsoImage(string bootFile, byte[] bootData, uint extentBias = 0, uint fileExtent = 21)
+    {
+        var image = new byte[2048 * 24];
+        Array.Copy(CreateBootSector(bootFile, "ISO BOOT TEST"), image, 2048);
+
+        var pvd = image.AsSpan(16 * 2048, 2048);
+        pvd[0] = 1;
+        System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(pvd[1..]);
+        pvd[6] = 1;
+        WriteAscii(image, (16 * 2048) + 40, 32, "TEST ISO");
+        WriteDirectoryRecord(pvd, 156, extentBias + 20, 2048, 0x02, [0]);
+
+        var directory = image.AsSpan(20 * 2048, 2048);
+        var offset = 0;
+        offset += WriteDirectoryRecord(directory, offset, extentBias + 20, 2048, 0x02, [0]);
+        offset += WriteDirectoryRecord(directory, offset, extentBias + 20, 2048, 0x02, [1]);
+        WriteDirectoryRecord(directory, offset, extentBias + fileExtent, (uint)bootData.Length, 0x00, System.Text.Encoding.ASCII.GetBytes($"{bootFile};1"));
+        var fileOffset = (long)fileExtent * 2048;
+        if (fileOffset + bootData.Length <= image.Length)
+        {
+            Array.Copy(bootData, 0, image, fileOffset, bootData.Length);
+        }
+
+        return image;
+    }
+
+    private static byte[] ToCdSectors(byte[] isoImage, int payloadOffset = 16)
+    {
+        var sectors = isoImage.Length / 2048;
+        var raw = new byte[sectors * 2352];
+        for (var sector = 0; sector < sectors; sector++)
+        {
+            Array.Copy(isoImage, sector * 2048, raw, (sector * 2352) + payloadOffset, 2048);
+        }
+
+        return raw;
+    }
+
+    private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)
+    {
+        var length = 33 + name.Length + (name.Length % 2 == 0 ? 1 : 0);
+        var record = destination.Slice(offset, length);
+        record.Clear();
+        record[0] = (byte)length;
+        WriteUInt32BothEndian(record, 2, extent);
+        WriteUInt32BothEndian(record, 10, dataLength);
+        record[25] = flags;
+        record[28] = 1;
+        record[29] = 0;
+        record[30] = 1;
+        record[31] = 0;
+        record[32] = (byte)name.Length;
+        name.CopyTo(record[33..]);
+        return length;
+    }
+
+    private static void WriteUInt32BothEndian(Span<byte> destination, int offset, uint value)
+    {
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(destination.Slice(offset + 4, 4), value);
     }
 }

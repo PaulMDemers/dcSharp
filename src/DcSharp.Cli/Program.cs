@@ -28,6 +28,9 @@ try
         case "media" when args.Length >= 3 && args[1] == "inspect":
             InspectMedia(args[2], args[3..]);
             return 0;
+        case "media" when args.Length >= 3 && args[1] == "extract-boot":
+            ExtractBoot(args[2], args[3..]);
+            return 0;
         case "run" when args.Length >= 2:
             RunElf(args[1], args[2..]);
             return 0;
@@ -153,6 +156,88 @@ static void PrintBootSectorCandidates(DreamcastMediaInspectionReport report)
         Console.WriteLine($"  {candidate.FilePath}: sector={boot.SectorHex}, byteOffset={candidate.ByteOffsetHex}, sourceSectorSize={candidate.SourceSectorSize}, payloadOffset={candidate.PayloadOffset}");
         Console.WriteLine($"    Boot file: {boot.BootFile}");
         Console.WriteLine($"    Title: {boot.Title}");
+    }
+}
+
+static void ExtractBoot(string path, string[] args)
+{
+    var emitJson = false;
+    var scanSectors = 1024;
+    string? outputPath = null;
+    for (var index = 0; index < args.Length; index++)
+    {
+        switch (args[index])
+        {
+            case "--json":
+                emitJson = true;
+                break;
+            case "--out" when index + 1 < args.Length:
+                outputPath = args[index + 1];
+                index++;
+                break;
+            case "--scan-sectors" when index + 1 < args.Length && int.TryParse(args[index + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScanSectors):
+                scanSectors = parsedScanSectors;
+                index++;
+                break;
+            default:
+                throw new InvalidDataException($"Unknown or invalid media extract-boot option: {args[index]}");
+        }
+    }
+
+    if (scanSectors < 0)
+    {
+        throw new InvalidDataException("--scan-sectors must be zero or greater.");
+    }
+
+    if (string.IsNullOrWhiteSpace(outputPath))
+    {
+        throw new InvalidDataException("media extract-boot requires --out <path>.");
+    }
+
+    var result = DreamcastBootExtractor.ExtractBootFile(path, scanSectors);
+    var fullOutputPath = Path.GetFullPath(outputPath);
+    var outputDirectory = Path.GetDirectoryName(fullOutputPath);
+    if (!string.IsNullOrEmpty(outputDirectory))
+    {
+        Directory.CreateDirectory(outputDirectory);
+    }
+
+    File.WriteAllBytes(fullOutputPath, result.Data);
+
+    var report = new BootExtractionCliReport(
+        result.MediaPath,
+        result.SourcePath,
+        fullOutputPath,
+        result.BootSector.BootFile,
+        result.BootSector.Title,
+        result.VolumeIdentifier,
+        result.File.ExtentSector,
+        $"0x{result.File.ExtentSector:X8}",
+        result.File.Length,
+        result.Data.Length,
+        result.PriorAttempts);
+
+    if (emitJson)
+    {
+        Console.WriteLine(SerializeJson(report));
+        return;
+    }
+
+    Console.WriteLine($"Media: {report.MediaPath}");
+    Console.WriteLine($"Source: {report.SourcePath}");
+    Console.WriteLine($"Volume: {report.VolumeIdentifier}");
+    Console.WriteLine($"Boot file: {report.BootFile}");
+    Console.WriteLine($"Title: {report.Title}");
+    Console.WriteLine($"Extent: {report.ExtentSector} ({report.ExtentSectorHex})");
+    Console.WriteLine($"Bytes: {report.BytesWritten}");
+    Console.WriteLine($"Output: {report.OutputPath}");
+    if (report.PriorAttempts.Count > 0)
+    {
+        Console.WriteLine("Earlier sources skipped:");
+        foreach (var attempt in report.PriorAttempts)
+        {
+            Console.WriteLine($"  {attempt}");
+        }
     }
 }
 
@@ -994,6 +1079,7 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  dcsharp inspect <file.elf>");
     Console.WriteLine("  dcsharp media inspect <path-to-media> [--scan-sectors count] [--json]");
+    Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -1037,6 +1123,19 @@ internal sealed record CliRunOptions(
     MemoryAccessKind? DeviceKind,
     AddressRange? DeviceAddressRange,
     string? DeviceDomain);
+
+internal sealed record BootExtractionCliReport(
+    string MediaPath,
+    string SourcePath,
+    string OutputPath,
+    string BootFile,
+    string Title,
+    string VolumeIdentifier,
+    uint ExtentSector,
+    string ExtentSectorHex,
+    uint FileLength,
+    int BytesWritten,
+    IReadOnlyList<string> PriorAttempts);
 
 internal sealed record AddressRange(uint Start, uint End)
 {

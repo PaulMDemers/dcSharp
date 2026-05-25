@@ -117,6 +117,7 @@ dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --filter input_idle
 dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 dotnet run --project src/DcSharp.Cli -- media inspect path/to/disc.cue
+dotnet run --project src/DcSharp.Cli -- media extract-boot path/to/disc.cue --out artifacts/retail/1ST_READ.BIN
 ```
 
 Useful run options:
@@ -134,6 +135,7 @@ Useful run options:
 - `--audio-wav artifacts/audio/probe.wav` writes a deterministic stereo PCM16 WAV from modeled AICA PCM16/PCM8 playback diagnostics plus Yamaha-style 4-bit ADPCM channel decode.
 - `--media path` accepts raw 2048-byte sector images, 2352-byte CD-sector dumps, simple CUE sheets, and GDI descriptors with local data tracks.
 - `media inspect path` loads raw/CUE/GDI media, reports synthesized GD-ROM geometry, lists CUE tracks when present, scans early candidate sectors for Dreamcast IP.BIN-style boot metadata, and prints fields such as area, product, version, boot file, software maker, and title. For CUE inputs it also scans adjacent `.bin` files in the same directory and reports boot-sector candidates, which helps diagnose dumps whose CUE points at a merged or incomplete file while numbered track files are also present. Use `--scan-sectors <count>` to widen or narrow the boot-sector scan and `--json` for structured output.
+- `media extract-boot path --out output.bin` inspects the media, finds the IP.BIN boot filename such as `1ST_READ.BIN`, opens the ISO9660 filesystem from the selected media or an adjacent CUE boot candidate, and writes the boot file to disk. Use `--json` for scriptable metadata including source path, ISO extent, title, volume identifier, and byte count.
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.

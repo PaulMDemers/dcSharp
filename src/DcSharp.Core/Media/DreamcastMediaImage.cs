@@ -43,6 +43,9 @@ public static class DreamcastMediaImageLoader
         TryLoadFromFile(path, DefaultSectorSize, out image, out error);
 
     public static bool TryLoadFromFile(string path, int sectorSize, out IDreamcastMediaImage? image, out string? error)
+        => TryLoadFromFile(path, sectorSize, rawCdPayloadOffset: null, out image, out error);
+
+    private static bool TryLoadFromFile(string path, int sectorSize, int? rawCdPayloadOffset, out IDreamcastMediaImage? image, out string? error)
     {
         image = null;
         error = null;
@@ -96,7 +99,7 @@ public static class DreamcastMediaImageLoader
         {
             if (sectorSize == DefaultSectorSize && data.Length % RawCdSectorSize == 0)
             {
-                image = new RawSectorFromCdImage(data);
+                image = new RawSectorFromCdImage(data, rawCdPayloadOffset ?? RawCdSectorPayloadOffset);
                 return true;
             }
 
@@ -133,6 +136,7 @@ public static class DreamcastMediaImageLoader
 
         string? activeFile = null;
         string? selectedMediaPath = null;
+        string? selectedTrackType = null;
         var fileRegex = new Regex("^FILE\\s+\"(?<path>[^\"]+)\"\\s+(?<type>\\w+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         var trackRegex = new Regex("^TRACK\\s+\\d+\\s+(?<type>\\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         var cueDir = Path.GetFullPath(directory);
@@ -163,6 +167,7 @@ public static class DreamcastMediaImageLoader
                 trackType.StartsWith("MODE2", StringComparison.OrdinalIgnoreCase))
             {
                 selectedMediaPath = activeFile;
+                selectedTrackType = trackType;
             }
         }
 
@@ -172,8 +177,13 @@ public static class DreamcastMediaImageLoader
             return false;
         }
 
-        return TryLoadFromFile(selectedMediaPath, sectorSize, out image, out error);
+        return TryLoadFromFile(selectedMediaPath, sectorSize, CuePayloadOffset(selectedTrackType), out image, out error);
     }
+
+    private static int? CuePayloadOffset(string? trackType) =>
+        trackType is not null && trackType.StartsWith("MODE2/2352", StringComparison.OrdinalIgnoreCase)
+            ? 24
+            : null;
 
     private static bool TryLoadFromGdi(string gdiPath, out IDreamcastMediaImage? image, out string? error)
     {
@@ -326,12 +336,11 @@ public sealed class RawSectorMediaImage : IDreamcastMediaImage
     }
 }
 
-public sealed class RawSectorFromCdImage(byte[] data) : IDreamcastMediaImage
+public sealed class RawSectorFromCdImage(byte[] data, int payloadOffset = 16) : IDreamcastMediaImage
 {
     private const uint DefaultDataTrackStartFad = 45_000;
     private const int UserDataBytes = 2048;
     private const int CdSectorSize = 2352;
-    private const int CdSectorPayloadOffset = 16;
 
     public int SectorSize => UserDataBytes;
     public ulong SectorCount => (ulong)data.Length / CdSectorSize;
@@ -346,7 +355,7 @@ public sealed class RawSectorFromCdImage(byte[] data) : IDreamcastMediaImage
             return false;
         }
 
-        var sourceOffset = ((long)sector * CdSectorSize) + CdSectorPayloadOffset;
+        var sourceOffset = ((long)sector * CdSectorSize) + payloadOffset;
         if (sourceOffset < 0 || sourceOffset + UserDataBytes > data.Length)
         {
             return false;

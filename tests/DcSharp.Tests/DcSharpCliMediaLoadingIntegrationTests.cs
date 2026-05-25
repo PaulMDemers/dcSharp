@@ -237,6 +237,33 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaExtractBootCommandWritesBootFile()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var mediaPath = Path.Combine(mediaDirectory, "game.bin");
+        var outputPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(mediaPath, CreateBootableIsoImage("1ST_READ.BIN", "CLI BOOT"u8.ToArray()));
+
+            var result = RunCli(cli, repoRoot, "media", "extract-boot", mediaPath, "--out", outputPath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Boot file: 1ST_READ.BIN", result.StandardOutput);
+            Assert.Contains($"Output: {outputPath}", result.StandardOutput);
+            Assert.Equal("CLI BOOT"u8.ToArray(), File.ReadAllBytes(outputPath));
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -349,6 +376,51 @@ public class DcSharpCliMediaLoadingIntegrationTests
         {
             data[offset + index] = 0x20;
         }
+    }
+
+    private static byte[] CreateBootableIsoImage(string bootFile, byte[] bootData)
+    {
+        var image = new byte[2048 * 24];
+        Array.Copy(CreateBootSector(bootFile, "CLI ISO TEST"), image, 2048);
+
+        var pvd = image.AsSpan(16 * 2048, 2048);
+        pvd[0] = 1;
+        System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(pvd[1..]);
+        pvd[6] = 1;
+        WriteAscii(image, (16 * 2048) + 40, 32, "CLI TEST ISO");
+        WriteDirectoryRecord(pvd, 156, 20, 2048, 0x02, [0]);
+
+        var directory = image.AsSpan(20 * 2048, 2048);
+        var offset = 0;
+        offset += WriteDirectoryRecord(directory, offset, 20, 2048, 0x02, [0]);
+        offset += WriteDirectoryRecord(directory, offset, 20, 2048, 0x02, [1]);
+        WriteDirectoryRecord(directory, offset, 21, (uint)bootData.Length, 0x00, System.Text.Encoding.ASCII.GetBytes($"{bootFile};1"));
+        Array.Copy(bootData, 0, image, 21 * 2048, bootData.Length);
+        return image;
+    }
+
+    private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)
+    {
+        var length = 33 + name.Length + (name.Length % 2 == 0 ? 1 : 0);
+        var record = destination.Slice(offset, length);
+        record.Clear();
+        record[0] = (byte)length;
+        WriteUInt32BothEndian(record, 2, extent);
+        WriteUInt32BothEndian(record, 10, dataLength);
+        record[25] = flags;
+        record[28] = 1;
+        record[29] = 0;
+        record[30] = 1;
+        record[31] = 0;
+        record[32] = (byte)name.Length;
+        name.CopyTo(record[33..]);
+        return length;
+    }
+
+    private static void WriteUInt32BothEndian(Span<byte> destination, int offset, uint value)
+    {
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(destination.Slice(offset + 4, 4), value);
     }
 
     private static string FindRepoRoot()
