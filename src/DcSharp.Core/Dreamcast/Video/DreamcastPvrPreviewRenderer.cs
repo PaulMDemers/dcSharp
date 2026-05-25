@@ -48,6 +48,12 @@ public static class DreamcastPvrPreviewRenderer
 
                 var pixelIndex = PreviewPixelIndex(x, y);
                 var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
+                if (IsPunchThrough(sprite)
+                    && SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex) < 128)
+                {
+                    continue;
+                }
+
                 if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
                 {
                     source = source with
@@ -148,8 +154,10 @@ public static class DreamcastPvrPreviewRenderer
                         continue;
                     }
 
-                    WritePreviewPixel(strip, vertices, point, a, b, c, vram, pixelIndex);
-                    WriteDepth(strip, vertices, pixelIndex, depthBuffer, useDepth);
+                    if (WritePreviewPixel(strip, vertices, point, a, b, c, vram, pixelIndex))
+                    {
+                        WriteDepth(strip, vertices, pixelIndex, depthBuffer, useDepth);
+                    }
                 }
             }
         }
@@ -249,7 +257,7 @@ public static class DreamcastPvrPreviewRenderer
     private static int PreviewPixelIndex(int x, int y) =>
         (y * Width) + x;
 
-    private static void WritePreviewPixel(
+    private static bool WritePreviewPixel(
         DreamcastPvrTaStrip strip,
         IReadOnlyList<DreamcastPvrTaVertex> vertices,
         Vector2 point,
@@ -261,6 +269,11 @@ public static class DreamcastPvrPreviewRenderer
     {
         var source = SourceSample(strip, vertices, point, a, b, c, vram);
         var mode2 = strip.HeaderPayload?.Mode2Fields;
+        if (IsPunchThrough(strip) && SourceAlpha(vertices, source.Alpha, source.AlphaMultipliesVertex) < 128)
+        {
+            return false;
+        }
+
         if (mode2?.AlphaEnabled == true)
         {
             source = source with
@@ -275,7 +288,14 @@ public static class DreamcastPvrPreviewRenderer
         }
 
         WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
+        return true;
     }
+
+    private static bool IsPunchThrough(DreamcastPvrTaStrip strip) =>
+        string.Equals(strip.ListTypeName, "PunchThroughPolygon", StringComparison.Ordinal);
+
+    private static bool IsPunchThrough(DreamcastPvrTaSprite sprite) =>
+        string.Equals(sprite.ListTypeName, "PunchThroughPolygon", StringComparison.Ordinal);
 
     private static DreamcastPvrPreviewSourceSample SourceSample(
         DreamcastPvrTaStrip strip,

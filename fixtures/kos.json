@@ -4291,6 +4291,168 @@
       }
     },
     {
+      "name": "pvr_list_types",
+      "sample": "samples/kos/pvr_list_types",
+      "artifact": "dcsharp_pvr_list_types.elf",
+      "instructions": 70000000,
+      "traceTail": 8,
+      "expectedStopReason": "ProgramExit",
+      "serialContains": [
+        "dcSharp PVR list types probe",
+        "opaque=0x80840000",
+        "translucent=0x82840000",
+        "punch=0x84840000",
+        "blend_mode2=0x94100000",
+        "ta_init=0x80000000"
+      ],
+      "requireVideoNonZero": true,
+      "videoSamples": [
+        {
+          "name": "origin",
+          "rgb565": "0x800F"
+        },
+        {
+          "name": "pixel_1_0",
+          "rgb565": "0x800F"
+        },
+        {
+          "name": "pixel_0_1_320x240",
+          "rgb565": "0x800F"
+        },
+        {
+          "name": "pixel_1_1_320x240",
+          "rgb565": "0x0000"
+        }
+      ],
+      "minPvrRegisterAccesses": 8,
+      "minPvrTaCommandWrites": 128,
+      "pvrRegisters": {
+        "PVR_TA_OPB_START": "0x00100000",
+        "PVR_TA_VERTBUF_START": "0x00200000",
+        "PVR_TA_OPB_END": "0x00101000",
+        "PVR_TA_VERTBUF_END": "0x00201000",
+        "PVR_TA_INIT": "0x80000000"
+      },
+      "pvrTaPolygonHeaderPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840000",
+          "mode2": "0x00000000",
+          "alphaEnabled": false,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "headerValue": "0x84840000",
+          "mode2": "0x00000000",
+          "alphaEnabled": false,
+          "minCount": 2
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "TranslucentPolygon",
+          "headerValue": "0x82840000",
+          "mode2": "0x94100000",
+          "blendSrcName": "SrcAlpha",
+          "blendDstName": "InverseSrcAlpha",
+          "alphaEnabled": true,
+          "minCount": 1
+        }
+      ],
+      "pvrTaRealVertexPayloads": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "argb": "0xFF00FF00",
+          "rgb565": "0x07E0",
+          "minCount": 3
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "argb": "0x00FF0000",
+          "rgb565": "0xF800",
+          "minCount": 3
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "argb": "0xFF0000FF",
+          "rgb565": "0x001F",
+          "minCount": 3
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "TranslucentPolygon",
+          "argb": "0x80FF0000",
+          "rgb565": "0xF800",
+          "minCount": 3
+        }
+      ],
+      "pvrTaLists": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "minPolygonHeaders": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "minPolygonHeaders": 2
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "TranslucentPolygon",
+          "minPolygonHeaders": 1
+        }
+      ],
+      "pvrTaStrips": [
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "OpaquePolygon",
+          "headerValue": "0x80840000",
+          "mode2": "0x00000000",
+          "rgb565": "0x07E0",
+          "minVertices": 3,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "headerValue": "0x84840000",
+          "rgb565": "0xF800",
+          "minVertices": 3,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "PunchThroughPolygon",
+          "headerValue": "0x84840000",
+          "rgb565": "0x001F",
+          "minVertices": 3,
+          "minCount": 1
+        },
+        {
+          "region": "TA_INPUT",
+          "listTypeName": "TranslucentPolygon",
+          "headerValue": "0x82840000",
+          "mode2": "0x94100000",
+          "blendSrcName": "SrcAlpha",
+          "blendDstName": "InverseSrcAlpha",
+          "alphaEnabled": true,
+          "rgb565": "0xF800",
+          "minVertices": 3,
+          "minCount": 1
+        }
+      ],
+      "minDeviceAccessDomains": {
+        "pvr": 1,
+        "scif": 1
+      }
+    },
+    {
       "name": "pvr_texture_alpha_argb4444",
       "sample": "samples/kos/pvr_texture_alpha_argb4444",
       "artifact": "dcsharp_pvr_texture_alpha_argb4444.elf",

@@ -97,6 +97,38 @@ public class DreamcastPvrTaStreamDecoderTests
         Assert.Equal(0x0102_0304u, vertex.OffsetArgb);
     }
 
+    [Theory]
+    [InlineData(0x8284_0000u, "TranslucentPolygon")]
+    [InlineData(0x8484_0000u, "PunchThroughPolygon")]
+    public void DecodesRealVertexPayloadsAfterRenderableListHeaders(uint headerValue, string listTypeName)
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", headerValue),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xE000_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xFFFF_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000)
+        };
+
+        var vertex = Assert.Single(DreamcastPvrTaRealVertexPayloadDecoder.Decode(writes));
+
+        Assert.Equal(listTypeName, vertex.ListTypeName);
+        Assert.Equal(0xFFFF_0000u, vertex.Argb);
+        Assert.Equal(0xF800, vertex.Rgb565);
+    }
+
     [Fact]
     public void IgnoresDiagnosticVertexShortcutsForRealVertexPayloads()
     {

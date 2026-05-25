@@ -3,7 +3,7 @@ namespace DcSharp.Core.Dreamcast.Video;
 public sealed class DreamcastPvrTaState
 {
     private const int ParameterHeaderPayloadWords = DreamcastPvrTaPolygonHeaderPayloadDecoder.PayloadWordCount;
-    private bool inRenderableOpaqueList;
+    private bool inRenderableList;
     private bool awaitingHeaderPayloadOrShortcut;
     private bool awaitingSpriteVertex;
     private bool inRealStream;
@@ -70,7 +70,7 @@ public sealed class DreamcastPvrTaState
 
         if (awaitingSpriteVertex)
         {
-            if (IsOpaqueInput(write) && IsVertexControl(write) && currentHeader is not null && currentSpriteHeaderPayload is not null)
+            if (IsTaInput(write) && IsVertexControl(write) && currentHeader is not null && currentSpriteHeaderPayload is not null)
             {
                 awaitingSpriteVertex = false;
                 spritePacketDecoder.Begin(
@@ -85,20 +85,20 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (IsOpaqueInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
+        if (IsRenderableInput(write) && string.Equals(write.Kind, "PolygonHeader", StringComparison.Ordinal))
         {
             ResetStrip();
-            inRenderableOpaqueList = true;
+            inRenderableList = true;
             currentHeader = write;
             currentHeaderValue = write.Value;
             awaitingHeaderPayloadOrShortcut = true;
             return null;
         }
 
-        if (IsOpaqueInput(write) && string.Equals(write.Kind, "SpriteHeader", StringComparison.Ordinal))
+        if (IsRenderableInput(write) && string.Equals(write.Kind, "SpriteHeader", StringComparison.Ordinal))
         {
             ResetStrip();
-            inRenderableOpaqueList = true;
+            inRenderableList = true;
             inRealStream = true;
             currentHeader = write;
             currentHeaderValue = write.Value;
@@ -106,12 +106,12 @@ public sealed class DreamcastPvrTaState
             return null;
         }
 
-        if (!inRenderableOpaqueList)
+        if (!inRenderableList)
         {
             return null;
         }
 
-        if (IsOpaqueInput(write) && IsVertexControl(write))
+        if (IsTaInput(write) && IsVertexControl(write))
         {
             var endOfStrip = string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
             if (inRealStream)
@@ -194,9 +194,9 @@ public sealed class DreamcastPvrTaState
         var stripColor = currentVertices[0].Rgb565;
         var strip = canRender
             ? new DreamcastPvrTaStrip(
-                write.Region,
-                write.ListType,
-                write.ListTypeName,
+                currentHeader?.Region ?? write.Region,
+                currentHeader?.ListType ?? write.ListType,
+                currentHeader?.ListTypeName ?? write.ListTypeName,
                 currentHeaderValue,
                 $"0x{currentHeaderValue:X8}",
                 currentHeaderPayload,
@@ -234,9 +234,12 @@ public sealed class DreamcastPvrTaState
         string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
         || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
 
-    private static bool IsOpaqueInput(DreamcastPvrTaCommandWrite write) =>
-        string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
-        && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
+    private static bool IsTaInput(DreamcastPvrTaCommandWrite write) =>
+        string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal);
+
+    private static bool IsRenderableInput(DreamcastPvrTaCommandWrite write) =>
+        IsTaInput(write)
+        && write.ListTypeName is "OpaquePolygon" or "TranslucentPolygon" or "PunchThroughPolygon";
 
     private static bool IsGouraudHeader(uint value) =>
         (value & 0x0000_0002u) != 0;

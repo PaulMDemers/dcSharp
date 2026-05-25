@@ -181,6 +181,50 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void CompletesTranslucentRealPvrVertexStripWithHeaderListType()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8284_0000, 2, "TranslucentPolygon")));
+        for (var index = 0; index < 7; index++)
+        {
+            Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        }
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0x80FF_0000));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0x80FF_0000));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0x80FF_0000);
+
+        Assert.NotNull(render);
+        var strip = Assert.Single(state.CompletedStrips);
+        Assert.Equal(2, strip.ListType);
+        Assert.Equal("TranslucentPolygon", strip.ListTypeName);
+        Assert.Equal("0x82840000", strip.HeaderValueHex);
+    }
+
+    [Fact]
+    public void CompletesPunchThroughRealPvrVertexStripWithHeaderListType()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8484_0000, 4, "PunchThroughPolygon")));
+        for (var index = 0; index < 7; index++)
+        {
+            Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        }
+
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x3F80_0000, 0x3F80_0000, 0xFFFF_0000));
+        Assert.Null(AcceptRealVertexPacket(state, "Vertex", 0x4000_0000, 0x3F80_0000, 0xFFFF_0000));
+        var render = AcceptRealVertexPacket(state, "VertexEndOfStrip", 0x3F80_0000, 0x4000_0000, 0xFFFF_0000);
+
+        Assert.NotNull(render);
+        var strip = Assert.Single(state.CompletedStrips);
+        Assert.Equal(4, strip.ListType);
+        Assert.Equal("PunchThroughPolygon", strip.ListTypeName);
+        Assert.Equal("0x84840000", strip.HeaderValueHex);
+    }
+
+    [Fact]
     public void IgnoresIncompleteOrMismatchedStrips()
     {
         var state = new DreamcastPvrTaState();
@@ -293,14 +337,14 @@ public class DreamcastPvrTaStateTests
         return state.Accept(CreateWrite("Unknown", 0));
     }
 
-    private static DreamcastPvrTaCommandWrite CreateWrite(string kind, uint value) =>
+    private static DreamcastPvrTaCommandWrite CreateWrite(string kind, uint value, int listType = 0, string listTypeName = "OpaquePolygon") =>
         new(
             0x1000_0000,
             "0x10000000",
             "TA_INPUT",
             kind,
-            0,
-            "OpaquePolygon",
+            listType,
+            listTypeName,
             (value & 0x1000_0000) != 0,
             4,
             value,

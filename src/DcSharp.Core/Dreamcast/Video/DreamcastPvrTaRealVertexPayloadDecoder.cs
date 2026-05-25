@@ -13,7 +13,7 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
         var decoded = new List<DreamcastPvrTaRealVertexPayload>();
         PendingPolygonHeader? pendingHeader = null;
         PendingVertex? pendingVertex = null;
-        var inRealPolygonStream = false;
+        DreamcastPvrTaCommandWrite? activePolygonHeader = null;
 
         foreach (var write in stream)
         {
@@ -23,14 +23,14 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
                 if (string.Equals(write.ControlKind, "PolygonHeader", StringComparison.Ordinal))
                 {
                     pendingHeader = new PendingPolygonHeader(write.Write);
-                    inRealPolygonStream = false;
+                    activePolygonHeader = null;
                     continue;
                 }
 
                 pendingHeader = null;
-                if (inRealPolygonStream && IsVertexControl(write.Write))
+                if (activePolygonHeader is not null && IsVertexControl(write.Write))
                 {
-                    pendingVertex = new PendingVertex(write.Write);
+                    pendingVertex = new PendingVertex(activePolygonHeader, write.Write);
                 }
 
                 continue;
@@ -41,14 +41,14 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
                 if (headerIndex == 0 && IsVertexControl(write.Write))
                 {
                     pendingHeader = null;
-                    inRealPolygonStream = false;
+                    activePolygonHeader = null;
                     continue;
                 }
 
                 pendingHeader.PayloadWordsSeen++;
                 if (pendingHeader.PayloadWordsSeen == PolygonHeaderPayloadWords)
                 {
-                    inRealPolygonStream = IsOpaqueInput(pendingHeader.Header);
+                    activePolygonHeader = IsRenderableInput(pendingHeader.Header) ? pendingHeader.Header : null;
                     pendingHeader = null;
                 }
 
@@ -79,9 +79,9 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
         var v = BitConverter.UInt32BitsToSingle(pending.Words[4]);
         var color = Argb8888ToRgb565(pending.Words[5]);
         return new DreamcastPvrTaRealVertexPayload(
-            pending.Control.Region,
-            pending.Control.ListType,
-            pending.Control.ListTypeName,
+            pending.Header.Region,
+            pending.Header.ListType,
+            pending.Header.ListTypeName,
             pending.Control.Value,
             pending.Control.ValueHex,
             pending.Control.EndOfStrip,
@@ -114,9 +114,9 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
         string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
         || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
 
-    private static bool IsOpaqueInput(DreamcastPvrTaCommandWrite write) =>
+    private static bool IsRenderableInput(DreamcastPvrTaCommandWrite write) =>
         string.Equals(write.Region, "TA_INPUT", StringComparison.Ordinal)
-        && string.Equals(write.ListTypeName, "OpaquePolygon", StringComparison.Ordinal);
+        && write.ListTypeName is "OpaquePolygon" or "TranslucentPolygon" or "PunchThroughPolygon";
 
     private static ushort Argb8888ToRgb565(uint value)
     {
@@ -133,7 +133,7 @@ public static class DreamcastPvrTaRealVertexPayloadDecoder
         public int PayloadWordsSeen { get; set; }
     }
 
-    private sealed record PendingVertex(DreamcastPvrTaCommandWrite Control)
+    private sealed record PendingVertex(DreamcastPvrTaCommandWrite Header, DreamcastPvrTaCommandWrite Control)
     {
         public uint[] Words { get; } = new uint[VertexPayloadWords];
         public bool[] WordSeen { get; } = new bool[VertexPayloadWords];

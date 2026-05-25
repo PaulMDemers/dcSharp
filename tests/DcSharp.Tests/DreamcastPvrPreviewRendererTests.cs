@@ -174,6 +174,61 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void TranslucentListBlendsOverOpaquePreviewPixels()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], argb: 0xFF00_FF00), vram);
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xF800,
+                [(1, 1), (2, 1), (1, 2)],
+                listType: 2,
+                listTypeName: "TranslucentPolygon",
+                headerValue: 0x8284_0000,
+                argb: 0x80FF_0000,
+                alphaEnabled: true,
+                blendSrc: "SrcAlpha",
+                blendDst: "InverseSrcAlpha"),
+            vram);
+
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
+    public void PunchThroughListDiscardsLowAlphaPreviewPixels()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0x07E0, [(1, 1), (2, 1), (1, 2)], argb: 0xFF00_FF00), vram);
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0xF800,
+                [(1, 1), (2, 1), (1, 2)],
+                listType: 4,
+                listTypeName: "PunchThroughPolygon",
+                headerValue: 0x8484_0000,
+                argb: 0x00FF_0000),
+            vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+
+        DreamcastPvrPreviewRenderer.RenderStrip(
+            CreateStrip(
+                0x001F,
+                [(1, 1), (2, 1), (1, 2)],
+                listType: 4,
+                listTypeName: "PunchThroughPolygon",
+                headerValue: 0x8484_0000,
+                argb: 0xFF00_00FF),
+            vram);
+
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 0));
+    }
+
+    [Fact]
     public void InterpolatesGouraudVertexColors()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
@@ -796,14 +851,17 @@ public class DreamcastPvrPreviewRendererTests
         uint textureBase = 0,
         IReadOnlyList<(float U, float V)>? uvs = null,
         bool gouraud = false,
-        IReadOnlyList<ushort>? vertexColors = null) =>
+        IReadOnlyList<ushort>? vertexColors = null,
+        int listType = 0,
+        string listTypeName = "OpaquePolygon",
+        uint? headerValue = null) =>
         new(
             "TA_INPUT",
-            0,
-            "OpaquePolygon",
-            gouraud ? 0x8084_0002u : 0x8084_0000u,
-            gouraud ? "0x80840002" : "0x80840000",
-            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, textureUSize, textureVSize, pixelFormat, textureBase),
+            listType,
+            listTypeName,
+            headerValue ?? (gouraud ? 0x8084_0002u : 0x8084_0000u),
+            $"0x{headerValue ?? (gouraud ? 0x8084_0002u : 0x8084_0000u):X8}",
+            CreateHeaderPayload(culling, depthCompare, depthWriteDisabled, alphaEnabled, blendSrc, blendDst, textureEnabled, nonTwiddled, uClamp, vClamp, uFlip, vFlip, textureAlphaDisabled, textureShading, filterMode, textureUSize, textureVSize, pixelFormat, textureBase, listType, listTypeName, headerValue ?? 0x8084_0000u),
             color,
             $"0x{color:X4}",
             points.Select((point, index) => new DreamcastPvrTaVertex(
@@ -920,7 +978,10 @@ public class DreamcastPvrPreviewRendererTests
         uint textureUSize,
         uint textureVSize,
         uint pixelFormat,
-        uint textureBase)
+        uint textureBase,
+        int listType,
+        string listTypeName,
+        uint headerValue)
     {
         if (culling is null && depthCompare is null && !depthWriteDisabled && !alphaEnabled && !textureEnabled)
         {
@@ -969,12 +1030,12 @@ public class DreamcastPvrPreviewRendererTests
             "0x10000000",
             "TA_INPUT",
             "PolygonHeader",
-            0,
-            "OpaquePolygon",
+            listType,
+            listTypeName,
             false,
             4,
-            0x8084_0000,
-            "0x80840000");
+            headerValue,
+            $"0x{headerValue:X8}");
         return DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, [mode1, mode2, mode3, 0, 0, 0, 0]);
     }
 
