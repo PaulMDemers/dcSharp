@@ -121,6 +121,7 @@ static void InspectMedia(string path, string[] args)
     if (report.BootSector is not { } boot)
     {
         Console.WriteLine("Dreamcast boot sector: not found");
+        PrintBootSectorCandidates(report);
         return;
     }
 
@@ -136,6 +137,23 @@ static void InspectMedia(string path, string[] args)
     Console.WriteLine($"  Boot file: {boot.BootFile}");
     Console.WriteLine($"  Software maker: {boot.SoftwareMaker}");
     Console.WriteLine($"  Title: {boot.Title}");
+}
+
+static void PrintBootSectorCandidates(DreamcastMediaInspectionReport report)
+{
+    if (report.BootSectorCandidates.Count == 0)
+    {
+        return;
+    }
+
+    Console.WriteLine("CUE directory boot candidates:");
+    foreach (var candidate in report.BootSectorCandidates)
+    {
+        var boot = candidate.BootSector;
+        Console.WriteLine($"  {candidate.FilePath}: sector={boot.SectorHex}, byteOffset={candidate.ByteOffsetHex}, sourceSectorSize={candidate.SourceSectorSize}, payloadOffset={candidate.PayloadOffset}");
+        Console.WriteLine($"    Boot file: {boot.BootFile}");
+        Console.WriteLine($"    Title: {boot.Title}");
+    }
 }
 
 static void RunElf(string path, string[] args)

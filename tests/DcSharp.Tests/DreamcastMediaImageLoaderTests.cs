@@ -283,6 +283,44 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void InspectReportsCueDirectoryBootCandidates()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var cueDataPath = Path.Combine(tempRoot, "game.bin");
+        var track3Path = Path.Combine(tempRoot, "game (Track 3).bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(track3Path, CreateCdSector(CreateBootSector("1ST_READ.BIN", "ADJACENT TITLE")));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var report = DreamcastMediaInspector.Inspect(cuePath);
+
+            Assert.Null(report.BootSector);
+            var candidate = Assert.Single(report.BootSectorCandidates);
+            Assert.Equal(track3Path, candidate.FilePath);
+            Assert.Equal(2352, candidate.SourceSectorSize);
+            Assert.Equal(16, candidate.PayloadOffset);
+            Assert.Equal(16, candidate.ByteOffset);
+            Assert.Equal("1ST_READ.BIN", candidate.BootSector.BootFile);
+            Assert.Equal("ADJACENT TITLE", candidate.BootSector.Title);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void LoadFromGdiMapsAbsoluteLbaFrom2352ByteDataTrack()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

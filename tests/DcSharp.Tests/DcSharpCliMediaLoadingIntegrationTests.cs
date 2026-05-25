@@ -199,6 +199,44 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaInspectCommandReportsCueDirectoryBootCandidates()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var cueDataPath = Path.Combine(mediaDirectory, "game.bin");
+        var track3Path = Path.Combine(mediaDirectory, "game (Track 3).bin");
+        var cuePath = Path.Combine(mediaDirectory, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(track3Path, CreateCdSector(CreateBootSector("1ST_READ.BIN", "CLI CANDIDATE")));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = RunCli(cli, repoRoot, "media", "inspect", cuePath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Dreamcast boot sector: not found", result.StandardOutput);
+            Assert.Contains("CUE directory boot candidates:", result.StandardOutput);
+            Assert.Contains(track3Path, result.StandardOutput);
+            Assert.Contains("Boot file: 1ST_READ.BIN", result.StandardOutput);
+            Assert.Contains("Title: CLI CANDIDATE", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();

@@ -7,6 +7,9 @@ public static class DreamcastMediaInspector
 {
     private const string DreamcastHardwareId = "SEGA SEGAKATANA";
     private const int DefaultBootScanSectors = 1024;
+    private const int RawCdSectorSize = 2352;
+    private const int RawCdSectorPayloadOffset = 16;
+    private const int UserDataSectorSize = 2048;
 
     public static DreamcastMediaInspectionReport Inspect(string path, int bootScanSectors = DefaultBootScanSectors)
     {
@@ -17,9 +20,11 @@ public static class DreamcastMediaInspector
 
         var fullPath = Path.GetFullPath(path);
         var image = DreamcastMediaImageLoader.LoadFromFile(fullPath);
-        var cueTracks = string.Equals(Path.GetExtension(fullPath), ".cue", StringComparison.OrdinalIgnoreCase)
+        var isCue = string.Equals(Path.GetExtension(fullPath), ".cue", StringComparison.OrdinalIgnoreCase);
+        var cueTracks = isCue
             ? ParseCueTracks(fullPath)
             : [];
+        var bootSector = FindBootSector(image, bootScanSectors);
         return new DreamcastMediaInspectionReport(
             fullPath,
             Path.GetExtension(fullPath).TrimStart('.').ToUpperInvariant(),
@@ -29,7 +34,8 @@ public static class DreamcastMediaInspector
             $"0x{image.LeadoutFad:X8}",
             image.Tracks,
             cueTracks,
-            FindBootSector(image, bootScanSectors));
+            bootSector,
+            isCue ? FindCueDirectoryBootSectorCandidates(fullPath, bootScanSectors) : []);
     }
 
     private static DreamcastBootSectorInfo? FindBootSector(IDreamcastMediaImage image, int bootScanSectors)
@@ -118,6 +124,85 @@ public static class DreamcastMediaInspector
         return tracks;
     }
 
+    private static IReadOnlyList<DreamcastBootSectorCandidate> FindCueDirectoryBootSectorCandidates(string cuePath, int bootScanSectors)
+    {
+        if (bootScanSectors == 0)
+        {
+            return [];
+        }
+
+        var cueDirectory = Path.GetDirectoryName(cuePath);
+        if (string.IsNullOrWhiteSpace(cueDirectory))
+        {
+            return [];
+        }
+
+        var candidates = new List<DreamcastBootSectorCandidate>();
+        foreach (var file in Directory.EnumerateFiles(cueDirectory, "*.bin").Order(StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var sectorLayout in CandidateSectorLayouts(file))
+            {
+                var boot = FindBootSectorInFile(file, sectorLayout, bootScanSectors);
+                if (boot is null)
+                {
+                    continue;
+                }
+
+                candidates.Add(new DreamcastBootSectorCandidate(
+                    file,
+                    sectorLayout.SourceSectorSize,
+                    sectorLayout.PayloadOffset,
+                    boot.ByteOffset,
+                    $"0x{boot.ByteOffset:X16}",
+                    boot.BootSector));
+            }
+        }
+
+        return candidates;
+    }
+
+    private static IReadOnlyList<SourceSectorLayout> CandidateSectorLayouts(string path)
+    {
+        var length = new FileInfo(path).Length;
+        var layouts = new List<SourceSectorLayout>();
+        if (length >= RawCdSectorSize && length % RawCdSectorSize == 0)
+        {
+            layouts.Add(new SourceSectorLayout(RawCdSectorSize, RawCdSectorPayloadOffset));
+        }
+
+        if (length >= UserDataSectorSize && length % UserDataSectorSize == 0)
+        {
+            layouts.Add(new SourceSectorLayout(UserDataSectorSize, 0));
+        }
+
+        return layouts;
+    }
+
+    private static FileBootSector? FindBootSectorInFile(string path, SourceSectorLayout layout, int bootScanSectors)
+    {
+        var sector = new byte[layout.SourceSectorSize];
+        using var stream = File.OpenRead(path);
+        var maxSectors = Math.Min((long)bootScanSectors, stream.Length / layout.SourceSectorSize);
+        for (var index = 0L; index < maxSectors; index++)
+        {
+            var byteOffset = index * layout.SourceSectorSize;
+            stream.Position = byteOffset;
+            var bytesRead = stream.ReadAtLeast(sector, layout.SourceSectorSize, throwOnEndOfStream: false);
+            if (bytesRead < layout.SourceSectorSize)
+            {
+                return null;
+            }
+
+            var payload = sector.AsSpan(layout.PayloadOffset, UserDataSectorSize);
+            if (ReadAscii(payload, 0x00, 0x10) == DreamcastHardwareId)
+            {
+                return new FileBootSector(byteOffset + layout.PayloadOffset, DreamcastBootSectorInfo.FromSector((uint)index, payload));
+            }
+        }
+
+        return null;
+    }
+
     internal static string ReadAscii(ReadOnlySpan<byte> bytes, int offset, int length)
     {
         var text = Encoding.ASCII.GetString(bytes.Slice(offset, length));
@@ -140,13 +225,22 @@ public sealed record DreamcastMediaInspectionReport(
     string LeadoutFadHex,
     IReadOnlyList<DreamcastMediaTrackInfo> Tracks,
     IReadOnlyList<DreamcastCueTrackInspection> CueTracks,
-    DreamcastBootSectorInfo? BootSector);
+    DreamcastBootSectorInfo? BootSector,
+    IReadOnlyList<DreamcastBootSectorCandidate> BootSectorCandidates);
 
 public sealed record DreamcastCueTrackInspection(
     int TrackNumber,
     string Type,
     string FilePath,
     bool IsData);
+
+public sealed record DreamcastBootSectorCandidate(
+    string FilePath,
+    int SourceSectorSize,
+    int PayloadOffset,
+    long ByteOffset,
+    string ByteOffsetHex,
+    DreamcastBootSectorInfo BootSector);
 
 public sealed record DreamcastBootSectorInfo(
     uint Sector,
@@ -179,3 +273,7 @@ public sealed record DreamcastBootSectorInfo(
             DreamcastMediaInspector.ReadAscii(bytes, 0x70, 0x10),
             DreamcastMediaInspector.ReadAscii(bytes, 0x80, 0x80));
 }
+
+internal sealed record SourceSectorLayout(int SourceSectorSize, int PayloadOffset);
+
+internal sealed record FileBootSector(long ByteOffset, DreamcastBootSectorInfo BootSector);
