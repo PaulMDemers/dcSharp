@@ -138,6 +138,42 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void LaterSpriteOverwritesStripPreviewPixels()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0xF800, [(1, 1), (3, 1), (1, 3)], argb: 0xFFFF_0000), vram);
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 0.0f, 0.0f), (3, 3, 0.0f, 0.0f), (1, 3, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
+    public void LaterStripOverwritesSpritePreviewPixels()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 0.0f, 0.0f), (3, 3, 0.0f, 0.0f), (1, 3, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram);
+        DreamcastPvrPreviewRenderer.RenderStrip(CreateStrip(0xF800, [(1, 1), (3, 1), (1, 3)], argb: 0xFFFF_0000), vram);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0xF800, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
     public void InterpolatesGouraudVertexColors()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
