@@ -7,7 +7,7 @@ public sealed class DreamcastRawBinaryLoader
     public const uint DefaultLoadAddress = 0x8C01_0000;
     public const uint IpBinLoadAddress = 0x8C00_8000;
 
-    public ElfLoadResult Load(ReadOnlySpan<byte> data, DreamcastMemory memory, uint loadAddress = DefaultLoadAddress, ReadOnlySpan<byte> ipBin = default)
+    public ElfLoadResult Load(ReadOnlySpan<byte> data, DreamcastMemory memory, uint loadAddress = DefaultLoadAddress, ReadOnlySpan<byte> ipBin = default, uint? entryPoint = null)
     {
         ArgumentNullException.ThrowIfNull(memory);
         if (data.Length == 0)
@@ -23,8 +23,8 @@ public sealed class DreamcastRawBinaryLoader
         memory.Write(loadAddress, data);
         var size = (uint)data.Length;
         return new ElfLoadResult(
-            loadAddress,
-            DreamcastMemory.TranslateAddress(loadAddress),
+            entryPoint ?? loadAddress,
+            DreamcastMemory.TranslateAddress(entryPoint ?? loadAddress),
             [new LoadedSegment(0, loadAddress, DreamcastMemory.TranslateAddress(loadAddress), size, size, 0x5, 4)],
             []);
     }

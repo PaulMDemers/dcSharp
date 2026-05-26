@@ -416,7 +416,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("Stopped: DeviceAccessStop", result.StandardOutput);
-            Assert.Contains("Stopped on UnmappedRead at 0x2D2D2D0A", result.StandardOutput);
+            Assert.Contains("Stopped on UnmappedRead at 0x08000010", result.StandardOutput);
         }
         finally
         {
@@ -605,7 +605,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x10, 0x60, // mov.b @r1,r0
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
-        0x0A, 0x2D, 0x2D, 0x2D
+        0x10, 0x00, 0x00, 0x08
     ];
 
     private static byte[] ToCdSectors(byte[] isoImage)

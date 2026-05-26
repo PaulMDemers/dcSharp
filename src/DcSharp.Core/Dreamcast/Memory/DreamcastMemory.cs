@@ -16,6 +16,8 @@ public sealed class DreamcastMemory
     private const uint P1Base = 0x8000_0000;
     private const uint P2Base = 0xA000_0000;
     private const uint PhysicalMask = 0x1FFF_FFFF;
+    private const uint BootRomPhysicalBase = 0x0000_0000;
+    private const uint BootRomBytes = 2 * 1024 * 1024;
     private const uint SystemRamPhysicalBase = 0x0C00_0000;
     private const uint SystemRamMirrorBytes = 32 * 1024 * 1024;
     private const uint PvrVram64PhysicalBase = 0x0400_0000;
@@ -34,6 +36,9 @@ public sealed class DreamcastMemory
     private const uint AicaRegisterLimit = 0x0071_0000;
     private const uint AicaRamBase = 0x0080_0000;
     private const uint AicaRamBytes = 2 * 1024 * 1024;
+    private const uint OperandCacheRamArea1Base = 0x7C00_0000;
+    private const uint OperandCacheRamArea2Base = 0x7E00_0000;
+    private const int OperandCacheRamAreaBytes = 4 * 1024;
     private const uint AicaOutputSampleRateHz = 44_100;
     private const uint ScifStatus = 0xFFE8_0010;
     private const uint ScifTransmitData = 0xFFE8_000C;
@@ -77,6 +82,8 @@ public sealed class DreamcastMemory
     private readonly byte[] pvrVram = new byte[PvrVramByteCount];
     private readonly float[] pvrPreviewDepth = new float[PvrVramByteCount / 2];
     private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
+    private readonly byte[] operandCacheRamArea1 = new byte[OperandCacheRamAreaBytes];
+    private readonly byte[] operandCacheRamArea2 = new byte[OperandCacheRamAreaBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly Dictionary<uint, uint> aicaRegisters = [];
@@ -177,11 +184,8 @@ public sealed class DreamcastMemory
     public void SetController(byte address, DreamcastControllerState state) =>
         mapleControllers[address] = state;
 
-    public static uint TranslateAddress(uint address)
-    {
-        var area = address & AreaMask;
-        return area is P1Base or P2Base ? address & PhysicalMask : address;
-    }
+    public static uint TranslateAddress(uint address) =>
+        IsP4Address(address) ? address : address & PhysicalMask;
 
     public void AdvanceHardware(ulong instructions)
     {
@@ -256,6 +260,45 @@ public sealed class DreamcastMemory
         return offset + length <= pvrVram.Length;
     }
 
+    private bool TryGetOperandCacheRamOffset(uint address, int length, out byte[] ram, out int offset)
+    {
+        ram = operandCacheRamArea1;
+        offset = 0;
+
+        if (length < 0)
+        {
+            return false;
+        }
+
+        if (address >= OperandCacheRamArea1Base && (ulong)address + (uint)length <= (ulong)OperandCacheRamArea1Base + OperandCacheRamAreaBytes)
+        {
+            ram = operandCacheRamArea1;
+            offset = (int)(address - OperandCacheRamArea1Base);
+            return true;
+        }
+
+        if (address >= OperandCacheRamArea2Base && (ulong)address + (uint)length <= (ulong)OperandCacheRamArea2Base + OperandCacheRamAreaBytes)
+        {
+            ram = operandCacheRamArea2;
+            offset = (int)(address - OperandCacheRamArea2Base);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsBootRomAddress(uint address, int length)
+    {
+        if (length < 0)
+        {
+            return false;
+        }
+
+        var physical = TranslateAddress(address);
+        return physical >= BootRomPhysicalBase
+            && (ulong)physical + (uint)length <= (ulong)BootRomPhysicalBase + BootRomBytes;
+    }
+
     public void Write(uint address, ReadOnlySpan<byte> data)
     {
         if (IsP4Address(address))
@@ -290,6 +333,18 @@ public sealed class DreamcastMemory
         if (TryGetPvrVramOffset(address, data.Length, out var vramOffset))
         {
             data.CopyTo(pvrVram.AsSpan(vramOffset));
+            return;
+        }
+
+        if (TryGetOperandCacheRamOffset(address, data.Length, out var operandCacheRam, out var operandCacheOffset))
+        {
+            data.CopyTo(operandCacheRam.AsSpan(operandCacheOffset));
+            return;
+        }
+
+        if (IsBootRomAddress(address, data.Length))
+        {
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data)));
             return;
         }
 
@@ -351,6 +406,17 @@ public sealed class DreamcastMemory
             return aicaRam[aicaOffset];
         }
 
+        if (TryGetOperandCacheRamOffset(address, 1, out var operandCacheRam, out var operandCacheOffset))
+        {
+            return operandCacheRam[operandCacheOffset];
+        }
+
+        if (IsBootRomAddress(address, 1))
+        {
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 1, 0));
+            return 0;
+        }
+
         if (!TryGetSystemRamOffset(address, 1, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 1, 0));
@@ -385,6 +451,17 @@ public sealed class DreamcastMemory
         if (TryGetAicaRamOffset(address, 2, out var aicaOffset))
         {
             return (ushort)(aicaRam[aicaOffset] | (aicaRam[aicaOffset + 1] << 8));
+        }
+
+        if (TryGetOperandCacheRamOffset(address, 2, out var operandCacheRam, out var operandCacheOffset))
+        {
+            return (ushort)(operandCacheRam[operandCacheOffset] | (operandCacheRam[operandCacheOffset + 1] << 8));
+        }
+
+        if (IsBootRomAddress(address, 2))
+        {
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 2, 0));
+            return 0;
         }
 
         if (!TryGetSystemRamOffset(address, 2, out var offset))
@@ -427,6 +504,20 @@ public sealed class DreamcastMemory
                 | (aicaRam[aicaOffset + 1] << 8)
                 | (aicaRam[aicaOffset + 2] << 16)
                 | (aicaRam[aicaOffset + 3] << 24));
+        }
+
+        if (TryGetOperandCacheRamOffset(address, 4, out var operandCacheRam, out var operandCacheOffset))
+        {
+            return (uint)(operandCacheRam[operandCacheOffset]
+                | (operandCacheRam[operandCacheOffset + 1] << 8)
+                | (operandCacheRam[operandCacheOffset + 2] << 16)
+                | (operandCacheRam[operandCacheOffset + 3] << 24));
+        }
+
+        if (IsBootRomAddress(address, 4))
+        {
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 4, 0));
+            return 0;
         }
 
         if (!TryGetSystemRamOffset(address, 4, out var offset))

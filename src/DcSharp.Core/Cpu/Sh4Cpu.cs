@@ -322,6 +322,14 @@ public sealed class Sh4Cpu
             return $"mov.l r{m},@-r{n} ; [0x{State.R[n]:X8}]=0x{State.R[m]:X8}";
         }
 
+        if (highNibble == 0x2 && lowNibble == 0x7)
+        {
+            State.M = (State.R[m] & 0x8000_0000) != 0;
+            State.Q = (State.R[n] & 0x8000_0000) != 0;
+            State.T = State.M != State.Q;
+            return $"div0s r{m},r{n} ; q={(State.Q ? 1 : 0)}, m={(State.M ? 1 : 0)}, t={(State.T ? 1 : 0)}";
+        }
+
         if (highNibble == 0x2 && lowNibble == 0x8)
         {
             State.T = (State.R[n] & State.R[m]) == 0;

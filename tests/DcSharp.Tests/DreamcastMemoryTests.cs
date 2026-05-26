@@ -11,9 +11,25 @@ public class DreamcastMemoryTests
     [InlineData(0x8C01_0000u, 0x0C01_0000u)]
     [InlineData(0xAC01_0000u, 0x0C01_0000u)]
     [InlineData(0x0C01_0000u, 0x0C01_0000u)]
+    [InlineData(0x4C01_0000u, 0x0C01_0000u)]
     public void TranslatesDreamcastRamMirrors(uint address, uint expectedPhysical)
     {
         Assert.Equal(expectedPhysical, DreamcastMemory.TranslateAddress(address));
+    }
+
+    [Fact]
+    public void TreatsBootRomAreaAsMappedReadOnlySpace()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x4000_00F0, 0x1234_5678);
+
+        Assert.Equal(0u, memory.ReadUInt32(0x0000_00F0));
+        Assert.DoesNotContain(memory.DeviceAccesses, access => access.Kind is MemoryAccessKind.UnmappedRead or MemoryAccessKind.UnmappedWrite);
+        Assert.Contains(memory.DeviceAccesses, access =>
+            access.Kind == MemoryAccessKind.Write
+            && access.Address == 0x4000_00F0
+            && access.Value == 0x1234_5678);
     }
 
     [Fact]
@@ -38,6 +54,19 @@ public class DreamcastMemoryTests
 
         Assert.Equal(0xAB, memory.ReadByte(0xACFF_FFFF));
         Assert.Equal(0xAB, memory.ReadByte(0xADFF_FFFF));
+    }
+
+    [Theory]
+    [InlineData(0x7C00_0FFCu)]
+    [InlineData(0x7E00_0FFCu)]
+    public void MapsOperandCacheRamScratchpadWindows(uint address)
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(address, 0x1234_5678);
+
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(address));
+        Assert.Empty(memory.DeviceAccesses);
     }
 
     [Fact]

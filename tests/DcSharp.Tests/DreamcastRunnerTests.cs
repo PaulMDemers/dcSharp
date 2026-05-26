@@ -56,7 +56,7 @@ public class DreamcastRunnerTests
         Assert.Equal(DreamcastStopReason.DeviceAccessStop, result.StopReason);
         Assert.Contains("Stopped on UnmappedRead", result.StopDetail);
         var access = Assert.Single(result.DeviceAccesses, access => access.Kind == MemoryAccessKind.UnmappedRead);
-        Assert.Equal(0x2D2D_2D0Au, access.Address);
+        Assert.Equal(0x0800_0010u, access.Address);
     }
 
     [Fact]
@@ -87,6 +87,42 @@ public class DreamcastRunnerTests
         Assert.Equal(4UL, bootWork.BytesWritten);
         Assert.Equal("0x8C00C000", bootWork.FirstAddressHex);
         Assert.Equal("0x8C00C003", bootWork.LastAddressHex);
+    }
+
+    [Fact]
+    public void RunCanSeedInitialVBlankEvent()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateAsicEventReadBinary(),
+            new DreamcastRunOptions(InstructionLimit: 2, TraceTailLength: 2, SeedInitialVBlank: true));
+
+        Assert.Contains(result.DeviceAccesses, access =>
+            access.Kind == MemoryAccessKind.Read
+            && access.Address == 0xA05F_6900
+            && access.Value == 0x0000_0008);
+    }
+
+    [Fact]
+    public void RunCanSeedInitialStatusRegister()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateStatusRegisterReadBinary(),
+            new DreamcastRunOptions(InstructionLimit: 1, TraceTailLength: 1, InitialStatusRegister: Sh4State.SrMachineBit | 0xF0));
+
+        Assert.Equal(Sh4State.SrMachineBit | 0xF0, result.Cpu.R[0]);
+        Assert.Equal("stc sr,r0 ; r0=0x400000F0", Assert.Single(result.TraceTail).Trace);
+    }
+
+    [Fact]
+    public void RunCanStartAtRawBinaryAlternateEntryPoint()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateDualEntryBinary(),
+            new DreamcastRunOptions(InstructionLimit: 1, TraceTailLength: 1),
+            entryPoint: 0x8C01_0004);
+
+        Assert.Equal(0x8C01_0006u, result.Cpu.Pc);
+        Assert.Equal(0xE001, Assert.Single(result.TraceTail).Opcode);
     }
 
     [Fact]
@@ -502,7 +538,7 @@ public class DreamcastRunnerTests
         0x10, 0x60, // mov.b @r1,r0
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
-        0x0A, 0x2D, 0x2D, 0x2D
+        0x10, 0x00, 0x00, 0x08
     ];
 
     private static byte[] CreateOtherDeviceReadBootBinary() =>
@@ -521,6 +557,27 @@ public class DreamcastRunnerTests
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
         0x00, 0xC0, 0x00, 0x8C
+    ];
+
+    private static byte[] CreateAsicEventReadBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x12, 0x60, // mov.l @r1,r0
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x69, 0x5F, 0xA0
+    ];
+
+    private static byte[] CreateStatusRegisterReadBinary() =>
+    [
+        0x02, 0x00 // stc sr,r0
+    ];
+
+    private static byte[] CreateDualEntryBinary() =>
+    [
+        0x09, 0x00, // nop
+        0x09, 0x00, // nop
+        0x01, 0xE0  // mov #1,r0
     ];
 
     private static byte[] CreateElfWithSegment(byte[] segmentBytes)

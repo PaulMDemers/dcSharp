@@ -23,12 +23,12 @@ public sealed class DreamcastRunner
         return RunLoaded(memory, load, options);
     }
 
-    public DreamcastRunResult RunRawBinary(ReadOnlySpan<byte> data, DreamcastRunOptions options, uint loadAddress = DreamcastRawBinaryLoader.DefaultLoadAddress, ReadOnlySpan<byte> ipBin = default)
+    public DreamcastRunResult RunRawBinary(ReadOnlySpan<byte> data, DreamcastRunOptions options, uint loadAddress = DreamcastRawBinaryLoader.DefaultLoadAddress, ReadOnlySpan<byte> ipBin = default, uint? entryPoint = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         var memory = new DreamcastMemory(options.ControllerA, options.ControllerB, options.Controllers, options.Media);
-        var load = new DreamcastRawBinaryLoader().Load(data, memory, loadAddress, ipBin);
+        var load = new DreamcastRawBinaryLoader().Load(data, memory, loadAddress, ipBin, entryPoint);
         return RunLoaded(memory, load, options);
     }
 
@@ -36,8 +36,15 @@ public sealed class DreamcastRunner
     {
         FirmwareStubs.Install(memory);
         memory.ResetSystemRamWriteCounters();
+        if (options.SeedInitialVBlank)
+        {
+            memory.RaiseVBlankBegin();
+        }
+
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
         var cpu = new Sh4Cpu(memory, load.EntryPoint, firmwareTrap.TryHandle);
+        cpu.State.R[15] = options.InitialStackPointer;
+        cpu.State.Sr = options.InitialStatusRegister;
         var scheduler = new DreamcastEventScheduler(memory, options);
         var traceTail = new Queue<Sh4StepResult>();
         var traceLog = new List<Sh4StepResult>();
@@ -251,7 +258,10 @@ public sealed record DreamcastRunOptions(
     IReadOnlyDictionary<byte, DreamcastControllerScript>? ControllerScripts = null,
     IDreamcastMediaImage? Media = null,
     bool StopOnUnmappedAccess = false,
-    string? StopOnDeviceDomain = null);
+    string? StopOnDeviceDomain = null,
+    uint InitialStackPointer = 0x8D00_0000,
+    uint InitialStatusRegister = 0,
+    bool SeedInitialVBlank = false);
 
 public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,

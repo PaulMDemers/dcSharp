@@ -3,6 +3,7 @@ using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Audio;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
+using DcSharp.Core.Cpu;
 using DcSharp.Core.Execution;
 using DcSharp.Core.Fixtures;
 using DcSharp.Core.Loading;
@@ -340,6 +341,8 @@ static void PrintBootBinaryCandidate(DreamcastBootBinaryCandidate candidate)
 
 static void BootSmoke(string path, string[] args)
 {
+    const uint ipBinEntryPoint = DreamcastRawBinaryLoader.IpBinLoadAddress + 0x300;
+    const uint ipBinInitialStatusRegister = Sh4State.SrMachineBit | 0xF0;
     var (scanSectors, requestedLayout, runArgs) = ParseBootSmokeOptions(args);
     var (data, sourcePath, sourceKind) = ReadBootAnalysisInput(path, scanSectors);
     var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, sourcePath, sourceKind);
@@ -349,16 +352,30 @@ static void BootSmoke(string path, string[] args)
         : data;
     var options = ParseRunOptions(runArgs);
     byte[]? ipBin = null;
+    var enterIpBin = false;
     if (IsMediaDescriptorPath(path))
     {
-        ipBin = TryReadMediaBootSector(path, scanSectors);
+        ipBin = TryReadIpBin(path, scanSectors);
+        enterIpBin = HasIpBinExecutableBootstrap(ipBin);
         options = options with
         {
-            Emulation = options.Emulation with { Media = DreamcastMediaImageLoader.LoadFromFile(path) }
+            Emulation = options.Emulation with
+            {
+                Media = DreamcastMediaImageLoader.LoadFromFile(path),
+                SeedInitialVBlank = enterIpBin,
+                InitialStatusRegister = enterIpBin && options.Emulation.InitialStatusRegister == 0
+                    ? ipBinInitialStatusRegister
+                    : options.Emulation.InitialStatusRegister
+            }
         };
     }
 
-    var result = new DreamcastRunner().RunRawBinary(bootBytes, options.Emulation, analysis.LoadAddress, ipBin);
+    var result = new DreamcastRunner().RunRawBinary(
+        bootBytes,
+        options.Emulation,
+        analysis.LoadAddress,
+        ipBin,
+        enterIpBin ? ipBinEntryPoint : null);
 
     if (options.FramebufferDumpPath is not null)
     {
@@ -438,36 +455,65 @@ static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSumm
     }
 }
 
-static byte[]? TryReadMediaBootSector(string path, int scanSectors)
+static byte[]? TryReadIpBin(string path, int scanSectors)
 {
+    const int ipBinSectorCount = 16;
+    const int ipBinBytes = ipBinSectorCount * DreamcastMediaImageLoader.DefaultSectorSize;
     var report = DreamcastMediaInspector.Inspect(path, scanSectors);
     if (report.BootSector is not null)
     {
         var image = DreamcastMediaImageLoader.LoadFromFile(path);
-        var sector = new byte[image.SectorSize];
-        return image.TryReadSector(report.BootSector.Sector, sector, out var bytesRead) && bytesRead >= 256
-            ? sector
-            : null;
+        var ipBin = new byte[ipBinBytes];
+        for (var sectorIndex = 0; sectorIndex < ipBinSectorCount; sectorIndex++)
+        {
+            if (!image.TryReadSector(report.BootSector.Sector + (uint)sectorIndex, ipBin.AsSpan(sectorIndex * DreamcastMediaImageLoader.DefaultSectorSize), out var bytesRead)
+                || bytesRead < DreamcastMediaImageLoader.DefaultSectorSize)
+            {
+                return null;
+            }
+        }
+
+        if (HasIpBinExecutableBootstrap(ipBin) || report.BootSectorCandidates.Count == 0)
+        {
+            return ipBin;
+        }
     }
 
+    byte[]? fallbackIpBin = null;
     foreach (var candidate in report.BootSectorCandidates)
     {
-        var sector = new byte[DreamcastMediaImageLoader.DefaultSectorSize];
+        var ipBin = new byte[ipBinBytes];
         using var stream = File.OpenRead(candidate.FilePath);
-        if (candidate.ByteOffset < 0 || candidate.ByteOffset + sector.Length > stream.Length)
+        if (candidate.ByteOffset < 0 || candidate.ByteOffset + ipBin.Length > stream.Length)
         {
             continue;
         }
 
         stream.Position = candidate.ByteOffset;
-        var bytesRead = stream.Read(sector);
-        if (bytesRead >= 256)
+        var bytesRead = stream.Read(ipBin);
+        if (bytesRead == ipBin.Length)
         {
-            return sector;
+            if (HasIpBinExecutableBootstrap(ipBin))
+            {
+                return ipBin;
+            }
+
+            fallbackIpBin ??= ipBin;
         }
     }
 
-    return null;
+    return fallbackIpBin;
+}
+
+static bool HasIpBinExecutableBootstrap(byte[]? ipBin)
+{
+    const int licenseCodeOffset = 0x300;
+    if (ipBin is null || ipBin.Length < licenseCodeOffset + 32)
+    {
+        return false;
+    }
+
+    return ipBin.AsSpan(licenseCodeOffset, 32).IndexOfAnyExcept((byte)0x00, (byte)0xFF) >= 0;
 }
 
 static (int ScanSectors, string Layout, string[] RunArgs) ParseBootSmokeOptions(string[] args)
@@ -1043,6 +1089,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? mediaPath = null;
     var stopOnUnmapped = false;
     string? stopOnDeviceDomain = null;
+    var initialStackPointer = 0x8D00_0000u;
+    var initialStatusRegister = 0u;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -1141,6 +1189,14 @@ static CliRunOptions ParseRunOptions(string[] args)
                 stopOnDeviceDomain = ParseDeviceDomain(args[index + 1]);
                 index++;
                 break;
+            case "--initial-sp" when index + 1 < args.Length:
+                initialStackPointer = ParseAddress(args[index + 1]);
+                index++;
+                break;
+            case "--initial-sr" when index + 1 < args.Length:
+                initialStatusRegister = ParseAddress(args[index + 1]);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -1181,7 +1237,9 @@ static CliRunOptions ParseRunOptions(string[] args)
             controllerScripts.Count == 0 ? null : controllerScripts,
             media,
             stopOnUnmapped,
-            stopOnDeviceDomain),
+            stopOnDeviceDomain,
+            initialStackPointer,
+            initialStatusRegister),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -1368,7 +1426,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--stop-on-unmapped] [--stop-on-device-domain domain] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");

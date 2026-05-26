@@ -189,6 +189,35 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ExecutesSignedDivideInitialization()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x2327);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[2] = 0xFFFF_FFFF;
+        cpu.State.R[3] = 0x0000_0001;
+
+        cpu.Step();
+
+        Assert.False(cpu.State.Q);
+        Assert.True(cpu.State.M);
+        Assert.True(cpu.State.T);
+    }
+
+    [Fact]
+    public void StoresStatusRegister()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0002);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Sr = Sh4State.SrMachineBit | 0xF0;
+
+        cpu.Step();
+
+        Assert.Equal(Sh4State.SrMachineBit | 0xF0, cpu.State.R[0]);
+    }
+
+    [Fact]
     public void ExecutesSignedWordExtension()
     {
         var memory = new DreamcastMemory();
