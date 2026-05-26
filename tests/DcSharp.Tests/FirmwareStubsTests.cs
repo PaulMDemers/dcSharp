@@ -8,6 +8,7 @@ namespace DcSharp.Tests;
 public class FirmwareStubsTests
 {
     private const uint GdromHleStub = 0x8C00_00D0;
+    private const uint SystemHleStub = 0x8C00_00E8;
     private const uint GdromSendCommand = 0;
     private const uint GdromCheckCommand = 1;
     private const uint GdromAbortCommand = 3;
@@ -23,6 +24,22 @@ public class FirmwareStubsTests
     private const uint StatusAddress = 0x8C01_0100;
     private const uint TocAddress = 0x8C01_0200;
     private const uint DestinationAddress = 0x8C02_0000;
+
+    [Theory]
+    [InlineData(0, "System BIOS soft reset requested: function=0")]
+    [InlineData(1, "System BIOS menu requested: function=1")]
+    [InlineData(2, "System BIOS CD menu requested: function=2")]
+    [InlineData(7, "System BIOS call requested: function=7")]
+    public void SystemBiosTrapReportsNamedTerminalCalls(uint function, string expectedMessage)
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = SystemHleStub };
+        state.R[4] = function;
+
+        var exception = Assert.Throws<DreamcastFirmwareExitException>(() => handler.TryHandle(state, new DreamcastMemory(), out _));
+
+        Assert.Equal(expectedMessage, exception.Message);
+    }
 
     [Fact]
     public void GdromCheckCommandReportsCompletedReadAndTransferredBytes()

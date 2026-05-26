@@ -51,7 +51,7 @@ internal static class FirmwareStubs
         {
             if (state.Pc == SystemHleStub)
             {
-                throw new DreamcastFirmwareExitException($"System BIOS call requested: function={state.R[4]}");
+                throw new DreamcastFirmwareExitException(SystemCallMessage(state.R[4]));
             }
 
             if (state.Pc != GdromHleStub)
@@ -250,6 +250,15 @@ internal static class FirmwareStubs
                 memory.WriteUInt32(address + ((uint)i * 4), unchecked((uint)values[i]));
             }
         }
+
+        private static string SystemCallMessage(uint function) =>
+            function switch
+            {
+                0 => "System BIOS soft reset requested: function=0",
+                1 => "System BIOS menu requested: function=1",
+                2 => "System BIOS CD menu requested: function=2",
+                _ => $"System BIOS call requested: function={function}"
+            };
 
         private sealed record GdromQueuedCommand(
             int Response,
