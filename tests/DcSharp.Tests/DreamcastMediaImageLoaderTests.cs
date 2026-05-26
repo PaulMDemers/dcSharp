@@ -470,6 +470,48 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void ExtractBootFileCanResolveBootExtentFromLaterAdjacentTrack()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var cueDataPath = Path.Combine(tempRoot, "game.bin");
+        var track3Path = Path.Combine(tempRoot, "game (Track 3).bin");
+        var track4Path = Path.Combine(tempRoot, "game (Track 4).bin");
+        var track5Path = Path.Combine(tempRoot, "game (Track 5).bin");
+        var cuePath = Path.Combine(tempRoot, "game.cue");
+
+        try
+        {
+            var bootData = "ADJACENT"u8.ToArray();
+            var track5Start = 45_000u + 24u + 1u;
+            var track3Iso = CreateBootableIsoImage("1ST_READ.BIN", bootData, extentBias: 45_000, fileExtent: track5Start + 1 - 45_000);
+            var track5Iso = new byte[2048 * 2];
+            bootData.CopyTo(track5Iso.AsSpan(2048));
+
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(track3Path, ToCdSectors(track3Iso));
+            File.WriteAllBytes(track4Path, CreateCdSector([0x00]));
+            File.WriteAllBytes(track5Path, ToCdSectors(track5Iso));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = DreamcastBootExtractor.ExtractBootFile(cuePath);
+
+            Assert.Equal(track3Path, result.SourcePath);
+            Assert.Equal(bootData, result.Data);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void DreamcastBootScramblerRoundTripsData()
     {
         var original = Enumerable.Range(0, 4096).Select(value => (byte)value).ToArray();

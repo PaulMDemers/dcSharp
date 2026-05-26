@@ -441,16 +441,33 @@ static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSumm
 static byte[]? TryReadMediaBootSector(string path, int scanSectors)
 {
     var report = DreamcastMediaInspector.Inspect(path, scanSectors);
-    if (report.BootSector is null)
+    if (report.BootSector is not null)
     {
-        return null;
+        var image = DreamcastMediaImageLoader.LoadFromFile(path);
+        var sector = new byte[image.SectorSize];
+        return image.TryReadSector(report.BootSector.Sector, sector, out var bytesRead) && bytesRead >= 256
+            ? sector
+            : null;
     }
 
-    var image = DreamcastMediaImageLoader.LoadFromFile(path);
-    var sector = new byte[image.SectorSize];
-    return image.TryReadSector(report.BootSector.Sector, sector, out var bytesRead) && bytesRead >= 256
-        ? sector
-        : null;
+    foreach (var candidate in report.BootSectorCandidates)
+    {
+        var sector = new byte[DreamcastMediaImageLoader.DefaultSectorSize];
+        using var stream = File.OpenRead(candidate.FilePath);
+        if (candidate.ByteOffset < 0 || candidate.ByteOffset + sector.Length > stream.Length)
+        {
+            continue;
+        }
+
+        stream.Position = candidate.ByteOffset;
+        var bytesRead = stream.Read(sector);
+        if (bytesRead >= 256)
+        {
+            return sector;
+        }
+    }
+
+    return null;
 }
 
 static (int ScanSectors, string Layout, string[] RunArgs) ParseBootSmokeOptions(string[] args)

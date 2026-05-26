@@ -355,6 +355,41 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandSeedsIpBinFromCueDirectoryCandidate()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var cueDataPath = Path.Combine(mediaDirectory, "game.bin");
+        var trackPath = Path.Combine(mediaDirectory, "game (Track 3).bin");
+        var cuePath = Path.Combine(mediaDirectory, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(trackPath, ToCdSectors(CreateBootableIsoImage("1ST_READ.BIN", CreateNopBootBinary())));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = RunCli(cli, repoRoot, "media", "boot-smoke", cuePath, "--instructions", "1", "--trace-tail", "0");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Source kind: media-extracted", result.StandardOutput);
+            Assert.Contains("IP.BIN seeded: True", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandCanStopOnUnmappedAccess()
     {
         var repoRoot = FindRepoRoot();

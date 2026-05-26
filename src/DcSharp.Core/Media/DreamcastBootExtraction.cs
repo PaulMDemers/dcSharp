@@ -36,6 +36,16 @@ public static class DreamcastBootExtractor
             catch (InvalidDataException ex)
             {
                 attempts.Add($"{source.Path}: {ex.Message}");
+                if (TryExtractFromAdjacentTrackSet(fullPath, source.Path, source.BootSector, out var adjacentResult, out var adjacentAttempt))
+                {
+                    return adjacentResult;
+                }
+
+                if (!string.IsNullOrWhiteSpace(adjacentAttempt))
+                {
+                    attempts.Add(adjacentAttempt);
+                }
+
                 continue;
             }
 
@@ -53,6 +63,56 @@ public static class DreamcastBootExtractor
             ? "No Dreamcast boot sector was found."
             : string.Join(Environment.NewLine, attempts.Select(attempt => $"  {attempt}"));
         throw new InvalidDataException($"Unable to extract Dreamcast boot file from '{fullPath}'.{Environment.NewLine}{detail}");
+    }
+
+    private static bool TryExtractFromAdjacentTrackSet(
+        string mediaPath,
+        string sourcePath,
+        DreamcastBootSectorInfo bootSector,
+        out DreamcastBootExtractionResult result,
+        out string? attempt)
+    {
+        result = default!;
+        attempt = null;
+        if (!AdjacentTrackSetMediaImage.TryCreate(sourcePath, out var image, out var error) || image is null)
+        {
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                attempt = $"{sourcePath}: adjacent track set unavailable: {error}";
+            }
+
+            return false;
+        }
+
+        if (!Iso9660FileSystem.TryOpen(image, out var fileSystem, out var isoError) || fileSystem is null)
+        {
+            attempt = $"{sourcePath}: adjacent track set: {isoError}";
+            return false;
+        }
+
+        if (!fileSystem.TryGetFile(bootSector.BootFile, out var file, out var fileError) || file is null)
+        {
+            attempt = $"{sourcePath}: adjacent track set: {fileError}";
+            return false;
+        }
+
+        try
+        {
+            result = new DreamcastBootExtractionResult(
+                mediaPath,
+                sourcePath,
+                bootSector,
+                fileSystem.VolumeIdentifier,
+                file,
+                fileSystem.ReadFile(file),
+                []);
+            return true;
+        }
+        catch (InvalidDataException ex)
+        {
+            attempt = $"{sourcePath}: adjacent track set: {ex.Message}";
+            return false;
+        }
     }
 
     private static IReadOnlyList<DreamcastBootSource> BootSources(string path, DreamcastMediaInspectionReport report)
