@@ -483,26 +483,59 @@ static byte[]? TryReadIpBin(string path, int scanSectors)
     foreach (var candidate in report.BootSectorCandidates)
     {
         var ipBin = new byte[ipBinBytes];
-        using var stream = File.OpenRead(candidate.FilePath);
-        if (candidate.ByteOffset < 0 || candidate.ByteOffset + ipBin.Length > stream.Length)
+        if (!TryReadCandidateIpBin(candidate, ipBin))
         {
             continue;
         }
 
-        stream.Position = candidate.ByteOffset;
-        var bytesRead = stream.Read(ipBin);
-        if (bytesRead == ipBin.Length)
+        if (HasIpBinExecutableBootstrap(ipBin))
         {
-            if (HasIpBinExecutableBootstrap(ipBin))
-            {
-                return ipBin;
-            }
-
-            fallbackIpBin ??= ipBin;
+            return ipBin;
         }
+
+        fallbackIpBin ??= ipBin;
     }
 
     return fallbackIpBin;
+}
+
+static bool TryReadCandidateIpBin(DreamcastBootSectorCandidate candidate, Span<byte> destination)
+{
+    const int userDataSectorSize = DreamcastMediaImageLoader.DefaultSectorSize;
+    if (candidate.SourceSectorSize < userDataSectorSize
+        || candidate.PayloadOffset < 0
+        || candidate.PayloadOffset + userDataSectorSize > candidate.SourceSectorSize
+        || candidate.ByteOffset < candidate.PayloadOffset
+        || destination.Length % userDataSectorSize != 0)
+    {
+        return false;
+    }
+
+    var firstSectorOffset = candidate.ByteOffset - candidate.PayloadOffset;
+    using var stream = File.OpenRead(candidate.FilePath);
+    var sectorCount = destination.Length / userDataSectorSize;
+    for (var sectorIndex = 0; sectorIndex < sectorCount; sectorIndex++)
+    {
+        var payloadOffset = firstSectorOffset
+            + ((long)sectorIndex * candidate.SourceSectorSize)
+            + candidate.PayloadOffset;
+        if (payloadOffset < 0 || payloadOffset + userDataSectorSize > stream.Length)
+        {
+            return false;
+        }
+
+        stream.Position = payloadOffset;
+        var bytesRead = stream.ReadAtLeast(
+            destination.Slice(sectorIndex * userDataSectorSize, userDataSectorSize),
+            userDataSectorSize,
+            throwOnEndOfStream: false);
+        if (bytesRead < userDataSectorSize)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool HasIpBinExecutableBootstrap(byte[]? ipBin)

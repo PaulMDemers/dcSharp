@@ -87,8 +87,8 @@ if ($raymanOutput) {
 
 $legacyOutput = Invoke-BootSmoke "Legacy of Kain" $legacy $LegacyInstructions
 if ($legacyOutput) {
-    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: DeviceAccessStop"
-    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped on UnmappedWrite at 0x330441F0"
+    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: InstructionLimit"
+    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C008374"
 }
 
 Write-Host "Retail probes completed."

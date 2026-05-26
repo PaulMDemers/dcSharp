@@ -390,6 +390,44 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandRebuildsCueDirectoryIpBinFromSectorPayloads()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var cueDataPath = Path.Combine(mediaDirectory, "game.bin");
+        var trackPath = Path.Combine(mediaDirectory, "game (Track 3).bin");
+        var cuePath = Path.Combine(mediaDirectory, "game.cue");
+
+        try
+        {
+            var iso = CreateBootableIsoImage("1ST_READ.BIN", CreateNopBootBinary());
+            CreateIpBinThatBranchesToSecondSector().CopyTo(iso.AsSpan(0, 16 * 2048));
+            File.WriteAllBytes(cueDataPath, CreateCdSector([0x00]));
+            File.WriteAllBytes(trackPath, ToCdSectors(iso));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(cueDataPath)}}" BINARY
+                  TRACK 01 MODE2/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = RunCli(cli, repoRoot, "media", "boot-smoke", cuePath, "--instructions", "3", "--trace-tail", "0");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("IP.BIN seeded: True", result.StandardOutput);
+            Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+            Assert.Contains("PC: 0x8C008902", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandCanStopOnUnmappedAccess()
     {
         var repoRoot = FindRepoRoot();
@@ -607,6 +645,19 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x09, 0x00, // nop
         0x10, 0x00, 0x00, 0x08
     ];
+
+    private static byte[] CreateIpBinThatBranchesToSecondSector()
+    {
+        var ipBin = new byte[16 * 2048];
+        CreateBootSector("1ST_READ.BIN", "CLI IP.BIN").CopyTo(ipBin, 0);
+        ipBin[0x300] = 0xFE; // bra 0x8C008900
+        ipBin[0x301] = 0xA2;
+        ipBin[0x302] = 0x09; // nop
+        ipBin[0x303] = 0x00;
+        ipBin[0x900] = 0x07; // mov #7,r0
+        ipBin[0x901] = 0xE0;
+        return ipBin;
+    }
 
     private static byte[] ToCdSectors(byte[] isoImage)
     {
