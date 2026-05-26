@@ -348,15 +348,17 @@ static void BootSmoke(string path, string[] args)
         ? DreamcastBootScrambler.Descramble(data)
         : data;
     var options = ParseRunOptions(runArgs);
+    byte[]? ipBin = null;
     if (IsMediaDescriptorPath(path))
     {
+        ipBin = TryReadMediaBootSector(path, scanSectors);
         options = options with
         {
             Emulation = options.Emulation with { Media = DreamcastMediaImageLoader.LoadFromFile(path) }
         };
     }
 
-    var result = new DreamcastRunner().RunRawBinary(bootBytes, options.Emulation, analysis.LoadAddress);
+    var result = new DreamcastRunner().RunRawBinary(bootBytes, options.Emulation, analysis.LoadAddress, ipBin);
 
     if (options.FramebufferDumpPath is not null)
     {
@@ -381,7 +383,7 @@ static void BootSmoke(string path, string[] args)
     var summary = DreamcastRunSummary.FromResult(result, options.Emulation);
     if (options.EmitJson)
     {
-        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, summary)));
+        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, ipBin is not null, summary)));
         return;
     }
 
@@ -390,6 +392,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Selected layout: {selectedLayout}");
     Console.WriteLine($"Analyzer recommendation: {analysis.RecommendedLayout}");
     Console.WriteLine($"Load address: {analysis.LoadAddressHex}");
+    Console.WriteLine($"IP.BIN seeded: {ipBin is not null}");
     Console.WriteLine($"Bytes loaded: {bootBytes.Length}");
     Console.WriteLine($"Instructions: {result.Cpu.InstructionsExecuted}");
     Console.WriteLine($"PC: 0x{result.Cpu.Pc:X8}");
@@ -418,6 +421,21 @@ static void BootSmoke(string path, string[] args)
             Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
         }
     }
+}
+
+static byte[]? TryReadMediaBootSector(string path, int scanSectors)
+{
+    var report = DreamcastMediaInspector.Inspect(path, scanSectors);
+    if (report.BootSector is null)
+    {
+        return null;
+    }
+
+    var image = DreamcastMediaImageLoader.LoadFromFile(path);
+    var sector = new byte[image.SectorSize];
+    return image.TryReadSector(report.BootSector.Sector, sector, out var bytesRead) && bytesRead >= 256
+        ? sector
+        : null;
 }
 
 static (int ScanSectors, string Layout, string[] RunArgs) ParseBootSmokeOptions(string[] args)
@@ -1367,6 +1385,7 @@ internal sealed record BootExtractionCliReport(
 internal sealed record BootSmokeCliReport(
     DreamcastBootBinaryAnalysis Analysis,
     string SelectedLayout,
+    bool IpBinSeeded,
     DreamcastRunSummary Summary);
 
 internal sealed record AddressRange(uint Start, uint End)

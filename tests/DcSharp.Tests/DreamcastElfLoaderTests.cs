@@ -26,6 +26,25 @@ public class DreamcastElfLoaderTests
         Assert.Equal(0x00, memory.ReadByte(0x8C01_0004));
     }
 
+    [Fact]
+    public void RawBinaryLoaderCanSeedIpBinAtBiosAddress()
+    {
+        var memory = new DreamcastMemory();
+        var raw = new byte[] { 0x09, 0x00 };
+        var ipBin = new byte[2048];
+        ipBin[0] = (byte)'S';
+        ipBin[1] = (byte)'E';
+        ipBin[2] = (byte)'G';
+        ipBin[3] = (byte)'A';
+
+        var result = new DreamcastRawBinaryLoader().Load(raw, memory, ipBin: ipBin);
+
+        Assert.Equal(0x8C01_0000u, result.EntryPoint);
+        Assert.Equal(0x09, memory.ReadByte(0x8C01_0000));
+        Assert.Equal((byte)'S', memory.ReadByte(0x8C00_8000));
+        Assert.Equal((byte)'A', memory.ReadByte(0x8C00_8003));
+    }
+
     private static byte[] CreateElfWithLoadSegment()
     {
         var bytes = new byte[88];

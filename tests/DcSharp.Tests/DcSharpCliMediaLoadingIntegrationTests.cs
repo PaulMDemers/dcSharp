@@ -320,6 +320,40 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandSeedsIpBinForCueInput()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var trackPath = Path.Combine(mediaDirectory, "track.bin");
+        var cuePath = Path.Combine(mediaDirectory, "game.cue");
+
+        try
+        {
+            File.WriteAllBytes(trackPath, ToCdSectors(CreateBootableIsoImage("1ST_READ.BIN", CreateNopBootBinary())));
+            File.WriteAllText(
+                cuePath,
+                $$"""
+                FILE "{{Path.GetFileName(trackPath)}}" BINARY
+                  TRACK 03 MODE1/2352
+                    INDEX 01 00:00:00
+                """);
+
+            var result = RunCli(cli, repoRoot, "media", "boot-smoke", cuePath, "--instructions", "1", "--trace-tail", "0");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Source kind: media-extracted", result.StandardOutput);
+            Assert.Contains("IP.BIN seeded: True", result.StandardOutput);
+            Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -492,6 +526,18 @@ public class DcSharpCliMediaLoadingIntegrationTests
         }
 
         return data;
+    }
+
+    private static byte[] ToCdSectors(byte[] isoImage)
+    {
+        var sectors = isoImage.Length / 2048;
+        var raw = new byte[sectors * 2352];
+        for (var sector = 0; sector < sectors; sector++)
+        {
+            Array.Copy(isoImage, sector * 2048, raw, (sector * 2352) + 16, 2048);
+        }
+
+        return raw;
     }
 
     private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)

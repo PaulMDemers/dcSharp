@@ -23,12 +23,12 @@ public sealed class DreamcastRunner
         return RunLoaded(memory, load, options);
     }
 
-    public DreamcastRunResult RunRawBinary(ReadOnlySpan<byte> data, DreamcastRunOptions options, uint loadAddress = DreamcastRawBinaryLoader.DefaultLoadAddress)
+    public DreamcastRunResult RunRawBinary(ReadOnlySpan<byte> data, DreamcastRunOptions options, uint loadAddress = DreamcastRawBinaryLoader.DefaultLoadAddress, ReadOnlySpan<byte> ipBin = default)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         var memory = new DreamcastMemory(options.ControllerA, options.ControllerB, options.Controllers, options.Media);
-        var load = new DreamcastRawBinaryLoader().Load(data, memory, loadAddress);
+        var load = new DreamcastRawBinaryLoader().Load(data, memory, loadAddress, ipBin);
         return RunLoaded(memory, load, options);
     }
 
