@@ -139,6 +139,19 @@ public sealed class Sh4Cpu
             return true;
         }
 
+        if ((opcode & 0xF00F) == 0x2006)
+        {
+            var destinationRegister = (opcode >> 8) & 0xF;
+            var sourceRegister = (opcode >> 4) & 0xF;
+            for (ulong index = 0; index < executions; index++)
+            {
+                State.R[destinationRegister] -= 4;
+                memory.WriteUInt32(State.R[destinationRegister], State.R[sourceRegister]);
+            }
+
+            return true;
+        }
+
         return false;
     }
 

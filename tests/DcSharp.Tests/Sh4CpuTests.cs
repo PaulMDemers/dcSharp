@@ -111,6 +111,35 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsMaskedCountedMemoryClearLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x4110); // dt r1
+        WriteInstruction(memory, 0x8C01_0002, 0x8FFD); // bf/s 0x8C010000
+        WriteInstruction(memory, 0x8C01_0004, 0x2466); // mov.l r6,@-r4
+        WriteInstruction(memory, 0x8C01_0006, 0x0009); // fallthrough
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Sr = 0xF0;
+        cpu.State.R[1] = 3;
+        cpu.State.R[4] = 0x8C02_000C;
+        cpu.State.R[6] = 0xAABB_CCDD;
+
+        cpu.Step();
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardCountedIdleLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(7UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[1]);
+        Assert.Equal(0x8C02_0000u, cpu.State.R[4]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C01_0006u, cpu.State.Pc);
+        Assert.Equal(9UL, cpu.State.InstructionsExecuted);
+        Assert.Equal(0xAABB_CCDDu, memory.ReadUInt32(0x8C02_0000));
+        Assert.Equal(0xAABB_CCDDu, memory.ReadUInt32(0x8C02_0004));
+        Assert.Equal(0xAABB_CCDDu, memory.ReadUInt32(0x8C02_0008));
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
@@ -202,6 +231,38 @@ public class Sh4CpuTests
         Assert.False(cpu.State.Q);
         Assert.True(cpu.State.M);
         Assert.True(cpu.State.T);
+    }
+
+    [Theory]
+    [InlineData(0x0000_0020u, 0x0000_0003u, false, false, false, 0x0000_003Du, false, true)]
+    [InlineData(0x8000_0000u, 0x0000_0002u, false, false, true, 0xFFFF_FFFFu, false, true)]
+    [InlineData(0x7FFF_FFFFu, 0xFFFF_FFFDu, false, true, false, 0xFFFF_FFFBu, true, false)]
+    [InlineData(0x8000_0000u, 0xFFFF_FFFEu, true, true, true, 0x0000_0003u, true, true)]
+    public void ExecutesDivideStepFromManualState(
+        uint dividend,
+        uint divisor,
+        bool initialM,
+        bool initialQ,
+        bool initialT,
+        uint expectedDividend,
+        bool expectedQ,
+        bool expectedT)
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x3124); // div1 r2,r1
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[1] = dividend;
+        cpu.State.R[2] = divisor;
+        cpu.State.M = initialM;
+        cpu.State.Q = initialQ;
+        cpu.State.T = initialT;
+
+        cpu.Step();
+
+        Assert.Equal(expectedDividend, cpu.State.R[1]);
+        Assert.Equal(initialM, cpu.State.M);
+        Assert.Equal(expectedQ, cpu.State.Q);
+        Assert.Equal(expectedT, cpu.State.T);
     }
 
     [Fact]
