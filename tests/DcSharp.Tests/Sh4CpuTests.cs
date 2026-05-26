@@ -140,6 +140,57 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsIpBinPatternFillLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C00_8F4E, 0x8BC9); // bf 0x8C008EE4
+        WriteInstruction(memory, 0x8C00_8F50, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8F4E);
+        cpu.State.Sr = 0xF0;
+        cpu.State.R[15] = 0x7E00_0F70;
+        memory.WriteUInt16(0x7E00_0F72, 1);
+        memory.WriteUInt16(0x7E00_0F94, 4);
+        memory.WriteUInt32(0x7E00_0F7C, 2);
+        memory.WriteUInt32(0x7E00_0F74, 5);
+        memory.WriteUInt32(0x7E00_0F80, 9);
+        memory.WriteUInt32(0x7E00_0F9C, 0x0000_0020);
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardIpBinPatternFillLoop(branch, 1_000, out var skippedInstructions));
+        Assert.Equal(10UL * 59, skippedInstructions);
+        Assert.Equal(3, memory.ReadUInt16(0x7E00_0F72));
+        Assert.Equal(4u, memory.ReadUInt32(0x7E00_0F7C));
+        Assert.Equal(19u, memory.ReadUInt32(0x7E00_0F80));
+        Assert.Equal(0x8C00_8F50u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+        Assert.False(cpu.State.T);
+    }
+
+    [Fact]
+    public void FastForwardsIpBinFramebufferCopyLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C00_834E, 0x8BFB); // bf 0x8C008348
+        WriteInstruction(memory, 0x8C00_8350, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C00_834E);
+        cpu.State.R[1] = 0xA500_0010;
+        cpu.State.R[4] = 0x8C10_0000;
+        cpu.State.R[7] = 3;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardIpBinFramebufferCopyLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(12UL, skippedInstructions);
+        Assert.Equal(0xA500_0004u, cpu.State.R[1]);
+        Assert.Equal(0x8C10_000Cu, cpu.State.R[4]);
+        Assert.Equal(0u, cpu.State.R[7]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C00_8350u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();

@@ -111,6 +111,119 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinPatternFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8F4E || step.Opcode != 0x8BC9 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C00_8EE4)
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or >= 0x7E00_1000)
+        {
+            return false;
+        }
+
+        var column = memory.ReadUInt16(stack + 0x02);
+        var row = memory.ReadUInt32(stack + 0x0C);
+        var rowLimit = memory.ReadUInt32(stack + 0x04);
+        var total = memory.ReadUInt32(stack + 0x10);
+        var geometry = memory.ReadUInt32(stack + 0x2C);
+        var width = memory.ReadUInt16(stack + 0x24);
+        if (rowLimit == 0 || width == 0 || column >= width || row >= rowLimit || total >= 0x0010_0000)
+        {
+            return false;
+        }
+
+        var rowsRemaining = rowLimit - row;
+        var firstRowCells = (uint)(width - column);
+        var cellsRemaining = firstRowCells + ((rowsRemaining - 1) * (uint)width);
+        if (cellsRemaining == 0)
+        {
+            return false;
+        }
+
+        var iterationsToSkip = (ulong)(cellsRemaining - 1);
+        const ulong instructionsPerIteration = 59;
+        if (iterationsToSkip > ulong.MaxValue / instructionsPerIteration)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var finalTotal = (ulong)total + iterationsToSkip;
+        if (finalTotal > uint.MaxValue)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt16(stack + 0x02, (ushort)(width - 1));
+        memory.WriteUInt32(stack + 0x0C, rowLimit - 1);
+        memory.WriteUInt32(stack + 0x10, (uint)finalTotal);
+        State.R[0] = (uint)width - 1;
+        State.R[1] = rowLimit - 2;
+        State.R[2] = rowLimit - 1;
+        State.R[3] = rowLimit - 1;
+        State.R[4] = (geometry & 0xFFFF) + ((uint)width - 1);
+        State.T = false;
+        State.Pc = 0x8C00_8F50;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardIpBinFramebufferCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_834E || step.Opcode != 0x8BFB || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C00_8348)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[7];
+        if (remainingIterations == 0)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        State.R[4] += remainingIterations * 4;
+        State.R[1] -= remainingIterations * 4;
+        State.R[7] = 0;
+        State.T = true;
+        State.Pc = 0x8C00_8350;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

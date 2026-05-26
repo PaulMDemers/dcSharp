@@ -1,7 +1,7 @@
 param(
     [int]$ScanSectors = 1024,
     [int]$VBlankInterval = 1000,
-    [int]$BootstrapInstructions = 1200000,
+    [int]$BootstrapInstructions = 8000000,
     [int]$LegacyInstructions = 50000
 )
 
@@ -71,15 +71,17 @@ $legacy = Join-Path $repoRoot "retail_discs\Legacy of Kain - Soul Reaver (USA)\L
 
 $doaOutput = Invoke-BootSmoke "Dead or Alive 2" $deadOrAlive $BootstrapInstructions
 if ($doaOutput) {
-    Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: InstructionLimit"
-    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C008EF0"
+    Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: FirmwareExit"
+    Assert-Contains "Dead or Alive 2" $doaOutput "System BIOS call requested: function=0"
+    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C0000E8"
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
 }
 
 $raymanOutput = Invoke-BootSmoke "Rayman 2" $rayman $BootstrapInstructions
 if ($raymanOutput) {
-    Assert-Contains "Rayman 2" $raymanOutput "Stopped: InstructionLimit"
-    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C008EF0"
+    Assert-Contains "Rayman 2" $raymanOutput "Stopped: FirmwareExit"
+    Assert-Contains "Rayman 2" $raymanOutput "System BIOS call requested: function=0"
+    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0000E8"
     Assert-NotContains "Rayman 2" $raymanOutput "Stopped on Unmapped"
 }
 
