@@ -2,7 +2,7 @@ param(
     [int]$ScanSectors = 1024,
     [int]$VBlankInterval = 1000,
     [int]$BootstrapInstructions = 8000000,
-    [int]$LegacyInstructions = 50000
+    [int]$LegacyInstructions = 8000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,8 +87,9 @@ if ($raymanOutput) {
 
 $legacyOutput = Invoke-BootSmoke "Legacy of Kain" $legacy $LegacyInstructions
 if ($legacyOutput) {
-    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: InstructionLimit"
-    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C008374"
+    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: FirmwareExit"
+    Assert-Contains "Legacy of Kain" $legacyOutput "System BIOS soft reset requested: function=0"
+    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C0000E8"
 }
 
 Write-Host "Retail probes completed."
