@@ -119,7 +119,7 @@ dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json
 dotnet run --project src/DcSharp.Cli -- media inspect path/to/disc.cue
 dotnet run --project src/DcSharp.Cli -- media extract-boot path/to/disc.cue --out artifacts/retail/1ST_READ.BIN
 dotnet run --project src/DcSharp.Cli -- media analyze-boot artifacts/retail/1ST_READ.BIN --out-descrambled artifacts/retail/1ST_READ.descrambled.BIN
-dotnet run --project src/DcSharp.Cli -- media boot-smoke path/to/disc.cue --instructions 2000 --trace-tail 16
+dotnet run --project src/DcSharp.Cli -- media boot-smoke path/to/disc.cue --instructions 2000 --trace-tail 16 --stop-on-unmapped
 ```
 
 Useful run options:
@@ -139,7 +139,7 @@ Useful run options:
 - `media inspect path` loads raw/CUE/GDI media, reports synthesized GD-ROM geometry, lists CUE tracks when present, scans early candidate sectors for Dreamcast IP.BIN-style boot metadata, and prints fields such as area, product, version, boot file, software maker, and title. For CUE inputs it also scans adjacent `.bin` files in the same directory and reports boot-sector candidates, which helps diagnose dumps whose CUE points at a merged or incomplete file while numbered track files are also present. Use `--scan-sectors <count>` to widen or narrow the boot-sector scan and `--json` for structured output.
 - `media extract-boot path --out output.bin` inspects the media, finds the IP.BIN boot filename such as `1ST_READ.BIN`, opens the ISO9660 filesystem from the selected media or an adjacent CUE boot candidate, and writes the boot file to disk. Use `--json` for scriptable metadata including source path, ISO extent, title, volume identifier, and byte count.
 - `media analyze-boot path` accepts a CUE/GDI descriptor or an already extracted boot binary, compares the original bytes with the KallistiOS/Marcus Comstedt descrambled layout, reports ELF/startup-stub/opcode-sample heuristics, assumes the BIOS boot load address `0x8C010000`, and can write the descrambled candidate with `--out-descrambled`.
-- `media boot-smoke path` accepts a CUE/GDI descriptor or an already extracted boot binary, selects the analyzed original/descrambled layout with `--layout auto|original|descrambled`, maps it at the BIOS boot address `0x8C010000`, seeds IP.BIN at `0x8C008000` when media metadata is available, and runs the normal emulator loop with the same run options as `dcsharp run`.
+- `media boot-smoke path` accepts a CUE/GDI descriptor or an already extracted boot binary, selects the analyzed original/descrambled layout with `--layout auto|original|descrambled`, maps it at the BIOS boot address `0x8C010000`, seeds IP.BIN at `0x8C008000` when media metadata is available, and runs the normal emulator loop with the same run options as `dcsharp run`. It also reports writes into key boot regions and can stop at the first selected diagnostic boundary with `--stop-on-unmapped` or `--stop-on-device-domain <domain>`.
 - `--trace-log artifacts/logs/trace.txt --trace-pc 0x8C010000-0x8C010100 --trace-log-limit 4096` writes a bounded filtered SH-4 trace.
 - `--device-log artifacts/logs/devices.txt --device-domain pvr --device-kind Write` writes filtered device accesses.
 - `--json` or `--summary-json` emits structured output for scripts and regression checks.

@@ -312,6 +312,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("Bytes loaded: 16", result.StandardOutput);
             Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
             Assert.Contains("PC: 0x8C010006", result.StandardOutput);
+            Assert.Contains("Boot region writes:", result.StandardOutput);
         }
         finally
         {
@@ -346,6 +347,41 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("Source kind: media-extracted", result.StandardOutput);
             Assert.Contains("IP.BIN seeded: True", result.StandardOutput);
             Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MediaBootSmokeCommandCanStopOnUnmappedAccess()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateUnmappedReadBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "10",
+                "--trace-tail",
+                "4",
+                "--stop-on-unmapped");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: DeviceAccessStop", result.StandardOutput);
+            Assert.Contains("Stopped on UnmappedRead at 0x2D2D2D0A", result.StandardOutput);
         }
         finally
         {
@@ -527,6 +563,15 @@ public class DcSharpCliMediaLoadingIntegrationTests
 
         return data;
     }
+
+    private static byte[] CreateUnmappedReadBootBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x10, 0x60, // mov.b @r1,r0
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x0A, 0x2D, 0x2D, 0x2D
+    ];
 
     private static byte[] ToCdSectors(byte[] isoImage)
     {

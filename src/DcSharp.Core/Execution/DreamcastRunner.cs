@@ -35,6 +35,7 @@ public sealed class DreamcastRunner
     private static DreamcastRunResult RunLoaded(DreamcastMemory memory, ElfLoadResult load, DreamcastRunOptions options)
     {
         FirmwareStubs.Install(memory);
+        memory.ResetSystemRamWriteCounters();
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
         var cpu = new Sh4Cpu(memory, load.EntryPoint, firmwareTrap.TryHandle);
         var scheduler = new DreamcastEventScheduler(memory, options);
@@ -46,6 +47,7 @@ public sealed class DreamcastRunner
             while (cpu.State.InstructionsExecuted < options.InstructionLimit)
             {
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
+                var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
                 var step = cpu.Step();
                 if (step.Trace == "sleep" || IsSideEffectFreeIdleLoop(step, memory))
                 {
@@ -71,6 +73,11 @@ public sealed class DreamcastRunner
                     {
                         traceTail.Dequeue();
                     }
+                }
+
+                if (ShouldStopOnDeviceAccess(options, memory.DeviceAccesses, deviceAccessCountBeforeStep, out var stopAccess, out var stopDetail))
+                {
+                    return DreamcastRunResult.DeviceAccessStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), stopAccess, stopDetail);
                 }
             }
 
@@ -115,6 +122,41 @@ public sealed class DreamcastRunner
 
     private static bool Contains(uint start, uint length, uint address) =>
         address >= start && (ulong)address < (ulong)start + length;
+
+    private static bool ShouldStopOnDeviceAccess(
+        DreamcastRunOptions options,
+        IReadOnlyList<MemoryAccess> deviceAccesses,
+        int previousCount,
+        out MemoryAccess stopAccess,
+        out string detail)
+    {
+        stopAccess = default!;
+        detail = string.Empty;
+        if (!options.StopOnUnmappedAccess && string.IsNullOrWhiteSpace(options.StopOnDeviceDomain))
+        {
+            return false;
+        }
+
+        foreach (var access in deviceAccesses.Skip(previousCount))
+        {
+            if (options.StopOnUnmappedAccess && access.Kind is MemoryAccessKind.UnmappedRead or MemoryAccessKind.UnmappedWrite)
+            {
+                stopAccess = access;
+                detail = $"Stopped on {access.Kind} at 0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}";
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.StopOnDeviceDomain)
+                && string.Equals(DreamcastDeviceDomainClassifier.Classify(access), options.StopOnDeviceDomain, StringComparison.OrdinalIgnoreCase))
+            {
+                stopAccess = access;
+                detail = $"Stopped on device domain '{options.StopOnDeviceDomain}' at 0x{access.Address:X8}, kind={access.Kind}, size={access.Size}, value=0x{access.Value:X8}";
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     internal static bool IsSideEffectFreeIdleLoop(Sh4StepResult step, DreamcastMemory memory)
     {
@@ -207,7 +249,9 @@ public sealed record DreamcastRunOptions(
     DreamcastControllerState? ControllerB = null,
     IReadOnlyDictionary<byte, DreamcastControllerState>? Controllers = null,
     IReadOnlyDictionary<byte, DreamcastControllerScript>? ControllerScripts = null,
-    IDreamcastMediaImage? Media = null);
+    IDreamcastMediaImage? Media = null,
+    bool StopOnUnmappedAccess = false,
+    string? StopOnDeviceDomain = null);
 
 public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,
@@ -241,6 +285,7 @@ public sealed record DreamcastRunResult(
     IReadOnlyList<Sh4StepResult> TraceTail,
     IReadOnlyList<Sh4StepResult> TraceLog,
     IReadOnlyList<MemoryAccess> DeviceAccesses,
+    IReadOnlyList<DreamcastMemoryRegionWriteSummary> MemoryRegionWrites,
     IReadOnlyList<byte> SerialOutput,
     DreamcastAsicSnapshot Asic,
     DreamcastVideoSnapshot Video,
@@ -269,7 +314,7 @@ public sealed record DreamcastRunResult(
         DreamcastSchedulerSnapshot scheduler,
         DreamcastGdromSnapshot gdrom,
         DreamcastTimerSnapshot timer) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.InstructionLimit, "Instruction limit reached", null, null, gdrom, timer);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.InstructionLimit, "Instruction limit reached", null, null, gdrom, timer);
 
     public static DreamcastRunResult UnsupportedInstruction(
         ElfLoadResult load,
@@ -289,7 +334,7 @@ public sealed record DreamcastRunResult(
         uint pc,
         ushort opcode,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.UnsupportedInstruction, detail, pc, opcode, gdrom, timer);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.UnsupportedInstruction, detail, pc, opcode, gdrom, timer);
 
     public static DreamcastRunResult ProgramExit(
         ElfLoadResult load,
@@ -309,7 +354,7 @@ public sealed record DreamcastRunResult(
         uint pc,
         ushort opcode,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS shutdown at 0x{pc:X8}: {detail}", pc, opcode, gdrom, timer);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS shutdown at 0x{pc:X8}: {detail}", pc, opcode, gdrom, timer);
 
     public static DreamcastRunResult MemoryFault(
         ElfLoadResult load,
@@ -327,7 +372,7 @@ public sealed record DreamcastRunResult(
         DreamcastGdromSnapshot gdrom,
         DreamcastTimerSnapshot timer,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.MemoryFault, detail, state.Pc, null, gdrom, timer);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.MemoryFault, detail, state.Pc, null, gdrom, timer);
 
     public static DreamcastRunResult FirmwareExit(
         ElfLoadResult load,
@@ -345,7 +390,26 @@ public sealed record DreamcastRunResult(
         DreamcastGdromSnapshot gdrom,
         DreamcastTimerSnapshot timer,
         string detail) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.FirmwareExit, detail, state.Pc, null, gdrom, timer);
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.FirmwareExit, detail, state.Pc, null, gdrom, timer);
+
+    public static DreamcastRunResult DeviceAccessStop(
+        ElfLoadResult load,
+        Sh4State state,
+        DreamcastMemory memory,
+        IReadOnlyList<Sh4StepResult> traceTail,
+        IReadOnlyList<Sh4StepResult> traceLog,
+        IReadOnlyList<MemoryAccess> deviceAccesses,
+        IReadOnlyList<byte> serialOutput,
+        DreamcastAsicSnapshot asic,
+        DreamcastVideoSnapshot video,
+        DreamcastAudioSnapshot audio,
+        DreamcastMapleSnapshot maple,
+        DreamcastSchedulerSnapshot scheduler,
+        DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
+        MemoryAccess access,
+        string detail) =>
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, deviceAccesses, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.DeviceAccessStop, detail, state.Pc, null, gdrom, timer);
 }
 
 public sealed record Sh4StateSnapshot(
@@ -389,5 +453,6 @@ public enum DreamcastStopReason
     UnsupportedInstruction,
     MemoryFault,
     FirmwareExit,
-    ProgramExit
+    ProgramExit,
+    DeviceAccessStop
 }

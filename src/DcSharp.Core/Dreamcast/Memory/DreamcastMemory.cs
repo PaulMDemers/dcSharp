@@ -95,6 +95,13 @@ public sealed class DreamcastMemory
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly List<byte> serialOutput = [];
+    private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
+    [
+        new("IP.BIN", 0x8C00_8000, 0x8000),
+        new("Boot work", 0x8C00_C000, 0x4000),
+        new("Boot binary", 0x8C01_0000, 0x200000),
+        new("High RAM init", 0x8C1D_0000, 0x150000)
+    ];
 
     public DreamcastMemory(
         DreamcastControllerState? controllerA = null,
@@ -123,6 +130,19 @@ public sealed class DreamcastMemory
     public int PvrVramBytes => pvrVram.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
+
+    public void ResetSystemRamWriteCounters()
+    {
+        foreach (var counter in systemRamWriteCounters)
+        {
+            counter.Reset();
+        }
+    }
+
+    public IReadOnlyList<DreamcastMemoryRegionWriteSummary> CreateSystemRamWriteSummary() =>
+        systemRamWriteCounters
+            .Select(counter => counter.CreateSummary())
+            .ToArray();
 
     public DreamcastSh4EventRegistersSnapshot CreateSh4EventRegistersSnapshot() =>
         new(
@@ -279,6 +299,7 @@ public sealed class DreamcastMemory
             return;
         }
 
+        RecordSystemRamWrite(address, data.Length);
         data.CopyTo(systemRam.AsSpan(offset));
     }
 
@@ -1402,6 +1423,19 @@ public sealed class DreamcastMemory
         _ => (uint)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24))
     };
 
+    private void RecordSystemRamWrite(uint address, int length)
+    {
+        if (length <= 0)
+        {
+            return;
+        }
+
+        foreach (var counter in systemRamWriteCounters)
+        {
+            counter.Record(address, length);
+        }
+    }
+
     private bool TryWritePvrTa(uint address, ReadOnlySpan<byte> data)
     {
         var physical = TranslateAddress(address);
@@ -1939,6 +1973,69 @@ public sealed record DreamcastSh4EventRegistersSnapshot(
     uint Tra,
     uint Expevt,
     uint Intevt);
+
+public sealed record DreamcastMemoryRegionWriteSummary(
+    string Name,
+    uint Start,
+    string StartHex,
+    uint End,
+    string EndHex,
+    ulong WriteCount,
+    ulong BytesWritten,
+    uint? FirstAddress,
+    string? FirstAddressHex,
+    uint? LastAddress,
+    string? LastAddressHex);
+
+internal sealed class DreamcastMemoryRegionWriteCounter(string name, uint start, uint length)
+{
+    private readonly uint end = start + length;
+
+    public ulong WriteCount { get; private set; }
+    public ulong BytesWritten { get; private set; }
+    public uint? FirstAddress { get; private set; }
+    public uint? LastAddress { get; private set; }
+
+    public void Reset()
+    {
+        WriteCount = 0;
+        BytesWritten = 0;
+        FirstAddress = null;
+        LastAddress = null;
+    }
+
+    public void Record(uint address, int length)
+    {
+        var translated = DreamcastMemory.TranslateAddress(address) | 0x8000_0000u;
+        var writeStart = translated;
+        var writeEnd = (ulong)translated + (uint)length;
+        if (writeEnd <= start || writeStart >= end)
+        {
+            return;
+        }
+
+        var overlapStart = Math.Max(writeStart, start);
+        var overlapEnd = Math.Min(writeEnd, end);
+        WriteCount++;
+        BytesWritten += overlapEnd - overlapStart;
+        FirstAddress ??= overlapStart;
+        LastAddress = (uint)(overlapEnd - 1);
+    }
+
+    public DreamcastMemoryRegionWriteSummary CreateSummary() =>
+        new(
+            name,
+            start,
+            $"0x{start:X8}",
+            end,
+            $"0x{end:X8}",
+            WriteCount,
+            BytesWritten,
+            FirstAddress,
+            FirstAddress is { } first ? $"0x{first:X8}" : null,
+            LastAddress,
+            LastAddress is { } last ? $"0x{last:X8}" : null);
+}
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 

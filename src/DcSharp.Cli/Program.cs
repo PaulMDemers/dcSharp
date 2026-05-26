@@ -383,7 +383,7 @@ static void BootSmoke(string path, string[] args)
     var summary = DreamcastRunSummary.FromResult(result, options.Emulation);
     if (options.EmitJson)
     {
-        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, ipBin is not null, summary)));
+        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, ipBin is not null, result.MemoryRegionWrites, summary)));
         return;
     }
 
@@ -404,6 +404,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
+    PrintMemoryRegionWrites(result.MemoryRegionWrites);
 
     if (result.DeviceAccesses.Count > 0)
     {
@@ -420,6 +421,20 @@ static void BootSmoke(string path, string[] args)
         {
             Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
         }
+    }
+}
+
+static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSummary> writes)
+{
+    if (writes.Count == 0)
+    {
+        return;
+    }
+
+    Console.WriteLine("Boot region writes:");
+    foreach (var region in writes)
+    {
+        Console.WriteLine($"  {region.Name}: writes={region.WriteCount}, bytes={region.BytesWritten}, range={region.StartHex}-{region.EndHex}, first={region.FirstAddressHex ?? "none"}, last={region.LastAddressHex ?? "none"}");
     }
 }
 
@@ -1009,6 +1024,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     AddressRange? deviceAddressRange = null;
     string? deviceDomain = null;
     string? mediaPath = null;
+    var stopOnUnmapped = false;
+    string? stopOnDeviceDomain = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -1100,6 +1117,13 @@ static CliRunOptions ParseRunOptions(string[] args)
                 mediaPath = args[index + 1];
                 index++;
                 break;
+            case "--stop-on-unmapped":
+                stopOnUnmapped = true;
+                break;
+            case "--stop-on-device-domain" when index + 1 < args.Length:
+                stopOnDeviceDomain = ParseDeviceDomain(args[index + 1]);
+                index++;
+                break;
             default:
                 throw new InvalidDataException($"Unknown or invalid run option: {args[index]}");
         }
@@ -1138,7 +1162,9 @@ static CliRunOptions ParseRunOptions(string[] args)
             controllerB,
             controllers.Count == 0 ? null : controllers,
             controllerScripts.Count == 0 ? null : controllerScripts,
-            media),
+            media,
+            stopOnUnmapped,
+            stopOnDeviceDomain),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -1325,7 +1351,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--stop-on-unmapped] [--stop-on-device-domain domain] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
@@ -1386,6 +1412,7 @@ internal sealed record BootSmokeCliReport(
     DreamcastBootBinaryAnalysis Analysis,
     string SelectedLayout,
     bool IpBinSeeded,
+    IReadOnlyList<DreamcastMemoryRegionWriteSummary> MemoryRegionWrites,
     DreamcastRunSummary Summary);
 
 internal sealed record AddressRange(uint Start, uint End)
