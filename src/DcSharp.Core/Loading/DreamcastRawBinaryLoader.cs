@@ -1,0 +1,25 @@
+using DcSharp.Core.Dreamcast.Memory;
+
+namespace DcSharp.Core.Loading;
+
+public sealed class DreamcastRawBinaryLoader
+{
+    public const uint DefaultLoadAddress = 0x8C01_0000;
+
+    public ElfLoadResult Load(ReadOnlySpan<byte> data, DreamcastMemory memory, uint loadAddress = DefaultLoadAddress)
+    {
+        ArgumentNullException.ThrowIfNull(memory);
+        if (data.Length == 0)
+        {
+            throw new InvalidDataException("Raw Dreamcast boot binary is empty.");
+        }
+
+        memory.Write(loadAddress, data);
+        var size = (uint)data.Length;
+        return new ElfLoadResult(
+            loadAddress,
+            DreamcastMemory.TranslateAddress(loadAddress),
+            [new LoadedSegment(0, loadAddress, DreamcastMemory.TranslateAddress(loadAddress), size, size, 0x5, 4)],
+            []);
+    }
+}

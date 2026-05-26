@@ -27,6 +27,26 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunsRawBootBinaryAtDreamcastBootAddress()
+    {
+        var raw = new byte[16];
+        for (var offset = 0; offset < raw.Length; offset += 2)
+        {
+            raw[offset] = 0x09;
+            raw[offset + 1] = 0x00;
+        }
+
+        var result = new DreamcastRunner().RunRawBinary(raw, new DreamcastRunOptions(InstructionLimit: 3, TraceTailLength: 2));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(0x8C01_0000u, result.Load.EntryPoint);
+        Assert.Equal(0x0C01_0000u, result.Load.TranslatedEntryPoint);
+        Assert.Equal(16u, result.Load.LoadedBytes);
+        Assert.Equal(0x8C01_0006u, result.Cpu.Pc);
+        Assert.Equal(2, result.TraceTail.Count);
+    }
+
+    [Fact]
     public void CapturesFilteredTraceLog()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));

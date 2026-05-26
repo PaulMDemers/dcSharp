@@ -34,6 +34,9 @@ try
         case "media" when args.Length >= 3 && args[1] == "analyze-boot":
             AnalyzeBoot(args[2], args[3..]);
             return 0;
+        case "media" when args.Length >= 3 && args[1] == "boot-smoke":
+            BootSmoke(args[2], args[3..]);
+            return 0;
         case "run" when args.Length >= 2:
             RunElf(args[1], args[2..]);
             return 0;
@@ -333,6 +336,134 @@ static void PrintBootBinaryCandidate(DreamcastBootBinaryCandidate candidate)
     Console.WriteLine($"  NOP/zero/fill opcodes: {candidate.NopCount}/{candidate.ZeroOpcodeCount}/{candidate.FillOpcodeCount}");
     Console.WriteLine($"  First words: {candidate.FirstWordsHex}");
     Console.WriteLine($"  First bytes: {candidate.FirstBytesHex}");
+}
+
+static void BootSmoke(string path, string[] args)
+{
+    var (scanSectors, requestedLayout, runArgs) = ParseBootSmokeOptions(args);
+    var (data, sourcePath, sourceKind) = ReadBootAnalysisInput(path, scanSectors);
+    var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, sourcePath, sourceKind);
+    var selectedLayout = ResolveBootLayout(requestedLayout, analysis);
+    var bootBytes = selectedLayout == "descrambled"
+        ? DreamcastBootScrambler.Descramble(data)
+        : data;
+    var options = ParseRunOptions(runArgs);
+    if (IsMediaDescriptorPath(path))
+    {
+        options = options with
+        {
+            Emulation = options.Emulation with { Media = DreamcastMediaImageLoader.LoadFromFile(path) }
+        };
+    }
+
+    var result = new DreamcastRunner().RunRawBinary(bootBytes, options.Emulation, analysis.LoadAddress);
+
+    if (options.FramebufferDumpPath is not null)
+    {
+        DumpFramebuffer(result, options);
+    }
+
+    if (options.AudioWavPath is not null)
+    {
+        DumpAudioWav(result, options.AudioWavPath);
+    }
+
+    if (options.TraceLogPath is not null)
+    {
+        DumpTraceLog(result, options.TraceLogPath);
+    }
+
+    if (options.DeviceLogPath is not null)
+    {
+        DumpDeviceLog(result, options);
+    }
+
+    var summary = DreamcastRunSummary.FromResult(result, options.Emulation);
+    if (options.EmitJson)
+    {
+        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, summary)));
+        return;
+    }
+
+    Console.WriteLine($"Source: {analysis.SourcePath}");
+    Console.WriteLine($"Source kind: {analysis.SourceKind}");
+    Console.WriteLine($"Selected layout: {selectedLayout}");
+    Console.WriteLine($"Analyzer recommendation: {analysis.RecommendedLayout}");
+    Console.WriteLine($"Load address: {analysis.LoadAddressHex}");
+    Console.WriteLine($"Bytes loaded: {bootBytes.Length}");
+    Console.WriteLine($"Instructions: {result.Cpu.InstructionsExecuted}");
+    Console.WriteLine($"PC: 0x{result.Cpu.Pc:X8}");
+    Console.WriteLine($"PR: 0x{result.Cpu.Pr:X8}");
+    Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
+    Console.WriteLine($"Stopped: {result.StopReason}");
+    Console.WriteLine($"Detail: {result.StopDetail}");
+    Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
+    Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
+    var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
+    Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
+
+    if (result.DeviceAccesses.Count > 0)
+    {
+        foreach (var access in result.DeviceAccesses.TakeLast(8))
+        {
+            Console.WriteLine($"  {access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+        }
+    }
+
+    if (result.TraceTail.Count > 0)
+    {
+        Console.WriteLine("Trace tail:");
+        foreach (var step in result.TraceTail)
+        {
+            Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
+        }
+    }
+}
+
+static (int ScanSectors, string Layout, string[] RunArgs) ParseBootSmokeOptions(string[] args)
+{
+    var scanSectors = 1024;
+    var layout = "auto";
+    var runArgs = new List<string>();
+    for (var index = 0; index < args.Length; index++)
+    {
+        switch (args[index])
+        {
+            case "--scan-sectors" when index + 1 < args.Length && int.TryParse(args[index + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScanSectors):
+                scanSectors = parsedScanSectors;
+                index++;
+                break;
+            case "--layout" when index + 1 < args.Length:
+                layout = args[index + 1].ToLowerInvariant();
+                if (layout is not ("auto" or "original" or "descrambled"))
+                {
+                    throw new InvalidDataException("--layout must be auto, original, or descrambled.");
+                }
+
+                index++;
+                break;
+            default:
+                runArgs.Add(args[index]);
+                break;
+        }
+    }
+
+    if (scanSectors < 0)
+    {
+        throw new InvalidDataException("--scan-sectors must be zero or greater.");
+    }
+
+    return (scanSectors, layout, runArgs.ToArray());
+}
+
+static string ResolveBootLayout(string requestedLayout, DreamcastBootBinaryAnalysis analysis)
+{
+    if (requestedLayout is "original" or "descrambled")
+    {
+        return requestedLayout;
+    }
+
+    return analysis.RecommendedLayout == "descrambled" ? "descrambled" : "original";
 }
 
 static void RunElf(string path, string[] args)
@@ -1175,6 +1306,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media inspect <path-to-media> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
+    Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -1231,6 +1363,11 @@ internal sealed record BootExtractionCliReport(
     uint FileLength,
     int BytesWritten,
     IReadOnlyList<string> PriorAttempts);
+
+internal sealed record BootSmokeCliReport(
+    DreamcastBootBinaryAnalysis Analysis,
+    string SelectedLayout,
+    DreamcastRunSummary Summary);
 
 internal sealed record AddressRange(uint Start, uint End)
 {

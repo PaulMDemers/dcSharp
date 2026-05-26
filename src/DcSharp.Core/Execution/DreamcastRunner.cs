@@ -20,6 +20,20 @@ public sealed class DreamcastRunner
 
         var memory = new DreamcastMemory(options.ControllerA, options.ControllerB, options.Controllers, options.Media);
         var load = new DreamcastElfLoader().Load(elf, memory);
+        return RunLoaded(memory, load, options);
+    }
+
+    public DreamcastRunResult RunRawBinary(ReadOnlySpan<byte> data, DreamcastRunOptions options, uint loadAddress = DreamcastRawBinaryLoader.DefaultLoadAddress)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var memory = new DreamcastMemory(options.ControllerA, options.ControllerB, options.Controllers, options.Media);
+        var load = new DreamcastRawBinaryLoader().Load(data, memory, loadAddress);
+        return RunLoaded(memory, load, options);
+    }
+
+    private static DreamcastRunResult RunLoaded(DreamcastMemory memory, ElfLoadResult load, DreamcastRunOptions options)
+    {
         FirmwareStubs.Install(memory);
         var firmwareTrap = FirmwareStubs.CreateTrapHandler();
         var cpu = new Sh4Cpu(memory, load.EntryPoint, firmwareTrap.TryHandle);

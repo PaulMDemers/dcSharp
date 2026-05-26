@@ -292,6 +292,34 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandRunsRawBootBinary()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateNopBootBinary());
+
+            var result = RunCli(cli, repoRoot, "media", "boot-smoke", bootPath, "--instructions", "3", "--trace-tail", "2");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Selected layout: original", result.StandardOutput);
+            Assert.Contains("Load address: 0x8C010000", result.StandardOutput);
+            Assert.Contains("Bytes loaded: 16", result.StandardOutput);
+            Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+            Assert.Contains("PC: 0x8C010006", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -449,6 +477,18 @@ public class DcSharpCliMediaLoadingIntegrationTests
         for (var index = 0; index < words.Length; index++)
         {
             System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(index * 2, 2), words[index]);
+        }
+
+        return data;
+    }
+
+    private static byte[] CreateNopBootBinary()
+    {
+        var data = new byte[16];
+        for (var offset = 0; offset < data.Length; offset += 2)
+        {
+            data[offset] = 0x09;
+            data[offset + 1] = 0x00;
         }
 
         return data;
