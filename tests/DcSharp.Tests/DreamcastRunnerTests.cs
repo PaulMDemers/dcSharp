@@ -177,6 +177,36 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesStackWordsInCpuSnapshot()
+    {
+        var memory = new DreamcastMemory();
+        var state = new Sh4State();
+        state.R[15] = 0x7E00_0FF8;
+        memory.WriteUInt32(0x7E00_0FF8, 0x1234_5678);
+        memory.WriteUInt32(0x7E00_0FFC, 0xAABB_CCDD);
+
+        var snapshot = Sh4StateSnapshot.From(state, memory);
+
+        Assert.Collection(
+            snapshot.StackWords!,
+            word =>
+            {
+                Assert.Equal(0x7E00_0FF8u, word.Address);
+                Assert.Equal("0x7E000FF8", word.AddressHex);
+                Assert.Equal(0x1234_5678u, word.Value);
+                Assert.Equal("0x12345678", word.ValueHex);
+            },
+            word =>
+            {
+                Assert.Equal(0x7E00_0FFCu, word.Address);
+                Assert.Equal("0x7E000FFC", word.AddressHex);
+                Assert.Equal(0xAABB_CCDDu, word.Value);
+                Assert.Equal("0xAABBCCDD", word.ValueHex);
+            });
+        Assert.Empty(memory.DeviceAccesses);
+    }
+
+    [Fact]
     public void BuildsStructuredRunSummary()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateKosExitFallthroughElf()));

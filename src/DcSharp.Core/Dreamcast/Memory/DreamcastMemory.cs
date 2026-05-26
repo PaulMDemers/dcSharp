@@ -532,6 +532,42 @@ public sealed class DreamcastMemory
             | (systemRam[offset + 3] << 24));
     }
 
+    public bool TryPeekUInt32(uint address, out uint value)
+    {
+        value = 0;
+        if (TryGetPvrVramOffset(address, 4, out var vramOffset))
+        {
+            value = ReadUInt32From(pvrVram, vramOffset);
+            return true;
+        }
+
+        if (TryGetAicaRamOffset(address, 4, out var aicaOffset))
+        {
+            value = ReadUInt32From(aicaRam, aicaOffset);
+            return true;
+        }
+
+        if (TryGetOperandCacheRamOffset(address, 4, out var operandCacheRam, out var operandCacheOffset))
+        {
+            value = ReadUInt32From(operandCacheRam, operandCacheOffset);
+            return true;
+        }
+
+        if (TryGetSystemRamOffset(address, 4, out var systemRamOffset))
+        {
+            value = ReadUInt32From(systemRam, systemRamOffset);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static uint ReadUInt32From(byte[] bytes, int offset) =>
+        (uint)(bytes[offset]
+            | (bytes[offset + 1] << 8)
+            | (bytes[offset + 2] << 16)
+            | (bytes[offset + 3] << 24));
+
     public uint ExecuteGdromCommand(uint parameterAddress)
     {
         if (parameterAddress == 0)

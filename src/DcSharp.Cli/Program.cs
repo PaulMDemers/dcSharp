@@ -418,6 +418,7 @@ static void BootSmoke(string path, string[] args)
     PrintGeneralRegisters(result.Cpu);
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
+    PrintSoftResetCheckpoint(result);
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
@@ -450,6 +451,22 @@ static void PrintGeneralRegisters(Sh4StateSnapshot cpu)
 
 static string FormatRegisterRange(IReadOnlyList<uint> registers, int start, int count) =>
     string.Join(" ", Enumerable.Range(start, count).Select(index => $"R{index}=0x{registers[index]:X8}"));
+
+static void PrintSoftResetCheckpoint(DreamcastRunResult result)
+{
+    if (result.StopReason != DreamcastStopReason.FirmwareExit
+        || !result.StopDetail.StartsWith("System BIOS soft reset requested", StringComparison.Ordinal)
+        || result.Cpu.StackWords is not { Count: > 0 } stackWords)
+    {
+        return;
+    }
+
+    Console.WriteLine("IP.BIN reset checkpoint stack:");
+    foreach (var word in stackWords)
+    {
+        Console.WriteLine($"  {word.AddressHex}: {word.ValueHex}");
+    }
+}
 
 static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSummary> writes)
 {

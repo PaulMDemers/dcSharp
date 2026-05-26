@@ -70,6 +70,29 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void TryPeekUInt32ReadsMappedRamWithoutRecordingDeviceAccess()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x7E00_0FF8, 0x1234_5678);
+
+        Assert.True(memory.TryPeekUInt32(0x7E00_0FF8, out var value));
+
+        Assert.Equal(0x1234_5678u, value);
+        Assert.Empty(memory.DeviceAccesses);
+    }
+
+    [Fact]
+    public void TryPeekUInt32RejectsUnmappedMemoryWithoutRecordingDeviceAccess()
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.False(memory.TryPeekUInt32(0x3304_41F0, out var value));
+
+        Assert.Equal(0u, value);
+        Assert.Empty(memory.DeviceAccesses);
+    }
+
+    [Fact]
     public void GdromSnapshotReportsMediaReadCommands()
     {
         var media = new RawSectorMediaImage(CreateMediaData(2), 2048);

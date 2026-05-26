@@ -443,7 +443,8 @@ public sealed record Sh4StateSnapshot(
     uint Ssr = 0,
     uint Tra = 0,
     uint Expevt = 0,
-    uint Intevt = 0)
+    uint Intevt = 0,
+    IReadOnlyList<Sh4StackWord>? StackWords = null)
 {
     public static Sh4StateSnapshot From(Sh4State state, DreamcastMemory? memory = null)
     {
@@ -461,9 +462,36 @@ public sealed record Sh4StateSnapshot(
             state.Ssr,
             events.Tra,
             events.Expevt,
-            events.Intevt);
+            events.Intevt,
+            CaptureStackWords(state, memory));
+    }
+
+    private static IReadOnlyList<Sh4StackWord> CaptureStackWords(Sh4State state, DreamcastMemory? memory)
+    {
+        const int stackWordsToCapture = 8;
+        if (memory is null)
+        {
+            return [];
+        }
+
+        var words = new List<Sh4StackWord>(stackWordsToCapture);
+        var stackPointer = state.R[15];
+        for (var index = 0; index < stackWordsToCapture; index++)
+        {
+            var address = stackPointer + ((uint)index * 4);
+            if (!memory.TryPeekUInt32(address, out var value))
+            {
+                break;
+            }
+
+            words.Add(new Sh4StackWord(address, $"0x{address:X8}", value, $"0x{value:X8}"));
+        }
+
+        return words;
     }
 }
+
+public sealed record Sh4StackWord(uint Address, string AddressHex, uint Value, string ValueHex);
 
 public enum DreamcastStopReason
 {
