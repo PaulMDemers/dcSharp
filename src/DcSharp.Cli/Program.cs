@@ -415,6 +415,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"PC: 0x{result.Cpu.Pc:X8}");
     Console.WriteLine($"PR: 0x{result.Cpu.Pr:X8}");
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
+    PrintGeneralRegisters(result.Cpu);
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
@@ -440,6 +441,15 @@ static void BootSmoke(string path, string[] args)
         }
     }
 }
+
+static void PrintGeneralRegisters(Sh4StateSnapshot cpu)
+{
+    Console.WriteLine($"R0-R7: {FormatRegisterRange(cpu.R, 0, 8)}");
+    Console.WriteLine($"R8-R15: {FormatRegisterRange(cpu.R, 8, 8)}");
+}
+
+static string FormatRegisterRange(IReadOnlyList<uint> registers, int start, int count) =>
+    string.Join(" ", Enumerable.Range(start, count).Select(index => $"R{index}=0x{registers[index]:X8}"));
 
 static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSummary> writes)
 {

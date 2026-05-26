@@ -312,6 +312,8 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("Bytes loaded: 16", result.StandardOutput);
             Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
             Assert.Contains("PC: 0x8C010006", result.StandardOutput);
+            Assert.Contains("R0-R7: R0=0x00000000 R1=0x00000000 R2=0x00000000 R3=0x00000000 R4=0x00000000 R5=0x00000000 R6=0x00000000 R7=0x00000000", result.StandardOutput);
+            Assert.Contains("R8-R15: R8=0x00000000 R9=0x00000000 R10=0x00000000 R11=0x00000000 R12=0x00000000 R13=0x00000000 R14=0x00000000 R15=0x8D000000", result.StandardOutput);
             Assert.Contains("Boot region writes:", result.StandardOutput);
         }
         finally
