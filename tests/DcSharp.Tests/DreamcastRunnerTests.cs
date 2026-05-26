@@ -433,6 +433,41 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunFastForwardsUncapturedLoopsWhenTraceCaptureIsActive()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateCountedIdleLoopElf()));
+
+        var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(
+            InstructionLimit: 15,
+            TraceTailLength: 0,
+            VBlankInterval: 0,
+            TraceCapture: new DreamcastTraceCaptureOptions(StartPc: 0x8C01_0000, EndPc: 0x8C01_0004, Limit: 8)));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(15UL, result.Cpu.InstructionsExecuted);
+        Assert.Equal(9UL, result.Scheduler.CpuFastForwardInstructions);
+        Assert.Equal(1UL, result.Scheduler.CpuFastForwardBatches);
+        Assert.Equal([0x8C01_0000u, 0x8C01_0002u, 0x8C01_0004u], result.TraceLog.Select(step => step.Pc));
+    }
+
+    [Fact]
+    public void RunDoesNotFastForwardLoopBodyInsideTraceCaptureRange()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateCountedIdleLoopElf()));
+
+        var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(
+            InstructionLimit: 15,
+            TraceTailLength: 0,
+            VBlankInterval: 0,
+            TraceCapture: new DreamcastTraceCaptureOptions(StartPc: 0x8C01_0006, EndPc: 0x8C01_000C, Limit: 16)));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(0UL, result.Scheduler.CpuFastForwardInstructions);
+        Assert.Contains(result.TraceLog, step => step.Pc == 0x8C01_0006);
+        Assert.Contains(result.TraceLog, step => step.Pc == 0x8C01_000A);
+    }
+
+    [Fact]
     public void DetectsSideEffectFreeIdleLoops()
     {
         var memory = new DreamcastMemory();

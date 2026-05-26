@@ -56,29 +56,34 @@ public sealed class DreamcastRunner
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
                 var step = cpu.Step();
+                TryCaptureTraceStep(options.TraceCapture, traceLog, step);
                 if (step.Trace == "sleep" || IsSideEffectFreeIdleLoop(step, memory))
                 {
                     scheduler.AdvanceAfterIdle();
                 }
-                else if (options.TraceCapture is null)
+                else
                 {
-                    if (cpu.TryFastForwardIpBinPatternFillLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var patternFillSkippedInstructions))
+                    if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8EE4, 0x8C00_8F4E)
+                        && cpu.TryFastForwardIpBinPatternFillLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var patternFillSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(patternFillSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
-                    else if (cpu.TryFastForwardIpBinFramebufferCopyLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var framebufferCopySkippedInstructions))
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8348, 0x8C00_834E)
+                        && cpu.TryFastForwardIpBinFramebufferCopyLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var framebufferCopySkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(framebufferCopySkippedInstructions, cpu.State.InstructionsExecuted);
                     }
-                    else if (cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_84F0, 0x8C00_84FC)
+                        && cpu.TryFastForwardIpBinShortDelayLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var shortDelaySkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(shortDelaySkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (TryGetDelayedBranchRange(step, out var branchStartPc, out var branchEndPc)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, branchStartPc, branchEndPc)
+                        && cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(skippedInstructions, cpu.State.InstructionsExecuted);
                     }
-                }
-
-                if (options.TraceCapture is { } traceCapture && traceLog.Count < traceCapture.Limit && traceCapture.ShouldCapture(step))
-                {
-                    traceLog.Add(step);
                 }
 
                 if (options.TraceTailLength > 0)
@@ -117,6 +122,20 @@ public sealed class DreamcastRunner
             return DreamcastRunResult.FirmwareExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), memory.DeviceAccesses.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message);
         }
     }
+
+    private static bool TryCaptureTraceStep(DreamcastTraceCaptureOptions? traceCapture, List<Sh4StepResult> traceLog, Sh4StepResult step)
+    {
+        if (traceCapture is null || traceLog.Count >= traceCapture.Limit || !traceCapture.ShouldCapture(step))
+        {
+            return false;
+        }
+
+        traceLog.Add(step);
+        return true;
+    }
+
+    private static bool CanFastForwardTraceRange(DreamcastTraceCaptureOptions? traceCapture, List<Sh4StepResult> traceLog, uint startPc, uint endPc) =>
+        traceCapture is null || traceLog.Count >= traceCapture.Limit || !traceCapture.ShouldCaptureAny(startPc, endPc);
 
     private static bool HasKosExitBanner(IReadOnlyList<byte> serialOutput)
     {
@@ -252,6 +271,26 @@ public sealed class DreamcastRunner
         target = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
         return true;
     }
+
+    private static bool TryGetDelayedBranchRange(Sh4StepResult step, out uint startPc, out uint endPc)
+    {
+        startPc = 0;
+        endPc = 0;
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var target = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (target >= step.Pc)
+        {
+            return false;
+        }
+
+        startPc = target;
+        endPc = step.Pc + 2;
+        return true;
+    }
 }
 
 public sealed record DreamcastRunOptions(
@@ -289,6 +328,31 @@ public sealed record DreamcastTraceCaptureOptions(
         }
 
         if (EndPc is { } endPc && step.Pc > endPc)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool ShouldCaptureAny(uint startPc, uint endPc)
+    {
+        if (Limit <= 0)
+        {
+            return false;
+        }
+
+        if (startPc > endPc)
+        {
+            (startPc, endPc) = (endPc, startPc);
+        }
+
+        if (StartPc is { } startFilter && endPc < startFilter)
+        {
+            return false;
+        }
+
+        if (EndPc is { } endFilter && startPc > endFilter)
         {
             return false;
         }

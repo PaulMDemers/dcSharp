@@ -224,6 +224,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinShortDelayLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_84FC || step.Opcode != 0x8BF8 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C00_84F0)
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or >= 0x7E00_1000)
+        {
+            return false;
+        }
+
+        var counterAddress = stack + 0x08;
+        var counter = memory.ReadUInt32(counterAddress);
+        var limit = (uint)memory.ReadUInt16(0x8C00_8530);
+        if (limit == 0 || counter >= limit)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 7;
+        var remainingIterations = limit - counter;
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt32(counterAddress, limit);
+        State.R[1] = limit;
+        State.R[2] = limit;
+        State.R[3] = limit;
+        State.T = true;
+        State.Pc = 0x8C00_84FE;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

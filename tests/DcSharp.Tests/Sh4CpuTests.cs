@@ -191,6 +191,30 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsIpBinShortDelayLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C00_84FC, 0x8BF8); // bf 0x8C0084F0
+        WriteInstruction(memory, 0x8C00_84FE, 0x0009);
+        memory.WriteUInt16(0x8C00_8530, 0x2710);
+        var cpu = new Sh4Cpu(memory, 0x8C00_84FC);
+        cpu.State.R[15] = 0x7E00_0FD0;
+        memory.WriteUInt32(0x7E00_0FD8, 0x270E);
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardIpBinShortDelayLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(14UL, skippedInstructions);
+        Assert.Equal(0x2710u, memory.ReadUInt32(0x7E00_0FD8));
+        Assert.Equal(0x2710u, cpu.State.R[1]);
+        Assert.Equal(0x2710u, cpu.State.R[2]);
+        Assert.Equal(0x2710u, cpu.State.R[3]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C00_84FEu, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
