@@ -73,6 +73,7 @@ public class DreamcastMemoryTests
     public void CapturesWatchedMemoryWritesByAddressRange()
     {
         var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(0x8C01_0003, 0x8C01_0004));
+        memory.CurrentInstructionPc = 0x8C02_0000;
 
         memory.Write(0x8C01_0000, [0x10, 0x20]);
         memory.Write(0x8C01_0002, [0xAA, 0xBB, 0xCC]);
@@ -82,6 +83,7 @@ public class DreamcastMemoryTests
         Assert.Equal(0x8C01_0002u, access.Address);
         Assert.Equal(3, access.Size);
         Assert.Equal(0x00CC_BBAAu, access.Value);
+        Assert.Equal(0x8C02_0000u, access.Pc);
     }
 
     [Fact]

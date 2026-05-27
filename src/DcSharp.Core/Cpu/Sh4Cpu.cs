@@ -21,6 +21,7 @@ public sealed class Sh4Cpu
     public Sh4StepResult Step()
     {
         var pc = State.Pc;
+        memory.CurrentInstructionPc = pc;
         if (delayedBranchTarget is null && TryAcceptExternalInterrupt(pc, out var interruptTrace))
         {
             State.InstructionsExecuted++;

@@ -104,6 +104,7 @@ public class DreamcastRunnerTests
         Assert.Equal(0x8C00_C000u, access.Address);
         Assert.Equal(4, access.Size);
         Assert.Equal(0u, access.Value);
+        Assert.Equal(0x8C01_0002u, access.Pc);
     }
 
     [Fact]

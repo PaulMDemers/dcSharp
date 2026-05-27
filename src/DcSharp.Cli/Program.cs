@@ -1141,7 +1141,8 @@ static void DumpMemoryWriteLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var access in result.WatchedMemoryWrites)
     {
-        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+        var pc = access.Pc is { } watchedPc ? $", pc=0x{watchedPc:X8}" : string.Empty;
+        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}{pc}");
     }
 }
 

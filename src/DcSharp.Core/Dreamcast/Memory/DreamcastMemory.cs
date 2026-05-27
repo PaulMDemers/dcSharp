@@ -144,6 +144,7 @@ public sealed class DreamcastMemory
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<MemoryAccess> WatchedWrites => watchedWrites;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
+    public uint? CurrentInstructionPc { get; set; }
 
     public void ResetSystemRamWriteCounters()
     {
@@ -1578,7 +1579,7 @@ public sealed class DreamcastMemory
             return;
         }
 
-        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data)));
+        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc));
     }
 
     private void RecordSystemRamWrite(uint address, int length)
@@ -2197,7 +2198,7 @@ internal sealed class DreamcastMemoryRegionWriteCounter(string name, uint start,
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 
-public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value);
+public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value, uint? Pc = null);
 
 public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,
