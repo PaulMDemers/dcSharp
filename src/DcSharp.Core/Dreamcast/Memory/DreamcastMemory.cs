@@ -91,6 +91,7 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> aicaRegisters = [];
     private readonly DreamcastAicaPlaybackState[] aicaPlayback = CreateAicaPlaybackStates();
     private readonly List<MemoryAccess> deviceAccesses = [];
+    private readonly List<MemoryAccess> watchedReads = [];
     private readonly List<MemoryAccess> watchedWrites = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
@@ -104,6 +105,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastGdromSectorModeCommand> gdromSectorModeCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
+    private readonly DreamcastMemoryReadWatch? readWatch;
     private readonly DreamcastMemoryWriteWatch? writeWatch;
     private readonly List<byte> serialOutput = [];
     private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
@@ -119,10 +121,12 @@ public sealed class DreamcastMemory
         DreamcastControllerState? controllerB = null,
         IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null,
         IDreamcastMediaImage? media = null,
-        DreamcastMemoryWriteWatch? writeWatch = null)
+        DreamcastMemoryWriteWatch? writeWatch = null,
+        DreamcastMemoryReadWatch? readWatch = null)
     {
         Array.Fill(pvrPreviewDepth, float.NaN);
         mediaImage = media;
+        this.readWatch = readWatch;
         this.writeWatch = writeWatch;
         mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
         if (controllerB is { } controllerBState)
@@ -142,6 +146,7 @@ public sealed class DreamcastMemory
     public int SystemRamBytes => systemRam.Length;
     public int PvrVramBytes => pvrVram.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
+    public IReadOnlyList<MemoryAccess> WatchedReads => watchedReads;
     public IReadOnlyList<MemoryAccess> WatchedWrites => watchedWrites;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
     public uint? CurrentInstructionPc { get; set; }
@@ -155,6 +160,8 @@ public sealed class DreamcastMemory
     }
 
     public void ResetWatchedWrites() => watchedWrites.Clear();
+
+    public void ResetWatchedReads() => watchedReads.Clear();
 
     public IReadOnlyList<DreamcastMemoryRegionWriteSummary> CreateSystemRamWriteSummary() =>
         systemRamWriteCounters
@@ -395,153 +402,200 @@ public sealed class DreamcastMemory
         if (IsP4Address(address))
         {
             var value = (byte)(ReadP4(address, 1) & 0xFF);
+            RecordWatchedRead(address, 1, value);
             return value;
         }
 
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
-            return (byte)(ReadExternal(address, externalAddress, 1) & 0xFF);
+            var value = (byte)(ReadExternal(address, externalAddress, 1) & 0xFF);
+            RecordWatchedRead(address, 1, value);
+            return value;
         }
 
         if (TryGetPvrVramOffset(address, 1, out var vramOffset))
         {
-            return pvrVram[vramOffset];
+            var value = pvrVram[vramOffset];
+            RecordWatchedRead(address, 1, value);
+            return value;
         }
 
         if (TryTranslateAicaRegister(address, out var aicaAddress))
         {
-            return (byte)(ReadAicaRegister(address, aicaAddress, 1) & 0xFF);
+            var value = (byte)(ReadAicaRegister(address, aicaAddress, 1) & 0xFF);
+            RecordWatchedRead(address, 1, value);
+            return value;
         }
 
         if (TryGetAicaRamOffset(address, 1, out var aicaOffset))
         {
-            return aicaRam[aicaOffset];
+            var value = aicaRam[aicaOffset];
+            RecordWatchedRead(address, 1, value);
+            return value;
         }
 
         if (TryGetOperandCacheRamOffset(address, 1, out var operandCacheRam, out var operandCacheOffset))
         {
-            return operandCacheRam[operandCacheOffset];
+            var value = operandCacheRam[operandCacheOffset];
+            RecordWatchedRead(address, 1, value);
+            return value;
         }
 
         if (IsBootRomAddress(address, 1))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 1, 0));
+            RecordWatchedRead(address, 1, 0);
             return 0;
         }
 
         if (!TryGetSystemRamOffset(address, 1, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 1, 0));
+            RecordWatchedRead(address, 1, 0);
             return 0;
         }
 
-        return systemRam[offset];
+        var systemRamValue = systemRam[offset];
+        RecordWatchedRead(address, 1, systemRamValue);
+        return systemRamValue;
     }
 
     public ushort ReadUInt16(uint address)
     {
         if (IsP4Address(address))
         {
-            return (ushort)(ReadP4(address, 2) & 0xFFFF);
+            var value = (ushort)(ReadP4(address, 2) & 0xFFFF);
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
-            return (ushort)(ReadExternal(address, externalAddress, 2) & 0xFFFF);
+            var value = (ushort)(ReadExternal(address, externalAddress, 2) & 0xFFFF);
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (TryGetPvrVramOffset(address, 2, out var vramOffset))
         {
-            return (ushort)(pvrVram[vramOffset] | (pvrVram[vramOffset + 1] << 8));
+            var value = (ushort)(pvrVram[vramOffset] | (pvrVram[vramOffset + 1] << 8));
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (TryTranslateAicaRegister(address, out var aicaAddress))
         {
-            return (ushort)(ReadAicaRegister(address, aicaAddress, 2) & 0xFFFF);
+            var value = (ushort)(ReadAicaRegister(address, aicaAddress, 2) & 0xFFFF);
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (TryGetAicaRamOffset(address, 2, out var aicaOffset))
         {
-            return (ushort)(aicaRam[aicaOffset] | (aicaRam[aicaOffset + 1] << 8));
+            var value = (ushort)(aicaRam[aicaOffset] | (aicaRam[aicaOffset + 1] << 8));
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (TryGetOperandCacheRamOffset(address, 2, out var operandCacheRam, out var operandCacheOffset))
         {
-            return (ushort)(operandCacheRam[operandCacheOffset] | (operandCacheRam[operandCacheOffset + 1] << 8));
+            var value = (ushort)(operandCacheRam[operandCacheOffset] | (operandCacheRam[operandCacheOffset + 1] << 8));
+            RecordWatchedRead(address, 2, value);
+            return value;
         }
 
         if (IsBootRomAddress(address, 2))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 2, 0));
+            RecordWatchedRead(address, 2, 0);
             return 0;
         }
 
         if (!TryGetSystemRamOffset(address, 2, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 2, 0));
+            RecordWatchedRead(address, 2, 0);
             return 0;
         }
 
-        return (ushort)(systemRam[offset] | (systemRam[offset + 1] << 8));
+        var systemRamValue = (ushort)(systemRam[offset] | (systemRam[offset + 1] << 8));
+        RecordWatchedRead(address, 2, systemRamValue);
+        return systemRamValue;
     }
 
     public uint ReadUInt32(uint address)
     {
         if (IsP4Address(address))
         {
-            return ReadP4(address, 4);
+            var value = ReadP4(address, 4);
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
-            return ReadExternal(address, externalAddress, 4);
+            var value = ReadExternal(address, externalAddress, 4);
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (TryGetPvrVramOffset(address, 4, out var vramOffset))
         {
-            return (uint)(pvrVram[vramOffset]
+            var value = (uint)(pvrVram[vramOffset]
                 | (pvrVram[vramOffset + 1] << 8)
                 | (pvrVram[vramOffset + 2] << 16)
                 | (pvrVram[vramOffset + 3] << 24));
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (TryTranslateAicaRegister(address, out var aicaAddress))
         {
-            return ReadAicaRegister(address, aicaAddress, 4);
+            var value = ReadAicaRegister(address, aicaAddress, 4);
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (TryGetAicaRamOffset(address, 4, out var aicaOffset))
         {
-            return (uint)(aicaRam[aicaOffset]
+            var value = (uint)(aicaRam[aicaOffset]
                 | (aicaRam[aicaOffset + 1] << 8)
                 | (aicaRam[aicaOffset + 2] << 16)
                 | (aicaRam[aicaOffset + 3] << 24));
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (TryGetOperandCacheRamOffset(address, 4, out var operandCacheRam, out var operandCacheOffset))
         {
-            return (uint)(operandCacheRam[operandCacheOffset]
+            var value = (uint)(operandCacheRam[operandCacheOffset]
                 | (operandCacheRam[operandCacheOffset + 1] << 8)
                 | (operandCacheRam[operandCacheOffset + 2] << 16)
                 | (operandCacheRam[operandCacheOffset + 3] << 24));
+            RecordWatchedRead(address, 4, value);
+            return value;
         }
 
         if (IsBootRomAddress(address, 4))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 4, 0));
+            RecordWatchedRead(address, 4, 0);
             return 0;
         }
 
         if (!TryGetSystemRamOffset(address, 4, out var offset))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.UnmappedRead, address, 4, 0));
+            RecordWatchedRead(address, 4, 0);
             return 0;
         }
 
-        return (uint)(systemRam[offset]
+        var systemRamValue = (uint)(systemRam[offset]
             | (systemRam[offset + 1] << 8)
             | (systemRam[offset + 2] << 16)
             | (systemRam[offset + 3] << 24));
+        RecordWatchedRead(address, 4, systemRamValue);
+        return systemRamValue;
     }
 
     public bool TryPeekUInt32(uint address, out uint value)
@@ -1582,6 +1636,16 @@ public sealed class DreamcastMemory
         watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc));
     }
 
+    private void RecordWatchedRead(uint address, int size, uint value)
+    {
+        if (readWatch is null || !readWatch.ShouldRecord(address, size) || watchedReads.Count >= readWatch.Limit)
+        {
+            return;
+        }
+
+        watchedReads.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, value, CurrentInstructionPc));
+    }
+
     private void RecordSystemRamWrite(uint address, int length)
     {
         if (length <= 0)
@@ -2218,6 +2282,27 @@ public sealed record DreamcastMemoryWriteWatch(
         var writeEnd = writeStart + (uint)length - 1;
 
         return writeStart <= end && writeEnd >= start;
+    }
+}
+
+public sealed record DreamcastMemoryReadWatch(
+    uint StartAddress = 0,
+    uint EndAddress = uint.MaxValue,
+    int Limit = 4096)
+{
+    public bool ShouldRecord(uint address, int length)
+    {
+        if (Limit <= 0 || length <= 0)
+        {
+            return false;
+        }
+
+        var start = Math.Min(StartAddress, EndAddress);
+        var end = Math.Max(StartAddress, EndAddress);
+        var readStart = (ulong)address;
+        var readEnd = readStart + (uint)length - 1;
+
+        return readStart <= end && readEnd >= start;
     }
 }
 

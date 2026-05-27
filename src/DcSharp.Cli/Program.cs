@@ -402,6 +402,11 @@ static void BootSmoke(string path, string[] args)
         DumpMemoryWriteLog(result, options.MemoryWriteLogPath);
     }
 
+    if (options.MemoryReadLogPath is not null)
+    {
+        DumpMemoryReadLog(result, options.MemoryReadLogPath);
+    }
+
     var summary = DreamcastRunSummary.FromResult(result, options.Emulation);
     if (options.EmitJson)
     {
@@ -426,6 +431,7 @@ static void BootSmoke(string path, string[] args)
     PrintSoftResetCheckpoint(result);
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
+    Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
@@ -679,6 +685,11 @@ static void RunElf(string path, string[] args)
         DumpMemoryWriteLog(result, options.MemoryWriteLogPath);
     }
 
+    if (options.MemoryReadLogPath is not null)
+    {
+        DumpMemoryReadLog(result, options.MemoryReadLogPath);
+    }
+
     if (options.EmitJson)
     {
         WriteJsonRunSummary(result, options.Emulation);
@@ -800,6 +811,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"ASIC: pending={result.Asic.PendingEventCodeHex ?? "none"}, level={result.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}{asicSource}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
+    Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
 
     if (result.SerialOutput.Count > 0)
@@ -1146,6 +1158,16 @@ static void DumpMemoryWriteLog(DreamcastRunResult result, string path)
     }
 }
 
+static void DumpMemoryReadLog(DreamcastRunResult result, string path)
+{
+    using var writer = CreateTextLog(path);
+    foreach (var access in result.WatchedMemoryReads)
+    {
+        var pc = access.Pc is { } watchedPc ? $", pc=0x{watchedPc:X8}" : string.Empty;
+        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}{pc}");
+    }
+}
+
 static StreamWriter CreateTextLog(string path)
 {
     var fullPath = Path.GetFullPath(path);
@@ -1190,6 +1212,9 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? memoryWriteLogPath = null;
     AddressRange? memoryWriteAddressRange = null;
     var memoryWriteLimit = 4096;
+    string? memoryReadLogPath = null;
+    AddressRange? memoryReadAddressRange = null;
+    var memoryReadLimit = 4096;
     string? mediaPath = null;
     var stopOnUnmapped = false;
     string? stopOnDeviceDomain = null;
@@ -1295,6 +1320,19 @@ static CliRunOptions ParseRunOptions(string[] args)
                 memoryWriteLimit = parsedMemoryWriteLimit;
                 index++;
                 break;
+            case "--memory-read-log" when index + 1 < args.Length:
+                memoryReadLogPath = args[index + 1];
+                index++;
+                break;
+            case "--memory-read-address" when index + 1 < args.Length:
+                var (memoryReadStart, memoryReadEnd) = ParseAddressRange(args[index + 1]);
+                memoryReadAddressRange = new AddressRange(memoryReadStart ?? 0, memoryReadEnd ?? memoryReadStart ?? uint.MaxValue);
+                index++;
+                break;
+            case "--memory-read-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedMemoryReadLimit):
+                memoryReadLimit = parsedMemoryReadLimit;
+                index++;
+                break;
             case "--media" when index + 1 < args.Length:
                 mediaPath = args[index + 1];
                 index++;
@@ -1339,6 +1377,11 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--memory-write-limit must be zero or greater.");
     }
 
+    if (memoryReadLimit < 0)
+    {
+        throw new InvalidDataException("--memory-read-limit must be zero or greater.");
+    }
+
     var traceCapture = traceLogPath is null
         ? null
         : new DreamcastTraceCaptureOptions(traceStartPc, traceEndPc, traceLogLimit);
@@ -1351,6 +1394,12 @@ static CliRunOptions ParseRunOptions(string[] args)
             memoryWriteAddressRange?.Start ?? 0,
             memoryWriteAddressRange?.End ?? uint.MaxValue,
             memoryWriteLimit);
+    var memoryReadWatch = memoryReadLogPath is null
+        ? null
+        : new DreamcastMemoryReadWatch(
+            memoryReadAddressRange?.Start ?? 0,
+            memoryReadAddressRange?.End ?? uint.MaxValue,
+            memoryReadLimit);
 
     return new CliRunOptions(
         new DreamcastRunOptions(
@@ -1368,7 +1417,8 @@ static CliRunOptions ParseRunOptions(string[] args)
             stopOnDeviceDomain,
             initialStackPointer,
             initialStatusRegister,
-            MemoryWriteWatch: memoryWriteWatch),
+            MemoryWriteWatch: memoryWriteWatch,
+            MemoryReadWatch: memoryReadWatch),
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -1379,7 +1429,8 @@ static CliRunOptions ParseRunOptions(string[] args)
         deviceKind,
         deviceAddressRange,
         deviceDomain,
-        memoryWriteLogPath);
+        memoryWriteLogPath,
+        memoryReadLogPath);
 }
 
 static (int Width, int Height) ParseFramebufferSize(string text)
@@ -1556,7 +1607,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
@@ -1599,7 +1650,8 @@ internal sealed record CliRunOptions(
     MemoryAccessKind? DeviceKind,
     AddressRange? DeviceAddressRange,
     string? DeviceDomain,
-    string? MemoryWriteLogPath);
+    string? MemoryWriteLogPath,
+    string? MemoryReadLogPath);
 
 internal sealed record BootExtractionCliReport(
     string MediaPath,

@@ -108,6 +108,24 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCapturesWatchedMemoryReadsAfterLoading()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateBootWorkReadBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 4,
+                TraceTailLength: 0,
+                MemoryReadWatch: new DreamcastMemoryReadWatch(0x8C00_C000, 0x8C00_C003)));
+
+        var access = Assert.Single(result.WatchedMemoryReads);
+        Assert.Equal(MemoryAccessKind.Read, access.Kind);
+        Assert.Equal(0x8C00_C000u, access.Address);
+        Assert.Equal(4, access.Size);
+        Assert.Equal(0u, access.Value);
+        Assert.Equal(0x8C01_0002u, access.Pc);
+    }
+
+    [Fact]
     public void RunCanSeedInitialVBlankEvent()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -305,6 +323,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            [],
             new DreamcastAsicSnapshot([], null, null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], [], []),
@@ -379,6 +398,7 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunResult(
             load,
             new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
             [],
             [],
             [],
@@ -659,6 +679,15 @@ public class DreamcastRunnerTests
     [
         0x01, 0xD1, // mov.l @(0x01,pc),r1
         0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0xC0, 0x00, 0x8C
+    ];
+
+    private static byte[] CreateBootWorkReadBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x12, 0x60, // mov.l @r1,r0
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
         0x00, 0xC0, 0x00, 0x8C

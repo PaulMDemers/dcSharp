@@ -100,6 +100,39 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CapturesWatchedMemoryReadsByAddressRange()
+    {
+        var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(0x8C01_0002, 0x8C01_0005));
+        memory.WriteUInt32(0x8C01_0004, 0x1234_5678);
+        memory.CurrentInstructionPc = 0x8C02_0000;
+
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0x8C01_0004));
+        Assert.Equal(0, memory.ReadByte(0x8C01_0008));
+
+        var access = Assert.Single(memory.WatchedReads);
+        Assert.Equal(MemoryAccessKind.Read, access.Kind);
+        Assert.Equal(0x8C01_0004u, access.Address);
+        Assert.Equal(4, access.Size);
+        Assert.Equal(0x1234_5678u, access.Value);
+        Assert.Equal(0x8C02_0000u, access.Pc);
+    }
+
+    [Fact]
+    public void RespectsWatchedMemoryReadLimit()
+    {
+        var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(0x8C01_0000, 0x8C01_000F, Limit: 1));
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0004, 2);
+
+        Assert.Equal(1u, memory.ReadUInt32(0x8C01_0000));
+        Assert.Equal(2u, memory.ReadUInt32(0x8C01_0004));
+
+        var access = Assert.Single(memory.WatchedReads);
+        Assert.Equal(0x8C01_0000u, access.Address);
+        Assert.Equal(1u, access.Value);
+    }
+
+    [Fact]
     public void TryPeekUInt32ReadsMappedRamWithoutRecordingDeviceAccess()
     {
         var memory = new DreamcastMemory();
