@@ -90,6 +90,23 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCapturesWatchedMemoryWritesAfterLoading()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateBootWorkWriteBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 4,
+                TraceTailLength: 0,
+                MemoryWriteWatch: new DreamcastMemoryWriteWatch(0x8C00_C000, 0x8C00_C003)));
+
+        var access = Assert.Single(result.WatchedMemoryWrites);
+        Assert.Equal(MemoryAccessKind.Write, access.Kind);
+        Assert.Equal(0x8C00_C000u, access.Address);
+        Assert.Equal(4, access.Size);
+        Assert.Equal(0u, access.Value);
+    }
+
+    [Fact]
     public void RunCanSeedInitialVBlankEvent()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -286,6 +303,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            [],
             new DreamcastAsicSnapshot([], null, null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], [], []),
@@ -360,6 +378,7 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunResult(
             load,
             new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
             [],
             [],
             [],

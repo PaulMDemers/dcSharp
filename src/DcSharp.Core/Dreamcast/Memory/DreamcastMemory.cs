@@ -91,6 +91,7 @@ public sealed class DreamcastMemory
     private readonly Dictionary<uint, uint> aicaRegisters = [];
     private readonly DreamcastAicaPlaybackState[] aicaPlayback = CreateAicaPlaybackStates();
     private readonly List<MemoryAccess> deviceAccesses = [];
+    private readonly List<MemoryAccess> watchedWrites = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly DreamcastPvrTaState pvrTaState = new();
@@ -103,6 +104,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastGdromSectorModeCommand> gdromSectorModeCommands = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
+    private readonly DreamcastMemoryWriteWatch? writeWatch;
     private readonly List<byte> serialOutput = [];
     private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
     [
@@ -116,10 +118,12 @@ public sealed class DreamcastMemory
         DreamcastControllerState? controllerA = null,
         DreamcastControllerState? controllerB = null,
         IReadOnlyDictionary<byte, DreamcastControllerState>? controllers = null,
-        IDreamcastMediaImage? media = null)
+        IDreamcastMediaImage? media = null,
+        DreamcastMemoryWriteWatch? writeWatch = null)
     {
         Array.Fill(pvrPreviewDepth, float.NaN);
         mediaImage = media;
+        this.writeWatch = writeWatch;
         mapleControllers[MaplePortAUnit0Address] = controllerA ?? DreamcastControllerState.Neutral;
         if (controllerB is { } controllerBState)
         {
@@ -138,6 +142,7 @@ public sealed class DreamcastMemory
     public int SystemRamBytes => systemRam.Length;
     public int PvrVramBytes => pvrVram.Length;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
+    public IReadOnlyList<MemoryAccess> WatchedWrites => watchedWrites;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
 
     public void ResetSystemRamWriteCounters()
@@ -147,6 +152,8 @@ public sealed class DreamcastMemory
             counter.Reset();
         }
     }
+
+    public void ResetWatchedWrites() => watchedWrites.Clear();
 
     public IReadOnlyList<DreamcastMemoryRegionWriteSummary> CreateSystemRamWriteSummary() =>
         systemRamWriteCounters
@@ -303,6 +310,8 @@ public sealed class DreamcastMemory
 
     public void Write(uint address, ReadOnlySpan<byte> data)
     {
+        RecordWatchedWrite(address, data);
+
         if (IsP4Address(address))
         {
             WriteP4(address, data);
@@ -1550,13 +1559,27 @@ public sealed class DreamcastMemory
         }
     }
 
-    private static uint ToValue(ReadOnlySpan<byte> data) => data.Length switch
+    private static uint ToValue(ReadOnlySpan<byte> data)
     {
-        0 => 0,
-        1 => data[0],
-        2 => (uint)(data[0] | (data[1] << 8)),
-        _ => (uint)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24))
-    };
+        uint value = 0;
+        var count = Math.Min(data.Length, 4);
+        for (var index = 0; index < count; index++)
+        {
+            value |= (uint)data[index] << (index * 8);
+        }
+
+        return value;
+    }
+
+    private void RecordWatchedWrite(uint address, ReadOnlySpan<byte> data)
+    {
+        if (writeWatch is null || !writeWatch.ShouldRecord(address, data.Length) || watchedWrites.Count >= writeWatch.Limit)
+        {
+            return;
+        }
+
+        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data)));
+    }
 
     private void RecordSystemRamWrite(uint address, int length)
     {
@@ -2175,6 +2198,27 @@ internal sealed class DreamcastMemoryRegionWriteCounter(string name, uint start,
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 
 public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value);
+
+public sealed record DreamcastMemoryWriteWatch(
+    uint StartAddress = 0,
+    uint EndAddress = uint.MaxValue,
+    int Limit = 4096)
+{
+    public bool ShouldRecord(uint address, int length)
+    {
+        if (Limit <= 0 || length <= 0)
+        {
+            return false;
+        }
+
+        var start = Math.Min(StartAddress, EndAddress);
+        var end = Math.Max(StartAddress, EndAddress);
+        var writeStart = (ulong)address;
+        var writeEnd = writeStart + (uint)length - 1;
+
+        return writeStart <= end && writeEnd >= start;
+    }
+}
 
 public enum MemoryAccessKind
 {
