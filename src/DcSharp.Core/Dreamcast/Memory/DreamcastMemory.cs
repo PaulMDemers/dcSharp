@@ -46,6 +46,8 @@ public sealed class DreamcastMemory
     private const uint Sh4Tra = 0xFF00_0020;
     private const uint Sh4Expevt = 0xFF00_0024;
     private const uint Sh4Intevt = 0xFF00_0028;
+    private const uint PortAData = 0xFF80_0030;
+    private const uint DefaultPortAData = 0x0000_0300;
     private const uint TimerStart = 0xFFD8_0004;
     private const uint TimerConstant0 = 0xFFD8_0008;
     private const uint TimerCounter0 = 0xFFD8_000C;
@@ -1346,7 +1348,7 @@ public sealed class DreamcastMemory
     private uint ReadP4(uint address, int size)
     {
         var aligned = address & 0xFFFF_FFFCu;
-        var value = p4Registers.GetValueOrDefault(aligned);
+        var value = p4Registers.GetValueOrDefault(aligned, DefaultP4RegisterValue(aligned));
         if (address == ScifStatus && size == 2)
         {
             value |= 0x60;
@@ -1365,6 +1367,12 @@ public sealed class DreamcastMemory
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, masked));
         return masked;
     }
+
+    private static uint DefaultP4RegisterValue(uint address) => address switch
+    {
+        PortAData => DefaultPortAData,
+        _ => 0
+    };
 
     private int GdromRequestedBytes(uint sectorCount)
     {

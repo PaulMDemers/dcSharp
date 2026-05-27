@@ -25,6 +25,16 @@ public class FirmwareStubsTests
     private const uint TocAddress = 0x8C01_0200;
     private const uint DestinationAddress = 0x8C02_0000;
 
+    [Fact]
+    public void InstallSeedsBiosWorkAreaLanguageCode()
+    {
+        var memory = new DreamcastMemory();
+
+        FirmwareStubs.Install(memory);
+
+        Assert.Equal((byte)'1', memory.ReadByte(0x8C00_0074));
+    }
+
     [Theory]
     [InlineData(0, "System BIOS soft reset requested: function=0")]
     [InlineData(1, "System BIOS menu requested: function=1")]

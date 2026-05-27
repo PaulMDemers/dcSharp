@@ -93,6 +93,15 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void ReadsDefaultSh4PortADataConfigurationBits()
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.Equal(0x0300u, memory.ReadUInt16(0xFF80_0030));
+        Assert.Equal(0x0300u, memory.ReadUInt32(0xFF80_0030) & 0x0300u);
+    }
+
+    [Fact]
     public void GdromSnapshotReportsMediaReadCommands()
     {
         var media = new RawSectorMediaImage(CreateMediaData(2), 2048);
