@@ -207,6 +207,26 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesIpBinResetFrameModeWordsInCpuSnapshot()
+    {
+        var memory = new DreamcastMemory();
+        var state = new Sh4State();
+        state.R[15] = 0x7E00_0FD0;
+        for (var index = 0u; index < 10; index++)
+        {
+            memory.WriteUInt32(state.R[15] + (index * 4), 0xA000_0000u + index);
+        }
+
+        var snapshot = Sh4StateSnapshot.From(state, memory);
+
+        Assert.Equal(10, snapshot.StackWords!.Count);
+        Assert.Equal(0x7E00_0FF0u, snapshot.StackWords[8].Address);
+        Assert.Equal(0xA000_0008u, snapshot.StackWords[8].Value);
+        Assert.Equal(0x7E00_0FF4u, snapshot.StackWords[9].Address);
+        Assert.Equal(0xA000_0009u, snapshot.StackWords[9].Value);
+    }
+
+    [Fact]
     public void BuildsStructuredRunSummary()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateKosExitFallthroughElf()));

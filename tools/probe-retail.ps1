@@ -74,6 +74,8 @@ if ($doaOutput) {
     Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: FirmwareExit"
     Assert-Contains "Dead or Alive 2" $doaOutput "System BIOS soft reset requested: function=0"
     Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C0000E8"
+    Assert-Contains "Dead or Alive 2" $doaOutput "selected-mode): 0x00000008"
+    Assert-Contains "Dead or Alive 2" $doaOutput "status-code): 0x00000001"
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
 }
 
@@ -82,6 +84,8 @@ if ($raymanOutput) {
     Assert-Contains "Rayman 2" $raymanOutput "Stopped: FirmwareExit"
     Assert-Contains "Rayman 2" $raymanOutput "System BIOS soft reset requested: function=0"
     Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0000E8"
+    Assert-Contains "Rayman 2" $raymanOutput "selected-mode): 0x00000008"
+    Assert-Contains "Rayman 2" $raymanOutput "status-code): 0x00000001"
     Assert-NotContains "Rayman 2" $raymanOutput "Stopped on Unmapped"
 }
 
@@ -90,6 +94,8 @@ if ($legacyOutput) {
     Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: FirmwareExit"
     Assert-Contains "Legacy of Kain" $legacyOutput "System BIOS soft reset requested: function=0"
     Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C0000E8"
+    Assert-Contains "Legacy of Kain" $legacyOutput "selected-mode): 0x00000008"
+    Assert-Contains "Legacy of Kain" $legacyOutput "status-code): 0x00000001"
 }
 
 Write-Host "Retail probes completed."

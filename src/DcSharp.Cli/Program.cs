@@ -462,11 +462,30 @@ static void PrintSoftResetCheckpoint(DreamcastRunResult result)
     }
 
     Console.WriteLine("IP.BIN reset checkpoint stack:");
+    var baseAddress = stackWords[0].Address;
     foreach (var word in stackWords)
     {
-        Console.WriteLine($"  {word.AddressHex}: {word.ValueHex}");
+        var offset = word.Address - baseAddress;
+        var label = IpBinResetStackLabel(offset);
+        var labelText = label is null ? string.Empty : $" {label}";
+        Console.WriteLine($"  {word.AddressHex} (+0x{offset:X2}{labelText}): {word.ValueHex}");
     }
 }
+
+static string? IpBinResetStackLabel(uint offset) => offset switch
+{
+    0x00 => "saved-sr-imask",
+    0x04 => "outer-wait-count",
+    0x08 => "short-delay-count",
+    0x0C => "completion-flag",
+    0x10 => "elapsed-ticks",
+    0x14 => "delta-ticks",
+    0x18 => "timer-current",
+    0x1C => "timer-start",
+    0x20 => "selected-mode",
+    0x24 => "status-code",
+    _ => null
+};
 
 static void PrintMemoryRegionWrites(IReadOnlyList<DreamcastMemoryRegionWriteSummary> writes)
 {

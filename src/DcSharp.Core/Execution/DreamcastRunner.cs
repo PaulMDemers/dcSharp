@@ -532,7 +532,7 @@ public sealed record Sh4StateSnapshot(
 
     private static IReadOnlyList<Sh4StackWord> CaptureStackWords(Sh4State state, DreamcastMemory? memory)
     {
-        const int stackWordsToCapture = 8;
+        const int stackWordsToCapture = 10;
         if (memory is null)
         {
             return [];
