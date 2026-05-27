@@ -33,6 +33,8 @@ internal static class FirmwareStubs
 
     internal sealed class FirmwareTrapHandler
     {
+        private const uint DefaultSoftResetEntryPoint = 0x8C01_0000;
+        private const uint DefaultSoftResetStackPointer = 0x8D00_0000;
         private const uint SuperFunctionGdrom = 0;
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
@@ -50,10 +52,29 @@ internal static class FirmwareStubs
         private uint nextCommandId = 1;
         private readonly Dictionary<uint, GdromQueuedCommand> commands = [];
 
+        public FirmwareTrapHandler(
+            uint softResetEntryPoint = DefaultSoftResetEntryPoint,
+            uint softResetStackPointer = DefaultSoftResetStackPointer)
+        {
+            SoftResetEntryPoint = softResetEntryPoint;
+            SoftResetStackPointer = softResetStackPointer;
+        }
+
+        public uint SoftResetEntryPoint { get; }
+        public uint SoftResetStackPointer { get; }
+
         public bool TryHandle(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
         {
             if (state.Pc == SystemHleStub)
             {
+                if (state.R[4] == 0)
+                {
+                    state.Pc = SoftResetEntryPoint;
+                    state.R[15] = SoftResetStackPointer;
+                    trace = $"firmware system hle func=0 ; pc=0x{state.Pc:X8}, sp=0x{state.R[15]:X8}";
+                    return true;
+                }
+
                 throw new DreamcastFirmwareExitException(SystemCallMessage(state.R[4]));
             }
 

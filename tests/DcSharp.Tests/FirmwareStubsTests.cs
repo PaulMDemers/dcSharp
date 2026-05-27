@@ -35,8 +35,22 @@ public class FirmwareStubsTests
         Assert.Equal((byte)'1', memory.ReadByte(0x8C00_0074));
     }
 
+    [Fact]
+    public void SystemBiosSoftResetContinuesAtLoadedBootEntry()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = SystemHleStub };
+        state.R[4] = 0;
+        state.R[15] = 0x7E00_0FD0;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x8C01_0000u, state.Pc);
+        Assert.Equal(0x8D00_0000u, state.R[15]);
+        Assert.Equal("firmware system hle func=0 ; pc=0x8C010000, sp=0x8D000000", trace);
+    }
+
     [Theory]
-    [InlineData(0, "System BIOS soft reset requested: function=0")]
     [InlineData(1, "System BIOS menu requested: function=1")]
     [InlineData(2, "System BIOS CD menu requested: function=2")]
     [InlineData(7, "System BIOS call requested: function=7")]

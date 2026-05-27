@@ -1,8 +1,8 @@
 param(
     [int]$ScanSectors = 1024,
     [int]$VBlankInterval = 1000,
-    [int]$BootstrapInstructions = 8000000,
-    [int]$LegacyInstructions = 8000000
+    [int]$BootstrapInstructions = 12000000,
+    [int]$LegacyInstructions = 12000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -71,31 +71,28 @@ $legacy = Join-Path $repoRoot "retail_discs\Legacy of Kain - Soul Reaver (USA)\L
 
 $doaOutput = Invoke-BootSmoke "Dead or Alive 2" $deadOrAlive $BootstrapInstructions
 if ($doaOutput) {
-    Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: FirmwareExit"
-    Assert-Contains "Dead or Alive 2" $doaOutput "System BIOS soft reset requested: function=0"
-    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C0000E8"
-    Assert-Contains "Dead or Alive 2" $doaOutput "selected-mode): 0x00000008"
-    Assert-Contains "Dead or Alive 2" $doaOutput "status-code): 0x00000001"
+    Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: InstructionLimit"
+    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C12ED2A"
+    Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads=0"
+    Assert-Contains "Dead or Alive 2" $doaOutput "Boot binary: writes="
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
 }
 
 $raymanOutput = Invoke-BootSmoke "Rayman 2" $rayman $BootstrapInstructions
 if ($raymanOutput) {
-    Assert-Contains "Rayman 2" $raymanOutput "Stopped: FirmwareExit"
-    Assert-Contains "Rayman 2" $raymanOutput "System BIOS soft reset requested: function=0"
-    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0000E8"
-    Assert-Contains "Rayman 2" $raymanOutput "selected-mode): 0x00000008"
-    Assert-Contains "Rayman 2" $raymanOutput "status-code): 0x00000001"
+    Assert-Contains "Rayman 2" $raymanOutput "Stopped: InstructionLimit"
+    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0DEC68"
+    Assert-Contains "Rayman 2" $raymanOutput "GD-ROM: media=True, reads=0"
+    Assert-Contains "Rayman 2" $raymanOutput "Boot binary: writes="
     Assert-NotContains "Rayman 2" $raymanOutput "Stopped on Unmapped"
 }
 
 $legacyOutput = Invoke-BootSmoke "Legacy of Kain" $legacy $LegacyInstructions
 if ($legacyOutput) {
-    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: FirmwareExit"
-    Assert-Contains "Legacy of Kain" $legacyOutput "System BIOS soft reset requested: function=0"
-    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C0000E8"
-    Assert-Contains "Legacy of Kain" $legacyOutput "selected-mode): 0x00000008"
-    Assert-Contains "Legacy of Kain" $legacyOutput "status-code): 0x00000001"
+    Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: InstructionLimit"
+    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C0388C8"
+    Assert-Contains "Legacy of Kain" $legacyOutput "GD-ROM: media=True, reads=0"
+    Assert-Contains "Legacy of Kain" $legacyOutput "Boot binary: writes="
 }
 
 Write-Host "Retail probes completed."
