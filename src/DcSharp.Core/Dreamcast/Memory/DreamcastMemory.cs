@@ -28,6 +28,13 @@ public sealed class DreamcastMemory
     private const uint ExternalRegisterLimit = 0x0060_0000;
     private const uint PvrRegisterBase = 0x005F_8000;
     private const uint PvrRegisterLimit = 0x005F_A000;
+    private const uint PvrId = 0x005F_8000;
+    private const uint PvrIdValue = 0x17FD_11DB;
+    private const uint PvrRevision = 0x005F_8004;
+    private const uint PvrRevisionValue = 0x0000_0011;
+    private const uint PvrSyncStatus = 0x005F_810C;
+    private const uint PvrSyncStatusVBlank = 0x0000_0001;
+    private const ulong PvrVBlankStatusTicks = 128;
     private const uint PvrTaInputBase = 0x1000_0000;
     private const uint PvrTaInputLimit = 0x1080_0000;
     private const uint PvrTaYuvBase = 0x1080_0000;
@@ -108,6 +115,7 @@ public sealed class DreamcastMemory
     private readonly DreamcastMemoryReadWatch? readWatch;
     private readonly DreamcastMemoryWriteWatch? writeWatch;
     private readonly List<byte> serialOutput = [];
+    private ulong pvrVBlankStatusTicksRemaining;
     private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
     [
         new("IP.BIN", 0x8C00_8000, 0x8000),
@@ -209,6 +217,13 @@ public sealed class DreamcastMemory
         if (instructions == 0)
         {
             return;
+        }
+
+        if (pvrVBlankStatusTicksRemaining != 0)
+        {
+            pvrVBlankStatusTicksRemaining = instructions >= pvrVBlankStatusTicksRemaining
+                ? 0
+                : pvrVBlankStatusTicksRemaining - instructions;
         }
 
         for (var channel = 0; channel < 3; channel++)
@@ -1024,7 +1039,11 @@ public sealed class DreamcastMemory
         return offset + length <= aicaRam.Length;
     }
 
-    public void RaiseVBlankBegin() => RaiseAsicEvent(AsicEventPvrVBlankBegin);
+    public void RaiseVBlankBegin()
+    {
+        pvrVBlankStatusTicksRemaining = PvrVBlankStatusTicks;
+        RaiseAsicEvent(AsicEventPvrVBlankBegin);
+    }
 
     internal void RaiseAsicEventForDiagnostics(ushort code) => RaiseAsicEvent(code);
 
@@ -1170,7 +1189,7 @@ public sealed class DreamcastMemory
     private uint ReadExternal(uint originalAddress, uint externalAddress, int size)
     {
         var aligned = externalAddress & 0xFFFF_FFFCu;
-        var value = externalRegisters.GetValueOrDefault(aligned);
+        var value = ReadExternalRegisterValue(aligned);
         var shift = (int)((externalAddress & 0x3) * 8);
         var shifted = value >> shift;
         var masked = size switch
@@ -1185,6 +1204,15 @@ public sealed class DreamcastMemory
         LogPvrRegisterAccess(MemoryAccessKind.Read, originalAddress, externalAddress, size, masked);
         return masked;
     }
+
+    private uint ReadExternalRegisterValue(uint aligned) =>
+        aligned switch
+        {
+            PvrId => PvrIdValue,
+            PvrRevision => PvrRevisionValue,
+            PvrSyncStatus when pvrVBlankStatusTicksRemaining != 0 => externalRegisters.GetValueOrDefault(aligned) | PvrSyncStatusVBlank,
+            _ => externalRegisters.GetValueOrDefault(aligned)
+        };
 
     private void WriteExternal(uint originalAddress, uint externalAddress, ReadOnlySpan<byte> data)
     {

@@ -1513,6 +1513,21 @@ public sealed class Sh4Cpu
 
                 return $"{FmovMnemonic(doubleSize)} fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
 
+            case 0xD:
+            {
+                var destinationBase = n & 0xC;
+                var sourceBase = m & 0xC;
+                var sum = 0.0f;
+                for (var index = 0; index < 4; index++)
+                {
+                    sum += BitConverter.UInt32BitsToSingle(State.Fr[destinationBase + index])
+                        * BitConverter.UInt32BitsToSingle(State.Fr[sourceBase + index]);
+                }
+
+                State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
+                return $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+            }
+
             default:
                 throw new UnsupportedInstructionException(State.Pc, opcode);
         }

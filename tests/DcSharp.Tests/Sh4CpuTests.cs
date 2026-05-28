@@ -500,6 +500,27 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ExecutesFloatingPointVectorInnerProduct()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(1.0f);
+        cpu.State.Fr[1] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.Fr[2] = BitConverter.SingleToUInt32Bits(3.0f);
+        cpu.State.Fr[3] = BitConverter.SingleToUInt32Bits(4.0f);
+        cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(5.0f);
+        cpu.State.Fr[9] = BitConverter.SingleToUInt32Bits(6.0f);
+        cpu.State.Fr[10] = BitConverter.SingleToUInt32Bits(7.0f);
+        cpu.State.Fr[11] = BitConverter.SingleToUInt32Bits(8.0f);
+
+        var step = cpu.Step();
+
+        Assert.Equal(BitConverter.SingleToUInt32Bits(70.0f), cpu.State.Fr[3]);
+        Assert.Equal("fipr fv8,fv0 ; fr3=0x428C0000", step.Trace);
+    }
+
+    [Fact]
     public void ExecutesLogicalShiftRightSixteen()
     {
         var memory = new DreamcastMemory();

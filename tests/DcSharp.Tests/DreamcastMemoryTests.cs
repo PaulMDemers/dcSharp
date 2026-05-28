@@ -291,6 +291,46 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void PvrIdentityRegistersReportDreamcastValues()
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.Equal(0x17FD_11DBu, memory.ReadUInt32(0xA05F_8000));
+        Assert.Equal(0x0000_0011u, memory.ReadUInt32(0xA05F_8004));
+
+        Assert.Collection(
+            memory.CreateVideoSnapshot().PvrRegisterAccesses,
+            access =>
+            {
+                Assert.Equal(MemoryAccessKind.Read, access.Kind);
+                Assert.Equal("PVR_ID", access.Name);
+                Assert.Equal("0x17FD11DB", access.ValueHex);
+            },
+            access =>
+            {
+                Assert.Equal(MemoryAccessKind.Read, access.Kind);
+                Assert.Equal("PVR_REVISION", access.Name);
+                Assert.Equal("0x00000011", access.ValueHex);
+            });
+    }
+
+    [Fact]
+    public void PvrSyncStatusReportsVBlankWindow()
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+
+        memory.RaiseVBlankBegin();
+
+        Assert.NotEqual(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+
+        memory.AdvanceHardware(128);
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsPvrTaCommandWrites()
     {
         var memory = new DreamcastMemory();

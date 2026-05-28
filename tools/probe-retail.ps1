@@ -72,7 +72,7 @@ $legacy = Join-Path $repoRoot "retail_discs\Legacy of Kain - Soul Reaver (USA)\L
 $doaOutput = Invoke-BootSmoke "Dead or Alive 2" $deadOrAlive $BootstrapInstructions
 if ($doaOutput) {
     Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: InstructionLimit"
-    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C12ED2A"
+    Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C129E3E"
     Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads=0"
     Assert-Contains "Dead or Alive 2" $doaOutput "Boot binary: writes="
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
@@ -81,7 +81,7 @@ if ($doaOutput) {
 $raymanOutput = Invoke-BootSmoke "Rayman 2" $rayman $BootstrapInstructions
 if ($raymanOutput) {
     Assert-Contains "Rayman 2" $raymanOutput "Stopped: InstructionLimit"
-    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0DEC68"
+    Assert-Contains "Rayman 2" $raymanOutput "PC: 0x8C0DECDA"
     Assert-Contains "Rayman 2" $raymanOutput "GD-ROM: media=True, reads=0"
     Assert-Contains "Rayman 2" $raymanOutput "Boot binary: writes="
     Assert-NotContains "Rayman 2" $raymanOutput "Stopped on Unmapped"
@@ -90,7 +90,7 @@ if ($raymanOutput) {
 $legacyOutput = Invoke-BootSmoke "Legacy of Kain" $legacy $LegacyInstructions
 if ($legacyOutput) {
     Assert-Contains "Legacy of Kain" $legacyOutput "Stopped: InstructionLimit"
-    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C0388C8"
+    Assert-Contains "Legacy of Kain" $legacyOutput "PC: 0x8C032164"
     Assert-Contains "Legacy of Kain" $legacyOutput "GD-ROM: media=True, reads=0"
     Assert-Contains "Legacy of Kain" $legacyOutput "Boot binary: writes="
 }
