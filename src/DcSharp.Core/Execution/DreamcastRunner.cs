@@ -80,6 +80,12 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(shortDelaySkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_ED90, 0x8C12_EDA0)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_9E20, 0x8C12_9E50)
+                        && cpu.TryFastForwardDoa2VramClearLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2VramClearSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2VramClearSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (TryGetDelayedBranchRange(step, out var branchStartPc, out var branchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, branchStartPc, branchEndPc)
                         && cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))

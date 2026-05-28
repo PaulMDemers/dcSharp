@@ -273,6 +273,65 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2VramClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_ED9E || step.Opcode != 0x7E04 || State.Pc != 0x8C12_ED90)
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (State.R[11] != 0x8C12_9E20 || State.R[12] == 0 || State.R[13] >= State.R[12])
+        {
+            return false;
+        }
+
+        if (State.R[15] is < 0x8C00_0000 or >= 0x8D00_0000)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[12] - State.R[13];
+        if (!memory.TryGetPvrVramOffset(State.R[14], checked((int)Math.Min((ulong)remainingIterations * 4, int.MaxValue)), out _))
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 23;
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var source = memory.ReadUInt32(State.R[15]);
+        var destination = State.R[14];
+        for (var index = 0u; index < remainingIterations; index++)
+        {
+            memory.WriteUInt32(destination + (index * 4), source);
+        }
+
+        State.R[0] = source;
+        State.R[4] = destination + (remainingIterations * 4);
+        State.R[5] = State.R[15] + 4;
+        State.R[6] = 0;
+        State.R[13] = State.R[12];
+        State.R[14] = destination + (remainingIterations * 4);
+        State.Pr = 0x8C12_ED98;
+        State.T = true;
+        State.Pc = 0x8C12_EDA0;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
