@@ -36,6 +36,19 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void InstallSeedsBootModeWorkAreaBytes()
+    {
+        var memory = new DreamcastMemory();
+        memory.Write(0x8C00_80FC, [(byte)' ']);
+        memory.Write(0x8C00_80FE, [(byte)' ']);
+
+        FirmwareStubs.Install(memory);
+
+        Assert.Equal(1, memory.ReadByte(0x8C00_80FC));
+        Assert.Equal(1, memory.ReadByte(0x8C00_80FE));
+    }
+
+    [Fact]
     public void SystemBiosSoftResetContinuesAtLoadedBootEntry()
     {
         var handler = FirmwareStubs.CreateTrapHandler();

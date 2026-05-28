@@ -182,7 +182,7 @@ Current state:
 
 - ELF loading maps KOS-built SH-4 binaries into Dreamcast RAM.
 - The SH-4 interpreter covers enough integer, control, exception-return, register-bank, and FPU behavior to run a minimal KOS program through `main()`.
-- Low-RAM firmware vectors include return-zero sysinfo/flash stubs, a GD-ROM HLE dispatcher, a writable BIOS interrupt handler table for VBR-zero retail IRQ dispatch, and a non-returning system BIOS exit trap.
+- Low-RAM firmware vectors include return-zero sysinfo/flash stubs, a GD-ROM HLE dispatcher, boot-mode work-area bytes for retail IP.BIN handoff checks, a writable BIOS interrupt handler table for VBR-zero retail IRQ dispatch, and a non-returning system BIOS exit trap.
 - The external ASIC/Maple slice includes stateful event registers, periodic VBlank events, Maple DMA completion, one virtual neutral controller on port A, and IRQ entry through KOS's normal interrupt vector.
 - The SH-4 TMU slice includes TSTR, TCOR/TCNT countdown, TCR underflow/interrupt bits, and IPRA priority lookup; the timer fixture now wakes from `thd_sleep()`.
 - PVR VRAM is backed for the 32-bit and 64-bit apertures, and run summaries include a checksum, non-zero byte count, first changed offset, and RGB565 samples.

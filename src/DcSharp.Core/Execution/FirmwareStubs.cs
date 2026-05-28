@@ -12,7 +12,10 @@ internal static class FirmwareStubs
     private const uint GdromHleStub = 0x8C00_00D0;
     private const uint SystemHleStub = 0x8C00_00E8;
     private const uint BiosLanguageCodeAddress = 0x8C00_0074;
+    private const uint BiosBootModeAddress = 0x8C00_80FC;
+    private const uint BiosBootAreaModeAddress = 0x8C00_80FE;
     private const byte DefaultBiosLanguageCode = (byte)'1';
+    private const byte DefaultBiosBootMode = 1;
 
     public static void Install(DreamcastMemory memory)
     {
@@ -21,6 +24,8 @@ internal static class FirmwareStubs
         memory.WriteUInt32(SyscallGdromVector, GdromHleStub);
         memory.WriteUInt32(SyscallSystemVector, SystemHleStub);
         memory.Write(BiosLanguageCodeAddress, [DefaultBiosLanguageCode]);
+        memory.Write(BiosBootModeAddress, [DefaultBiosBootMode]);
+        memory.Write(BiosBootAreaModeAddress, [DefaultBiosBootMode]);
         memory.Write(ReturnZeroStub,
         [
             0x00, 0xE0, // mov #0,r0
