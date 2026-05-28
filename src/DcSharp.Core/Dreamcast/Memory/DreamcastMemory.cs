@@ -18,6 +18,9 @@ public sealed class DreamcastMemory
     private const uint PhysicalMask = 0x1FFF_FFFF;
     private const uint BootRomPhysicalBase = 0x0000_0000;
     private const uint BootRomBytes = 2 * 1024 * 1024;
+    private const uint BiosVectorTableBase = 0x0000_0180;
+    private const uint BiosVectorTableBytes = 0x0000_0280;
+    private const uint BiosInterruptHandlerTableBase = 0x0000_0200;
     private const uint SystemRamPhysicalBase = 0x0C00_0000;
     private const uint SystemRamMirrorBytes = 32 * 1024 * 1024;
     private const uint PvrVram64PhysicalBase = 0x0400_0000;
@@ -88,6 +91,7 @@ public sealed class DreamcastMemory
     private const ushort AsicEventMapleDma = 0x000C;
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
+    private readonly byte[] biosVectorTable = new byte[BiosVectorTableBytes];
     private readonly byte[] pvrVram = new byte[PvrVramByteCount];
     private readonly float[] pvrPreviewDepth = new float[PvrVramByteCount / 2];
     private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
@@ -331,6 +335,25 @@ public sealed class DreamcastMemory
             && (ulong)physical + (uint)length <= (ulong)BootRomPhysicalBase + BootRomBytes;
     }
 
+    private static bool TryGetBiosVectorTableOffset(uint address, int length, out int offset)
+    {
+        offset = 0;
+        if (length < 0)
+        {
+            return false;
+        }
+
+        var physical = TranslateAddress(address);
+        if (physical < BiosVectorTableBase
+            || (ulong)physical + (uint)length > (ulong)BiosVectorTableBase + BiosVectorTableBytes)
+        {
+            return false;
+        }
+
+        offset = (int)(physical - BiosVectorTableBase);
+        return true;
+    }
+
     public void Write(uint address, ReadOnlySpan<byte> data)
     {
         RecordWatchedWrite(address, data);
@@ -373,6 +396,13 @@ public sealed class DreamcastMemory
         if (TryGetOperandCacheRamOffset(address, data.Length, out var operandCacheRam, out var operandCacheOffset))
         {
             data.CopyTo(operandCacheRam.AsSpan(operandCacheOffset));
+            return;
+        }
+
+        if (TryGetBiosVectorTableOffset(address, data.Length, out var biosVectorOffset))
+        {
+            data.CopyTo(biosVectorTable.AsSpan(biosVectorOffset));
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data)));
             return;
         }
 
@@ -456,6 +486,14 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryGetBiosVectorTableOffset(address, 1, out var biosVectorOffset))
+        {
+            var value = biosVectorTable[biosVectorOffset];
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 1, value));
+            RecordWatchedRead(address, 1, value);
+            return value;
+        }
+
         if (IsBootRomAddress(address, 1))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 1, 0));
@@ -515,6 +553,14 @@ public sealed class DreamcastMemory
         if (TryGetOperandCacheRamOffset(address, 2, out var operandCacheRam, out var operandCacheOffset))
         {
             var value = (ushort)(operandCacheRam[operandCacheOffset] | (operandCacheRam[operandCacheOffset + 1] << 8));
+            RecordWatchedRead(address, 2, value);
+            return value;
+        }
+
+        if (TryGetBiosVectorTableOffset(address, 2, out var biosVectorOffset))
+        {
+            var value = (ushort)(biosVectorTable[biosVectorOffset] | (biosVectorTable[biosVectorOffset + 1] << 8));
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 2, value));
             RecordWatchedRead(address, 2, value);
             return value;
         }
@@ -591,6 +637,14 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryGetBiosVectorTableOffset(address, 4, out var biosVectorOffset))
+        {
+            var value = ReadUInt32From(biosVectorTable, biosVectorOffset);
+            deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 4, value));
+            RecordWatchedRead(address, 4, value);
+            return value;
+        }
+
         if (IsBootRomAddress(address, 4))
         {
             deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, 4, 0));
@@ -634,6 +688,12 @@ public sealed class DreamcastMemory
             return true;
         }
 
+        if (TryGetBiosVectorTableOffset(address, 4, out var biosVectorOffset))
+        {
+            value = ReadUInt32From(biosVectorTable, biosVectorOffset);
+            return true;
+        }
+
         if (TryGetSystemRamOffset(address, 4, out var systemRamOffset))
         {
             value = ReadUInt32From(systemRam, systemRamOffset);
@@ -641,6 +701,25 @@ public sealed class DreamcastMemory
         }
 
         return false;
+    }
+
+    public bool TryGetBiosInterruptHandler(int interruptLevel, out uint vectorAddress, out uint handlerAddress)
+    {
+        vectorAddress = 0;
+        handlerAddress = 0;
+        if (interruptLevel is < 0 or > 15)
+        {
+            return false;
+        }
+
+        vectorAddress = BiosInterruptHandlerTableBase + ((uint)interruptLevel * 4);
+        if (!TryGetBiosVectorTableOffset(vectorAddress, 4, out var offset))
+        {
+            return false;
+        }
+
+        handlerAddress = ReadUInt32From(biosVectorTable, offset);
+        return handlerAddress != 0;
     }
 
     private static uint ReadUInt32From(byte[] bytes, int offset) =>

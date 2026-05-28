@@ -33,6 +33,22 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void PreservesLowBiosInterruptVectorTableWrites()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0x0000_0224, 0x8C12_BF20);
+
+        Assert.Equal(0x8C12_BF20u, memory.ReadUInt32(0x4000_0224));
+        Assert.True(memory.TryPeekUInt32(0x0000_0224, out var peeked));
+        Assert.Equal(0x8C12_BF20u, peeked);
+        Assert.True(memory.TryGetBiosInterruptHandler(9, out var vectorAddress, out var handlerAddress));
+        Assert.Equal(0x0000_0224u, vectorAddress);
+        Assert.Equal(0x8C12_BF20u, handlerAddress);
+        Assert.DoesNotContain(memory.DeviceAccesses, access => access.Kind is MemoryAccessKind.UnmappedRead or MemoryAccessKind.UnmappedWrite);
+    }
+
+    [Fact]
     public void WritesThroughP1MirrorIntoSystemRam()
     {
         var memory = new DreamcastMemory();

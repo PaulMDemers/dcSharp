@@ -903,6 +903,35 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void VbrZeroExternalInterruptDispatchesThroughLowBiosVectorTable()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C12_BF20, 0x002B);
+        WriteInstruction(memory, 0x8C12_BF22, 0x0009);
+        memory.WriteUInt32(0x0000_0224, 0x8C12_BF20);
+        RaiseVBlankIrq9(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+
+        var step = cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, step.Pc);
+        Assert.Equal(0, step.Opcode);
+        Assert.Equal(0x8C12_BF20u, cpu.State.Pc);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0u, cpu.State.Ssr);
+        Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
+        Assert.Equal(Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | 0x90u, cpu.State.Sr);
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C12BF20, bios-vector=0x00000224", step.Trace);
+
+        cpu.Step();
+        cpu.Step();
+
+        Assert.Equal(0x8C01_0000u, cpu.State.Pc);
+        Assert.Equal(0u, cpu.State.Sr);
+    }
+
+    [Fact]
     public void DoesNotAcceptExternalInterruptWhenBlockBitIsSet()
     {
         var memory = new DreamcastMemory();

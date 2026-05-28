@@ -336,7 +336,15 @@ public sealed class Sh4Cpu
         State.Ssr = State.Sr;
         memory.WriteUInt32(0xFF00_0028, eventCode);
         State.Sr = (State.Sr & ~0xF0u) | Sh4State.SrMachineBit | Sh4State.SrRegisterBankBit | Sh4State.SrBlockBit | ((uint)level << 4);
-        State.Pc = State.Vbr + 0x600;
+        var target = State.Vbr + 0x600;
+        if (State.Vbr == 0 && memory.TryGetBiosInterruptHandler(level, out var vectorAddress, out var handlerAddress))
+        {
+            State.Pc = handlerAddress;
+            trace = $"interrupt event=0x{eventCode:X4}, level={level}, target=0x{State.Pc:X8}, bios-vector=0x{vectorAddress:X8}";
+            return true;
+        }
+
+        State.Pc = target;
         trace = $"interrupt event=0x{eventCode:X4}, level={level}, target=0x{State.Pc:X8}";
         return true;
     }
