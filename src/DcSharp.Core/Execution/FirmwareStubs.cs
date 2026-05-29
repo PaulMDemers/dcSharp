@@ -63,6 +63,7 @@ internal static class FirmwareStubs
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
+        private const int GdromProcessing = 1;
         private const int GdromCompleted = 2;
         private const int GdromNoDiscStatus = 2;
         private const int CdStatusStandby = 2;
@@ -143,7 +144,7 @@ internal static class FirmwareStubs
             {
                 GdromFunctionSendCommand => SendCommand(state, memory),
                 GdromFunctionCheckCommand => CheckCommand(state, memory),
-                GdromFunctionExecServer => 0,
+                GdromFunctionExecServer => ExecServer(memory),
                 GdromFunctionInit => 0,
                 GdromFunctionDriveStatus => CheckDrive(state, memory),
                 GdromFunctionDmaCallback => 0,
@@ -161,7 +162,7 @@ internal static class FirmwareStubs
         private uint SendCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
             var commandId = nextCommandId++;
-            var command = ExecuteCommand(state.R[4], state.R[5], memory);
+            var command = GdromQueuedCommand.Pending(state.R[4], state.R[5]);
             commands[commandId] = command;
             memory.RecordGdromCommandActivity(
                 "send",
@@ -178,6 +179,33 @@ internal static class FirmwareStubs
                 command.AtaStatus,
                 "command queued");
             return commandId;
+        }
+
+        private uint ExecServer(DreamcastMemory memory)
+        {
+            var pending = commands.FirstOrDefault(pair => pair.Value.Response == GdromProcessing);
+            if (pending.Value is null)
+            {
+                return 0;
+            }
+
+            var executed = ExecuteCommand(pending.Value.Command!.Value, pending.Value.ParameterAddress ?? 0, memory);
+            commands[pending.Key] = executed;
+            memory.RecordGdromCommandActivity(
+                "exec",
+                pending.Key,
+                executed.Command,
+                executed.Command is { } commandValue ? GdromCommandName(commandValue) : null,
+                executed.ParameterAddress,
+                null,
+                executed.Response,
+                GdromResponseName(executed.Response),
+                executed.Status0,
+                executed.Status1,
+                executed.TransferredBytes,
+                executed.AtaStatus,
+                "command executed");
+            return 0;
         }
 
         private static GdromQueuedCommand ExecuteCommand(uint command, uint parameters, DreamcastMemory memory)
@@ -284,9 +312,14 @@ internal static class FirmwareStubs
 
         private uint CheckCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
+            var removeAfterReport = false;
             if (!commands.TryGetValue(state.R[4], out var command))
             {
                 command = new GdromQueuedCommand(null, null, GdromNoActive, 0, 0, 0, 0);
+            }
+            else
+            {
+                removeAfterReport = command.Response is GdromCompleted or GdromFailed;
             }
 
             WriteWords(memory, state.R[5], command.Status0, command.Status1, command.TransferredBytes, command.AtaStatus);
@@ -304,6 +337,11 @@ internal static class FirmwareStubs
                 command.TransferredBytes,
                 command.AtaStatus,
                 command.Response == GdromNoActive ? "no active command" : "command status reported");
+            if (removeAfterReport)
+            {
+                commands.Remove(state.R[4]);
+            }
+
             return unchecked((uint)command.Response);
         }
 
@@ -413,6 +451,7 @@ internal static class FirmwareStubs
             {
                 GdromFailed => "failed",
                 GdromNoActive => "no active",
+                GdromProcessing => "processing",
                 GdromCompleted => "completed",
                 _ => "unknown"
             };
@@ -426,6 +465,9 @@ internal static class FirmwareStubs
             int TransferredBytes,
             int AtaStatus)
         {
+            public static GdromQueuedCommand Pending(uint command, uint parameters) =>
+                new(command, parameters, GdromProcessing, 0, 0, 0, 0);
+
             public static GdromQueuedCommand Completed(uint command, uint parameters, int status0, int status1, int transferredBytes, int ataStatus) =>
                 new(command, parameters, GdromCompleted, status0, status1, transferredBytes, ataStatus);
 

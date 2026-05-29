@@ -11,6 +11,7 @@ public class FirmwareStubsTests
     private const uint SystemHleStub = 0x8C00_00E8;
     private const uint GdromSendCommand = 0;
     private const uint GdromCheckCommand = 1;
+    private const uint GdromExecServer = 2;
     private const uint GdromInit = 3;
     private const uint GdromAbortCommand = 8;
     private const uint GdromReset = 9;
@@ -23,6 +24,7 @@ public class FirmwareStubsTests
     private const uint GdromCommandGetVersion = 40;
     private const uint GdromCompleted = 2;
     private const uint GdromNoActive = 0;
+    private const uint GdromProcessing = 1;
     private const uint Sector = 1;
     private const uint ParameterAddress = 0x8C01_0000;
     private const uint StatusAddress = 0x8C01_0100;
@@ -109,6 +111,11 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandPioRead, ParameterAddress);
+        var processingResponse = CheckGdromCommand(handler, memory, commandId);
+        Assert.Equal(GdromProcessing, processingResponse);
+        Assert.Equal(0, memory.ReadByte(DestinationAddress));
+
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var response = CheckGdromCommand(handler, memory, commandId);
 
         Assert.Equal(1u, commandId);
@@ -118,6 +125,8 @@ public class FirmwareStubsTests
         Assert.Equal(2048u, memory.ReadUInt32(StatusAddress + 8));
         Assert.Equal(0u, memory.ReadUInt32(StatusAddress + 12));
         Assert.Equal(0x20, memory.ReadByte(DestinationAddress));
+        var inactiveResponse = CheckGdromCommand(handler, memory, commandId);
+        Assert.Equal(GdromNoActive, inactiveResponse);
 
         var activities = memory.CreateGdromSnapshot().CommandActivities;
         Assert.Collection(
@@ -129,8 +138,22 @@ public class FirmwareStubsTests
                 Assert.Equal(GdromCommandPioRead, send.Command);
                 Assert.Equal("PIO_READ", send.CommandName);
                 Assert.Equal(ParameterAddress, send.ParameterAddress);
-                Assert.Equal((int)GdromCompleted, send.Response);
-                Assert.Equal(2048, send.TransferredBytes);
+                Assert.Equal((int)GdromProcessing, send.Response);
+                Assert.Equal("processing", send.ResponseName);
+            },
+            processing =>
+            {
+                Assert.Equal("check", processing.Operation);
+                Assert.Equal((int)GdromProcessing, processing.Response);
+                Assert.Equal("processing", processing.ResponseName);
+            },
+            exec =>
+            {
+                Assert.Equal("exec", exec.Operation);
+                Assert.Equal(1u, exec.CommandId);
+                Assert.Equal(GdromCommandPioRead, exec.Command);
+                Assert.Equal((int)GdromCompleted, exec.Response);
+                Assert.Equal(2048, exec.TransferredBytes);
             },
             check =>
             {
@@ -142,6 +165,14 @@ public class FirmwareStubsTests
                 Assert.Equal("completed", check.ResponseName);
                 Assert.Equal(2048, check.TransferredBytes);
                 Assert.Equal("command status reported", check.Status);
+            },
+            inactive =>
+            {
+                Assert.Equal("check", inactive.Operation);
+                Assert.Equal(1u, inactive.CommandId);
+                Assert.Null(inactive.Command);
+                Assert.Equal((int)GdromNoActive, inactive.Response);
+                Assert.Equal("no active", inactive.ResponseName);
             });
     }
 
@@ -153,6 +184,7 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandPioRead, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var response = CheckGdromCommand(handler, memory, commandId);
 
         Assert.Equal(unchecked((uint)-1), response);
@@ -168,6 +200,7 @@ public class FirmwareStubsTests
 
         var unknownResponse = CheckGdromCommand(handler, memory, 42);
         var nopCommandId = SendGdromCommand(handler, memory, GdromCommandNop, 0);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var nopResponse = CheckGdromCommand(handler, memory, nopCommandId);
         var commandId = SendGdromCommand(handler, memory, GdromCommandNop, 0);
         AbortGdromCommand(handler, memory, commandId);
@@ -187,6 +220,7 @@ public class FirmwareStubsTests
 
         Assert.Equal(0u, CallGdromFunction(handler, memory, GdromInit));
         Assert.Equal(0u, CallGdromFunction(handler, memory, GdromReset));
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
 
         Assert.Equal(GdromCompleted, CheckGdromCommand(handler, memory, commandId));
     }
@@ -212,8 +246,10 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var initCommandId = SendGdromCommand(handler, memory, GdromCommandInit, 0);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var initResponse = CheckGdromCommand(handler, memory, initCommandId);
         var versionCommandId = SendGdromCommand(handler, memory, GdromCommandGetVersion, 0);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var versionResponse = CheckGdromCommand(handler, memory, versionCommandId);
 
         Assert.Equal(GdromCompleted, initResponse);
@@ -230,6 +266,7 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var versionCommandId = SendGdromCommand(handler, memory, GdromCommandGetVersion, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var versionResponse = CheckGdromCommand(handler, memory, versionCommandId);
 
         Assert.Equal(GdromCompleted, versionResponse);
@@ -249,6 +286,7 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var response = CheckGdromCommand(handler, memory, commandId);
         var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
 
@@ -277,6 +315,7 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var response = CheckGdromCommand(handler, memory, commandId);
         var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
 
@@ -303,6 +342,7 @@ public class FirmwareStubsTests
         var handler = FirmwareStubs.CreateTrapHandler();
 
         var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
         var response = CheckGdromCommand(handler, memory, commandId);
         var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
 
@@ -418,6 +458,15 @@ public class FirmwareStubsTests
         var state = CreateGdromState(GdromCheckCommand);
         state.R[4] = commandId;
         state.R[5] = StatusAddress;
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
+    }
+
+    private static uint ExecGdromServer(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory)
+    {
+        var state = CreateGdromState(GdromExecServer);
         Assert.True(handler.TryHandle(state, memory, out _));
         return state.R[0];
     }
