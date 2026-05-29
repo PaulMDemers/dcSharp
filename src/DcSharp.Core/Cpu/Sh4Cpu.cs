@@ -445,6 +445,163 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2InitDelayLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_4276 || step.Opcode != 0x8BED || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C11_4254)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C11_4254) != 0x65F2
+            || memory.ReadInstructionUInt16(0x8C11_4256) != 0x56F1
+            || memory.ReadInstructionUInt16(0x8C11_4272) != 0x7C01
+            || memory.ReadInstructionUInt16(0x8C11_4274) != 0x3CE3
+            || memory.ReadInstructionUInt16(0x8C11_4276) != 0x8BED
+            || memory.ReadInstructionUInt16(0x8C11_41FE) != 0x4410
+            || memory.ReadInstructionUInt16(0x8C11_4200) != 0x8BFD)
+        {
+            return false;
+        }
+
+        if (State.Pr != 0x8C11_4272
+            || State.R[11] != 0x8C11_F518
+            || State.R[13] != 0x8C11_6F94
+            || State.R[14] != 0x0000_2710
+            || State.R[12] >= State.R[14]
+            || State.R[15] is < 0x8C00_0000 or >= 0x8D00_0000)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[14] - State.R[12];
+        const ulong instructionsPerIteration = 386_000;
+        if (remainingIterations > maxInstructionsToSkip / instructionsPerIteration)
+        {
+            return false;
+        }
+
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions == 0)
+        {
+            return false;
+        }
+
+        State.R[4] = 0;
+        State.R[12] = State.R[14];
+        State.T = true;
+        State.Pc = 0x8C11_4278;
+        State.InstructionsExecuted += skippedInstructions;
+        memory.WriteUInt32(0x8C1C_AF88, 0);
+        memory.WriteUInt32(0x8C1C_AF8C, 0);
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2StringScanLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_EDBC || step.Opcode != 0x8BF5 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C10_EDAA)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C10_EDAA) != 0x62F2
+            || memory.ReadInstructionUInt16(0x8C10_EDAC) != 0x7201
+            || memory.ReadInstructionUInt16(0x8C10_EDAE) != 0x2F22
+            || memory.ReadInstructionUInt16(0x8C10_EDB0) != 0x64F2
+            || memory.ReadInstructionUInt16(0x8C10_EDB2) != 0x6440
+            || memory.ReadInstructionUInt16(0x8C10_EDB4) != 0x2448
+            || memory.ReadInstructionUInt16(0x8C10_EDB6) != 0x8902
+            || memory.ReadInstructionUInt16(0x8C10_EDB8) != 0x6043
+            || memory.ReadInstructionUInt16(0x8C10_EDBA) != 0x8825
+            || memory.ReadInstructionUInt16(0x8C10_EDBC) != 0x8BF5)
+        {
+            return false;
+        }
+
+        if (State.R[15] is < 0x8C00_0000 or >= 0x8D00_0000 || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        var currentAddress = memory.ReadUInt32(State.R[15]);
+        if (!memory.TryGetSystemRamOffset(currentAddress, 1, out _))
+        {
+            return false;
+        }
+
+        if (maxInstructionsToSkip < 7)
+        {
+            return false;
+        }
+
+        var maxDistance = (maxInstructionsToSkip / 10) + 1;
+        uint sentinelAddress = 0;
+        byte sentinel = 0;
+        for (var scanDistance = 1UL; scanDistance <= maxDistance; scanDistance++)
+        {
+            var address = currentAddress + (uint)scanDistance;
+            if (address <= currentAddress || !memory.TryGetSystemRamOffset(address, 1, out _))
+            {
+                break;
+            }
+
+            var value = memory.ReadByte(address);
+            if (value is 0 or 0x25)
+            {
+                sentinelAddress = address;
+                sentinel = value;
+                break;
+            }
+        }
+
+        if (sentinelAddress == 0)
+        {
+            return false;
+        }
+
+        var distance = sentinelAddress - currentAddress;
+        if (distance == 0)
+        {
+            return false;
+        }
+
+        var nonSentinelIterations = (ulong)distance - 1;
+        skippedInstructions = (nonSentinelIterations * 10) + (sentinel == 0 ? 7UL : 10UL);
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt32(State.R[15], sentinelAddress);
+        State.R[2] = sentinelAddress;
+        State.R[4] = sentinel;
+        if (sentinel == 0x25)
+        {
+            State.R[0] = sentinel;
+        }
+
+        State.T = true;
+        State.Pc = 0x8C10_EDBE;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

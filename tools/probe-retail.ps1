@@ -4,7 +4,7 @@ param(
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$LongDoa2,
-    [int]$LongDoa2Instructions = 220000000
+    [long]$LongDoa2Instructions = 4500000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +16,7 @@ function Invoke-BootSmoke {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][int]$Instructions
+        [Parameter(Mandatory = $true)][long]$Instructions
     )
 
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -87,7 +87,7 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C10EDB8"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=8, ok=8, failed=0"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=1, 45166x8"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
@@ -99,6 +99,7 @@ if ($LongDoa2) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=2048/2048, ok=True"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C00834A"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C113318"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "FirmwareExit"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
     }
