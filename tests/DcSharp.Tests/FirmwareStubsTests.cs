@@ -11,7 +11,9 @@ public class FirmwareStubsTests
     private const uint SystemHleStub = 0x8C00_00E8;
     private const uint GdromSendCommand = 0;
     private const uint GdromCheckCommand = 1;
-    private const uint GdromAbortCommand = 3;
+    private const uint GdromInit = 3;
+    private const uint GdromAbortCommand = 8;
+    private const uint GdromReset = 9;
     private const uint GdromCheckDrive = 4;
     private const uint GdromSectorMode = 10;
     private const uint GdromCommandPioRead = 16;
@@ -174,6 +176,19 @@ public class FirmwareStubsTests
         Assert.Equal(GdromNoActive, unknownResponse);
         Assert.Equal(GdromCompleted, nopResponse);
         Assert.Equal(GdromNoActive, abortedResponse);
+    }
+
+    [Fact]
+    public void GdromInitAndResetSyscallsDoNotAbortQueuedCommands()
+    {
+        var memory = new DreamcastMemory();
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var commandId = SendGdromCommand(handler, memory, GdromCommandNop, 0);
+
+        Assert.Equal(0u, CallGdromFunction(handler, memory, GdromInit));
+        Assert.Equal(0u, CallGdromFunction(handler, memory, GdromReset));
+
+        Assert.Equal(GdromCompleted, CheckGdromCommand(handler, memory, commandId));
     }
 
     [Fact]
@@ -415,6 +430,16 @@ public class FirmwareStubsTests
         var state = CreateGdromState(GdromAbortCommand);
         state.R[4] = commandId;
         Assert.True(handler.TryHandle(state, memory, out _));
+    }
+
+    private static uint CallGdromFunction(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory,
+        uint function)
+    {
+        var state = CreateGdromState(function);
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
     }
 
     private static uint CheckDrive(

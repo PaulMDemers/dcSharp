@@ -41,6 +41,20 @@ internal static class FirmwareStubs
         private const uint DefaultSoftResetEntryPoint = 0x8C01_0000;
         private const uint DefaultSoftResetStackPointer = 0x8D00_0000;
         private const uint SuperFunctionGdrom = 0;
+        private const uint GdromFunctionSendCommand = 0;
+        private const uint GdromFunctionCheckCommand = 1;
+        private const uint GdromFunctionExecServer = 2;
+        private const uint GdromFunctionInit = 3;
+        private const uint GdromFunctionDriveStatus = 4;
+        private const uint GdromFunctionDmaCallback = 5;
+        private const uint GdromFunctionDmaTransfer = 6;
+        private const uint GdromFunctionDmaCheck = 7;
+        private const uint GdromFunctionAbortCommand = 8;
+        private const uint GdromFunctionReset = 9;
+        private const uint GdromFunctionSectorMode = 10;
+        private const uint GdromFunctionPioCallback = 11;
+        private const uint GdromFunctionPioTransfer = 12;
+        private const uint GdromFunctionPioCheck = 13;
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
         private const uint GdromCommandGetToc2 = 19;
@@ -127,21 +141,20 @@ internal static class FirmwareStubs
         private uint HandleGdrom(uint function, DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory) =>
             function switch
             {
-                0 => SendCommand(state, memory),
-                1 => CheckCommand(state, memory),
-                2 => 0,
-                3 => AbortCommand(state, memory),
-                4 => CheckDrive(state, memory),
-                5 => 0,
-                6 => 0,
-                7 => CheckTransfer(state, memory),
-                8 => 0,
-                9 => 0,
-                10 => SectorMode(state, memory),
-                11 => 0,
-                12 => 0,
-                13 => CheckTransfer(state, memory),
-                14 => ReadSectors(state, memory),
+                GdromFunctionSendCommand => SendCommand(state, memory),
+                GdromFunctionCheckCommand => CheckCommand(state, memory),
+                GdromFunctionExecServer => 0,
+                GdromFunctionInit => 0,
+                GdromFunctionDriveStatus => CheckDrive(state, memory),
+                GdromFunctionDmaCallback => 0,
+                GdromFunctionDmaTransfer => 0,
+                GdromFunctionDmaCheck => CheckTransfer(state, memory),
+                GdromFunctionAbortCommand => AbortCommand(state, memory),
+                GdromFunctionReset => 0,
+                GdromFunctionSectorMode => SectorMode(state, memory),
+                GdromFunctionPioCallback => 0,
+                GdromFunctionPioTransfer => 0,
+                GdromFunctionPioCheck => CheckTransfer(state, memory),
                 _ => 0
             };
 
@@ -359,11 +372,6 @@ internal static class FirmwareStubs
             var sectorSize = unchecked((int)memory.ReadUInt32(parameters + 12));
             memory.RecordGdromSectorModeCommand(parameters, request, sectorPart, cdXa, sectorSize, true, "sector mode set");
             return 0;
-        }
-
-        private static uint ReadSectors(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
-        {
-            return memory.ExecuteGdromCommand(state.R[4]);
         }
 
         private static void WriteWords(DreamcastMemory memory, uint address, params int[] values)
