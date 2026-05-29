@@ -91,6 +91,12 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2SystemRamClearSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (TryGetImmediateBranchRange(step, out var immediateBranchStartPc, out var immediateBranchEndPc)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, immediateBranchStartPc, immediateBranchEndPc)
+                        && cpu.TryFastForwardImmediateDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var immediateDtSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(immediateDtSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (TryGetDelayedBranchRange(step, out var branchStartPc, out var branchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, branchStartPc, branchEndPc)
                         && cpu.TryFastForwardCountedIdleLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var skippedInstructions))
@@ -282,6 +288,26 @@ public sealed class DreamcastRunner
         }
 
         target = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        return true;
+    }
+
+    private static bool TryGetImmediateBranchRange(Sh4StepResult step, out uint startPc, out uint endPc)
+    {
+        startPc = 0;
+        endPc = 0;
+        if ((step.Opcode & 0xFF00) is not (0x8900 or 0x8B00) || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var target = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (target >= step.Pc)
+        {
+            return false;
+        }
+
+        startPc = target;
+        endPc = step.Pc;
         return true;
     }
 

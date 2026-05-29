@@ -54,15 +54,34 @@ public class FirmwareStubsTests
     public void SystemBiosSoftResetContinuesAtLoadedBootEntry()
     {
         var handler = FirmwareStubs.CreateTrapHandler();
+        var memory = new DreamcastMemory();
+        FirmwareStubs.Install(memory);
         var state = new Sh4State { Pc = SystemHleStub };
         state.R[4] = 0;
         state.R[15] = 0x7E00_0FD0;
 
-        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+        Assert.True(handler.TryHandle(state, memory, out var trace));
 
         Assert.Equal(0x8C01_0000u, state.Pc);
         Assert.Equal(0x8D00_0000u, state.R[15]);
+        Assert.Equal(1, memory.ReadByte(0x8C00_80FC));
+        Assert.Equal(0, memory.ReadByte(0x8C00_80FE));
         Assert.Equal("firmware system hle func=0 r4=0x00000000, r5=0x00000000, r6=0x00000000, r7=0x00000000, pr=0x00000000 ; pc=0x8C010000, sp=0x8D000000", trace);
+    }
+
+    [Fact]
+    public void SystemBiosCheckDiscReturnsToCaller()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = SystemHleStub, Pr = 0x8C01_2450 };
+        state.R[4] = 3;
+        state.R[5] = 0x1234_5678;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x8C01_2450u, state.Pc);
+        Assert.Equal(0u, state.R[0]);
+        Assert.Equal("firmware system hle func=3 r4=0x00000003, r5=0x12345678, r6=0x00000000, r7=0x00000000, pr=0x8C012450 ; r0=0x00000000", trace);
     }
 
     [Theory]

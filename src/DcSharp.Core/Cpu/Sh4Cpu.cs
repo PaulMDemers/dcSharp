@@ -112,6 +112,58 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardImmediateDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((step.Opcode & 0xFF00) is not (0x8900 or 0x8B00) || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (State.Pc != branchTarget || branchTarget + 2 != step.Pc)
+        {
+            return false;
+        }
+
+        var dtOpcode = memory.ReadInstructionUInt16(branchTarget);
+        if ((dtOpcode & 0xF0FF) != 0x4010)
+        {
+            return false;
+        }
+
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (remainingIterations == 0 || maxInstructionsToSkip < 2)
+        {
+            return false;
+        }
+
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / 2);
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * 2;
+        State.R[counterRegister] -= (uint)iterationsToSkip;
+        if (iterationsToSkip == remainingIterations)
+        {
+            State.T = true;
+            State.Pc = step.Pc + 2;
+        }
+        else
+        {
+            State.T = false;
+            State.Pc = branchTarget;
+        }
+
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinPatternFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1654,6 +1706,15 @@ public sealed class Sh4Cpu
 
                 State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
                 return $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+            }
+
+            case 0xE:
+            {
+                var addend = BitConverter.UInt32BitsToSingle(State.Fr[n]);
+                var factor = BitConverter.UInt32BitsToSingle(State.Fr[m]);
+                var accumulator = BitConverter.UInt32BitsToSingle(State.Fr[0]);
+                State.Fr[n] = BitConverter.SingleToUInt32Bits(addend + (factor * accumulator));
+                return $"fmac fr0,fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
             }
 
             default:

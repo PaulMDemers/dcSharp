@@ -87,9 +87,9 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C129E48"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=24, ok=24, failed=0"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=1, 45166x24"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=8, ok=8, failed=0"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=1, 45166x8"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"
@@ -99,6 +99,7 @@ if ($LongDoa2) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=2048/2048, ok=True"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C00834A"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C113318"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "FirmwareExit"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
     }
 }

@@ -140,6 +140,27 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsImmediateDtLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x4410); // dt r4
+        WriteInstruction(memory, 0x8C01_0002, 0x8BFD); // bf 0x8C010000
+        WriteInstruction(memory, 0x8C01_0004, 0x0009); // fallthrough
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[4] = 4;
+
+        cpu.Step();
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardImmediateDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(6UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[4]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C01_0004u, cpu.State.Pc);
+        Assert.Equal(8UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void FastForwardsIpBinPatternFillLoop()
     {
         var memory = new DreamcastMemory();
@@ -664,6 +685,22 @@ public class Sh4CpuTests
 
         Assert.Equal(BitConverter.SingleToUInt32Bits(70.0f), cpu.State.Fr[3]);
         Assert.Equal("fipr fv8,fv0 ; fr3=0x428C0000", step.Trace);
+    }
+
+    [Fact]
+    public void ExecutesFloatingPointMultiplyAccumulate()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF32E);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.Fr[2] = BitConverter.SingleToUInt32Bits(3.0f);
+        cpu.State.Fr[3] = BitConverter.SingleToUInt32Bits(4.0f);
+
+        var step = cpu.Step();
+
+        Assert.Equal(BitConverter.SingleToUInt32Bits(10.0f), cpu.State.Fr[3]);
+        Assert.Equal("fmac fr0,fr2,fr3 ; fr3=0x41200000", step.Trace);
     }
 
     [Fact]
