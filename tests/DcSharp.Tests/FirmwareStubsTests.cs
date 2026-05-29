@@ -189,6 +189,24 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void GdromGetVersionWritesBiosVersionString()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(ParameterAddress, DestinationAddress);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var versionCommandId = SendGdromCommand(handler, memory, GdromCommandGetVersion, ParameterAddress);
+        var versionResponse = CheckGdromCommand(handler, memory, versionCommandId);
+
+        Assert.Equal(GdromCompleted, versionResponse);
+        Assert.Equal((byte)'G', memory.ReadByte(DestinationAddress));
+        Assert.Equal((byte)'D', memory.ReadByte(DestinationAddress + 1));
+        Assert.Equal((byte)'C', memory.ReadByte(DestinationAddress + 2));
+        Assert.Equal((byte)' ', memory.ReadByte(DestinationAddress + 3));
+        Assert.Equal(0x02, memory.ReadByte(DestinationAddress + 27));
+    }
+
+    [Fact]
     public void GdromGetToc2WritesSingleDataTrackToc()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));

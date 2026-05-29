@@ -45,6 +45,7 @@ internal static class FirmwareStubs
         private const uint GdromCommandDmaRead = 17;
         private const uint GdromCommandGetToc2 = 19;
         private const uint GdromCommandInit = 24;
+        private const uint GdromCommandGetVersion = 40;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
@@ -173,6 +174,12 @@ internal static class FirmwareStubs
                 return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
             }
 
+            if (command == GdromCommandGetVersion)
+            {
+                WriteGetVersion(parameters, memory);
+                return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
+            }
+
             return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
         }
 
@@ -218,6 +225,31 @@ internal static class FirmwareStubs
             memory.WriteUInt32(buffer + 404, PackTocEntry(0, leadoutFad));
             memory.RecordGdromTocCommand(parameters, buffer, firstTrack, lastTrack, dataTrackStartFad, leadoutFad, true, "TOC written");
             return GdromQueuedCommand.Completed(GdromCommandGetToc2, parameters, 0, 0, 0, 0);
+        }
+
+        private static void WriteGetVersion(uint parameters, DreamcastMemory memory)
+        {
+            if (parameters == 0)
+            {
+                return;
+            }
+
+            var buffer = memory.ReadUInt32(parameters);
+            if (buffer == 0)
+            {
+                return;
+            }
+
+            ReadOnlySpan<byte> version =
+            [
+                (byte)'G', (byte)'D', (byte)'C', (byte)' ',
+                (byte)'V', (byte)'e', (byte)'r', (byte)'s', (byte)'i', (byte)'o', (byte)'n', (byte)' ',
+                (byte)'1', (byte)'.', (byte)'1', (byte)'0', (byte)' ',
+                (byte)'1', (byte)'9', (byte)'9', (byte)'9', (byte)'-', (byte)'0', (byte)'3', (byte)'-', (byte)'3', (byte)'1',
+                0x02
+            ];
+
+            memory.Write(buffer, version);
         }
 
         private static uint PackTocEntry(uint control, uint fad) =>
@@ -350,7 +382,7 @@ internal static class FirmwareStubs
                 GdromCommandGetToc2 => "GET_TOC2",
                 GdromCommandInit => "INIT",
                 29 => "NOP",
-                40 => "GET_VERSION",
+                GdromCommandGetVersion => "GET_VERSION",
                 _ => "unknown"
             };
 
