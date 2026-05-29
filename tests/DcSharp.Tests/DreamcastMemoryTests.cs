@@ -103,6 +103,27 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CapturesWatchedMemoryWritesAcrossAddressRanges()
+    {
+        var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(
+            Limit: 4,
+            Ranges:
+            [
+                new DreamcastMemoryAddressRange(0x8C01_0000, 0x8C01_0003),
+                new DreamcastMemoryAddressRange(0x8C02_0000, 0x8C02_0003)
+            ]));
+
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0010, 2);
+        memory.WriteUInt32(0x8C02_0000, 3);
+
+        Assert.Collection(
+            memory.WatchedWrites,
+            first => Assert.Equal(0x8C01_0000u, first.Address),
+            second => Assert.Equal(0x8C02_0000u, second.Address));
+    }
+
+    [Fact]
     public void RespectsWatchedMemoryWriteLimit()
     {
         var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(0x8C01_0000, 0x8C01_000F, Limit: 1));
@@ -131,6 +152,30 @@ public class DreamcastMemoryTests
         Assert.Equal(4, access.Size);
         Assert.Equal(0x1234_5678u, access.Value);
         Assert.Equal(0x8C02_0000u, access.Pc);
+    }
+
+    [Fact]
+    public void CapturesWatchedMemoryReadsAcrossAddressRanges()
+    {
+        var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(
+            Limit: 4,
+            Ranges:
+            [
+                new DreamcastMemoryAddressRange(0x8C01_0000, 0x8C01_0003),
+                new DreamcastMemoryAddressRange(0x8C02_0000, 0x8C02_0003)
+            ]));
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0010, 2);
+        memory.WriteUInt32(0x8C02_0000, 3);
+
+        Assert.Equal(1u, memory.ReadUInt32(0x8C01_0000));
+        Assert.Equal(2u, memory.ReadUInt32(0x8C01_0010));
+        Assert.Equal(3u, memory.ReadUInt32(0x8C02_0000));
+
+        Assert.Collection(
+            memory.WatchedReads,
+            first => Assert.Equal(0x8C01_0000u, first.Address),
+            second => Assert.Equal(0x8C02_0000u, second.Address));
     }
 
     [Fact]

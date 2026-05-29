@@ -1256,6 +1256,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? traceLogPath = null;
     uint? traceStartPc = null;
     uint? traceEndPc = null;
+    var tracePcRanges = new List<AddressRange>();
     var traceLogLimit = 4096;
     string? deviceLogPath = null;
     MemoryAccessKind? deviceKind = null;
@@ -1263,9 +1264,11 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? deviceDomain = null;
     string? memoryWriteLogPath = null;
     AddressRange? memoryWriteAddressRange = null;
+    var memoryWriteAddressRanges = new List<AddressRange>();
     var memoryWriteLimit = 4096;
     string? memoryReadLogPath = null;
     AddressRange? memoryReadAddressRange = null;
+    var memoryReadAddressRanges = new List<AddressRange>();
     var memoryReadLimit = 4096;
     string? mediaPath = null;
     var stopOnUnmapped = false;
@@ -1336,6 +1339,7 @@ static CliRunOptions ParseRunOptions(string[] args)
                 break;
             case "--trace-pc" when index + 1 < args.Length:
                 (traceStartPc, traceEndPc) = ParseAddressRange(args[index + 1]);
+                tracePcRanges.Add(new AddressRange(traceStartPc ?? 0, traceEndPc ?? traceStartPc ?? uint.MaxValue));
                 index++;
                 break;
             case "--trace-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedTraceLogLimit):
@@ -1366,6 +1370,7 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--memory-write-address" when index + 1 < args.Length:
                 var (memoryWriteStart, memoryWriteEnd) = ParseAddressRange(args[index + 1]);
                 memoryWriteAddressRange = new AddressRange(memoryWriteStart ?? 0, memoryWriteEnd ?? memoryWriteStart ?? uint.MaxValue);
+                memoryWriteAddressRanges.Add(memoryWriteAddressRange);
                 index++;
                 break;
             case "--memory-write-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedMemoryWriteLimit):
@@ -1379,6 +1384,7 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--memory-read-address" when index + 1 < args.Length:
                 var (memoryReadStart, memoryReadEnd) = ParseAddressRange(args[index + 1]);
                 memoryReadAddressRange = new AddressRange(memoryReadStart ?? 0, memoryReadEnd ?? memoryReadStart ?? uint.MaxValue);
+                memoryReadAddressRanges.Add(memoryReadAddressRange);
                 index++;
                 break;
             case "--memory-read-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedMemoryReadLimit):
@@ -1436,7 +1442,13 @@ static CliRunOptions ParseRunOptions(string[] args)
 
     var traceCapture = traceLogPath is null
         ? null
-        : new DreamcastTraceCaptureOptions(traceStartPc, traceEndPc, traceLogLimit);
+        : new DreamcastTraceCaptureOptions(
+            traceStartPc,
+            traceEndPc,
+            traceLogLimit,
+            tracePcRanges.Count == 0
+                ? null
+                : tracePcRanges.Select(range => new DreamcastTracePcRange(range.Start, range.End)).ToArray());
     var media = mediaPath is null
         ? null
         : DreamcastMediaImageLoader.LoadFromFile(mediaPath);
@@ -1445,13 +1457,19 @@ static CliRunOptions ParseRunOptions(string[] args)
         : new DreamcastMemoryWriteWatch(
             memoryWriteAddressRange?.Start ?? 0,
             memoryWriteAddressRange?.End ?? uint.MaxValue,
-            memoryWriteLimit);
+            memoryWriteLimit,
+            memoryWriteAddressRanges.Count == 0
+                ? null
+                : memoryWriteAddressRanges.Select(range => new DreamcastMemoryAddressRange(range.Start, range.End)).ToArray());
     var memoryReadWatch = memoryReadLogPath is null
         ? null
         : new DreamcastMemoryReadWatch(
             memoryReadAddressRange?.Start ?? 0,
             memoryReadAddressRange?.End ?? uint.MaxValue,
-            memoryReadLimit);
+            memoryReadLimit,
+            memoryReadAddressRanges.Count == 0
+                ? null
+                : memoryReadAddressRanges.Select(range => new DreamcastMemoryAddressRange(range.Start, range.End)).ToArray());
 
     return new CliRunOptions(
         new DreamcastRunOptions(
@@ -1660,6 +1678,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
     Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");

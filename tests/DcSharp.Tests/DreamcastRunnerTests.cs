@@ -177,6 +177,29 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFilteredTraceLogAcrossPcRanges()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));
+        var options = new DreamcastRunOptions(
+            InstructionLimit: 3,
+            TraceTailLength: 0,
+            TraceCapture: new DreamcastTraceCaptureOptions(
+                Limit: 4,
+                Ranges:
+                [
+                    new DreamcastTracePcRange(0x8C01_0000, 0x8C01_0000),
+                    new DreamcastTracePcRange(0x8C01_0004, 0x8C01_0004)
+                ]));
+
+        var result = new DreamcastRunner().Run(elf, options);
+
+        Assert.Collection(
+            result.TraceLog,
+            first => Assert.Equal(0x8C01_0000u, first.Pc),
+            second => Assert.Equal(0x8C01_0004u, second.Pc));
+    }
+
+    [Fact]
     public void ReportsProgramExitWhenKosExitBannerFallsOutOfExecutableCode()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateKosExitFallthroughElf()));

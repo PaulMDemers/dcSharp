@@ -2435,7 +2435,8 @@ public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size,
 public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
-    int Limit = 4096)
+    int Limit = 4096,
+    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null)
 {
     public bool ShouldRecord(uint address, int length)
     {
@@ -2444,19 +2445,20 @@ public sealed record DreamcastMemoryWriteWatch(
             return false;
         }
 
-        var start = Math.Min(StartAddress, EndAddress);
-        var end = Math.Max(StartAddress, EndAddress);
-        var writeStart = (ulong)address;
-        var writeEnd = writeStart + (uint)length - 1;
+        if (Ranges is { Count: > 0 })
+        {
+            return Ranges.Any(range => range.Overlaps(address, length));
+        }
 
-        return writeStart <= end && writeEnd >= start;
+        return new DreamcastMemoryAddressRange(StartAddress, EndAddress).Overlaps(address, length);
     }
 }
 
 public sealed record DreamcastMemoryReadWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
-    int Limit = 4096)
+    int Limit = 4096,
+    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null)
 {
     public bool ShouldRecord(uint address, int length)
     {
@@ -2465,12 +2467,30 @@ public sealed record DreamcastMemoryReadWatch(
             return false;
         }
 
+        if (Ranges is { Count: > 0 })
+        {
+            return Ranges.Any(range => range.Overlaps(address, length));
+        }
+
+        return new DreamcastMemoryAddressRange(StartAddress, EndAddress).Overlaps(address, length);
+    }
+}
+
+public sealed record DreamcastMemoryAddressRange(uint StartAddress, uint EndAddress)
+{
+    public bool Overlaps(uint address, int length)
+    {
+        if (length <= 0)
+        {
+            return false;
+        }
+
         var start = Math.Min(StartAddress, EndAddress);
         var end = Math.Max(StartAddress, EndAddress);
-        var readStart = (ulong)address;
-        var readEnd = readStart + (uint)length - 1;
+        var accessStart = (ulong)address;
+        var accessEnd = accessStart + (uint)length - 1;
 
-        return readStart <= end && readEnd >= start;
+        return accessStart <= end && accessEnd >= start;
     }
 }
 

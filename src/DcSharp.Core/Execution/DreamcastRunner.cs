@@ -376,13 +376,19 @@ public sealed record DreamcastRunOptions(
 public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,
     uint? EndPc = null,
-    int Limit = 4096)
+    int Limit = 4096,
+    IReadOnlyList<DreamcastTracePcRange>? Ranges = null)
 {
     public bool ShouldCapture(Sh4StepResult step)
     {
         if (Limit <= 0)
         {
             return false;
+        }
+
+        if (Ranges is { Count: > 0 })
+        {
+            return Ranges.Any(range => range.Contains(step.Pc));
         }
 
         if (StartPc is { } startPc && step.Pc < startPc)
@@ -410,6 +416,11 @@ public sealed record DreamcastTraceCaptureOptions(
             (startPc, endPc) = (endPc, startPc);
         }
 
+        if (Ranges is { Count: > 0 })
+        {
+            return Ranges.Any(range => range.Overlaps(startPc, endPc));
+        }
+
         if (StartPc is { } startFilter && endPc < startFilter)
         {
             return false;
@@ -421,6 +432,19 @@ public sealed record DreamcastTraceCaptureOptions(
         }
 
         return true;
+    }
+}
+
+public sealed record DreamcastTracePcRange(uint StartPc, uint EndPc)
+{
+    public bool Contains(uint pc) =>
+        pc >= Math.Min(StartPc, EndPc) && pc <= Math.Max(StartPc, EndPc);
+
+    public bool Overlaps(uint startPc, uint endPc)
+    {
+        var start = Math.Min(StartPc, EndPc);
+        var end = Math.Max(StartPc, EndPc);
+        return startPc <= end && endPc >= start;
     }
 }
 
