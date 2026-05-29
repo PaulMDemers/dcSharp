@@ -207,18 +207,18 @@ public sealed class Sh4Cpu
         }
 
         const ulong instructionsPerIteration = 4;
-        skippedInstructions = remainingIterations * instructionsPerIteration;
-        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0)
         {
-            skippedInstructions = 0;
             return false;
         }
 
-        State.R[4] += remainingIterations * 4;
-        State.R[1] -= remainingIterations * 4;
-        State.R[7] = 0;
-        State.T = true;
-        State.Pc = 0x8C00_8350;
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[4] += (uint)iterationsToSkip * 4;
+        State.R[1] -= (uint)iterationsToSkip * 4;
+        State.R[7] -= (uint)iterationsToSkip;
+        State.T = State.R[7] == 0;
+        State.Pc = State.T ? 0x8C00_8350 : 0x8C00_8348;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
@@ -297,35 +297,37 @@ public sealed class Sh4Cpu
         }
 
         var remainingIterations = State.R[12] - State.R[13];
-        if (!memory.TryGetPvrVramOffset(State.R[14], checked((int)Math.Min((ulong)remainingIterations * 4, int.MaxValue)), out _))
+        const ulong instructionsPerIteration = 23;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0)
         {
             return false;
         }
 
-        const ulong instructionsPerIteration = 23;
-        skippedInstructions = remainingIterations * instructionsPerIteration;
-        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        if (!memory.TryGetPvrVramOffset(State.R[14], checked((int)Math.Min(iterationsToSkip * 4, int.MaxValue)), out _))
         {
-            skippedInstructions = 0;
             return false;
         }
 
         var source = memory.ReadUInt32(State.R[15]);
         var destination = State.R[14];
-        for (var index = 0u; index < remainingIterations; index++)
+        for (var index = 0ul; index < iterationsToSkip; index++)
         {
-            memory.WriteUInt32(destination + (index * 4), source);
+            memory.WriteUInt32(destination + ((uint)index * 4), source);
         }
 
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        var completed = iterationsToSkip == remainingIterations;
+        var skippedBytes = (uint)iterationsToSkip * 4;
         State.R[0] = source;
-        State.R[4] = destination + (remainingIterations * 4);
+        State.R[4] = destination + skippedBytes;
         State.R[5] = State.R[15] + 4;
         State.R[6] = 0;
-        State.R[13] = State.R[12];
-        State.R[14] = destination + (remainingIterations * 4);
+        State.R[13] += (uint)iterationsToSkip;
+        State.R[14] = destination + skippedBytes;
         State.Pr = 0x8C12_ED98;
-        State.T = true;
-        State.Pc = 0x8C12_EDA0;
+        State.T = completed;
+        State.Pc = completed ? 0x8C12_EDA0 : 0x8C12_ED90;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;

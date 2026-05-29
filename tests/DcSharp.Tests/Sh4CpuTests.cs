@@ -191,6 +191,28 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void PartiallyFastForwardsIpBinFramebufferCopyLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C00_834E, 0x8BFB);
+        var cpu = new Sh4Cpu(memory, 0x8C00_834E);
+        cpu.State.R[1] = 0xA500_0010;
+        cpu.State.R[4] = 0x8C10_0000;
+        cpu.State.R[7] = 5;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardIpBinFramebufferCopyLoop(branch, 8, out var skippedInstructions));
+        Assert.Equal(8UL, skippedInstructions);
+        Assert.Equal(0xA500_0008u, cpu.State.R[1]);
+        Assert.Equal(0x8C10_0008u, cpu.State.R[4]);
+        Assert.Equal(3u, cpu.State.R[7]);
+        Assert.False(cpu.State.T);
+        Assert.Equal(0x8C00_8348u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void FastForwardsIpBinShortDelayLoop()
     {
         var memory = new DreamcastMemory();
@@ -245,6 +267,36 @@ public class Sh4CpuTests
         Assert.Equal(0x8C12_EDA0u, cpu.State.Pc);
         Assert.Equal(71UL, cpu.State.InstructionsExecuted);
         Assert.True(cpu.State.T);
+    }
+
+    [Fact]
+    public void PartiallyFastForwardsDoa2VramClearLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C12_ED9C, 0x8FF8);
+        WriteInstruction(memory, 0x8C12_ED9E, 0x7E04);
+        memory.WriteUInt32(0x8CFF_FF80, 0x1122_3344);
+        var cpu = new Sh4Cpu(memory, 0x8C12_ED9C);
+        cpu.State.R[11] = 0x8C12_9E20;
+        cpu.State.R[12] = 6;
+        cpu.State.R[13] = 1;
+        cpu.State.R[14] = 0xA500_0000;
+        cpu.State.R[15] = 0x8CFF_FF80;
+        cpu.State.T = false;
+
+        cpu.Step();
+        var delaySlot = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardDoa2VramClearLoop(delaySlot, 46, out var skippedInstructions));
+        Assert.Equal(46UL, skippedInstructions);
+        Assert.Equal(0x1122_3344u, memory.ReadUInt32(0xA500_0004));
+        Assert.Equal(0x1122_3344u, memory.ReadUInt32(0xA500_0008));
+        Assert.Equal(3u, cpu.State.R[13]);
+        Assert.Equal(0xA500_000Cu, cpu.State.R[14]);
+        Assert.Equal(0xA500_000Cu, cpu.State.R[4]);
+        Assert.False(cpu.State.T);
+        Assert.Equal(0x8C12_ED90u, cpu.State.Pc);
+        Assert.Equal(48UL, cpu.State.InstructionsExecuted);
     }
 
     [Fact]
