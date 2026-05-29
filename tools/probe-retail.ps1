@@ -2,7 +2,9 @@ param(
     [int]$ScanSectors = 1024,
     [int]$VBlankInterval = 1000,
     [int]$BootstrapInstructions = 12000000,
-    [int]$LegacyInstructions = 12000000
+    [int]$LegacyInstructions = 12000000,
+    [switch]$LongDoa2,
+    [int]$LongDoa2Instructions = 120000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +37,9 @@ function Invoke-BootSmoke {
     }
 
     foreach ($line in ($output | Select-String -Pattern "^(Instructions|PC|SR|Stopped|Detail|GD-ROM):")) {
+        Write-Host $line.Line
+    }
+    foreach ($line in ($output | Select-String -Pattern "^  GD-ROM (read|status|TOC):")) {
         Write-Host $line.Line
     }
 
@@ -76,6 +81,19 @@ if ($doaOutput) {
     Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads="
     Assert-Contains "Dead or Alive 2" $doaOutput "Boot binary: writes="
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
+}
+
+if ($LongDoa2) {
+    $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
+    if ($longDoaOutput) {
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=16, ok=16, failed=0"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=2048/2048, ok=True"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
+    }
 }
 
 $raymanOutput = Invoke-BootSmoke "Rayman 2" $rayman $BootstrapInstructions

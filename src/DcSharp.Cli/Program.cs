@@ -435,6 +435,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
+    PrintGdromActivity(gdrom);
     PrintMemoryRegionWrites(result.MemoryRegionWrites);
 
     if (result.DeviceAccesses.Count > 0)
@@ -452,6 +453,24 @@ static void BootSmoke(string path, string[] args)
         {
             Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
         }
+    }
+}
+
+static void PrintGdromActivity(DreamcastGdromSnapshot gdrom)
+{
+    foreach (var status in gdrom.StatusCommands.TakeLast(4))
+    {
+        Console.WriteLine($"  GD-ROM status: buffer=0x{status.BufferAddress:X8}, drive={status.StatusCode}/{status.StatusName}, disc={status.DiscType}/{status.DiscTypeName}, ok={status.Success}, status={status.Status}");
+    }
+
+    foreach (var read in gdrom.ReadCommands.TakeLast(8))
+    {
+        Console.WriteLine($"  GD-ROM read: sector={read.Sector?.ToString(CultureInfo.InvariantCulture) ?? "none"}, count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, dest={read.DestinationHex ?? "none"}, bytes={read.BytesRead}/{read.BytesRequested}, ok={read.Success}, status={read.Status}");
+    }
+
+    foreach (var toc in gdrom.TocCommands.TakeLast(4))
+    {
+        Console.WriteLine($"  GD-ROM TOC: buffer={toc.BufferAddress?.ToString(CultureInfo.InvariantCulture) ?? "none"}, first={toc.FirstTrack?.ToString(CultureInfo.InvariantCulture) ?? "none"}, last={toc.LastTrack?.ToString(CultureInfo.InvariantCulture) ?? "none"}, data={toc.DataTrackStartFadHex ?? "none"}, leadout={toc.LeadoutFadHex ?? "none"}, ok={toc.Success}, status={toc.Status}");
     }
 }
 
