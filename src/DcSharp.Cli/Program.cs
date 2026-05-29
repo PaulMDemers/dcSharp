@@ -458,6 +458,17 @@ static void BootSmoke(string path, string[] args)
 
 static void PrintGdromActivity(DreamcastGdromSnapshot gdrom)
 {
+    var readSectors = gdrom.ReadCommands
+        .Where(read => read.Sector is not null)
+        .GroupBy(read => read.Sector!.Value)
+        .OrderBy(group => group.Key)
+        .Select(group => $"{group.Key.ToString(CultureInfo.InvariantCulture)}x{group.Count()}")
+        .ToArray();
+    if (readSectors.Length > 0)
+    {
+        Console.WriteLine($"  GD-ROM read sectors: unique={readSectors.Length}, {string.Join(", ", readSectors.Take(8))}");
+    }
+
     foreach (var activity in gdrom.CommandActivities.TakeLast(8))
     {
         Console.WriteLine($"  GD-ROM command: op={activity.Operation}, id={activity.CommandId?.ToString(CultureInfo.InvariantCulture) ?? "none"}, cmd={activity.CommandHex ?? "none"}/{activity.CommandName ?? "none"}, params={activity.ParameterAddressHex ?? "none"}, statusBuffer={activity.StatusAddressHex ?? "none"}, response={activity.Response?.ToString(CultureInfo.InvariantCulture) ?? "none"}/{activity.ResponseName ?? "none"}, words={activity.Status0?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.Status1?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.TransferredBytes?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.AtaStatus?.ToString(CultureInfo.InvariantCulture) ?? "none"}, status={activity.Status}");
@@ -880,6 +891,17 @@ static void RunElf(string path, string[] args)
     foreach (var read in gdrom.ReadCommands.TakeLast(8))
     {
         Console.WriteLine($"  GD-ROM read: sector={read.SectorHex ?? "none"}, count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, dest={read.DestinationHex ?? "none"}, bytes={read.BytesRead}/{read.BytesRequested}, ok={read.Success}, status={read.Status}");
+    }
+
+    var readSectors = gdrom.ReadCommands
+        .Where(read => read.Sector is not null)
+        .GroupBy(read => read.Sector!.Value)
+        .OrderBy(group => group.Key)
+        .Select(group => $"{group.Key.ToString(CultureInfo.InvariantCulture)}x{group.Count()}")
+        .ToArray();
+    if (readSectors.Length > 0)
+    {
+        Console.WriteLine($"  GD-ROM read sectors: unique={readSectors.Length}, {string.Join(", ", readSectors.Take(8))}");
     }
 
     foreach (var activity in gdrom.CommandActivities.TakeLast(8))

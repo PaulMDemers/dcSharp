@@ -74,11 +74,16 @@ internal static class FirmwareStubs
         {
             if (state.Pc == SystemHleStub)
             {
+                var systemR4 = state.R[4];
+                var systemR5 = state.R[5];
+                var systemR6 = state.R[6];
+                var systemR7 = state.R[7];
+                var systemPr = state.Pr;
                 if (state.R[4] == 0)
                 {
                     state.Pc = SoftResetEntryPoint;
                     state.R[15] = SoftResetStackPointer;
-                    trace = $"firmware system hle func=0 ; pc=0x{state.Pc:X8}, sp=0x{state.R[15]:X8}";
+                    trace = $"firmware system hle func=0 r4=0x{systemR4:X8}, r5=0x{systemR5:X8}, r6=0x{systemR6:X8}, r7=0x{systemR7:X8}, pr=0x{systemPr:X8} ; pc=0x{state.Pc:X8}, sp=0x{state.R[15]:X8}";
                     return true;
                 }
 

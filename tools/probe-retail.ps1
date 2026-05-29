@@ -39,7 +39,7 @@ function Invoke-BootSmoke {
     foreach ($line in ($output | Select-String -Pattern "^(Instructions|PC|SR|Stopped|Detail|GD-ROM):")) {
         Write-Host $line.Line
     }
-    foreach ($line in ($output | Select-String -Pattern "^  GD-ROM (command|read|status|TOC):")) {
+    foreach ($line in ($output | Select-String -Pattern "^  GD-ROM (command|read|read sectors|status|TOC):")) {
         Write-Host $line.Line
     }
 
@@ -89,6 +89,7 @@ if ($LongDoa2) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C129E48"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=24, ok=24, failed=0"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=1, 45166x24"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"

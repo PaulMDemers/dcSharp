@@ -62,7 +62,7 @@ public class FirmwareStubsTests
 
         Assert.Equal(0x8C01_0000u, state.Pc);
         Assert.Equal(0x8D00_0000u, state.R[15]);
-        Assert.Equal("firmware system hle func=0 ; pc=0x8C010000, sp=0x8D000000", trace);
+        Assert.Equal("firmware system hle func=0 r4=0x00000000, r5=0x00000000, r6=0x00000000, r7=0x00000000, pr=0x00000000 ; pc=0x8C010000, sp=0x8D000000", trace);
     }
 
     [Theory]
