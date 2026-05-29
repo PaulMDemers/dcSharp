@@ -334,6 +334,65 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2SystemRamClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_331A || step.Opcode != 0x8BFA || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C11_3312) != 0x2542
+            || memory.ReadInstructionUInt16(0x8C11_3314) != 0x7504
+            || memory.ReadInstructionUInt16(0x8C11_3316) != 0x6362
+            || memory.ReadInstructionUInt16(0x8C11_3318) != 0x3532)
+        {
+            return false;
+        }
+
+        var destination = State.R[5];
+        var end = State.R[3];
+        if (State.R[6] == 0 || destination >= end || (destination & 3) != 0 || (end & 3) != 0)
+        {
+            return false;
+        }
+
+        var remainingIterations = (end - destination) / 4;
+        const ulong instructionsPerIteration = 5;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0 || iterationsToSkip > int.MaxValue / 4)
+        {
+            return false;
+        }
+
+        if (!memory.TryGetSystemRamOffset(destination, checked((int)iterationsToSkip * 4), out _))
+        {
+            return false;
+        }
+
+        var value = State.R[4];
+        for (var index = 0ul; index < iterationsToSkip; index++)
+        {
+            memory.WriteUInt32(destination + ((uint)index * 4), value);
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        var skippedBytes = (uint)iterationsToSkip * 4;
+        State.R[5] = destination + skippedBytes;
+        State.R[3] = end;
+        State.T = State.R[5] >= end;
+        State.Pc = State.T ? 0x8C11_331C : 0x8C11_3312;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

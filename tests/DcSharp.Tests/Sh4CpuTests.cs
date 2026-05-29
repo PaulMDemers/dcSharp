@@ -300,6 +300,67 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2SystemRamClearLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C11_3312, 0x2542); // mov.l r4,@r5
+        WriteInstruction(memory, 0x8C11_3314, 0x7504); // add #4,r5
+        WriteInstruction(memory, 0x8C11_3316, 0x6362); // mov.l @r6,r3
+        WriteInstruction(memory, 0x8C11_3318, 0x3532); // cmp/hs r3,r5
+        WriteInstruction(memory, 0x8C11_331A, 0x8BFA); // bf 0x8C113312
+        WriteInstruction(memory, 0x8C11_331C, 0x0009);
+        memory.WriteUInt32(0x8C14_8850, 0x8C20_0010);
+        var cpu = new Sh4Cpu(memory, 0x8C11_331A);
+        cpu.State.R[3] = 0x8C20_0010;
+        cpu.State.R[4] = 0;
+        cpu.State.R[5] = 0x8C20_0004;
+        cpu.State.R[6] = 0x8C14_8850;
+        cpu.State.T = false;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardDoa2SystemRamClearLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(15UL, skippedInstructions);
+        Assert.Equal(0u, memory.ReadUInt32(0x8C20_0004));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C20_0008));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C20_000C));
+        Assert.Equal(0x8C20_0010u, cpu.State.R[5]);
+        Assert.Equal(0x8C20_0010u, cpu.State.R[3]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C11_331Cu, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void PartiallyFastForwardsDoa2SystemRamClearLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C11_3312, 0x2542);
+        WriteInstruction(memory, 0x8C11_3314, 0x7504);
+        WriteInstruction(memory, 0x8C11_3316, 0x6362);
+        WriteInstruction(memory, 0x8C11_3318, 0x3532);
+        WriteInstruction(memory, 0x8C11_331A, 0x8BFA);
+        memory.WriteUInt32(0x8C14_8850, 0x8C20_0018);
+        var cpu = new Sh4Cpu(memory, 0x8C11_331A);
+        cpu.State.R[3] = 0x8C20_0018;
+        cpu.State.R[4] = 0xAABB_CCDD;
+        cpu.State.R[5] = 0x8C20_0004;
+        cpu.State.R[6] = 0x8C14_8850;
+        cpu.State.T = false;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardDoa2SystemRamClearLoop(branch, 10, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        Assert.Equal(0xAABB_CCDDu, memory.ReadUInt32(0x8C20_0004));
+        Assert.Equal(0xAABB_CCDDu, memory.ReadUInt32(0x8C20_0008));
+        Assert.Equal(0x8C20_000Cu, cpu.State.R[5]);
+        Assert.False(cpu.State.T);
+        Assert.Equal(0x8C11_3312u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
