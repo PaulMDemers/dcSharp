@@ -16,7 +16,9 @@ public class FirmwareStubsTests
     private const uint GdromSectorMode = 10;
     private const uint GdromCommandPioRead = 16;
     private const uint GdromCommandGetToc2 = 19;
+    private const uint GdromCommandInit = 24;
     private const uint GdromCommandNop = 29;
+    private const uint GdromCommandGetVersion = 40;
     private const uint GdromCompleted = 2;
     private const uint GdromNoActive = 0;
     private const uint Sector = 1;
@@ -131,6 +133,37 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void GdromTraceIncludesSyscallArguments()
+    {
+        var memory = new DreamcastMemory();
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = CreateGdromState(GdromSendCommand);
+        state.R[4] = GdromCommandInit;
+        state.R[5] = 0x8CFF_FF7C;
+
+        Assert.True(handler.TryHandle(state, memory, out var trace));
+
+        Assert.Equal("firmware gdrom hle func=0 r4=0x00000018, r5=0x8CFFFF7C, r6=0x00000000, r7=0x00000000 ; r0=0x00000001", trace);
+    }
+
+    [Fact]
+    public void GdromInitAndVersionCommandsCompleteWithoutTransfer()
+    {
+        var memory = new DreamcastMemory();
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var initCommandId = SendGdromCommand(handler, memory, GdromCommandInit, 0);
+        var initResponse = CheckGdromCommand(handler, memory, initCommandId);
+        var versionCommandId = SendGdromCommand(handler, memory, GdromCommandGetVersion, 0);
+        var versionResponse = CheckGdromCommand(handler, memory, versionCommandId);
+
+        Assert.Equal(GdromCompleted, initResponse);
+        Assert.Equal(0u, memory.ReadUInt32(StatusAddress + 8));
+        Assert.Equal(GdromCompleted, versionResponse);
+        Assert.Empty(memory.CreateGdromSnapshot().ReadCommands);
+    }
+
+    [Fact]
     public void GdromGetToc2WritesSingleDataTrackToc()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));
@@ -213,11 +246,11 @@ public class FirmwareStubsTests
 
         Assert.Equal(0u, response);
         Assert.Equal(2u, memory.ReadUInt32(StatusAddress));
-        Assert.Equal(0x20u, memory.ReadUInt32(StatusAddress + 4));
+        Assert.Equal(0x80u, memory.ReadUInt32(StatusAddress + 4));
         Assert.Equal(2, status.StatusCode);
         Assert.Equal("standby", status.StatusName);
-        Assert.Equal(0x20, status.DiscType);
-        Assert.Equal("CD-ROM XA", status.DiscTypeName);
+        Assert.Equal(0x80, status.DiscType);
+        Assert.Equal("GD-ROM", status.DiscTypeName);
         Assert.True(status.Success);
     }
 

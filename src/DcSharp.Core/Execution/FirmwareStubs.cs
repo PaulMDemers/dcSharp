@@ -44,6 +44,7 @@ internal static class FirmwareStubs
         private const uint GdromCommandPioRead = 16;
         private const uint GdromCommandDmaRead = 17;
         private const uint GdromCommandGetToc2 = 19;
+        private const uint GdromCommandInit = 24;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
@@ -52,7 +53,7 @@ internal static class FirmwareStubs
         private const int CdStatusStandby = 2;
         private const int CdStatusNoDisc = 7;
         private const int CdCdda = 0x00;
-        private const int CdRomXa = 0x20;
+        private const int CdGdrom = 0x80;
 
         private uint nextCommandId = 1;
         private readonly Dictionary<uint, GdromQueuedCommand> commands = [];
@@ -94,13 +95,17 @@ internal static class FirmwareStubs
             {
                 state.R[0] = 0;
                 state.Pc = state.Pr;
-                trace = $"firmware misc hle func={function} ; r0=0x{state.R[0]:X8}";
+                trace = $"firmware misc hle func={function} r4=0x{state.R[4]:X8}, r5=0x{state.R[5]:X8}, r6=0x{state.R[6]:X8}, r7=0x{state.R[7]:X8} ; r0=0x{state.R[0]:X8}";
                 return true;
             }
 
+            var r4 = state.R[4];
+            var r5 = state.R[5];
+            var r6 = state.R[6];
+            var r7 = state.R[7];
             state.R[0] = HandleGdrom(function, state, memory);
             state.Pc = state.Pr;
-            trace = $"firmware gdrom hle func={function} ; r0=0x{state.R[0]:X8}";
+            trace = $"firmware gdrom hle func={function} r4=0x{r4:X8}, r5=0x{r5:X8}, r6=0x{r6:X8}, r7=0x{r7:X8} ; r0=0x{state.R[0]:X8}";
             return true;
         }
 
@@ -146,6 +151,11 @@ internal static class FirmwareStubs
             if (command == GdromCommandGetToc2)
             {
                 return WriteToc2(parameters, memory);
+            }
+
+            if (command == GdromCommandInit)
+            {
+                return GdromQueuedCommand.Completed(0, 0, 0, 0);
             }
 
             return GdromQueuedCommand.Completed(0, 0, 0, 0);
@@ -219,9 +229,9 @@ internal static class FirmwareStubs
         {
             var snapshot = memory.CreateGdromSnapshot();
             var statusCode = snapshot.HasMedia ? CdStatusStandby : CdStatusNoDisc;
-            var discType = snapshot.HasMedia ? CdRomXa : CdCdda;
+            var discType = snapshot.HasMedia ? CdGdrom : CdCdda;
             var statusName = snapshot.HasMedia ? "standby" : "no disc";
-            var discTypeName = snapshot.HasMedia ? "CD-ROM XA" : "CDDA/no disc";
+            var discTypeName = snapshot.HasMedia ? "GD-ROM" : "CDDA/no disc";
 
             WriteWords(memory, state.R[4], statusCode, discType);
             memory.RecordGdromStatusCommand(state.R[4], statusCode, statusName, discType, discTypeName, true, "drive status reported");

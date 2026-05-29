@@ -257,8 +257,8 @@ public class DreamcastFixtureRunnerTests
                 {
                     StatusCode = 2,
                     StatusName = "standby",
-                    DiscType = 0x20,
-                    DiscTypeName = "CD-ROM XA",
+                    DiscType = 0x80,
+                    DiscTypeName = "GD-ROM",
                     Success = true,
                     Status = "drive status reported"
                 }
@@ -1048,8 +1048,8 @@ public class DreamcastFixtureRunnerTests
                     "0x8C010300",
                     2,
                     "standby",
-                    0x20,
-                    "CD-ROM XA",
+                    0x80,
+                    "GD-ROM",
                     true,
                     "drive status reported")
             ],

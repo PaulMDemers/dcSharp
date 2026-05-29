@@ -179,7 +179,7 @@
       "traceTail": 8,
       "expectedStopReason": "ProgramExit",
       "serialContains": [
-        "dcSharp GD-ROM status rv=0 status=2 disc=0x20",
+        "dcSharp GD-ROM status rv=0 status=2 disc=0x80",
         "dcSharp GD-ROM status probe done"
       ],
       "minGdromStatusCommands": 1,
@@ -187,8 +187,8 @@
         {
           "statusCode": 2,
           "statusName": "standby",
-          "discType": 32,
-          "discTypeName": "CD-ROM XA",
+          "discType": 128,
+          "discTypeName": "GD-ROM",
           "success": true,
           "status": "drive status reported"
         }

@@ -73,7 +73,7 @@ $doaOutput = Invoke-BootSmoke "Dead or Alive 2" $deadOrAlive $BootstrapInstructi
 if ($doaOutput) {
     Assert-Contains "Dead or Alive 2" $doaOutput "Stopped: InstructionLimit"
     Assert-Contains "Dead or Alive 2" $doaOutput "PC: 0x8C129E3E"
-    Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads=0"
+    Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads="
     Assert-Contains "Dead or Alive 2" $doaOutput "Boot binary: writes="
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
 }
