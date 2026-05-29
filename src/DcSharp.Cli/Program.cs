@@ -362,7 +362,7 @@ static void BootSmoke(string path, string[] args)
             Emulation = options.Emulation with
             {
                 Media = DreamcastMediaImageLoader.LoadFromFile(path),
-                SeedInitialVBlank = enterIpBin,
+                SeedInitialVBlank = options.SeedInitialVBlankOverride ?? enterIpBin,
                 InitialStatusRegister = enterIpBin && options.Emulation.InitialStatusRegister == 0
                     ? ipBinInitialStatusRegister
                     : options.Emulation.InitialStatusRegister
@@ -1292,6 +1292,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? stopOnDeviceDomain = null;
     var initialStackPointer = 0x8D00_0000u;
     var initialStatusRegister = 0u;
+    bool? seedInitialVBlank = null;
 
     for (var index = 0; index < args.Length; index++)
     {
@@ -1312,6 +1313,12 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--vblank-interval" when index + 1 < args.Length && ulong.TryParse(args[index + 1], out var parsedVblankInterval):
                 vblankInterval = parsedVblankInterval;
                 index++;
+                break;
+            case "--seed-initial-vblank":
+                seedInitialVBlank = true;
+                break;
+            case "--no-initial-vblank":
+                seedInitialVBlank = false;
                 break;
             case "--controller-a" when index + 1 < args.Length:
                 controllerA = DreamcastControllerStateParser.ParseState(args[index + 1]);
@@ -1505,7 +1512,9 @@ static CliRunOptions ParseRunOptions(string[] args)
             initialStackPointer,
             initialStatusRegister,
             MemoryWriteWatch: memoryWriteWatch,
-            MemoryReadWatch: memoryReadWatch),
+            MemoryReadWatch: memoryReadWatch,
+            SeedInitialVBlank: seedInitialVBlank == true),
+        seedInitialVBlank,
         emitJson,
         framebufferDumpPath,
         framebufferWidth,
@@ -1694,7 +1703,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -1728,6 +1737,7 @@ static string ResolveRepoPath(string repoRoot, string path) =>
 
 internal sealed record CliRunOptions(
     DreamcastRunOptions Emulation,
+    bool? SeedInitialVBlankOverride,
     bool EmitJson,
     string? FramebufferDumpPath,
     int FramebufferWidth,
