@@ -283,6 +283,34 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void GdromReadTranslatesRawCdFilesystemFadToTrackRelativeSector()
+    {
+        var media = new RawSectorFromCdImage(CreateCdMediaData(
+        [
+            [0xA0, 0xA1],
+            [0x01, 0x43, 0x44, 0x30, 0x30, 0x31]
+        ]));
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(0x8C01_0000, 45_151);
+        memory.WriteUInt32(0x8C01_0004, 1);
+        memory.WriteUInt32(0x8C01_0008, 0x8C02_0000);
+
+        var status = memory.ExecuteGdromPioReadCommand(0x8C01_0000);
+
+        Assert.Equal(0u, status);
+        Assert.Equal(0x01, memory.ReadByte(0x8C02_0000));
+        Assert.Equal((byte)'C', memory.ReadByte(0x8C02_0001));
+        Assert.Equal((byte)'D', memory.ReadByte(0x8C02_0002));
+        Assert.Equal((byte)'0', memory.ReadByte(0x8C02_0003));
+        Assert.Equal((byte)'0', memory.ReadByte(0x8C02_0004));
+        Assert.Equal((byte)'1', memory.ReadByte(0x8C02_0005));
+        var read = Assert.Single(memory.CreateGdromSnapshot().ReadCommands);
+        Assert.Equal(45_151u, read.Sector);
+        Assert.Equal("0x0000B05F", read.SectorHex);
+        Assert.True(read.Success);
+    }
+
+    [Fact]
     public void GdromSnapshotReportsFailedReads()
     {
         var memory = new DreamcastMemory();

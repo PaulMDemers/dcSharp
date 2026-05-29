@@ -1639,7 +1639,18 @@ public sealed class DreamcastMemory
         if (mediaImage is RawSectorFromCdImage)
         {
             var firstTrackStart = mediaImage.Tracks.FirstOrDefault()?.StartFad ?? 0;
-            if (firstTrackStart != 0 && sector >= firstTrackStart)
+            if (firstTrackStart == 0)
+            {
+                return sector;
+            }
+
+            var gdFilesystemStart = firstTrackStart + 150;
+            if (sector >= gdFilesystemStart)
+            {
+                return sector - gdFilesystemStart;
+            }
+
+            if (sector >= firstTrackStart)
             {
                 return sector - firstTrackStart;
             }

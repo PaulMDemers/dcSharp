@@ -87,9 +87,9 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C116FDE"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=8, ok=8, failed=0"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=1, 45166x8"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C014670"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=16, ok=16, failed=0"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=2, 45166x8, 45170x8"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"
