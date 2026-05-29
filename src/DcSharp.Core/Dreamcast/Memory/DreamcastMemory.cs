@@ -1619,9 +1619,11 @@ public sealed class DreamcastMemory
         var buffer = new byte[sectorSize];
         for (uint index = 0; index < sectorCount; index++)
         {
-            if (!mediaImage.TryReadSector(sector + index, buffer, out var sectorBytesRead) || sectorBytesRead != sectorSize)
+            var requestedSector = sector + index;
+            var mediaSector = TranslateGdromSector(requestedSector);
+            if (!mediaImage.TryReadSector(mediaSector, buffer, out var sectorBytesRead) || sectorBytesRead != sectorSize)
             {
-                status = $"sector read failed at LBA {sector + index}";
+                status = $"sector read failed at LBA {requestedSector}";
                 return false;
             }
 
@@ -1630,6 +1632,20 @@ public sealed class DreamcastMemory
         }
 
         return true;
+    }
+
+    private uint TranslateGdromSector(uint sector)
+    {
+        if (mediaImage is RawSectorFromCdImage)
+        {
+            var firstTrackStart = mediaImage.Tracks.FirstOrDefault()?.StartFad ?? 0;
+            if (firstTrackStart != 0 && sector >= firstTrackStart)
+            {
+                return sector - firstTrackStart;
+            }
+        }
+
+        return sector;
     }
 
     private void RecordGdromRead(

@@ -259,6 +259,30 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void GdromReadTranslatesRawCdFadToTrackRelativeSector()
+    {
+        var media = new RawSectorFromCdImage(CreateCdMediaData(
+        [
+            [0xA0, 0xA1],
+            [0xB0, 0xB1]
+        ]));
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(0x8C01_0000, 45_001);
+        memory.WriteUInt32(0x8C01_0004, 1);
+        memory.WriteUInt32(0x8C01_0008, 0x8C02_0000);
+
+        var status = memory.ExecuteGdromPioReadCommand(0x8C01_0000);
+
+        Assert.Equal(0u, status);
+        Assert.Equal(0xB0, memory.ReadByte(0x8C02_0000));
+        Assert.Equal(0xB1, memory.ReadByte(0x8C02_0001));
+        var read = Assert.Single(memory.CreateGdromSnapshot().ReadCommands);
+        Assert.Equal(45_001u, read.Sector);
+        Assert.Equal("0x0000AFC9", read.SectorHex);
+        Assert.True(read.Success);
+    }
+
+    [Fact]
     public void GdromSnapshotReportsFailedReads()
     {
         var memory = new DreamcastMemory();
@@ -1530,6 +1554,18 @@ public class DreamcastMemoryTests
         for (var sector = 0; sector < sectors; sector++)
         {
             data[sector * 2048] = (byte)(0x10 + (sector * 0x10));
+        }
+
+        return data;
+    }
+
+    private static byte[] CreateCdMediaData(byte[][] sectorPrefixes)
+    {
+        var data = new byte[sectorPrefixes.Length * 2352];
+        for (var sector = 0; sector < sectorPrefixes.Length; sector++)
+        {
+            var prefix = sectorPrefixes[sector];
+            Array.Copy(prefix, 0, data, (sector * 2352) + 16, prefix.Length);
         }
 
         return data;
