@@ -97,6 +97,31 @@ public class FirmwareStubsTests
         Assert.Equal(2048u, memory.ReadUInt32(StatusAddress + 8));
         Assert.Equal(0u, memory.ReadUInt32(StatusAddress + 12));
         Assert.Equal(0x20, memory.ReadByte(DestinationAddress));
+
+        var activities = memory.CreateGdromSnapshot().CommandActivities;
+        Assert.Collection(
+            activities,
+            send =>
+            {
+                Assert.Equal("send", send.Operation);
+                Assert.Equal(1u, send.CommandId);
+                Assert.Equal(GdromCommandPioRead, send.Command);
+                Assert.Equal("PIO_READ", send.CommandName);
+                Assert.Equal(ParameterAddress, send.ParameterAddress);
+                Assert.Equal((int)GdromCompleted, send.Response);
+                Assert.Equal(2048, send.TransferredBytes);
+            },
+            check =>
+            {
+                Assert.Equal("check", check.Operation);
+                Assert.Equal(1u, check.CommandId);
+                Assert.Equal(GdromCommandPioRead, check.Command);
+                Assert.Equal(StatusAddress, check.StatusAddress);
+                Assert.Equal((int)GdromCompleted, check.Response);
+                Assert.Equal("completed", check.ResponseName);
+                Assert.Equal(2048, check.TransferredBytes);
+                Assert.Equal("command status reported", check.Status);
+            });
     }
 
     [Fact]

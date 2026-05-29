@@ -776,7 +776,7 @@ public class DreamcastFixtureRunnerTests
                 mapleDescriptorLimitHits,
                 CreateMapleDmaBatches(mapleDmaBatches, mapleDescriptorLimitHits),
                 []),
-            gdrom ?? new DreamcastGdromSummary(false, null, null, null, null, [], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], []),
+            gdrom ?? new DreamcastGdromSummary(false, null, null, null, null, [], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], [], [], []),
             timer ?? CreateTimerSummary(),
             new DreamcastSchedulerSummary(
                 0,
@@ -1065,6 +1065,25 @@ public class DreamcastFixtureRunnerTests
                     2048,
                     true,
                     "sector mode set")
+            ],
+            [
+                new DreamcastGdromCommandActivitySummary(
+                    "check",
+                    1,
+                    16,
+                    "0x00000010",
+                    "PIO_READ",
+                    0x8C01_0000,
+                    "0x8C010000",
+                    0x8C01_0500,
+                    "0x8C010500",
+                    2,
+                    "completed",
+                    0,
+                    0,
+                    2048,
+                    0,
+                    "command status reported")
             ]);
 
     private static DreamcastAicaChannelSummary CreateAudioChannel(

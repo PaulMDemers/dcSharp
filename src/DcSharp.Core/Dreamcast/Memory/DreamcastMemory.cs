@@ -114,6 +114,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastGdromTocCommand> gdromTocCommands = [];
     private readonly List<DreamcastGdromStatusCommand> gdromStatusCommands = [];
     private readonly List<DreamcastGdromSectorModeCommand> gdromSectorModeCommands = [];
+    private readonly List<DreamcastGdromCommandActivity> gdromCommandActivities = [];
     private readonly Dictionary<byte, DreamcastControllerState> mapleControllers = [];
     private readonly IDreamcastMediaImage? mediaImage;
     private readonly DreamcastMemoryReadWatch? readWatch;
@@ -899,7 +900,8 @@ public sealed class DreamcastMemory
             gdromReadCommands.ToArray(),
             gdromTocCommands.ToArray(),
             gdromStatusCommands.ToArray(),
-            gdromSectorModeCommands.ToArray());
+            gdromSectorModeCommands.ToArray(),
+            gdromCommandActivities.ToArray());
 
     public void RecordGdromTocCommand(
         uint parameterAddress,
@@ -960,6 +962,38 @@ public sealed class DreamcastMemory
             discType,
             discTypeName,
             success,
+            status));
+
+    public void RecordGdromCommandActivity(
+        string operation,
+        uint? commandId,
+        uint? command,
+        string? commandName,
+        uint? parameterAddress,
+        uint? statusAddress,
+        int? response,
+        string? responseName,
+        int? status0,
+        int? status1,
+        int? transferredBytes,
+        int? ataStatus,
+        string status) =>
+        gdromCommandActivities.Add(new DreamcastGdromCommandActivity(
+            operation,
+            commandId,
+            command,
+            command is { } commandValue ? $"0x{commandValue:X8}" : null,
+            commandName,
+            parameterAddress,
+            parameterAddress is { } parameterValue ? $"0x{parameterValue:X8}" : null,
+            statusAddress,
+            statusAddress is { } statusValue ? $"0x{statusValue:X8}" : null,
+            response,
+            responseName,
+            status0,
+            status1,
+            transferredBytes,
+            ataStatus,
             status));
 
     public DreamcastAsicSnapshot CreateAsicSnapshot()

@@ -12,9 +12,10 @@ public sealed record DreamcastGdromSnapshot(
     IReadOnlyList<DreamcastGdromReadCommand> ReadCommands,
     IReadOnlyList<DreamcastGdromTocCommand> TocCommands,
     IReadOnlyList<DreamcastGdromStatusCommand> StatusCommands,
-    IReadOnlyList<DreamcastGdromSectorModeCommand> SectorModeCommands)
+    IReadOnlyList<DreamcastGdromSectorModeCommand> SectorModeCommands,
+    IReadOnlyList<DreamcastGdromCommandActivity> CommandActivities)
 {
-    public static DreamcastGdromSnapshot Empty { get; } = new(false, null, null, null, null, [], [], [], [], []);
+    public static DreamcastGdromSnapshot Empty { get; } = new(false, null, null, null, null, [], [], [], [], [], []);
 }
 
 public sealed record DreamcastGdromReadCommand(
@@ -65,4 +66,22 @@ public sealed record DreamcastGdromSectorModeCommand(
     int CdXa,
     int SectorSize,
     bool Success,
+    string Status);
+
+public sealed record DreamcastGdromCommandActivity(
+    string Operation,
+    uint? CommandId,
+    uint? Command,
+    string? CommandHex,
+    string? CommandName,
+    uint? ParameterAddress,
+    string? ParameterAddressHex,
+    uint? StatusAddress,
+    string? StatusAddressHex,
+    int? Response,
+    string? ResponseName,
+    int? Status0,
+    int? Status1,
+    int? TransferredBytes,
+    int? AtaStatus,
     string Status);

@@ -458,6 +458,11 @@ static void BootSmoke(string path, string[] args)
 
 static void PrintGdromActivity(DreamcastGdromSnapshot gdrom)
 {
+    foreach (var activity in gdrom.CommandActivities.TakeLast(8))
+    {
+        Console.WriteLine($"  GD-ROM command: op={activity.Operation}, id={activity.CommandId?.ToString(CultureInfo.InvariantCulture) ?? "none"}, cmd={activity.CommandHex ?? "none"}/{activity.CommandName ?? "none"}, params={activity.ParameterAddressHex ?? "none"}, statusBuffer={activity.StatusAddressHex ?? "none"}, response={activity.Response?.ToString(CultureInfo.InvariantCulture) ?? "none"}/{activity.ResponseName ?? "none"}, words={activity.Status0?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.Status1?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.TransferredBytes?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.AtaStatus?.ToString(CultureInfo.InvariantCulture) ?? "none"}, status={activity.Status}");
+    }
+
     foreach (var status in gdrom.StatusCommands.TakeLast(4))
     {
         Console.WriteLine($"  GD-ROM status: buffer=0x{status.BufferAddress:X8}, drive={status.StatusCode}/{status.StatusName}, disc={status.DiscType}/{status.DiscTypeName}, ok={status.Success}, status={status.Status}");
@@ -875,6 +880,11 @@ static void RunElf(string path, string[] args)
     foreach (var read in gdrom.ReadCommands.TakeLast(8))
     {
         Console.WriteLine($"  GD-ROM read: sector={read.SectorHex ?? "none"}, count={read.SectorCount?.ToString(CultureInfo.InvariantCulture) ?? "none"}, dest={read.DestinationHex ?? "none"}, bytes={read.BytesRead}/{read.BytesRequested}, ok={read.Success}, status={read.Status}");
+    }
+
+    foreach (var activity in gdrom.CommandActivities.TakeLast(8))
+    {
+        Console.WriteLine($"  GD-ROM command: op={activity.Operation}, id={activity.CommandId?.ToString(CultureInfo.InvariantCulture) ?? "none"}, cmd={activity.CommandHex ?? "none"}/{activity.CommandName ?? "none"}, params={activity.ParameterAddressHex ?? "none"}, statusBuffer={activity.StatusAddressHex ?? "none"}, response={activity.Response?.ToString(CultureInfo.InvariantCulture) ?? "none"}/{activity.ResponseName ?? "none"}, words={activity.Status0?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.Status1?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.TransferredBytes?.ToString(CultureInfo.InvariantCulture) ?? "none"},{activity.AtaStatus?.ToString(CultureInfo.InvariantCulture) ?? "none"}, status={activity.Status}");
     }
 
     foreach (var track in gdrom.MediaTracks)

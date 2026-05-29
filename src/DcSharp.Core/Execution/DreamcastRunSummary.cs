@@ -1191,7 +1191,8 @@ public sealed record DreamcastGdromSummary(
     IReadOnlyList<DreamcastGdromReadCommandSummary> RecentReadCommands,
     IReadOnlyList<DreamcastGdromTocCommandSummary> RecentTocCommands,
     IReadOnlyList<DreamcastGdromStatusCommandSummary> RecentStatusCommands,
-    IReadOnlyList<DreamcastGdromSectorModeCommandSummary> RecentSectorModeCommands)
+    IReadOnlyList<DreamcastGdromSectorModeCommandSummary> RecentSectorModeCommands,
+    IReadOnlyList<DreamcastGdromCommandActivitySummary> RecentCommandActivities)
 {
     public static DreamcastGdromSummary FromSnapshot(DreamcastGdromSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -1217,7 +1218,8 @@ public sealed record DreamcastGdromSummary(
             snapshot.ReadCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromReadCommandSummary.FromCommand).ToArray(),
             snapshot.TocCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromTocCommandSummary.FromCommand).ToArray(),
             snapshot.StatusCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromStatusCommandSummary.FromCommand).ToArray(),
-            snapshot.SectorModeCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromSectorModeCommandSummary.FromCommand).ToArray());
+            snapshot.SectorModeCommands.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromSectorModeCommandSummary.FromCommand).ToArray(),
+            snapshot.CommandActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastGdromCommandActivitySummary.FromActivity).ToArray());
 }
 
 public sealed record DreamcastMediaTrackSummary(
@@ -1337,6 +1339,44 @@ public sealed record DreamcastGdromSectorModeCommandSummary(
             command.SectorSize,
             command.Success,
             command.Status);
+}
+
+public sealed record DreamcastGdromCommandActivitySummary(
+    string Operation,
+    uint? CommandId,
+    uint? Command,
+    string? CommandHex,
+    string? CommandName,
+    uint? ParameterAddress,
+    string? ParameterAddressHex,
+    uint? StatusAddress,
+    string? StatusAddressHex,
+    int? Response,
+    string? ResponseName,
+    int? Status0,
+    int? Status1,
+    int? TransferredBytes,
+    int? AtaStatus,
+    string Status)
+{
+    public static DreamcastGdromCommandActivitySummary FromActivity(DreamcastGdromCommandActivity activity) =>
+        new(
+            activity.Operation,
+            activity.CommandId,
+            activity.Command,
+            activity.CommandHex,
+            activity.CommandName,
+            activity.ParameterAddress,
+            activity.ParameterAddressHex,
+            activity.StatusAddress,
+            activity.StatusAddressHex,
+            activity.Response,
+            activity.ResponseName,
+            activity.Status0,
+            activity.Status1,
+            activity.TransferredBytes,
+            activity.AtaStatus,
+            activity.Status);
 }
 
 public sealed record DreamcastSchedulerSummary(

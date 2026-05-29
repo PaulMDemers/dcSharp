@@ -39,7 +39,7 @@ function Invoke-BootSmoke {
     foreach ($line in ($output | Select-String -Pattern "^(Instructions|PC|SR|Stopped|Detail|GD-ROM):")) {
         Write-Host $line.Line
     }
-    foreach ($line in ($output | Select-String -Pattern "^  GD-ROM (read|status|TOC):")) {
+    foreach ($line in ($output | Select-String -Pattern "^  GD-ROM (command|read|status|TOC):")) {
         Write-Host $line.Line
     }
 
@@ -91,6 +91,9 @@ if ($LongDoa2) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM command:"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "cmd=0x00000011/DMA_READ"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "response=2/completed"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=2048/2048, ok=True"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
     }

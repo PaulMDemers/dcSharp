@@ -446,6 +446,13 @@ internal sealed class MainForm : Form
                 $"  sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString() ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead}/{read.BytesRequested} ok={read.Success} status={read.Status}"));
         }
 
+        if (summary.Gdrom.RecentCommandActivities.Count > 0)
+        {
+            lines.Add("");
+            lines.Add("GD-ROM commands:");
+            lines.AddRange(summary.Gdrom.RecentCommandActivities.TakeLast(8).Select(FormatGdromCommandActivity));
+        }
+
         if (summary.Gdrom.RecentTocCommands.Count > 0)
         {
             lines.Add("");
@@ -489,7 +496,8 @@ internal sealed class MainForm : Form
             $"  Bytes read: {gdrom.BytesRead:N0}",
             $"  TOCs: {gdrom.TocCommandCount:N0}",
             $"  Status probes: {gdrom.StatusCommandCount:N0}",
-            $"  Sector modes: {gdrom.SectorModeCommandCount:N0}"
+            $"  Sector modes: {gdrom.SectorModeCommandCount:N0}",
+            $"  Recent command activities: {gdrom.RecentCommandActivities.Count:N0}"
         };
 
         lines.Add("");
@@ -512,6 +520,17 @@ internal sealed class MainForm : Form
         else
         {
             lines.AddRange(gdrom.RecentReadCommands.Select(FormatGdromRead));
+        }
+
+        lines.Add("");
+        lines.Add("Recent commands:");
+        if (gdrom.RecentCommandActivities.Count == 0)
+        {
+            lines.Add("  none");
+        }
+        else
+        {
+            lines.AddRange(gdrom.RecentCommandActivities.Select(FormatGdromCommandActivity));
         }
 
         lines.Add("");
@@ -554,6 +573,16 @@ internal sealed class MainForm : Form
     {
         var outcome = read.Success ? "OK  " : "FAIL";
         return $"  [{outcome}] sector={read.SectorHex ?? "none"} count={read.SectorCount?.ToString() ?? "none"} dest={read.DestinationHex ?? "none"} bytes={read.BytesRead:N0}/{read.BytesRequested:N0} status={read.Status}";
+    }
+
+    private static string FormatGdromCommandActivity(DreamcastGdromCommandActivitySummary activity)
+    {
+        var words =
+            $"{activity.Status0?.ToString() ?? "none"}," +
+            $"{activity.Status1?.ToString() ?? "none"}," +
+            $"{activity.TransferredBytes?.ToString() ?? "none"}," +
+            $"{activity.AtaStatus?.ToString() ?? "none"}";
+        return $"  op={activity.Operation} id={activity.CommandId?.ToString() ?? "none"} cmd={activity.CommandHex ?? "none"}/{activity.CommandName ?? "none"} params={activity.ParameterAddressHex ?? "none"} statusBuffer={activity.StatusAddressHex ?? "none"} response={activity.Response?.ToString() ?? "none"}/{activity.ResponseName ?? "none"} words={words} status={activity.Status}";
     }
 
     private static string FormatGdromToc(DreamcastGdromTocCommandSummary toc)
