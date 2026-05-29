@@ -101,6 +101,18 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2StringScanSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (TryGetDelayedBranchRange(step, out var predecrementStoreBranchStartPc, out var predecrementStoreBranchEndPc)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, predecrementStoreBranchStartPc, predecrementStoreBranchEndPc)
+                        && cpu.TryFastForwardPredecrementStoreDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var predecrementStoreSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(predecrementStoreSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (TryGetDelayedBranchRange(step, out var postincrementStoreBranchStartPc, out var postincrementStoreBranchEndPc)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, postincrementStoreBranchStartPc, postincrementStoreBranchEndPc)
+                        && cpu.TryFastForwardPostincrementStoreDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var postincrementStoreSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(postincrementStoreSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (TryGetImmediateBranchRange(step, out var immediateBranchStartPc, out var immediateBranchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, immediateBranchStartPc, immediateBranchEndPc)
                         && cpu.TryFastForwardImmediateDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var immediateDtSkippedInstructions))

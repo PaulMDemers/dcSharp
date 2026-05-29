@@ -480,22 +480,24 @@ public sealed class Sh4Cpu
         }
 
         var remainingIterations = State.R[14] - State.R[12];
-        const ulong instructionsPerIteration = 386_000;
-        if (remainingIterations > maxInstructionsToSkip / instructionsPerIteration)
+        const ulong instructionsPerIteration = 100_000;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0)
         {
             return false;
         }
 
-        skippedInstructions = remainingIterations * instructionsPerIteration;
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
         if (skippedInstructions == 0)
         {
             return false;
         }
 
+        var completed = iterationsToSkip == remainingIterations;
         State.R[4] = 0;
-        State.R[12] = State.R[14];
-        State.T = true;
-        State.Pc = 0x8C11_4278;
+        State.R[12] += (uint)iterationsToSkip;
+        State.T = completed;
+        State.Pc = completed ? 0x8C11_4278 : 0x8C11_4254;
         State.InstructionsExecuted += skippedInstructions;
         memory.WriteUInt32(0x8C1C_AF88, 0);
         memory.WriteUInt32(0x8C1C_AF8C, 0);
@@ -596,6 +598,132 @@ public sealed class Sh4Cpu
 
         State.T = true;
         State.Pc = 0x8C10_EDBE;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardPredecrementStoreDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (delayedBranchTarget != branchTarget || State.Pc != step.Pc + 2 || branchTarget + 4 != step.Pc)
+        {
+            return false;
+        }
+
+        var storeOpcode = memory.ReadInstructionUInt16(branchTarget);
+        var dtOpcode = memory.ReadInstructionUInt16(branchTarget + 2);
+        var delaySlotOpcode = memory.ReadInstructionUInt16(step.Pc + 2);
+        if ((storeOpcode & 0xF00F) != 0x2006 || (dtOpcode & 0xF0FF) != 0x4010 || delaySlotOpcode != 0x0009)
+        {
+            return false;
+        }
+
+        var destinationRegister = (storeOpcode >> 8) & 0xF;
+        var valueRegister = (storeOpcode >> 4) & 0xF;
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (remainingIterations == 0 || maxInstructionsToSkip < 4)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0 || iterationsToSkip > int.MaxValue / 4)
+        {
+            return false;
+        }
+
+        var bytesToWrite = checked((int)iterationsToSkip * 4);
+        var firstDestination = State.R[destinationRegister] - 4;
+        var lastDestination = State.R[destinationRegister] - (uint)bytesToWrite;
+        if (lastDestination > firstDestination || !memory.TryGetSystemRamOffset(lastDestination, bytesToWrite, out _))
+        {
+            return false;
+        }
+
+        var value = State.R[valueRegister];
+        for (var index = 0ul; index < iterationsToSkip; index++)
+        {
+            memory.WriteUInt32(firstDestination - ((uint)index * 4), value);
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[destinationRegister] -= (uint)bytesToWrite;
+        State.R[counterRegister] -= (uint)iterationsToSkip;
+        State.T = State.R[counterRegister] == 0;
+        State.Pc = State.T ? step.Pc + 4 : branchTarget;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardPostincrementStoreDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (delayedBranchTarget != branchTarget || State.Pc != step.Pc + 2 || branchTarget + 4 != step.Pc)
+        {
+            return false;
+        }
+
+        var storeOpcode = memory.ReadInstructionUInt16(branchTarget);
+        var dtOpcode = memory.ReadInstructionUInt16(branchTarget + 2);
+        var delaySlotOpcode = memory.ReadInstructionUInt16(step.Pc + 2);
+        if ((storeOpcode & 0xF00F) != 0x2002 || (dtOpcode & 0xF0FF) != 0x4010 || (delaySlotOpcode & 0xF0FF) != 0x7004)
+        {
+            return false;
+        }
+
+        var destinationRegister = (storeOpcode >> 8) & 0xF;
+        var valueRegister = (storeOpcode >> 4) & 0xF;
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var delaySlotRegister = (delaySlotOpcode >> 8) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (destinationRegister != delaySlotRegister || remainingIterations == 0 || maxInstructionsToSkip < 4)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0 || iterationsToSkip > int.MaxValue / 4)
+        {
+            return false;
+        }
+
+        var firstDestination = State.R[destinationRegister] + 4;
+        var bytesToWrite = checked((int)iterationsToSkip * 4);
+        if (firstDestination < State.R[destinationRegister] || !memory.TryGetSystemRamOffset(firstDestination, bytesToWrite, out _))
+        {
+            return false;
+        }
+
+        var value = State.R[valueRegister];
+        for (var index = 0ul; index < iterationsToSkip; index++)
+        {
+            memory.WriteUInt32(firstDestination + ((uint)index * 4), value);
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[destinationRegister] += ((uint)iterationsToSkip + 1) * 4;
+        State.R[counterRegister] -= (uint)iterationsToSkip;
+        State.T = State.R[counterRegister] == 0;
+        State.Pc = State.T ? step.Pc + 4 : branchTarget;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
@@ -1338,10 +1466,16 @@ public sealed class Sh4Cpu
             return $"sts macl,r{n} ; r{n}=0x{State.R[n]:X8}";
         }
 
-        if ((opcode & 0xF0FF) == 0x402A)
+        if ((opcode & 0xF0FF) == 0x002A)
         {
             State.R[n] = State.Pr;
             return $"sts pr,r{n} ; r{n}=0x{State.R[n]:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x402A)
+        {
+            State.Pr = State.R[n];
+            return $"lds r{n},pr ; pr=0x{State.Pr:X8}";
         }
 
         if ((opcode & 0xF0FF) == 0x400E)
