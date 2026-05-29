@@ -1195,7 +1195,8 @@ static void DumpDeviceLog(DreamcastRunResult result, CliRunOptions options)
 
     foreach (var access in accesses)
     {
-        writer.WriteLine($"{access.Kind}: domain={DreamcastDeviceDomainClassifier.Classify(access)}, addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}");
+        var pc = access.Pc is { } accessPc ? $", pc=0x{accessPc:X8}" : string.Empty;
+        writer.WriteLine($"{access.Kind}: domain={DreamcastDeviceDomainClassifier.Classify(access)}, addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}{pc}");
     }
 }
 

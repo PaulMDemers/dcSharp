@@ -212,10 +212,21 @@ public sealed record DreamcastMemoryAccessSummary(
     string AddressHex,
     int Size,
     uint Value,
-    string ValueHex)
+    string ValueHex,
+    uint? Pc,
+    string? PcHex)
 {
     public static DreamcastMemoryAccessSummary FromAccess(MemoryAccess access) =>
-        new(access.Kind, DreamcastDeviceDomainClassifier.Classify(access), access.Address, $"0x{access.Address:X8}", access.Size, access.Value, $"0x{access.Value:X8}");
+        new(
+            access.Kind,
+            DreamcastDeviceDomainClassifier.Classify(access),
+            access.Address,
+            $"0x{access.Address:X8}",
+            access.Size,
+            access.Value,
+            $"0x{access.Value:X8}",
+            access.Pc,
+            access.Pc is { } pc ? $"0x{pc:X8}" : null);
 }
 
 public sealed record DreamcastTraceSummary(

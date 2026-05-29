@@ -149,6 +149,33 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CapturesP4DeviceAccessProgramCounter()
+    {
+        var memory = new DreamcastMemory();
+        memory.CurrentInstructionPc = 0x8C02_1234;
+
+        memory.WriteUInt32(0xFFD8_000C, 0x1234_5678);
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0xFFD8_000C));
+
+        Assert.Collection(
+            memory.DeviceAccesses,
+            write =>
+            {
+                Assert.Equal(MemoryAccessKind.Write, write.Kind);
+                Assert.Equal(0xFFD8_000C, write.Address);
+                Assert.Equal(0x1234_5678u, write.Value);
+                Assert.Equal(0x8C02_1234u, write.Pc);
+            },
+            read =>
+            {
+                Assert.Equal(MemoryAccessKind.Read, read.Kind);
+                Assert.Equal(0xFFD8_000C, read.Address);
+                Assert.Equal(0x1234_5678u, read.Value);
+                Assert.Equal(0x8C02_1234u, read.Pc);
+            });
+    }
+
+    [Fact]
     public void TryPeekUInt32ReadsMappedRamWithoutRecordingDeviceAccess()
     {
         var memory = new DreamcastMemory();

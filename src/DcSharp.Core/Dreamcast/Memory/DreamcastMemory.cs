@@ -1569,7 +1569,7 @@ public sealed class DreamcastMemory
             _ => throw new MemoryMapException($"Unsupported P4 read size: {size}")
         };
 
-        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, masked));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, masked, CurrentInstructionPc));
         return masked;
     }
 
@@ -1747,7 +1747,7 @@ public sealed class DreamcastMemory
         var existing = p4Registers.GetValueOrDefault(aligned);
         var written = (existing & ~mask) | ((value << shift) & mask);
         p4Registers[aligned] = IsTimerControl(aligned) ? written & 0xFFFFu : written;
-        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value, CurrentInstructionPc));
 
         if (address == ScifTransmitData && data.Length == 1)
         {
