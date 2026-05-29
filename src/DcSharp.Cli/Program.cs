@@ -433,6 +433,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
     Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
+    PrintRuntimeScheduling(summary);
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
     PrintGdromActivity(gdrom);
@@ -454,6 +455,22 @@ static void BootSmoke(string path, string[] args)
             Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}");
         }
     }
+}
+
+static void PrintRuntimeScheduling(DreamcastRunSummary summary)
+{
+    var scheduler = summary.Scheduler;
+    Console.WriteLine($"Scheduler: vblanks={scheduler.VBlankEventsRaised}, nextVBlank={scheduler.NextVBlankInstruction}, hardwareTicks={scheduler.HardwareAdvanceTicks}, hardwareBatches={scheduler.HardwareAdvanceBatches}, maxHardwareBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+
+    var timerSource = summary.Timer.PendingInterrupt is { } pendingTimer
+        ? $", channel={pendingTimer.Channel}, priority={pendingTimer.Priority}"
+        : string.Empty;
+    Console.WriteLine($"TMU: pending={summary.Timer.PendingEventCodeHex ?? "none"}{timerSource}");
+
+    var asicSource = summary.Asic.PendingInterrupt is { } pendingAsic
+        ? $", source={pendingAsic.RegisterName}:bit{pendingAsic.Bit}, mask={pendingAsic.BitMaskHex}, levelName={pendingAsic.LevelName}"
+        : string.Empty;
+    Console.WriteLine($"ASIC: pending={summary.Asic.PendingEventCodeHex ?? "none"}, level={summary.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}{asicSource}");
 }
 
 static void PrintGdromActivity(DreamcastGdromSnapshot gdrom)
