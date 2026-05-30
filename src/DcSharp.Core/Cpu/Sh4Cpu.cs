@@ -686,6 +686,7 @@ public sealed class Sh4Cpu
 
         var busyMask = memory.ReadUInt32(0x8C2F_67FC);
         var busyBit = 1u << (int)(State.R[13] & 31);
+        var queueHead = memory.ReadUInt32(0x8C2F_766C);
         if (State.R[10] != 0x8C12_D2C0
             || State.R[12] != 1
             || busyBit != 1
@@ -694,10 +695,7 @@ public sealed class Sh4Cpu
             || memory.ReadUInt32(0x8C2F_680C) != 0
             || memory.ReadUInt32(0x8C2F_67F4) != 0
             || memory.ReadUInt32(0x8C2F_76A4) != 0
-            || memory.ReadUInt32(0x8C2F_766C) != 0x8C2F_6820
-            || memory.ReadUInt32(0x8C2F_6820) != 1
-            || memory.ReadUInt32(0x8C2F_6834) != 2
-            || memory.ReadUInt32(0x8C2F_6838) != 8)
+            || !IsDoa2BusyBitWorkItem(queueHead))
         {
             return false;
         }
@@ -713,6 +711,24 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    private bool IsDoa2BusyBitWorkItem(uint queueHead)
+    {
+        const uint firstWorkItem = 0x8C2F_6820;
+        const uint workItemStride = 0x1C4;
+        const uint lastObservedWorkItem = firstWorkItem + (workItemStride * 2);
+
+        if (queueHead < firstWorkItem
+            || queueHead > lastObservedWorkItem
+            || ((queueHead - firstWorkItem) % workItemStride) != 0)
+        {
+            return false;
+        }
+
+        return memory.ReadUInt32(queueHead) == 1
+            && memory.ReadUInt32(queueHead + 0x14) == 2
+            && memory.ReadUInt32(queueHead + 0x18) == 8;
     }
 
     internal bool TryFastForwardPredecrementStoreDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)

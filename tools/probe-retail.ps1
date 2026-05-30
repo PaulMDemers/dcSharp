@@ -4,7 +4,7 @@ param(
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$LongDoa2,
-    [long]$LongDoa2Instructions = 80000000
+    [long]$LongDoa2Instructions = 150000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,7 +87,7 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12BF8E"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12BF2A"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=0x0320"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=17, ok=17, failed=0"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=17, 45166x1, 45168x1, 45170x1, 45171x1"
