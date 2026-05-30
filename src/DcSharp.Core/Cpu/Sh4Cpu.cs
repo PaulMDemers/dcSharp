@@ -666,6 +666,55 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2BusyBitWaitLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_048E || step.Opcode != 0x8BE7 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C13_0460 || maxInstructionsToSkip < 30)
+        {
+            return false;
+        }
+
+        if (!IsDoa2BusyBitWaitLoop())
+        {
+            return false;
+        }
+
+        var busyMask = memory.ReadUInt32(0x8C2F_67FC);
+        var busyBit = 1u << (int)(State.R[13] & 31);
+        if (State.R[10] != 0x8C12_D2C0
+            || State.R[12] != 1
+            || busyBit != 1
+            || (busyMask & busyBit) == 0
+            || memory.ReadUInt32(0x8C2F_6808) != 0
+            || memory.ReadUInt32(0x8C2F_680C) != 0
+            || memory.ReadUInt32(0x8C2F_67F4) != 0
+            || memory.ReadUInt32(0x8C2F_76A4) != 0
+            || memory.ReadUInt32(0x8C2F_766C) != 0x8C2F_6820
+            || memory.ReadUInt32(0x8C2F_6820) != 1
+            || memory.ReadUInt32(0x8C2F_6834) != 2
+            || memory.ReadUInt32(0x8C2F_6838) != 8)
+        {
+            return false;
+        }
+
+        skippedInstructions = 30;
+        memory.WriteUInt32(0x8C2F_67FC, busyMask & ~busyBit);
+        State.R[1] = 0x8C2F_67FC;
+        State.R[3] = 0;
+        State.R[4] = 0;
+        State.T = true;
+        State.Pc = 0x8C13_0490;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardPredecrementStoreDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -821,6 +870,28 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C12_F9B2) == 0x2338
         && memory.ReadInstructionUInt16(0x8C12_F9B4) == 0x8BF1
         && State.R[13] == 0x8C12_D2C0
+        && memory.ReadUInt32(0x8C30_C778) == 0x8C12_BE60
+        && memory.ReadUInt32(0x8C30_C77C) == 0
+        && memory.ReadInstructionUInt16(0x8C12_BE60) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C12_BE62) == 0x0009;
+
+    private bool IsDoa2BusyBitWaitLoop() =>
+        memory.ReadInstructionUInt16(0x8C13_0460) == 0x4A0B
+        && memory.ReadInstructionUInt16(0x8C13_0462) == 0xE407
+        && memory.ReadInstructionUInt16(0x8C13_0464) == 0xD22F
+        && memory.ReadInstructionUInt16(0x8C13_0466) == 0x6422
+        && memory.ReadInstructionUInt16(0x8C13_0468) == 0x2448
+        && memory.ReadInstructionUInt16(0x8C13_046A) == 0x890A
+        && memory.ReadInstructionUInt16(0x8C13_0482) == 0xD12A
+        && memory.ReadInstructionUInt16(0x8C13_0484) == 0x63DB
+        && memory.ReadInstructionUInt16(0x8C13_0486) == 0x6412
+        && memory.ReadInstructionUInt16(0x8C13_0488) == 0x443D
+        && memory.ReadInstructionUInt16(0x8C13_048A) == 0x24C9
+        && memory.ReadInstructionUInt16(0x8C13_048C) == 0x2448
+        && memory.ReadInstructionUInt16(0x8C13_048E) == 0x8BE7
+        && memory.ReadUInt32(0x8C13_0524) == 0x8C2F_6808
+        && memory.ReadUInt32(0x8C13_0528) == 0x8C2F_6814
+        && memory.ReadUInt32(0x8C13_052C) == 0x8C2F_67FC
         && memory.ReadUInt32(0x8C30_C778) == 0x8C12_BE60
         && memory.ReadUInt32(0x8C30_C77C) == 0
         && memory.ReadInstructionUInt16(0x8C12_BE60) == 0x000B

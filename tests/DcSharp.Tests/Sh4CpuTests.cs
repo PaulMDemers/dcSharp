@@ -567,6 +567,43 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2BusyBitWaitLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2BusyBitWaitLoop(memory);
+        WriteInstruction(memory, 0x8C12_BE60, 0x000B);
+        WriteInstruction(memory, 0x8C12_BE62, 0x0009);
+        memory.WriteUInt32(0x8C30_C778, 0x8C12_BE60);
+        memory.WriteUInt32(0x8C30_C77C, 0);
+        memory.WriteUInt32(0x8C2F_67F4, 0);
+        memory.WriteUInt32(0x8C2F_67FC, 1);
+        memory.WriteUInt32(0x8C2F_6808, 0);
+        memory.WriteUInt32(0x8C2F_680C, 0);
+        memory.WriteUInt32(0x8C2F_6820, 1);
+        memory.WriteUInt32(0x8C2F_6834, 2);
+        memory.WriteUInt32(0x8C2F_6838, 8);
+        memory.WriteUInt32(0x8C2F_766C, 0x8C2F_6820);
+        memory.WriteUInt32(0x8C2F_76A4, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C13_048E);
+        cpu.State.R[10] = 0x8C12_D2C0;
+        cpu.State.R[12] = 1;
+        cpu.State.R[13] = 0;
+        cpu.State.T = false;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardDoa2BusyBitWaitLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(30UL, skippedInstructions);
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67FC));
+        Assert.Equal(0x8C2F_67FCu, cpu.State.R[1]);
+        Assert.Equal(0u, cpu.State.R[3]);
+        Assert.Equal(0u, cpu.State.R[4]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C13_0490u, cpu.State.Pc);
+        Assert.Equal(31UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void FastForwardsPredecrementStoreDtLoop()
     {
         var memory = new DreamcastMemory();
@@ -1793,6 +1830,26 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C12_F9B0, 0x6312);
         WriteInstruction(memory, 0x8C12_F9B2, 0x2338);
         WriteInstruction(memory, 0x8C12_F9B4, 0x8BF1);
+    }
+
+    private static void WriteDoa2BusyBitWaitLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_0460, 0x4A0B);
+        WriteInstruction(memory, 0x8C13_0462, 0xE407);
+        WriteInstruction(memory, 0x8C13_0464, 0xD22F);
+        WriteInstruction(memory, 0x8C13_0466, 0x6422);
+        WriteInstruction(memory, 0x8C13_0468, 0x2448);
+        WriteInstruction(memory, 0x8C13_046A, 0x890A);
+        WriteInstruction(memory, 0x8C13_0482, 0xD12A);
+        WriteInstruction(memory, 0x8C13_0484, 0x63DB);
+        WriteInstruction(memory, 0x8C13_0486, 0x6412);
+        WriteInstruction(memory, 0x8C13_0488, 0x443D);
+        WriteInstruction(memory, 0x8C13_048A, 0x24C9);
+        WriteInstruction(memory, 0x8C13_048C, 0x2448);
+        WriteInstruction(memory, 0x8C13_048E, 0x8BE7);
+        memory.WriteUInt32(0x8C13_0524, 0x8C2F_6808);
+        memory.WriteUInt32(0x8C13_0528, 0x8C2F_6814);
+        memory.WriteUInt32(0x8C13_052C, 0x8C2F_67FC);
     }
 
     private static void RaiseVBlankIrq9(DreamcastMemory memory)
