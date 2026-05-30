@@ -797,6 +797,8 @@ public sealed class Sh4Cpu
         if (State.Vbr == 0 && memory.TryGetBiosInterruptHandler(level, out var vectorAddress, out var handlerAddress))
         {
             State.Pc = handlerAddress;
+            State.SaveBiosInterruptPr(State.Pr);
+            State.Pr = DreamcastMemory.BiosInterruptReturnHleStub;
             trace = $"interrupt event=0x{eventCode:X4}, level={level}, target=0x{State.Pc:X8}, bios-vector=0x{vectorAddress:X8}";
             return true;
         }
@@ -874,6 +876,7 @@ public sealed class Sh4Cpu
         {
             delayedBranchTarget = State.Spc;
             State.Sr = State.Ssr;
+            State.RestoreBiosInterruptPr();
             return $"rte ; target=0x{State.Spc:X8}, sr=0x{State.Sr:X8}";
         }
 
@@ -2092,6 +2095,8 @@ public sealed class Sh4State
     public const uint SrMachineBit = 1u << 30;
 
     private uint sr;
+    private uint biosInterruptPr;
+    private bool hasBiosInterruptPr;
 
     public uint[] R { get; } = new uint[16];
     public uint[] RBank { get; } = new uint[8];
@@ -2141,6 +2146,25 @@ public sealed class Sh4State
     }
 
     public ulong InstructionsExecuted { get; set; }
+
+    internal void SaveBiosInterruptPr(uint value)
+    {
+        biosInterruptPr = value;
+        hasBiosInterruptPr = true;
+    }
+
+    internal bool RestoreBiosInterruptPr()
+    {
+        if (!hasBiosInterruptPr)
+        {
+            return false;
+        }
+
+        Pr = biosInterruptPr;
+        biosInterruptPr = 0;
+        hasBiosInterruptPr = false;
+        return true;
+    }
 }
 
 public sealed record Sh4StepResult(uint Pc, ushort Opcode, string Trace);

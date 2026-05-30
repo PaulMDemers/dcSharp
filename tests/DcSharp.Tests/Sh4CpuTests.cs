@@ -1,5 +1,6 @@
 using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Execution;
 
 namespace DcSharp.Tests;
 
@@ -1345,6 +1346,7 @@ public class Sh4CpuTests
         Assert.Equal(0x8C01_0000u, step.Pc);
         Assert.Equal(0, step.Opcode);
         Assert.Equal(0x8C12_BF20u, cpu.State.Pc);
+        Assert.Equal(0x8C00_00F0u, cpu.State.Pr);
         Assert.Equal(0x8C01_0000u, cpu.State.Spc);
         Assert.Equal(0u, cpu.State.Ssr);
         Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
@@ -1356,6 +1358,42 @@ public class Sh4CpuTests
 
         Assert.Equal(0x8C01_0000u, cpu.State.Pc);
         Assert.Equal(0u, cpu.State.Sr);
+    }
+
+    [Fact]
+    public void VbrZeroBiosInterruptCallbackReturnsThroughFirmwareWrapper()
+    {
+        var memory = new DreamcastMemory();
+        FirmwareStubs.Install(memory);
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C12_BF20, 0x000B);
+        WriteInstruction(memory, 0x8C12_BF22, 0x0009);
+        memory.WriteUInt32(0x0000_0224, 0x8C12_BF20);
+        RaiseVBlankIrq9(memory);
+        var trapHandler = FirmwareStubs.CreateTrapHandler();
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000, trapHandler.TryHandle)
+        {
+            State =
+            {
+                Sr = 0x0000_0001,
+                Pr = 0x8C01_2340
+            }
+        };
+
+        var interrupt = cpu.Step();
+        var callbackReturn = cpu.Step();
+        var delaySlot = cpu.Step();
+        var firmwareReturn = cpu.Step();
+
+        Assert.Equal("interrupt event=0x0320, level=9, target=0x8C12BF20, bios-vector=0x00000224", interrupt.Trace);
+        Assert.Equal("rts ; target=0x8C0000F0", callbackReturn.Trace);
+        Assert.Equal("nop", delaySlot.Trace);
+        Assert.Equal("firmware interrupt return hle ; pc=0x8C010000, sr=0x00000001, pr=0x8C012340", firmwareReturn.Trace);
+        Assert.Equal(0x8C01_0000u, cpu.State.Pc);
+        Assert.Equal(0x8C01_2340u, cpu.State.Pr);
+        Assert.Equal(0x0000_0001u, cpu.State.Sr);
+        Assert.Equal(0x8C01_0000u, cpu.State.Spc);
+        Assert.Equal(0x0000_0001u, cpu.State.Ssr);
     }
 
     [Fact]

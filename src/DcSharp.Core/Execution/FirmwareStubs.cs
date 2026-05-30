@@ -11,6 +11,7 @@ internal static class FirmwareStubs
     private const uint ReturnZeroStub = 0x8C00_00C0;
     private const uint GdromHleStub = 0x8C00_00D0;
     private const uint SystemHleStub = 0x8C00_00E8;
+    private const uint InterruptReturnHleStub = DreamcastMemory.BiosInterruptReturnHleStub;
     private const uint BiosLanguageCodeAddress = 0x8C00_0074;
     private const uint BiosBootModeAddress = 0x8C00_80FC;
     private const uint BiosBootAreaModeAddress = 0x8C00_80FE;
@@ -112,6 +113,20 @@ internal static class FirmwareStubs
                 }
 
                 throw new DreamcastFirmwareExitException(SystemCallMessage(state.R[4]));
+            }
+
+            if (state.Pc == InterruptReturnHleStub)
+            {
+                state.Sr = state.Ssr;
+                state.Pc = state.Spc;
+                var prRestored = state.RestoreBiosInterruptPr();
+                trace = $"firmware interrupt return hle ; pc=0x{state.Pc:X8}, sr=0x{state.Sr:X8}";
+                if (prRestored)
+                {
+                    trace += $", pr=0x{state.Pr:X8}";
+                }
+
+                return true;
             }
 
             if (state.Pc != GdromHleStub)

@@ -12,6 +12,8 @@ namespace DcSharp.Core.Dreamcast.Memory;
 
 public sealed class DreamcastMemory
 {
+    internal const uint BiosInterruptReturnHleStub = 0x8C00_00F0;
+
     private const uint AreaMask = 0xE000_0000;
     private const uint P1Base = 0x8000_0000;
     private const uint P2Base = 0xA000_0000;
