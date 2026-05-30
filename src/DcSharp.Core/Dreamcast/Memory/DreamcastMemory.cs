@@ -91,6 +91,7 @@ public sealed class DreamcastMemory
     private const int MapleDmaDescriptorLimit = 64;
     private const ushort AsicEventPvrVBlankBegin = 0x0003;
     private const ushort AsicEventMapleDma = 0x000C;
+    private const ushort AsicEventGdromCommand = 0x0100;
     private const ushort AsicEventGdromDma = 0x000E;
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
@@ -787,6 +788,8 @@ public sealed class DreamcastMemory
 
         return status;
     }
+
+    internal void RaiseGdromCommandStatus() => RaiseAsicEvent(AsicEventGdromCommand);
 
     private uint ExecuteGdromRead(uint parameterAddress, uint sector, uint destination, uint sectorCount)
     {

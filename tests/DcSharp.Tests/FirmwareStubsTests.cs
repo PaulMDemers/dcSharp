@@ -216,6 +216,29 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void GdromCommandExecutionRaisesCommandStatusInterruptSource()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));
+        memory.WriteUInt32(0xA05F_6924, 1);
+        WritePioReadParameters(memory);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandPioRead, ParameterAddress);
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
+
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0360u, eventCode);
+        Assert.Equal(11, level);
+        var pending = memory.CreateAsicSnapshot().PendingInterrupt;
+        Assert.Equal("IRQB", pending?.LevelName);
+        Assert.Equal("B", pending?.RegisterName);
+        Assert.Equal(0, pending?.Bit);
+        Assert.Equal(GdromCompleted, CheckGdromCommand(handler, memory, commandId));
+    }
+
+    [Fact]
     public void GdromDmaStreamTransfersSectorsAndReportsCompletion()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));

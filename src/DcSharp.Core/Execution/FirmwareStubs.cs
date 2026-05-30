@@ -215,6 +215,7 @@ internal static class FirmwareStubs
 
             var executed = ExecuteCommand(pending.Value.Command!.Value, pending.Value.ParameterAddress ?? 0, memory);
             commands[pending.Key] = executed;
+            memory.RaiseGdromCommandStatus();
             memory.RecordGdromCommandActivity(
                 "exec",
                 pending.Key,
