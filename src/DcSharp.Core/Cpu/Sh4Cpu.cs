@@ -702,6 +702,7 @@ public sealed class Sh4Cpu
 
         skippedInstructions = 30;
         memory.WriteUInt32(0x8C2F_67FC, busyMask & ~busyBit);
+        memory.WriteUInt32(queueHead, 0);
         State.R[1] = 0x8C2F_67FC;
         State.R[3] = 0;
         State.R[4] = 0;

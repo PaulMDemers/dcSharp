@@ -595,6 +595,7 @@ public class Sh4CpuTests
         Assert.True(cpu.TryFastForwardDoa2BusyBitWaitLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(30UL, skippedInstructions);
         Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67FC));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_6820));
         Assert.Equal(0x8C2F_67FCu, cpu.State.R[1]);
         Assert.Equal(0u, cpu.State.R[3]);
         Assert.Equal(0u, cpu.State.R[4]);
@@ -632,6 +633,7 @@ public class Sh4CpuTests
         Assert.True(cpu.TryFastForwardDoa2BusyBitWaitLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(30UL, skippedInstructions);
         Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67FC));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_69E4));
         Assert.Equal(0x8C2F_67FCu, cpu.State.R[1]);
         Assert.Equal(0u, cpu.State.R[3]);
         Assert.Equal(0u, cpu.State.R[4]);
@@ -669,6 +671,7 @@ public class Sh4CpuTests
         Assert.True(cpu.TryFastForwardDoa2BusyBitWaitLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(30UL, skippedInstructions);
         Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67FC));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_6D6C));
         Assert.Equal(0x8C13_0490u, cpu.State.Pc);
         Assert.Equal(31UL, cpu.State.InstructionsExecuted);
     }
