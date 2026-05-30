@@ -762,10 +762,27 @@ public sealed class DreamcastMemory
 
     public uint ExecuteGdromDmaReadCommand(uint parameterAddress)
     {
-        var status = ExecuteGdromPioReadCommand(parameterAddress);
+        if (parameterAddress == 0)
+        {
+            RecordGdromRead(parameterAddress, null, null, null, 0, 0, false, "missing parameter block");
+            return 1;
+        }
+
+        var sector = ReadUInt32(parameterAddress);
+        var sectorCount = ReadUInt32(parameterAddress + 4);
+        var destination = ReadUInt32(parameterAddress + 8);
+        return ExecuteGdromReadCommand(parameterAddress, sector, destination, sectorCount, raiseDmaComplete: true);
+    }
+
+    internal uint ExecuteGdromReadCommand(uint parameterAddress, uint sector, uint destination, uint sectorCount, bool raiseDmaComplete)
+    {
+        var status = ExecuteGdromRead(parameterAddress, sector, destination, sectorCount);
         if (status == 0)
         {
-            RaiseAsicEvent(AsicEventGdromDma);
+            if (raiseDmaComplete)
+            {
+                RaiseAsicEvent(AsicEventGdromDma);
+            }
         }
 
         return status;

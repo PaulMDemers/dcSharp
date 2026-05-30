@@ -60,12 +60,17 @@ internal static class FirmwareStubs
         private const uint GdromCommandDmaRead = 17;
         private const uint GdromCommandGetToc2 = 19;
         private const uint GdromCommandInit = 24;
+        private const uint GdromCommandDmaReadStream = 28;
+        private const uint GdromCommandPioReadStream = 37;
+        private const uint GdromCommandDmaReadStreamEx = 38;
+        private const uint GdromCommandPioReadStreamEx = 39;
         private const uint GdromCommandGetVersion = 40;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
         private const int GdromProcessing = 1;
         private const int GdromCompleted = 2;
+        private const int GdromStreaming = 3;
         private const int GdromNoDiscStatus = 2;
         private const int CdStatusStandby = 2;
         private const int CdStatusNoDisc = 7;
@@ -74,6 +79,10 @@ internal static class FirmwareStubs
 
         private uint nextCommandId = 1;
         private readonly Dictionary<uint, GdromQueuedCommand> commands = [];
+        private uint dmaCallback;
+        private uint dmaCallbackParameter;
+        private uint pioCallback;
+        private uint pioCallbackParameter;
 
         public FirmwareTrapHandler(
             uint softResetEntryPoint = DefaultSoftResetEntryPoint,
@@ -162,15 +171,15 @@ internal static class FirmwareStubs
                 GdromFunctionExecServer => ExecServer(memory),
                 GdromFunctionInit => 0,
                 GdromFunctionDriveStatus => CheckDrive(state, memory),
-                GdromFunctionDmaCallback => 0,
-                GdromFunctionDmaTransfer => 0,
-                GdromFunctionDmaCheck => CheckTransfer(state, memory),
+                GdromFunctionDmaCallback => SetTransferCallback(state, memory, isDma: true),
+                GdromFunctionDmaTransfer => TransferStream(state, memory, isDma: true),
+                GdromFunctionDmaCheck => CheckTransfer(state, memory, isDma: true),
                 GdromFunctionAbortCommand => AbortCommand(state, memory),
                 GdromFunctionReset => 0,
                 GdromFunctionSectorMode => SectorMode(state, memory),
-                GdromFunctionPioCallback => 0,
-                GdromFunctionPioTransfer => 0,
-                GdromFunctionPioCheck => CheckTransfer(state, memory),
+                GdromFunctionPioCallback => SetTransferCallback(state, memory, isDma: false),
+                GdromFunctionPioTransfer => TransferStream(state, memory, isDma: false),
+                GdromFunctionPioCheck => CheckTransfer(state, memory, isDma: false),
                 _ => 0
             };
 
@@ -258,7 +267,30 @@ internal static class FirmwareStubs
                 return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
             }
 
+            if (command is GdromCommandDmaReadStream or GdromCommandPioReadStream or GdromCommandDmaReadStreamEx or GdromCommandPioReadStreamEx)
+            {
+                return StartStream(command, parameters, memory);
+            }
+
             return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
+        }
+
+        private static GdromQueuedCommand StartStream(uint command, uint parameters, DreamcastMemory memory)
+        {
+            if (parameters == 0)
+            {
+                return GdromQueuedCommand.Failed(command, parameters, 0, 0, 0, 0);
+            }
+
+            var snapshot = memory.CreateGdromSnapshot();
+            if (!snapshot.HasMedia)
+            {
+                return GdromQueuedCommand.Failed(command, parameters, GdromNoDiscStatus, 0, 0, 0);
+            }
+
+            var sector = memory.ReadUInt32(parameters);
+            var sectorCount = memory.ReadUInt32(parameters + 4);
+            return GdromQueuedCommand.Streaming(command, parameters, sector, sectorCount);
         }
 
         private static int MapReadFailureStatus(DreamcastGdromReadCommand? read) =>
@@ -401,13 +433,134 @@ internal static class FirmwareStubs
             return 0;
         }
 
-        private static uint CheckTransfer(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
+        private uint SetTransferCallback(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, bool isDma)
         {
-            if (state.R[5] != 0)
+            if (isDma)
             {
-                memory.WriteUInt32(state.R[5], 0);
+                dmaCallback = state.R[4];
+                dmaCallbackParameter = state.R[5];
+            }
+            else
+            {
+                pioCallback = state.R[4];
+                pioCallbackParameter = state.R[5];
             }
 
+            memory.RecordGdromCommandActivity(
+                isDma ? "dma-callback" : "pio-callback",
+                null,
+                null,
+                null,
+                state.R[4],
+                state.R[5],
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                $"callback={(isDma ? dmaCallback : pioCallback):X8}, param=0x{(isDma ? dmaCallbackParameter : pioCallbackParameter):X8}");
+            return 0;
+        }
+
+        private uint TransferStream(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, bool isDma)
+        {
+            if (state.R[5] == 0 || !commands.TryGetValue(state.R[4], out var command) || command.Response != GdromStreaming)
+            {
+                RecordTransferActivity(memory, isDma, state.R[4], null, state.R[5], -1, "no streaming command");
+                return unchecked((uint)-1);
+            }
+
+            var destination = memory.ReadUInt32(state.R[5]);
+            var byteCount = memory.ReadUInt32(state.R[5] + 4);
+            var sectorSize = (uint)(memory.CreateGdromSnapshot().SectorSize ?? 2048);
+            var requestedSectors = byteCount == 0 ? 0 : ((byteCount + sectorSize - 1) / sectorSize);
+            var transferSectors = command.StreamRemainingSectors is { } remaining && remaining != 0x1FF
+                ? Math.Min(requestedSectors, remaining)
+                : requestedSectors;
+
+            if (transferSectors == 0)
+            {
+                commands[state.R[4]] = command with { LastTransferRemainingBytes = 0 };
+                RecordTransferActivity(memory, isDma, state.R[4], command.Command, state.R[5], 0, "empty transfer");
+                return 0;
+            }
+
+            var status = memory.ExecuteGdromReadCommand(state.R[5], command.StreamSector ?? 0, destination, transferSectors, isDma);
+            if (status != 0)
+            {
+                commands[state.R[4]] = command with { Response = GdromFailed, Status0 = GdromNoDiscStatus, LastTransferRemainingBytes = 0 };
+                RecordTransferActivity(memory, isDma, state.R[4], command.Command, state.R[5], -1, "transfer failed");
+                return unchecked((uint)-1);
+            }
+
+            var nextSector = (command.StreamSector ?? 0) + transferSectors;
+            uint? remainingSectors = command.StreamRemainingSectors;
+            if (remainingSectors is { } sectorsLeft && sectorsLeft != 0x1FF)
+            {
+                remainingSectors = sectorsLeft > transferSectors ? sectorsLeft - transferSectors : 0;
+            }
+
+            var response = remainingSectors == 0 ? GdromCompleted : GdromStreaming;
+            commands[state.R[4]] = command with
+            {
+                Response = response,
+                StreamSector = nextSector,
+                StreamRemainingSectors = remainingSectors,
+                LastTransferRemainingBytes = 0,
+                TransferredBytes = unchecked((int)(transferSectors * sectorSize))
+            };
+            RecordTransferActivity(memory, isDma, state.R[4], command.Command, state.R[5], 0, "transfer completed");
+            return 0;
+        }
+
+        private static void RecordTransferActivity(
+            DreamcastMemory memory,
+            bool isDma,
+            uint commandId,
+            uint? command,
+            uint parameterAddress,
+            int response,
+            string status) =>
+            memory.RecordGdromCommandActivity(
+                isDma ? "dma-transfer" : "pio-transfer",
+                commandId,
+                command,
+                command is { } commandValue ? GdromCommandName(commandValue) : null,
+                parameterAddress,
+                null,
+                response,
+                response == 0 ? "completed" : "failed",
+                null,
+                null,
+                null,
+                null,
+                status);
+
+        private uint CheckTransfer(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, bool isDma)
+        {
+            var remainingBytes = commands.TryGetValue(state.R[4], out var command)
+                ? command.LastTransferRemainingBytes
+                : 0;
+            if (state.R[5] != 0)
+            {
+                memory.WriteUInt32(state.R[5], remainingBytes);
+            }
+
+            memory.RecordGdromCommandActivity(
+                isDma ? "dma-check" : "pio-check",
+                state.R[4],
+                command?.Command,
+                command?.Command is { } commandValue ? GdromCommandName(commandValue) : null,
+                command?.ParameterAddress,
+                state.R[5],
+                command is null ? GdromNoActive : 0,
+                command is null ? "no active" : "completed",
+                null,
+                null,
+                unchecked((int)remainingBytes),
+                null,
+                command is null ? "no streaming command" : "transfer status reported");
             return 0;
         }
 
@@ -464,7 +617,11 @@ internal static class FirmwareStubs
                 GdromCommandDmaRead => "DMA_READ",
                 GdromCommandGetToc2 => "GET_TOC2",
                 GdromCommandInit => "INIT",
+                GdromCommandDmaReadStream => "DMA_READ_STREAM",
                 29 => "NOP",
+                GdromCommandPioReadStream => "PIO_READ_STREAM",
+                GdromCommandDmaReadStreamEx => "DMA_READ_STREAM_EX",
+                GdromCommandPioReadStreamEx => "PIO_READ_STREAM_EX",
                 GdromCommandGetVersion => "GET_VERSION",
                 _ => "unknown"
             };
@@ -476,6 +633,7 @@ internal static class FirmwareStubs
                 GdromNoActive => "no active",
                 GdromProcessing => "processing",
                 GdromCompleted => "completed",
+                GdromStreaming => "streaming",
                 _ => "unknown"
             };
 
@@ -486,7 +644,10 @@ internal static class FirmwareStubs
             int Status0,
             int Status1,
             int TransferredBytes,
-            int AtaStatus)
+            int AtaStatus,
+            uint? StreamSector = null,
+            uint? StreamRemainingSectors = null,
+            uint LastTransferRemainingBytes = 0)
         {
             public static GdromQueuedCommand Pending(uint command, uint parameters) =>
                 new(command, parameters, GdromProcessing, 0, 0, 0, 0);
@@ -496,6 +657,9 @@ internal static class FirmwareStubs
 
             public static GdromQueuedCommand Failed(uint command, uint parameters, int status0, int status1, int transferredBytes, int ataStatus) =>
                 new(command, parameters, GdromFailed, status0, status1, transferredBytes, ataStatus);
+
+            public static GdromQueuedCommand Streaming(uint command, uint parameters, uint sector, uint sectorCount) =>
+                new(command, parameters, GdromStreaming, 0, 0, 0, 0, sector, sectorCount);
         }
     }
 }

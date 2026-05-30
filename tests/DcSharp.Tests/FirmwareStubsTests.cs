@@ -12,25 +12,34 @@ public class FirmwareStubsTests
     private const uint GdromSendCommand = 0;
     private const uint GdromCheckCommand = 1;
     private const uint GdromExecServer = 2;
+    private const uint GdromDmaTransfer = 6;
+    private const uint GdromDmaCheck = 7;
     private const uint GdromInit = 3;
     private const uint GdromAbortCommand = 8;
     private const uint GdromReset = 9;
     private const uint GdromCheckDrive = 4;
     private const uint GdromSectorMode = 10;
+    private const uint GdromPioTransfer = 12;
+    private const uint GdromPioCheck = 13;
     private const uint GdromCommandPioRead = 16;
     private const uint GdromCommandDmaRead = 17;
     private const uint GdromCommandGetToc2 = 19;
     private const uint GdromCommandInit = 24;
+    private const uint GdromCommandDmaReadStream = 28;
+    private const uint GdromCommandPioReadStream = 37;
     private const uint GdromCommandNop = 29;
     private const uint GdromCommandGetVersion = 40;
     private const uint GdromCompleted = 2;
     private const uint GdromNoActive = 0;
     private const uint GdromProcessing = 1;
+    private const uint GdromStreaming = 3;
     private const uint Sector = 1;
     private const uint ParameterAddress = 0x8C01_0000;
     private const uint StatusAddress = 0x8C01_0100;
     private const uint TocAddress = 0x8C01_0200;
     private const uint DestinationAddress = 0x8C02_0000;
+    private const uint TransferParameterAddress = 0x8C01_0300;
+    private const uint TransferSizeAddress = 0x8C01_0400;
 
     [Fact]
     public void InstallSeedsBiosWorkAreaLanguageCode()
@@ -204,6 +213,63 @@ public class FirmwareStubsTests
         Assert.Equal(14, pending?.Bit);
         var read = Assert.Single(memory.CreateGdromSnapshot().ReadCommands);
         Assert.True(read.Success);
+    }
+
+    [Fact]
+    public void GdromDmaStreamTransfersSectorsAndReportsCompletion()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));
+        memory.WriteUInt32(0xA05F_6920, 1u << 14);
+        WriteStreamParameters(memory, 0, 2);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandDmaReadStream, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
+        Assert.Equal(GdromStreaming, CheckGdromCommand(handler, memory, commandId));
+
+        WriteTransferParameters(memory, DestinationAddress, 2048);
+        Assert.Equal(0u, CallGdromTransfer(handler, memory, GdromDmaTransfer, commandId));
+        Assert.Equal(0x10, memory.ReadByte(DestinationAddress));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0360u, eventCode);
+        Assert.Equal(11, level);
+        Assert.Equal(0u, CheckGdromTransfer(handler, memory, GdromDmaCheck, commandId));
+        Assert.Equal(0u, memory.ReadUInt32(TransferSizeAddress));
+        Assert.Equal(GdromStreaming, CheckGdromCommand(handler, memory, commandId));
+
+        memory.WriteUInt32(0xA05F_6900, 1u << 14);
+        WriteTransferParameters(memory, DestinationAddress + 2048, 2048);
+        Assert.Equal(0u, CallGdromTransfer(handler, memory, GdromDmaTransfer, commandId));
+        Assert.Equal(0x20, memory.ReadByte(DestinationAddress + 2048));
+        Assert.Equal(GdromCompleted, CheckGdromCommand(handler, memory, commandId));
+        Assert.Equal(2048u, memory.ReadUInt32(StatusAddress + 8));
+        Assert.Equal(GdromNoActive, CheckGdromCommand(handler, memory, commandId));
+
+        var reads = memory.CreateGdromSnapshot().ReadCommands;
+        Assert.Equal(2, reads.Count);
+        Assert.Equal(0u, reads[0].Sector);
+        Assert.Equal(1u, reads[1].Sector);
+    }
+
+    [Fact]
+    public void GdromPioStreamTransferDoesNotRaiseDmaInterruptSource()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));
+        memory.WriteUInt32(0xA05F_6920, 1u << 14);
+        WriteStreamParameters(memory, 1, 1);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandPioReadStream, ParameterAddress);
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
+        Assert.Equal(GdromStreaming, CheckGdromCommand(handler, memory, commandId));
+        WriteTransferParameters(memory, DestinationAddress, 2048);
+
+        Assert.Equal(0u, CallGdromTransfer(handler, memory, GdromPioTransfer, commandId));
+
+        Assert.Equal(0x20, memory.ReadByte(DestinationAddress));
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+        Assert.Equal(0u, CheckGdromTransfer(handler, memory, GdromPioCheck, commandId));
+        Assert.Equal(GdromCompleted, CheckGdromCommand(handler, memory, commandId));
     }
 
     [Fact]
@@ -521,6 +587,32 @@ public class FirmwareStubsTests
         return state.R[0];
     }
 
+    private static uint CallGdromTransfer(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory,
+        uint function,
+        uint commandId)
+    {
+        var state = CreateGdromState(function);
+        state.R[4] = commandId;
+        state.R[5] = TransferParameterAddress;
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
+    }
+
+    private static uint CheckGdromTransfer(
+        FirmwareStubs.FirmwareTrapHandler handler,
+        DreamcastMemory memory,
+        uint function,
+        uint commandId)
+    {
+        var state = CreateGdromState(function);
+        state.R[4] = commandId;
+        state.R[5] = TransferSizeAddress;
+        Assert.True(handler.TryHandle(state, memory, out _));
+        return state.R[0];
+    }
+
     private static uint CheckDrive(
         FirmwareStubs.FirmwareTrapHandler handler,
         DreamcastMemory memory)
@@ -559,6 +651,18 @@ public class FirmwareStubsTests
         memory.WriteUInt32(ParameterAddress + 4, 1);
         memory.WriteUInt32(ParameterAddress + 8, DestinationAddress);
         memory.WriteUInt32(ParameterAddress + 12, 0);
+    }
+
+    private static void WriteStreamParameters(DreamcastMemory memory, uint sector, uint sectorCount)
+    {
+        memory.WriteUInt32(ParameterAddress, sector);
+        memory.WriteUInt32(ParameterAddress + 4, sectorCount);
+    }
+
+    private static void WriteTransferParameters(DreamcastMemory memory, uint destination, uint byteCount)
+    {
+        memory.WriteUInt32(TransferParameterAddress, destination);
+        memory.WriteUInt32(TransferParameterAddress + 4, byteCount);
     }
 
     private static byte[] CreateMediaData(int sectors)
