@@ -717,10 +717,10 @@ public sealed class Sh4Cpu
     {
         const uint firstWorkItem = 0x8C2F_6820;
         const uint workItemStride = 0x1C4;
-        const uint lastObservedWorkItem = firstWorkItem + (workItemStride * 2);
+        const uint workItemArenaEnd = 0x8C2F_7640;
 
         if (queueHead < firstWorkItem
-            || queueHead > lastObservedWorkItem
+            || queueHead >= workItemArenaEnd
             || ((queueHead - firstWorkItem) % workItemStride) != 0)
         {
             return false;

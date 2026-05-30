@@ -4,13 +4,14 @@ param(
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$LongDoa2,
-    [long]$LongDoa2Instructions = 150000000
+    [long]$LongDoa2Instructions = 205000000
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $cliProject = Join-Path $repoRoot "src\DcSharp.Cli"
+$cliDll = Join-Path $cliProject "bin\Debug\net10.0\DcSharp.Cli.dll"
 
 function Invoke-BootSmoke {
     param(
@@ -25,12 +26,21 @@ function Invoke-BootSmoke {
     }
 
     Write-Host "== $Name =="
-    $output = & dotnet run --no-build --project $cliProject -- media boot-smoke $Path `
-        --scan-sectors $ScanSectors `
-        --instructions $Instructions `
-        --trace-tail 12 `
-        --stop-on-unmapped `
-        --vblank-interval $VBlankInterval
+    $commandArgs = if (Test-Path -LiteralPath $cliDll) {
+        @($cliDll, 'media', 'boot-smoke', $Path)
+    }
+    else {
+        @('run', '--no-build', '--project', $cliProject, '--', 'media', 'boot-smoke', $Path)
+    }
+
+    $commandArgs += @(
+        '--scan-sectors', $ScanSectors,
+        '--instructions', $Instructions,
+        '--trace-tail', 12,
+        '--stop-on-unmapped',
+        '--vblank-interval', $VBlankInterval)
+
+    $output = & dotnet @commandArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "$Name boot-smoke failed with exit code $LASTEXITCODE"
@@ -87,7 +97,7 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12BF2A"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12F99A"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=0x0320"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=17, ok=17, failed=0"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=17, 45166x1, 45168x1, 45170x1, 45171x1"
@@ -105,6 +115,7 @@ if ($LongDoa2) {
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C10EDB8"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C014674"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C13048A"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=0x0360"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "FirmwareExit"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
