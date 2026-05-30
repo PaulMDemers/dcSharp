@@ -227,7 +227,15 @@ internal static class FirmwareStubs
         {
             if (command is GdromCommandPioRead or GdromCommandDmaRead)
             {
-                memory.ExecuteGdromPioReadCommand(parameters);
+                if (command == GdromCommandDmaRead)
+                {
+                    memory.ExecuteGdromDmaReadCommand(parameters);
+                }
+                else
+                {
+                    memory.ExecuteGdromPioReadCommand(parameters);
+                }
+
                 var read = memory.CreateGdromSnapshot().ReadCommands.LastOrDefault();
                 return read?.Success == true
                     ? GdromQueuedCommand.Completed(command, parameters, 0, 0, read.BytesRead, 0)

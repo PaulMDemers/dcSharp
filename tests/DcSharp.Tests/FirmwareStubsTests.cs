@@ -18,6 +18,7 @@ public class FirmwareStubsTests
     private const uint GdromCheckDrive = 4;
     private const uint GdromSectorMode = 10;
     private const uint GdromCommandPioRead = 16;
+    private const uint GdromCommandDmaRead = 17;
     private const uint GdromCommandGetToc2 = 19;
     private const uint GdromCommandInit = 24;
     private const uint GdromCommandNop = 29;
@@ -174,6 +175,35 @@ public class FirmwareStubsTests
                 Assert.Equal((int)GdromNoActive, inactive.Response);
                 Assert.Equal("no active", inactive.ResponseName);
             });
+    }
+
+    [Fact]
+    public void GdromDmaReadCommandRaisesDmaCompleteInterruptSource()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));
+        memory.WriteUInt32(0xA05F_6920, 1u << 14);
+        WritePioReadParameters(memory);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandDmaRead, ParameterAddress);
+        var processingResponse = CheckGdromCommand(handler, memory, commandId);
+        Assert.Equal(GdromProcessing, processingResponse);
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
+        var response = CheckGdromCommand(handler, memory, commandId);
+
+        Assert.Equal(GdromCompleted, response);
+        Assert.Equal(2048u, memory.ReadUInt32(StatusAddress + 8));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0360u, eventCode);
+        Assert.Equal(11, level);
+        var pending = memory.CreateAsicSnapshot().PendingInterrupt;
+        Assert.Equal("IRQB", pending?.LevelName);
+        Assert.Equal("A", pending?.RegisterName);
+        Assert.Equal(14, pending?.Bit);
+        var read = Assert.Single(memory.CreateGdromSnapshot().ReadCommands);
+        Assert.True(read.Success);
     }
 
     [Fact]

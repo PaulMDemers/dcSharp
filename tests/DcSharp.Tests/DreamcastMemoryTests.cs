@@ -304,6 +304,37 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void GdromDmaReadCommandRaisesDmaCompleteAsicEvent()
+    {
+        var media = new RawSectorMediaImage(CreateMediaData(2), 2048);
+        var memory = new DreamcastMemory(media: media);
+        memory.WriteUInt32(0xA05F_6920, 1u << 14);
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0004, 1);
+        memory.WriteUInt32(0x8C01_0008, 0x8C02_0000);
+        memory.WriteUInt32(0x8C01_000C, 0);
+
+        var status = memory.ExecuteGdromDmaReadCommand(0x8C01_0000);
+
+        Assert.Equal(0u, status);
+        Assert.Equal(0x20, memory.ReadByte(0x8C02_0000));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0360u, eventCode);
+        Assert.Equal(11, level);
+        var snapshot = memory.CreateAsicSnapshot();
+        Assert.Equal("IRQB", snapshot.PendingInterrupt?.LevelName);
+        Assert.Equal("A", snapshot.PendingInterrupt?.RegisterName);
+        Assert.Equal(14, snapshot.PendingInterrupt?.Bit);
+        var registerA = Assert.Single(snapshot.EventRegisters, register => register.Name == "A");
+        Assert.Equal(1u << 14, registerA.Ack);
+        Assert.Equal(1u << 14, registerA.PendingIrqB);
+
+        memory.WriteUInt32(0xA05F_6900, 1u << 14);
+
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+    }
+
+    [Fact]
     public void GdromReadTranslatesRawCdFadToTrackRelativeSector()
     {
         var media = new RawSectorFromCdImage(CreateCdMediaData(
