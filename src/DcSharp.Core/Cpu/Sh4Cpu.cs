@@ -604,6 +604,68 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2CallbackTimeoutLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_F9B4 || step.Opcode != 0x8BF1 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (delayedBranchTarget is not null || State.Pc != 0x8C12_F99A)
+        {
+            return false;
+        }
+
+        if (!IsDoa2CallbackTimeoutLoop())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x8C00_0000 or >= 0x8D00_0000 || !memory.TryGetSystemRamOffset(stack, 8, out _))
+        {
+            return false;
+        }
+
+        var counterAddress = memory.ReadUInt32(stack);
+        var watchedAddress = memory.ReadUInt32(stack + 4);
+        if (!memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(watchedAddress, 4, out _)
+            || memory.ReadUInt32(watchedAddress) != State.R[14])
+        {
+            return false;
+        }
+
+        var remainingIterations = memory.ReadUInt32(counterAddress);
+        if (remainingIterations == 0)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 32;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        var timedOut = iterationsToSkip == remainingIterations;
+        memory.WriteUInt32(counterAddress, remainingIterations - (uint)iterationsToSkip);
+        State.R[0] = 0;
+        State.R[1] = counterAddress;
+        State.R[2] = timedOut ? 0 : remainingIterations - (uint)iterationsToSkip;
+        State.R[3] = State.R[2];
+        State.R[4] = 7;
+        State.T = timedOut;
+        State.Pc = timedOut ? 0x8C12_F9B6 : 0x8C12_F99A;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardPredecrementStoreDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -742,6 +804,27 @@ public sealed class Sh4Cpu
         skippedInstructions = 1 + ((ulong)remainingIterations * perIteration);
         return true;
     }
+
+    private bool IsDoa2CallbackTimeoutLoop() =>
+        memory.ReadInstructionUInt16(0x8C12_F99A) == 0x4D0B
+        && memory.ReadInstructionUInt16(0x8C12_F99C) == 0xE407
+        && memory.ReadInstructionUInt16(0x8C12_F99E) == 0x63F2
+        && memory.ReadInstructionUInt16(0x8C12_F9A0) == 0x6232
+        && memory.ReadInstructionUInt16(0x8C12_F9A2) == 0x72FF
+        && memory.ReadInstructionUInt16(0x8C12_F9A4) == 0x2322
+        && memory.ReadInstructionUInt16(0x8C12_F9A6) == 0x53F1
+        && memory.ReadInstructionUInt16(0x8C12_F9A8) == 0x6232
+        && memory.ReadInstructionUInt16(0x8C12_F9AA) == 0x32E0
+        && memory.ReadInstructionUInt16(0x8C12_F9AC) == 0x8B03
+        && memory.ReadInstructionUInt16(0x8C12_F9AE) == 0x61F2
+        && memory.ReadInstructionUInt16(0x8C12_F9B0) == 0x6312
+        && memory.ReadInstructionUInt16(0x8C12_F9B2) == 0x2338
+        && memory.ReadInstructionUInt16(0x8C12_F9B4) == 0x8BF1
+        && State.R[13] == 0x8C12_D2C0
+        && memory.ReadUInt32(0x8C30_C778) == 0x8C12_BE60
+        && memory.ReadUInt32(0x8C30_C77C) == 0
+        && memory.ReadInstructionUInt16(0x8C12_BE60) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C12_BE62) == 0x0009;
 
     private bool TryApplyRepeatedDelaySlot(ushort opcode, ulong executions)
     {
