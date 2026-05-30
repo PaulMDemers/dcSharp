@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Memory;
+using DcSharp.Core.Media;
 
 namespace DcSharp.Core.Execution;
 
@@ -20,6 +21,7 @@ internal static class FirmwareStubs
     private const byte DefaultBiosLanguageCode = (byte)'1';
     private const byte DefaultBiosBootMode = 1;
     private const byte DefaultBiosBootDirectoryMode = (byte)' ';
+    private const int BiosBootDirectoryLength = 12;
     private static readonly byte[] DefaultBiosBootDirectory = ".           "u8.ToArray();
 
     public static void Install(DreamcastMemory memory)
@@ -29,7 +31,7 @@ internal static class FirmwareStubs
         memory.WriteUInt32(SyscallGdromVector, GdromHleStub);
         memory.WriteUInt32(SyscallSystemVector, SystemHleStub);
         memory.Write(BiosLanguageCodeAddress, [DefaultBiosLanguageCode]);
-        memory.Write(BiosBootDirectoryAddress, DefaultBiosBootDirectory);
+        memory.Write(BiosBootDirectoryAddress, ResolveBiosBootDirectory(memory));
         memory.Write(BiosBootModeAddress, [DefaultBiosBootMode]);
         memory.Write(BiosBootDirectoryModeAddress, [DefaultBiosBootDirectoryMode]);
         memory.Write(BiosBootAreaModeAddress, [DefaultBiosBootMode]);
@@ -40,6 +42,50 @@ internal static class FirmwareStubs
             0x09, 0x00  // nop
         ]);
     }
+
+    private static byte[] ResolveBiosBootDirectory(DreamcastMemory memory)
+    {
+        var bootDirectory = ResolveMediaBootDirectory(memory.Media);
+        if (bootDirectory is null)
+        {
+            return [.. DefaultBiosBootDirectory];
+        }
+
+        var bytes = new byte[BiosBootDirectoryLength];
+        bytes.AsSpan().Fill((byte)' ');
+        var ascii = System.Text.Encoding.ASCII.GetBytes(bootDirectory);
+        ascii.AsSpan(0, Math.Min(ascii.Length, bytes.Length)).CopyTo(bytes);
+        return bytes;
+    }
+
+    private static string? ResolveMediaBootDirectory(IDreamcastMediaImage? media)
+    {
+        if (media is null || !Iso9660FileSystem.TryOpen(media, out var fileSystem, out _) || fileSystem is null)
+        {
+            return null;
+        }
+
+        string[] matches;
+        try
+        {
+            var volume = NormalizeIsoIdentifier(fileSystem.VolumeIdentifier);
+            matches = fileSystem.GetRootDirectories()
+                .Where(directory => directory.NormalizedName.Length is > 0 and <= BiosBootDirectoryLength)
+                .Select(directory => directory.NormalizedName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(directory => volume.EndsWith(NormalizeIsoIdentifier(directory), StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private static string NormalizeIsoIdentifier(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
     public static FirmwareTrapHandler CreateTrapHandler() => new();
 

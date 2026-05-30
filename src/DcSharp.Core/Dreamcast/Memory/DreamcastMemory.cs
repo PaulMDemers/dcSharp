@@ -162,6 +162,7 @@ public sealed class DreamcastMemory
 
     public int SystemRamBytes => systemRam.Length;
     public int PvrVramBytes => pvrVram.Length;
+    public IDreamcastMediaImage? Media => mediaImage;
     public IReadOnlyList<MemoryAccess> DeviceAccesses => deviceAccesses;
     public IReadOnlyList<MemoryAccess> WatchedReads => watchedReads;
     public IReadOnlyList<MemoryAccess> WatchedWrites => watchedWrites;

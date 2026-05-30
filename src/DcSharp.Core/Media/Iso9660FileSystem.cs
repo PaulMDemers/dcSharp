@@ -22,6 +22,12 @@ public sealed class Iso9660FileSystem
 
     public string VolumeIdentifier { get; }
 
+    public IReadOnlyList<Iso9660DirectoryInfo> GetRootDirectories() =>
+        ReadDirectory(rootDirectory)
+            .Where(entry => entry.IsDirectory)
+            .Select(entry => new Iso9660DirectoryInfo(entry.Name, entry.NormalizedName, entry.ExtentSector, entry.DataLength))
+            .ToArray();
+
     public static bool TryOpen(IDreamcastMediaImage image, out Iso9660FileSystem? fileSystem, out string? error)
     {
         fileSystem = null;
@@ -270,6 +276,12 @@ internal sealed record Iso9660SectorMapping(uint VolumeStartSector, uint ExtentB
 }
 
 public sealed record Iso9660FileInfo(
+    string Name,
+    string NormalizedName,
+    uint ExtentSector,
+    uint Length);
+
+public sealed record Iso9660DirectoryInfo(
     string Name,
     string NormalizedName,
     uint ExtentSector,

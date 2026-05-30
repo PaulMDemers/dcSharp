@@ -73,6 +73,20 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void InstallSeedsBootDirectoryFromMatchingIsoRootDirectory()
+    {
+        var media = new RawSectorMediaImage(CreateIsoWithRootDirectory("USDC_DOA2", "DOA2"), 2048);
+        var memory = new DreamcastMemory(media: media);
+
+        FirmwareStubs.Install(memory);
+
+        Assert.Equal("DOA2        ", ReadAscii(memory, 0x8C00_80F0, 12));
+        Assert.Equal(1, memory.ReadByte(0x8C00_80FC));
+        Assert.Equal((byte)' ', memory.ReadByte(0x8C00_80FD));
+        Assert.Equal(1, memory.ReadByte(0x8C00_80FE));
+    }
+
+    [Fact]
     public void SystemBiosSoftResetContinuesAtLoadedBootEntry()
     {
         var handler = FirmwareStubs.CreateTrapHandler();
@@ -705,5 +719,66 @@ public class FirmwareStubsTests
         }
 
         return data;
+    }
+
+    private static string ReadAscii(DreamcastMemory memory, uint address, int length)
+    {
+        var bytes = new byte[length];
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            bytes[index] = memory.ReadByte(address + (uint)index);
+        }
+
+        return System.Text.Encoding.ASCII.GetString(bytes);
+    }
+
+    private static byte[] CreateIsoWithRootDirectory(string volumeIdentifier, string directoryName)
+    {
+        var image = new byte[2048 * 24];
+        var pvd = image.AsSpan(16 * 2048, 2048);
+        pvd[0] = 1;
+        System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(pvd[1..]);
+        pvd[6] = 1;
+        WriteAscii(image, (16 * 2048) + 40, 32, volumeIdentifier);
+        WriteDirectoryRecord(pvd, 156, 20, 2048, 0x02, [0]);
+
+        var directory = image.AsSpan(20 * 2048, 2048);
+        var offset = 0;
+        offset += WriteDirectoryRecord(directory, offset, 20, 2048, 0x02, [0]);
+        offset += WriteDirectoryRecord(directory, offset, 20, 2048, 0x02, [1]);
+        WriteDirectoryRecord(directory, offset, 21, 2048, 0x02, System.Text.Encoding.ASCII.GetBytes(directoryName));
+        return image;
+    }
+
+    private static void WriteAscii(byte[] data, int offset, int length, string text)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes(text);
+        Array.Copy(bytes, 0, data, offset, Math.Min(bytes.Length, length));
+        for (var index = bytes.Length; index < length; index++)
+        {
+            data[offset + index] = 0x20;
+        }
+    }
+
+    private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)
+    {
+        var length = 33 + name.Length + (name.Length % 2 == 0 ? 1 : 0);
+        var record = destination.Slice(offset, length);
+        record.Clear();
+        record[0] = (byte)length;
+        WriteUInt32BothEndian(record, 2, extent);
+        WriteUInt32BothEndian(record, 10, dataLength);
+        record[25] = flags;
+        record[28] = 1;
+        record[30] = 1;
+        record[32] = (byte)name.Length;
+        name.CopyTo(record[33..]);
+        return length;
+    }
+
+    private static void WriteUInt32BothEndian(Span<byte> destination, int offset, uint value)
+    {
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(destination.Slice(offset + 4, 4), value);
     }
 }
