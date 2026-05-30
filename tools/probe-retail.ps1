@@ -4,7 +4,7 @@ param(
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$LongDoa2,
-    [long]$LongDoa2Instructions = 360000000
+    [long]$LongDoa2Instructions = 650000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,7 +97,7 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12BF8E"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C12BF42"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=0x0320"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=17, ok=17, failed=0"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=17, 45166x1, 45168x1, 45170x1, 45171x1"
@@ -110,6 +110,7 @@ if ($LongDoa2) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "response=2/completed"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=2048/2048, ok=True"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "bytes=67584/67584, ok=True"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Boot binary: writes=103289"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C00834A"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C113318"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
