@@ -13,10 +13,14 @@ internal static class FirmwareStubs
     private const uint SystemHleStub = 0x8C00_00E8;
     private const uint InterruptReturnHleStub = DreamcastMemory.BiosInterruptReturnHleStub;
     private const uint BiosLanguageCodeAddress = 0x8C00_0074;
+    private const uint BiosBootDirectoryAddress = 0x8C00_80F0;
     private const uint BiosBootModeAddress = 0x8C00_80FC;
+    private const uint BiosBootDirectoryModeAddress = 0x8C00_80FD;
     private const uint BiosBootAreaModeAddress = 0x8C00_80FE;
     private const byte DefaultBiosLanguageCode = (byte)'1';
     private const byte DefaultBiosBootMode = 1;
+    private const byte DefaultBiosBootDirectoryMode = (byte)' ';
+    private static readonly byte[] DefaultBiosBootDirectory = ".           "u8.ToArray();
 
     public static void Install(DreamcastMemory memory)
     {
@@ -25,7 +29,9 @@ internal static class FirmwareStubs
         memory.WriteUInt32(SyscallGdromVector, GdromHleStub);
         memory.WriteUInt32(SyscallSystemVector, SystemHleStub);
         memory.Write(BiosLanguageCodeAddress, [DefaultBiosLanguageCode]);
+        memory.Write(BiosBootDirectoryAddress, DefaultBiosBootDirectory);
         memory.Write(BiosBootModeAddress, [DefaultBiosBootMode]);
+        memory.Write(BiosBootDirectoryModeAddress, [DefaultBiosBootDirectoryMode]);
         memory.Write(BiosBootAreaModeAddress, [DefaultBiosBootMode]);
         memory.Write(ReturnZeroStub,
         [
@@ -128,7 +134,12 @@ internal static class FirmwareStubs
             {
                 state.Sr = state.Ssr;
                 state.Pc = state.Spc;
-                var prRestored = state.RestoreBiosInterruptPr();
+                var prRestored = state.RestoreBiosInterruptPr(out var interruptEventCode);
+                if (prRestored)
+                {
+                    memory.AcknowledgeBiosAsicInterrupt(interruptEventCode);
+                }
+
                 trace = $"firmware interrupt return hle ; pc=0x{state.Pc:X8}, sr=0x{state.Sr:X8}";
                 if (prRestored)
                 {

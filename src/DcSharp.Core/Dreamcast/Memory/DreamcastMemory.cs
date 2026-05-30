@@ -791,6 +791,17 @@ public sealed class DreamcastMemory
 
     internal void RaiseGdromCommandStatus() => RaiseAsicEvent(AsicEventGdromCommand);
 
+    internal void AcknowledgeBiosAsicInterrupt(uint eventCode)
+    {
+        if (!TryGetPendingAsicInterrupt(out var pendingInterrupt) || pendingInterrupt.EventCode != eventCode)
+        {
+            return;
+        }
+
+        var address = AsicAckA + ((uint)pendingInterrupt.RegisterIndex * 4);
+        externalRegisters[address] = externalRegisters.GetValueOrDefault(address) & ~pendingInterrupt.BitMask;
+    }
+
     private uint ExecuteGdromRead(uint parameterAddress, uint sector, uint destination, uint sectorCount)
     {
         if (mediaImage is null)

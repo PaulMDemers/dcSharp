@@ -797,8 +797,9 @@ public sealed class Sh4Cpu
         if (State.Vbr == 0 && memory.TryGetBiosInterruptHandler(level, out var vectorAddress, out var handlerAddress))
         {
             State.Pc = handlerAddress;
-            State.SaveBiosInterruptPr(State.Pr);
+            State.SaveBiosInterruptPr(State.Pr, eventCode);
             State.Pr = DreamcastMemory.BiosInterruptReturnHleStub;
+            State.R[4] = eventCode;
             trace = $"interrupt event=0x{eventCode:X4}, level={level}, target=0x{State.Pc:X8}, bios-vector=0x{vectorAddress:X8}";
             return true;
         }
@@ -2096,6 +2097,7 @@ public sealed class Sh4State
 
     private uint sr;
     private uint biosInterruptPr;
+    private uint biosInterruptEventCode;
     private bool hasBiosInterruptPr;
 
     public uint[] R { get; } = new uint[16];
@@ -2147,21 +2149,27 @@ public sealed class Sh4State
 
     public ulong InstructionsExecuted { get; set; }
 
-    internal void SaveBiosInterruptPr(uint value)
+    internal void SaveBiosInterruptPr(uint value, uint eventCode = 0)
     {
         biosInterruptPr = value;
+        biosInterruptEventCode = eventCode;
         hasBiosInterruptPr = true;
     }
 
-    internal bool RestoreBiosInterruptPr()
+    internal bool RestoreBiosInterruptPr() => RestoreBiosInterruptPr(out _);
+
+    internal bool RestoreBiosInterruptPr(out uint eventCode)
     {
+        eventCode = 0;
         if (!hasBiosInterruptPr)
         {
             return false;
         }
 
         Pr = biosInterruptPr;
+        eventCode = biosInterruptEventCode;
         biosInterruptPr = 0;
+        biosInterruptEventCode = 0;
         hasBiosInterruptPr = false;
         return true;
     }

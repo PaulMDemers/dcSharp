@@ -55,12 +55,20 @@ public class FirmwareStubsTests
     public void InstallSeedsBootModeWorkAreaBytes()
     {
         var memory = new DreamcastMemory();
+        memory.Write(0x8C00_80F0, "DEAD OR ALI "u8.ToArray());
         memory.Write(0x8C00_80FC, [(byte)' ']);
         memory.Write(0x8C00_80FE, [(byte)' ']);
 
         FirmwareStubs.Install(memory);
 
+        Assert.Equal((byte)'.', memory.ReadByte(0x8C00_80F0));
+        for (var offset = 0x8C00_80F1u; offset <= 0x8C00_80FB; offset++)
+        {
+            Assert.Equal((byte)' ', memory.ReadByte(offset));
+        }
+
         Assert.Equal(1, memory.ReadByte(0x8C00_80FC));
+        Assert.Equal((byte)' ', memory.ReadByte(0x8C00_80FD));
         Assert.Equal(1, memory.ReadByte(0x8C00_80FE));
     }
 

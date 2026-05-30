@@ -4,7 +4,7 @@ param(
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$LongDoa2,
-    [long]$LongDoa2Instructions = 3060000000
+    [long]$LongDoa2Instructions = 80000000
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,9 +87,10 @@ if ($LongDoa2) {
     $longDoaOutput = Invoke-BootSmoke "Dead or Alive 2 long" $deadOrAlive $LongDoa2Instructions
     if ($longDoaOutput) {
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "Stopped: InstructionLimit"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C014674"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=16, ok=16, failed=0"
-        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=2, 45166x8, 45170x8"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C115D44"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=none"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM: media=True, reads=3, ok=3, failed=0"
+        Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read sectors: unique=3, 45166x1, 45168x1, 45170x1"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM status:"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "disc=128/GD-ROM"
         Assert-Contains "Dead or Alive 2 long" $longDoaOutput "GD-ROM read:"
@@ -101,6 +102,8 @@ if ($LongDoa2) {
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C113318"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C114200"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C10EDB8"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "PC: 0x8C014674"
+        Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "ASIC: pending=0x0360"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "FirmwareExit"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
     }

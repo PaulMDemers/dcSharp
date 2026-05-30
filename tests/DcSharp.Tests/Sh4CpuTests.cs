@@ -1347,6 +1347,7 @@ public class Sh4CpuTests
         Assert.Equal(0, step.Opcode);
         Assert.Equal(0x8C12_BF20u, cpu.State.Pc);
         Assert.Equal(0x8C00_00F0u, cpu.State.Pr);
+        Assert.Equal(0x0320u, cpu.State.R[4]);
         Assert.Equal(0x8C01_0000u, cpu.State.Spc);
         Assert.Equal(0u, cpu.State.Ssr);
         Assert.Equal(0x0320u, memory.ReadUInt32(0xFF00_0028));
@@ -1376,6 +1377,7 @@ public class Sh4CpuTests
             State =
             {
                 Sr = 0x0000_0001,
+                R = { [4] = 0x4455_6677 },
                 Pr = 0x8C01_2340
             }
         };
@@ -1391,9 +1393,37 @@ public class Sh4CpuTests
         Assert.Equal("firmware interrupt return hle ; pc=0x8C010000, sr=0x00000001, pr=0x8C012340", firmwareReturn.Trace);
         Assert.Equal(0x8C01_0000u, cpu.State.Pc);
         Assert.Equal(0x8C01_2340u, cpu.State.Pr);
+        Assert.Equal(0x4455_6677u, cpu.State.R[4]);
         Assert.Equal(0x0000_0001u, cpu.State.Sr);
         Assert.Equal(0x8C01_0000u, cpu.State.Spc);
         Assert.Equal(0x0000_0001u, cpu.State.Ssr);
+    }
+
+    [Fact]
+    public void VbrZeroBiosInterruptCallbackClearsAcceptedAsicSourceOnFirmwareReturn()
+    {
+        var memory = new DreamcastMemory();
+        FirmwareStubs.Install(memory);
+        WriteInstruction(memory, 0x8C01_0000, 0x0009);
+        WriteInstruction(memory, 0x8C12_BF20, 0x000B);
+        WriteInstruction(memory, 0x8C12_BF22, 0x0009);
+        memory.WriteUInt32(0x0000_022C, 0x8C12_BF20);
+        memory.WriteUInt32(0xA05F_6920, 1u << 14);
+        memory.RaiseAsicEventForDiagnostics(0x000E);
+        var trapHandler = FirmwareStubs.CreateTrapHandler();
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000, trapHandler.TryHandle);
+
+        var interrupt = cpu.Step();
+        Assert.Equal(0x0360u, cpu.State.R[4]);
+        var callbackReturn = cpu.Step();
+        var delaySlot = cpu.Step();
+        var firmwareReturn = cpu.Step();
+
+        Assert.Equal("interrupt event=0x0360, level=11, target=0x8C12BF20, bios-vector=0x0000022C", interrupt.Trace);
+        Assert.Equal("rts ; target=0x8C0000F0", callbackReturn.Trace);
+        Assert.Equal("nop", delaySlot.Trace);
+        Assert.Equal("firmware interrupt return hle ; pc=0x8C010000, sr=0x00000000, pr=0x00000000", firmwareReturn.Trace);
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
     }
 
     [Fact]
