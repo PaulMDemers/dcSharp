@@ -2182,9 +2182,15 @@ public sealed class Sh4Cpu
                         * BitConverter.UInt32BitsToSingle(sourceOperands[index]);
                 }
 
-                State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
+                var rounded = ApplySingleOverflowRounding(sum, AllFiniteSingleOperands(destinationOperands, sourceOperands));
+                State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(rounded);
                 RecordFpuSingleResult(destinationOperands, sourceOperands, sum, forceInexact: true);
                 var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+                if (float.IsFinite(rounded))
+                {
+                    return float.IsInfinity(sum) ? $"{trace} ; overflow-rounded" : trace;
+                }
+
                 return float.IsFinite(sum)
                     ? trace
                     : $"{trace} ; fv{destinationBase}={FormatFpuVector(destinationOperands)}, fv{sourceBase}={FormatFpuVector(sourceOperands)}";
@@ -2199,10 +2205,11 @@ public sealed class Sh4Cpu
                 var factor = BitConverter.UInt32BitsToSingle(factorBits);
                 var accumulator = BitConverter.UInt32BitsToSingle(accumulatorBits);
                 var result = addend + (factor * accumulator);
-                State.Fr[n] = BitConverter.SingleToUInt32Bits(result);
+                var rounded = ApplySingleOverflowRounding(result, float.IsFinite(addend) && float.IsFinite(factor) && float.IsFinite(accumulator));
+                State.Fr[n] = BitConverter.SingleToUInt32Bits(rounded);
                 RecordFpuSingleResult([addendBits, factorBits, accumulatorBits], result);
-                var detail = float.IsFinite(result)
-                    ? string.Empty
+                var detail = float.IsFinite(rounded)
+                    ? float.IsInfinity(result) ? " ; overflow-rounded" : string.Empty
                     : $" ; nonfinite fr{n}old=0x{addendBits:X8},fr{m}=0x{factorBits:X8},fr0=0x{accumulatorBits:X8}";
                 return $"fmac fr0,fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
@@ -2226,10 +2233,15 @@ public sealed class Sh4Cpu
             var result = doubleOperation(left, right);
             var leftBits = ReadDoubleRegisterBits(n);
             var rightBits = ReadDoubleRegisterBits(m);
-            WriteDoubleRegister(n, result);
+            var isOverflow = double.IsInfinity(result)
+                && double.IsFinite(left)
+                && double.IsFinite(right)
+                && (kind != FpuArithmeticKind.Divide || right != 0.0);
+            var rounded = ApplyDoubleOverflowRounding(result, isOverflow);
+            WriteDoubleRegister(n, rounded);
             RecordFpuDoubleResult(kind, left, right, result);
-            return double.IsFinite(result)
-                ? string.Empty
+            return double.IsFinite(rounded)
+                ? isOverflow && double.IsInfinity(result) ? " ; overflow-rounded" : string.Empty
                 : $" ; nonfinite dr{n & ~1}old=0x{leftBits:X16},dr{m & ~1}=0x{rightBits:X16}";
         }
 
@@ -2238,11 +2250,50 @@ public sealed class Sh4Cpu
         var leftSingle = BitConverter.UInt32BitsToSingle(leftBitsSingle);
         var rightSingle = BitConverter.UInt32BitsToSingle(rightBitsSingle);
         var resultSingle = singleOperation(leftSingle, rightSingle);
-        State.Fr[n] = BitConverter.SingleToUInt32Bits(resultSingle);
+        var isSingleOverflow = float.IsInfinity(resultSingle)
+            && float.IsFinite(leftSingle)
+            && float.IsFinite(rightSingle)
+            && (kind != FpuArithmeticKind.Divide || rightSingle != 0.0f);
+        var roundedSingle = ApplySingleOverflowRounding(resultSingle, isSingleOverflow);
+        State.Fr[n] = BitConverter.SingleToUInt32Bits(roundedSingle);
         RecordFpuSingleResult(kind, leftSingle, rightSingle, resultSingle);
-        return float.IsFinite(resultSingle)
-            ? string.Empty
+        return float.IsFinite(roundedSingle)
+            ? isSingleOverflow && float.IsInfinity(resultSingle) ? " ; overflow-rounded" : string.Empty
             : $" ; nonfinite fr{n}old=0x{leftBitsSingle:X8},fr{m}=0x{rightBitsSingle:X8}";
+    }
+
+    private float ApplySingleOverflowRounding(float result, bool finiteOverflowInputs)
+    {
+        if ((State.Fpscr & Sh4State.FpscrRoundToZeroBit) == 0 || !finiteOverflowInputs || !float.IsInfinity(result))
+        {
+            return result;
+        }
+
+        return float.IsNegative(result) ? -float.MaxValue : float.MaxValue;
+    }
+
+    private double ApplyDoubleOverflowRounding(double result, bool finiteOverflowInputs)
+    {
+        if ((State.Fpscr & Sh4State.FpscrRoundToZeroBit) == 0 || !finiteOverflowInputs || !double.IsInfinity(result))
+        {
+            return result;
+        }
+
+        return double.IsNegative(result) ? -double.MaxValue : double.MaxValue;
+    }
+
+    private static bool AllFiniteSingleOperands(ReadOnlySpan<uint> leftOperands, ReadOnlySpan<uint> rightOperands)
+    {
+        for (var index = 0; index < leftOperands.Length; index++)
+        {
+            if (!float.IsFinite(BitConverter.UInt32BitsToSingle(leftOperands[index]))
+                || !float.IsFinite(BitConverter.UInt32BitsToSingle(rightOperands[index])))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void RecordFpuSingleResult(FpuArithmeticKind kind, float left, float right, float result)

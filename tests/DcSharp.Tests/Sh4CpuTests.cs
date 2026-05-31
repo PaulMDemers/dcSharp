@@ -1144,11 +1144,32 @@ public class Sh4CpuTests
     }
 
     [Fact]
-    public void FloatingPointMultiplyOverflowSetsFpscrCauseAndStickyFlagBits()
+    public void FloatingPointMultiplyOverflowRoundToZeroSaturatesAndSetsFpscrBits()
     {
         var memory = new DreamcastMemory();
         WriteInstruction(memory, 0x8C01_0000, 0xF452);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(float.MaxValue);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(2.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x7F7F_FFFFu, cpu.State.Fr[4]);
+        Assert.Equal(
+            Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(
+            Sh4State.FpscrFlagOverflowBit | Sh4State.FpscrFlagInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointMultiplyOverflowRoundNearestProducesInfinityAndSetsFpscrBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF452);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fpscr = Sh4State.FpscrDnBit;
         cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(float.MaxValue);
         cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(2.0f);
 
@@ -1213,7 +1234,7 @@ public class Sh4CpuTests
     }
 
     [Fact]
-    public void FloatingPointVectorInnerProductOverflowSetsFpscrCauseAndStickyFlagBits()
+    public void FloatingPointVectorInnerProductOverflowRoundToZeroSaturatesAndSetsFpscrBits()
     {
         var memory = new DreamcastMemory();
         WriteInstruction(memory, 0x8C01_0000, 0xF08D);
@@ -1223,7 +1244,7 @@ public class Sh4CpuTests
 
         cpu.Step();
 
-        Assert.Equal(0x7F80_0000u, cpu.State.Fr[3]);
+        Assert.Equal(0x7F7F_FFFFu, cpu.State.Fr[3]);
         Assert.Equal(
             Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit,
             cpu.State.Fpscr & Sh4State.FpscrCauseMask);
