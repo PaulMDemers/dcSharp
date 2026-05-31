@@ -450,6 +450,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"PC: 0x{result.Cpu.Pc:X8}");
     Console.WriteLine($"PR: 0x{result.Cpu.Pr:X8}");
     Console.WriteLine($"SR: 0x{result.Cpu.Sr:X8}");
+    Console.WriteLine($"FPSCR: {FormatFpscr(result.Cpu.Fpscr)}");
     PrintGeneralRegisters(result.Cpu);
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
@@ -824,7 +825,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"VBR: 0x{result.Cpu.Vbr:X8}");
     Console.WriteLine($"SPC: 0x{result.Cpu.Spc:X8}");
     Console.WriteLine($"SSR: 0x{result.Cpu.Ssr:X8}");
-    Console.WriteLine($"FPSCR: 0x{result.Cpu.Fpscr:X8}");
+    Console.WriteLine($"FPSCR: {FormatFpscr(result.Cpu.Fpscr)}");
     Console.WriteLine($"Events: TRA=0x{result.Cpu.Tra:X8}, EXPEVT=0x{result.Cpu.Expevt:X8}, INTEVT=0x{result.Cpu.Intevt:X8}");
     Console.WriteLine($"Stopped: {result.StopReason}");
     Console.WriteLine($"Detail: {result.StopDetail}");
@@ -1251,6 +1252,12 @@ static void DumpTraceLog(DreamcastRunResult result, string path)
     }
 }
 
+static string FormatFpscr(uint value)
+{
+    var summary = Sh4FpscrSummary.FromValue(value);
+    return $"{summary.ValueHex} ({summary.Display})";
+}
+
 static void DumpFpuAnomalyLog(DreamcastRunResult result, string path)
 {
     using var writer = CreateTextLog(path);
@@ -1259,7 +1266,7 @@ static void DumpFpuAnomalyLog(DreamcastRunResult result, string path)
         var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(anomaly.Pc), anomaly.Pc);
         var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{anomaly.Instruction}: {anomaly.PcHex}: {anomaly.OpcodeHex}  {anomaly.Trace} ; {anomaly.Register} {anomaly.OldValueHex}->{anomaly.NewValueHex} {anomaly.Kind}, fpscr={anomaly.FpscrHex}{symbolText}");
+            $"#{anomaly.Instruction}: {anomaly.PcHex}: {anomaly.OpcodeHex}  {anomaly.Trace} ; {anomaly.Register} {anomaly.OldValueHex}->{anomaly.NewValueHex} {anomaly.Kind}, fpscr={FormatFpscr(anomaly.Fpscr)}{symbolText}");
     }
 }
 
@@ -1271,7 +1278,7 @@ static void DumpFpuWriteLog(DreamcastRunResult result, string path)
         var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(write.Pc), write.Pc);
         var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{write.Instruction}: {write.PcHex}: {write.OpcodeHex}  {write.Trace} ; {write.Register} {write.OldValueHex}->{write.NewValueHex}, fpscr={write.FpscrHex}{symbolText}");
+            $"#{write.Instruction}: {write.PcHex}: {write.OpcodeHex}  {write.Trace} ; {write.Register} {write.OldValueHex}->{write.NewValueHex}, fpscr={FormatFpscr(write.Fpscr)}{symbolText}");
     }
 }
 
@@ -1283,7 +1290,7 @@ static void DumpFpscrLog(DreamcastRunResult result, string path)
         var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(fpscrEvent.Pc), fpscrEvent.Pc);
         var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{fpscrEvent.Instruction}: {fpscrEvent.PcHex}: {fpscrEvent.OpcodeHex}  {fpscrEvent.Trace} ; fpscr {fpscrEvent.OldValueHex}->{fpscrEvent.NewValueHex} {fpscrEvent.Kind}{symbolText}");
+            $"#{fpscrEvent.Instruction}: {fpscrEvent.PcHex}: {fpscrEvent.OpcodeHex}  {fpscrEvent.Trace} ; fpscr {FormatFpscr(fpscrEvent.OldValue)}->{FormatFpscr(fpscrEvent.NewValue)} {fpscrEvent.Kind}{symbolText}");
     }
 }
 
@@ -1296,7 +1303,7 @@ static void DumpFpuSnapshotLog(DreamcastRunResult result, string path)
         var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
             $"#{snapshot.Instruction}: {snapshot.PcHex}: {snapshot.OpcodeHex}  {snapshot.Trace}{symbolText}");
-        writer.WriteLine($"  fpscr={snapshot.FpscrHex}, fpul={snapshot.FpulHex}, pr={snapshot.PrHex}, r15={snapshot.R15Hex}");
+        writer.WriteLine($"  fpscr={FormatFpscr(snapshot.Fpscr)}, fpul={snapshot.FpulHex}, pr={snapshot.PrHex}, r15={snapshot.R15Hex}");
         writer.WriteLine($"  fr={FormatFpuSnapshotBank("fr", snapshot.Fr)}");
         writer.WriteLine($"  xf={FormatFpuSnapshotBank("xf", snapshot.Xf)}");
     }
@@ -1329,7 +1336,7 @@ static void DumpFpuMemoryLog(DreamcastRunResult result, string path)
             ? $"{transfer.ValueHex},{high}"
             : transfer.ValueHex;
         writer.WriteLine(
-            $"#{transfer.Instruction}: {transfer.PcHex}: {transfer.OpcodeHex}  {transfer.Trace} ; {transfer.Direction} {transfer.Register}, addr={transfer.AddressHex}, size={transfer.Size}, value={value}, fpscr={transfer.FpscrHex}{symbolText}");
+            $"#{transfer.Instruction}: {transfer.PcHex}: {transfer.OpcodeHex}  {transfer.Trace} ; {transfer.Direction} {transfer.Register}, addr={transfer.AddressHex}, size={transfer.Size}, value={value}, fpscr={FormatFpscr(transfer.Fpscr)}{symbolText}");
     }
 }
 

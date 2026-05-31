@@ -2451,9 +2451,11 @@ public sealed class Sh4Cpu
 
 public sealed class Sh4State
 {
+    public const uint FpscrRoundToZeroBit = 1u;
     public const uint FpscrSzBit = 1u << 20;
     public const uint FpscrFrBit = 1u << 21;
     public const uint FpscrPrBit = 1u << 19;
+    public const uint FpscrDnBit = 1u << 18;
     public const uint FpscrCauseInexactBit = 1u << 12;
     public const uint FpscrCauseUnderflowBit = 1u << 13;
     public const uint FpscrCauseOverflowBit = 1u << 14;
@@ -2474,6 +2476,7 @@ public sealed class Sh4State
         | FpscrFlagOverflowBit
         | FpscrFlagUnderflowBit
         | FpscrFlagInexactBit;
+    public const uint FpscrEnableMask = FpscrFlagMask << 5;
     public const uint SrBlockBit = 1u << 28;
     public const uint SrRegisterBankBit = 1u << 29;
     public const uint SrMachineBit = 1u << 30;

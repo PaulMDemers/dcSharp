@@ -1,3 +1,4 @@
+using DcSharp.Core.Cpu;
 using DcSharp.Core.Dreamcast.Input;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Execution;
@@ -841,6 +842,7 @@ public class DreamcastFixtureRunnerTests
                 $"0x{ssr:X8}",
                 fpscr,
                 $"0x{fpscr:X8}",
+                Sh4FpscrSummary.FromValue(fpscr),
                 tra,
                 $"0x{tra:X8}",
                 expevt,

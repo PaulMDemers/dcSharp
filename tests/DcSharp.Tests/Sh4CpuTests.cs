@@ -7,6 +7,24 @@ namespace DcSharp.Tests;
 public class Sh4CpuTests
 {
     [Fact]
+    public void DecodesFloatingPointStatusRegisterFields()
+    {
+        var summary = Sh4FpscrSummary.FromValue(0x0004_5015);
+
+        Assert.Equal("0x00045015", summary.ValueHex);
+        Assert.Equal("zero", summary.RoundingMode);
+        Assert.Equal("O/I", summary.Flags);
+        Assert.Equal("none", summary.Enables);
+        Assert.Equal("O/I", summary.Causes);
+        Assert.Equal("DN", summary.Controls);
+        Assert.True(summary.DenormalAsZero);
+        Assert.False(summary.DoublePrecision);
+        Assert.False(summary.DoubleTransferSize);
+        Assert.False(summary.RegisterBank);
+        Assert.Equal("rm=zero, flags=O/I, enables=none, causes=O/I, controls=DN", summary.Display);
+    }
+
+    [Fact]
     public void ExecutesPcRelativeMovLong()
     {
         var memory = new DreamcastMemory();

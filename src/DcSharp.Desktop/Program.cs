@@ -406,7 +406,7 @@ internal sealed class MainForm : Form
             $"VBR: 0x{result.Cpu.Vbr:X8}",
             $"SPC: 0x{result.Cpu.Spc:X8}",
             $"SSR: 0x{result.Cpu.Ssr:X8}",
-            $"FPSCR: 0x{result.Cpu.Fpscr:X8}",
+            $"FPSCR: {summary.Cpu.FpscrFields.ValueHex} ({summary.Cpu.FpscrFields.Display})",
             $"Events: TRA=0x{result.Cpu.Tra:X8}, EXPEVT=0x{result.Cpu.Expevt:X8}, INTEVT=0x{result.Cpu.Intevt:X8}",
             $"Loaded bytes: {result.Load.LoadedBytes:N0}",
             $"Segments: {result.Load.LoadedSegments.Count}",
