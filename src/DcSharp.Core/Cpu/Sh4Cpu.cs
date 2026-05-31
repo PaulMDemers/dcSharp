@@ -2267,6 +2267,7 @@ public sealed class Sh4State
     public const uint SrMachineBit = 1u << 30;
 
     private uint sr;
+    private uint fpscr = 0x0004_0001;
     private uint biosInterruptPr;
     private uint biosInterruptEventCode;
     private bool hasBiosInterruptPr;
@@ -2274,6 +2275,7 @@ public sealed class Sh4State
     public uint[] R { get; } = new uint[16];
     public uint[] RBank { get; } = new uint[8];
     public uint[] Fr { get; } = new uint[16];
+    public uint[] Xf { get; } = new uint[16];
     public uint Pc { get; set; }
     public uint Pr { get; set; }
     public uint Sr
@@ -2296,7 +2298,19 @@ public sealed class Sh4State
     public uint Spc { get; set; }
     public uint Gbr { get; set; }
     public uint Vbr { get; set; }
-    public uint Fpscr { get; set; } = 0x0004_0001;
+    public uint Fpscr
+    {
+        get => fpscr;
+        set
+        {
+            if (((fpscr ^ value) & FpscrFrBit) != 0)
+            {
+                SwapFloatingPointRegisterBanks();
+            }
+
+            fpscr = value;
+        }
+    }
     public uint Fpul { get; set; }
     public uint Mach { get; set; }
     public uint Macl { get; set; }
@@ -2319,6 +2333,14 @@ public sealed class Sh4State
     }
 
     public ulong InstructionsExecuted { get; set; }
+
+    private void SwapFloatingPointRegisterBanks()
+    {
+        for (var index = 0; index < Fr.Length; index++)
+        {
+            (Fr[index], Xf[index]) = (Xf[index], Fr[index]);
+        }
+    }
 
     internal void SaveBiosInterruptPr(uint value, uint eventCode = 0)
     {

@@ -1220,6 +1220,45 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointRegisterBankToggleSwapsFrAndXf()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xFBFD);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = 0x1111_1111;
+        cpu.State.Xf[0] = 0x2222_2222;
+        cpu.State.Fr[15] = 0xAAAA_AAAA;
+        cpu.State.Xf[15] = 0xBBBB_BBBB;
+
+        cpu.Step();
+
+        Assert.Equal(0x2222_2222u, cpu.State.Fr[0]);
+        Assert.Equal(0x1111_1111u, cpu.State.Xf[0]);
+        Assert.Equal(0xBBBB_BBBBu, cpu.State.Fr[15]);
+        Assert.Equal(0xAAAA_AAAAu, cpu.State.Xf[15]);
+        Assert.Equal(Sh4State.FpscrFrBit | 0x0004_0001u, cpu.State.Fpscr);
+    }
+
+    [Fact]
+    public void LoadingFpscrRegisterBankBitSwapsFrAndXfOnce()
+    {
+        var cpu = new Sh4Cpu(new DreamcastMemory(), 0x8C01_0000);
+        cpu.State.Fr[2] = 0x1111_1111;
+        cpu.State.Xf[2] = 0x2222_2222;
+
+        cpu.State.Fpscr = Sh4State.FpscrFrBit | 0x0004_0001u;
+        cpu.State.Fpscr = Sh4State.FpscrFrBit | 0x0004_0001u;
+
+        Assert.Equal(0x2222_2222u, cpu.State.Fr[2]);
+        Assert.Equal(0x1111_1111u, cpu.State.Xf[2]);
+
+        cpu.State.Fpscr = 0x0004_0001u;
+
+        Assert.Equal(0x1111_1111u, cpu.State.Fr[2]);
+        Assert.Equal(0x2222_2222u, cpu.State.Xf[2]);
+    }
+
+    [Fact]
     public void StoresControlRegisterToPredecrementedRegister()
     {
         var memory = new DreamcastMemory();
