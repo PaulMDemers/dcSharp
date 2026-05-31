@@ -61,7 +61,7 @@ public sealed class DreamcastRunner
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
                 Sh4StepResult step;
-                if (ShouldCaptureFpuAnomalies(options.FpuAnomalyCapture, fpuAnomalies))
+                if (ShouldCaptureFpuAnomalies(options.FpuAnomalyCapture, fpuAnomalies, cpu.State.InstructionsExecuted + 1))
                 {
                     cpu.State.Fr.AsSpan().CopyTo(frBefore);
                     cpu.State.Xf.AsSpan().CopyTo(xfBefore);
@@ -189,8 +189,11 @@ public sealed class DreamcastRunner
         }
     }
 
-    private static bool ShouldCaptureFpuAnomalies(DreamcastFpuAnomalyCaptureOptions? options, List<Sh4FpuAnomaly> anomalies) =>
-        options is not null && anomalies.Count < options.Limit;
+    private static bool ShouldCaptureFpuAnomalies(DreamcastFpuAnomalyCaptureOptions? options, List<Sh4FpuAnomaly> anomalies, ulong nextInstruction) =>
+        options is not null
+        && anomalies.Count < options.Limit
+        && (options.StartInstruction is null || nextInstruction >= options.StartInstruction)
+        && (options.EndInstruction is null || nextInstruction <= options.EndInstruction);
 
     private static void CaptureFpuAnomalies(
         DreamcastFpuAnomalyCaptureOptions options,
@@ -217,7 +220,10 @@ public sealed class DreamcastRunner
         {
             var oldValue = before[index];
             var newValue = after[index];
-            if (oldValue == newValue || !ShouldCaptureNonFiniteSingle(newValue, options.Kind))
+            var register = $"{bank}{index}";
+            if (oldValue == newValue
+                || !ShouldCaptureRegister(register, options.Register)
+                || !ShouldCaptureNonFiniteSingle(newValue, options.Kind))
             {
                 continue;
             }
@@ -227,12 +233,15 @@ public sealed class DreamcastRunner
                 step.Pc,
                 step.Opcode,
                 step.Trace,
-                $"{bank}{index}",
+                register,
                 oldValue,
                 newValue,
                 state.Fpscr));
         }
     }
+
+    private static bool ShouldCaptureRegister(string register, string? filter) =>
+        filter is null || string.Equals(register, filter, StringComparison.OrdinalIgnoreCase);
 
     private static bool ShouldCaptureNonFiniteSingle(uint value, DreamcastFpuAnomalyKind kind)
     {
@@ -461,7 +470,12 @@ public sealed record DreamcastRunOptions(
     DreamcastMemoryReadWatch? MemoryReadWatch = null,
     DreamcastFpuAnomalyCaptureOptions? FpuAnomalyCapture = null);
 
-public sealed record DreamcastFpuAnomalyCaptureOptions(int Limit = 4096, DreamcastFpuAnomalyKind Kind = DreamcastFpuAnomalyKind.All);
+public sealed record DreamcastFpuAnomalyCaptureOptions(
+    int Limit = 4096,
+    DreamcastFpuAnomalyKind Kind = DreamcastFpuAnomalyKind.All,
+    ulong? StartInstruction = null,
+    ulong? EndInstruction = null,
+    string? Register = null);
 
 public enum DreamcastFpuAnomalyKind
 {

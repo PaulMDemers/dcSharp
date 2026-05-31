@@ -58,7 +58,7 @@ public class DreamcastRunnerTests
             new DreamcastRunOptions(
                 InstructionLimit: 1,
                 TraceTailLength: 0,
-                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(Limit: 4)));
+                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(Limit: 4, Register: "fr4")));
 
         var anomaly = Assert.Single(result.FpuAnomalies);
         Assert.Equal(1UL, anomaly.Instruction);
@@ -68,6 +68,47 @@ public class DreamcastRunnerTests
         Assert.Equal(0u, anomaly.OldValue);
         Assert.Equal("nan", anomaly.Kind);
         Assert.Contains("fdiv fr5,fr4", anomaly.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FiltersFpuAnomalyLogByRegister()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x53;
+        raw[1] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(Limit: 4, Register: "fr5")));
+
+        Assert.Empty(result.FpuAnomalies);
+    }
+
+    [Fact]
+    public void CapturesFpuAnomalyLogAcrossInstructionRange()
+    {
+        var raw = new byte[6];
+        raw[0] = 0x09;
+        raw[1] = 0x00;
+        raw[2] = 0x53;
+        raw[3] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 2,
+                TraceTailLength: 0,
+                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(
+                    Limit: 4,
+                    StartInstruction: 2,
+                    EndInstruction: 2)));
+
+        var anomaly = Assert.Single(result.FpuAnomalies);
+        Assert.Equal(2UL, anomaly.Instruction);
+        Assert.Equal(0x8C01_0002u, anomaly.Pc);
     }
 
     [Fact]
