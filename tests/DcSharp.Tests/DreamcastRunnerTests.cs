@@ -112,6 +112,54 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFpuRegisterWriteLogForSelectedRegister()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x53;
+        raw[1] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpuRegisterWatch: new DreamcastFpuRegisterWatchOptions(Limit: 4, Register: "fr4")));
+
+        var write = Assert.Single(result.FpuRegisterWrites);
+        Assert.Equal(1UL, write.Instruction);
+        Assert.Equal(0x8C01_0000u, write.Pc);
+        Assert.Equal("fr4", write.Register);
+        Assert.Equal(0u, write.OldValue);
+        Assert.NotEqual(0u, write.NewValue);
+        Assert.Contains("fdiv fr5,fr4", write.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CapturesFpuRegisterWriteLogAcrossInstructionRange()
+    {
+        var raw = new byte[6];
+        raw[0] = 0x09;
+        raw[1] = 0x00;
+        raw[2] = 0x53;
+        raw[3] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 2,
+                TraceTailLength: 0,
+                FpuRegisterWatch: new DreamcastFpuRegisterWatchOptions(
+                    Limit: 4,
+                    Register: "fr4",
+                    StartInstruction: 2,
+                    EndInstruction: 2)));
+
+        var write = Assert.Single(result.FpuRegisterWrites);
+        Assert.Equal(2UL, write.Instruction);
+        Assert.Equal(0x8C01_0002u, write.Pc);
+    }
+
+    [Fact]
     public void RunCanStopOnUnmappedDeviceAccess()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -441,6 +489,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            [],
             new DreamcastAsicSnapshot([], null, null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], [], []),
@@ -515,6 +564,7 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunResult(
             load,
             new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
             [],
             [],
             [],

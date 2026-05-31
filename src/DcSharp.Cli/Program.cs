@@ -397,6 +397,11 @@ static void BootSmoke(string path, string[] args)
         DumpFpuAnomalyLog(result, options.FpuAnomalyLogPath);
     }
 
+    if (options.FpuWriteLogPath is not null)
+    {
+        DumpFpuWriteLog(result, options.FpuWriteLogPath);
+    }
+
     if (options.DeviceLogPath is not null)
     {
         DumpDeviceLog(result, options);
@@ -436,6 +441,7 @@ static void BootSmoke(string path, string[] args)
     PrintSoftResetCheckpoint(result);
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"FPU anomalies: {result.FpuAnomalies.Count}");
+    Console.WriteLine($"FPU writes: {result.FpuRegisterWrites.Count}");
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
     Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
@@ -738,6 +744,11 @@ static void RunElf(string path, string[] args)
         DumpFpuAnomalyLog(result, options.FpuAnomalyLogPath);
     }
 
+    if (options.FpuWriteLogPath is not null)
+    {
+        DumpFpuWriteLog(result, options.FpuWriteLogPath);
+    }
+
     if (options.DeviceLogPath is not null)
     {
         DumpDeviceLog(result, options);
@@ -874,6 +885,7 @@ static void RunElf(string path, string[] args)
     Console.WriteLine($"ASIC: pending={result.Asic.PendingEventCodeHex ?? "none"}, level={result.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}{asicSource}");
     Console.WriteLine($"Device accesses: {result.DeviceAccesses.Count}");
     Console.WriteLine($"FPU anomalies: {result.FpuAnomalies.Count}");
+    Console.WriteLine($"FPU writes: {result.FpuRegisterWrites.Count}");
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
     Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
@@ -1215,6 +1227,18 @@ static void DumpFpuAnomalyLog(DreamcastRunResult result, string path)
     }
 }
 
+static void DumpFpuWriteLog(DreamcastRunResult result, string path)
+{
+    using var writer = CreateTextLog(path);
+    foreach (var write in result.FpuRegisterWrites)
+    {
+        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(write.Pc), write.Pc);
+        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
+        writer.WriteLine(
+            $"#{write.Instruction}: {write.PcHex}: {write.OpcodeHex}  {write.Trace} ; {write.Register} {write.OldValueHex}->{write.NewValueHex}, fpscr={write.FpscrHex}{symbolText}");
+    }
+}
+
 static void DumpDeviceLog(DreamcastRunResult result, CliRunOptions options)
 {
     using var writer = CreateTextLog(options.DeviceLogPath!);
@@ -1307,6 +1331,11 @@ static CliRunOptions ParseRunOptions(string[] args)
     ulong? fpuAnomalyStartInstruction = null;
     ulong? fpuAnomalyEndInstruction = null;
     string? fpuAnomalyRegister = null;
+    string? fpuWriteLogPath = null;
+    var fpuWriteLimit = 4096;
+    string? fpuWriteRegister = null;
+    ulong? fpuWriteStartInstruction = null;
+    ulong? fpuWriteEndInstruction = null;
     string? deviceLogPath = null;
     MemoryAccessKind? deviceKind = null;
     AddressRange? deviceAddressRange = null;
@@ -1426,6 +1455,22 @@ static CliRunOptions ParseRunOptions(string[] args)
                 fpuAnomalyRegister = args[index + 1];
                 index++;
                 break;
+            case "--fpu-write-log" when index + 1 < args.Length:
+                fpuWriteLogPath = args[index + 1];
+                index++;
+                break;
+            case "--fpu-write-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedFpuWriteLimit):
+                fpuWriteLimit = parsedFpuWriteLimit;
+                index++;
+                break;
+            case "--fpu-write-register" when index + 1 < args.Length:
+                fpuWriteRegister = args[index + 1];
+                index++;
+                break;
+            case "--fpu-write-instruction" when index + 1 < args.Length:
+                (fpuWriteStartInstruction, fpuWriteEndInstruction) = ParseInstructionRange(args[index + 1]);
+                index++;
+                break;
             case "--device-log" when index + 1 < args.Length:
                 deviceLogPath = args[index + 1];
                 index++;
@@ -1515,6 +1560,11 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--fpu-anomaly-limit must be zero or greater.");
     }
 
+    if (fpuWriteLimit < 0)
+    {
+        throw new InvalidDataException("--fpu-write-limit must be zero or greater.");
+    }
+
     if (memoryWriteLimit < 0)
     {
         throw new InvalidDataException("--memory-write-limit must be zero or greater.");
@@ -1577,6 +1627,7 @@ static CliRunOptions ParseRunOptions(string[] args)
             MemoryWriteWatch: memoryWriteWatch,
             MemoryReadWatch: memoryReadWatch,
             FpuAnomalyCapture: fpuAnomalyLogPath is null ? null : new DreamcastFpuAnomalyCaptureOptions(fpuAnomalyLimit, fpuAnomalyKind, fpuAnomalyStartInstruction, fpuAnomalyEndInstruction, fpuAnomalyRegister),
+            FpuRegisterWatch: fpuWriteLogPath is null ? null : new DreamcastFpuRegisterWatchOptions(fpuWriteLimit, fpuWriteRegister, fpuWriteStartInstruction, fpuWriteEndInstruction),
             SeedInitialVBlank: seedInitialVBlank == true),
         seedInitialVBlank,
         emitJson,
@@ -1586,6 +1637,7 @@ static CliRunOptions ParseRunOptions(string[] args)
         audioWavPath,
         traceLogPath,
         fpuAnomalyLogPath,
+        fpuWriteLogPath,
         deviceLogPath,
         deviceKind,
         deviceAddressRange,
@@ -1818,8 +1870,8 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
-    Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges. --trace-instruction and --fpu-anomaly-instruction accept N, START-END, START-, or -END.");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges. --trace-instruction, --fpu-anomaly-instruction, and --fpu-write-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
@@ -1860,6 +1912,7 @@ internal sealed record CliRunOptions(
     string? AudioWavPath,
     string? TraceLogPath,
     string? FpuAnomalyLogPath,
+    string? FpuWriteLogPath,
     string? DeviceLogPath,
     MemoryAccessKind? DeviceKind,
     AddressRange? DeviceAddressRange,
