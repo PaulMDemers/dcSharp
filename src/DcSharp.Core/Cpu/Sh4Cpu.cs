@@ -2095,20 +2095,28 @@ public sealed class Sh4Cpu
         switch (lowNibble)
         {
             case 0x0:
-                ExecuteFpuArithmetic(n, m, static (left, right) => left + right, static (left, right) => left + right);
-                return $"fadd fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+            {
+                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left + right, static (left, right) => left + right);
+                return $"fadd fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
+            }
 
             case 0x1:
-                ExecuteFpuArithmetic(n, m, static (left, right) => left - right, static (left, right) => left - right);
-                return $"fsub fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+            {
+                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left - right, static (left, right) => left - right);
+                return $"fsub fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
+            }
 
             case 0x2:
-                ExecuteFpuArithmetic(n, m, static (left, right) => left * right, static (left, right) => left * right);
-                return $"fmul fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+            {
+                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left * right, static (left, right) => left * right);
+                return $"fmul fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
+            }
 
             case 0x3:
-                ExecuteFpuArithmetic(n, m, static (left, right) => left / right, static (left, right) => left / right);
-                return $"fdiv fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+            {
+                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left / right, static (left, right) => left / right);
+                return $"fdiv fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
+            }
 
             case 0x4:
                 State.T = CompareFpu(n, m, static (left, right) => left == right, static (left, right) => left == right);
@@ -2163,15 +2171,22 @@ public sealed class Sh4Cpu
             {
                 var destinationBase = n & 0xC;
                 var sourceBase = m & 0xC;
+                Span<uint> destinationOperands = stackalloc uint[4];
+                Span<uint> sourceOperands = stackalloc uint[4];
                 var sum = 0.0f;
                 for (var index = 0; index < 4; index++)
                 {
-                    sum += BitConverter.UInt32BitsToSingle(State.Fr[destinationBase + index])
-                        * BitConverter.UInt32BitsToSingle(State.Fr[sourceBase + index]);
+                    destinationOperands[index] = State.Fr[destinationBase + index];
+                    sourceOperands[index] = State.Fr[sourceBase + index];
+                    sum += BitConverter.UInt32BitsToSingle(destinationOperands[index])
+                        * BitConverter.UInt32BitsToSingle(sourceOperands[index]);
                 }
 
                 State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
-                return $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+                var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+                return float.IsFinite(sum)
+                    ? trace
+                    : $"{trace} ; fv{destinationBase}={FormatFpuVector(destinationOperands)}, fv{sourceBase}={FormatFpuVector(sourceOperands)}";
             }
 
             case 0xE:
@@ -2179,8 +2194,12 @@ public sealed class Sh4Cpu
                 var addend = BitConverter.UInt32BitsToSingle(State.Fr[n]);
                 var factor = BitConverter.UInt32BitsToSingle(State.Fr[m]);
                 var accumulator = BitConverter.UInt32BitsToSingle(State.Fr[0]);
-                State.Fr[n] = BitConverter.SingleToUInt32Bits(addend + (factor * accumulator));
-                return $"fmac fr0,fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+                var result = addend + (factor * accumulator);
+                State.Fr[n] = BitConverter.SingleToUInt32Bits(result);
+                var detail = float.IsFinite(result)
+                    ? string.Empty
+                    : $" ; nonfinite fr{n}old=0x{BitConverter.SingleToUInt32Bits(addend):X8},fr{m}=0x{State.Fr[m]:X8},fr0=0x{State.Fr[0]:X8}";
+                return $"fmac fr0,fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
             default:
@@ -2188,7 +2207,7 @@ public sealed class Sh4Cpu
         }
     }
 
-    private void ExecuteFpuArithmetic(
+    private string ExecuteFpuArithmetic(
         int n,
         int m,
         Func<float, float, float> singleOperation,
@@ -2196,13 +2215,26 @@ public sealed class Sh4Cpu
     {
         if ((State.Fpscr & Sh4State.FpscrPrBit) != 0)
         {
-            WriteDoubleRegister(n, doubleOperation(ReadDoubleRegister(n), ReadDoubleRegister(m)));
-            return;
+            var left = ReadDoubleRegister(n);
+            var right = ReadDoubleRegister(m);
+            var result = doubleOperation(left, right);
+            var leftBits = ReadDoubleRegisterBits(n);
+            var rightBits = ReadDoubleRegisterBits(m);
+            WriteDoubleRegister(n, result);
+            return double.IsFinite(result)
+                ? string.Empty
+                : $" ; nonfinite dr{n & ~1}old=0x{leftBits:X16},dr{m & ~1}=0x{rightBits:X16}";
         }
 
-        var left = BitConverter.UInt32BitsToSingle(State.Fr[n]);
-        var right = BitConverter.UInt32BitsToSingle(State.Fr[m]);
-        State.Fr[n] = BitConverter.SingleToUInt32Bits(singleOperation(left, right));
+        var leftBitsSingle = State.Fr[n];
+        var rightBitsSingle = State.Fr[m];
+        var leftSingle = BitConverter.UInt32BitsToSingle(leftBitsSingle);
+        var rightSingle = BitConverter.UInt32BitsToSingle(rightBitsSingle);
+        var resultSingle = singleOperation(leftSingle, rightSingle);
+        State.Fr[n] = BitConverter.SingleToUInt32Bits(resultSingle);
+        return float.IsFinite(resultSingle)
+            ? string.Empty
+            : $" ; nonfinite fr{n}old=0x{leftBitsSingle:X8},fr{m}=0x{rightBitsSingle:X8}";
     }
 
     private bool CompareFpu(
@@ -2241,11 +2273,18 @@ public sealed class Sh4Cpu
 
     private static string FmovMnemonic(bool doubleSize) => doubleSize ? "fmov.d" : "fmov.s";
 
+    private static string FormatFpuVector(ReadOnlySpan<uint> values) =>
+        $"[0x{values[0]:X8},0x{values[1]:X8},0x{values[2]:X8},0x{values[3]:X8}]";
+
     private double ReadDoubleRegister(int register)
     {
+        return BitConverter.UInt64BitsToDouble(ReadDoubleRegisterBits(register));
+    }
+
+    private ulong ReadDoubleRegisterBits(int register)
+    {
         var evenRegister = register & ~1;
-        var bits = ((ulong)State.Fr[evenRegister] << 32) | State.Fr[evenRegister + 1];
-        return BitConverter.UInt64BitsToDouble(bits);
+        return ((ulong)State.Fr[evenRegister] << 32) | State.Fr[evenRegister + 1];
     }
 
     private void WriteDoubleRegister(int register, double value)

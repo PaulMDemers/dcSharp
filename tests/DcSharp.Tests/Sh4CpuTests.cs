@@ -1095,6 +1095,37 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointVectorInnerProductTraceIncludesOperandsForNonFiniteResult()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = 0x7FC0_0000;
+        cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(1.0f);
+
+        var step = cpu.Step();
+
+        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[3])));
+        Assert.Contains("fipr fv8,fv0 ; fr3=0x", step.Trace, StringComparison.Ordinal);
+        Assert.Contains("fv0=[0x7FC00000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
+        Assert.Contains("fv8=[0x3F800000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FloatingPointArithmeticTraceIncludesOperandsForNonFiniteResult()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF453);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+
+        var step = cpu.Step();
+
+        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[4])));
+        Assert.Contains("fdiv fr5,fr4 ; fr4=0x", step.Trace, StringComparison.Ordinal);
+        Assert.Contains("nonfinite fr4old=0x00000000,fr5=0x00000000", step.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ExecutesFloatingPointMultiplyAccumulate()
     {
         var memory = new DreamcastMemory();
