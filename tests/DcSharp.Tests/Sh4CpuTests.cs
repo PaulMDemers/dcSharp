@@ -1215,6 +1215,22 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointVectorInnerProductAlwaysSetsInexactCauseAndStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(3.0f);
+
+        cpu.Step();
+
+        Assert.Equal(BitConverter.SingleToUInt32Bits(6.0f), cpu.State.Fr[3]);
+        Assert.Equal(Sh4State.FpscrCauseInexactBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInexactBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
     public void ExecutesFloatingPointMultiplyAccumulate()
     {
         var memory = new DreamcastMemory();

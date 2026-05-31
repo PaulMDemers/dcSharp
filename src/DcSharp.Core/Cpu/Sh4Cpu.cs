@@ -2183,7 +2183,7 @@ public sealed class Sh4Cpu
                 }
 
                 State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
-                RecordFpuSingleResult(destinationOperands, sourceOperands, sum);
+                RecordFpuSingleResult(destinationOperands, sourceOperands, sum, forceInexact: true);
                 var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
                 return float.IsFinite(sum)
                     ? trace
@@ -2297,9 +2297,10 @@ public sealed class Sh4Cpu
     private void RecordFpuSingleResult(
         ReadOnlySpan<uint> leftOperands,
         ReadOnlySpan<uint> rightOperands,
-        float result)
+        float result,
+        bool forceInexact = false)
     {
-        var cause = 0u;
+        var cause = forceInexact ? Sh4State.FpscrCauseInexactBit : 0u;
         var finiteInputs = true;
         for (var index = 0; index < leftOperands.Length; index++)
         {
