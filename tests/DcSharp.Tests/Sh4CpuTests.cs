@@ -1126,6 +1126,95 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointMultiplyOverflowSetsFpscrCauseAndStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF452);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(float.MaxValue);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(2.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x7F80_0000u, cpu.State.Fr[4]);
+        Assert.Equal(
+            Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(
+            Sh4State.FpscrFlagOverflowBit | Sh4State.FpscrFlagInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointDivideByZeroSetsFpscrDivisionByZeroCauseAndStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF453);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(1.0f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(0.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x7F80_0000u, cpu.State.Fr[4]);
+        Assert.Equal(Sh4State.FpscrCauseDivisionByZeroBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagDivisionByZeroBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointInvalidOperationSetsFpscrInvalidCauseAndStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF450);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(float.PositiveInfinity);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(float.NegativeInfinity);
+
+        cpu.Step();
+
+        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[4])));
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void NormalFloatingPointArithmeticClearsCauseBitsButKeepsStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF450);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fpscr = Sh4State.FpscrCauseInvalidBit | Sh4State.FpscrFlagOverflowBit;
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(1.0f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(2.0f);
+
+        cpu.Step();
+
+        Assert.Equal(BitConverter.SingleToUInt32Bits(3.0f), cpu.State.Fr[4]);
+        Assert.Equal(0u, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagOverflowBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointVectorInnerProductOverflowSetsFpscrCauseAndStickyFlagBits()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(float.MaxValue);
+        cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(2.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x7F80_0000u, cpu.State.Fr[3]);
+        Assert.Equal(
+            Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(
+            Sh4State.FpscrFlagOverflowBit | Sh4State.FpscrFlagInexactBit,
+            cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
     public void ExecutesFloatingPointMultiplyAccumulate()
     {
         var memory = new DreamcastMemory();

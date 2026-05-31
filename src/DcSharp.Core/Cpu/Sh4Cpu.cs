@@ -2096,25 +2096,25 @@ public sealed class Sh4Cpu
         {
             case 0x0:
             {
-                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left + right, static (left, right) => left + right);
+                var detail = ExecuteFpuArithmetic(n, m, FpuArithmeticKind.Add, static (left, right) => left + right, static (left, right) => left + right);
                 return $"fadd fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
             case 0x1:
             {
-                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left - right, static (left, right) => left - right);
+                var detail = ExecuteFpuArithmetic(n, m, FpuArithmeticKind.Subtract, static (left, right) => left - right, static (left, right) => left - right);
                 return $"fsub fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
             case 0x2:
             {
-                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left * right, static (left, right) => left * right);
+                var detail = ExecuteFpuArithmetic(n, m, FpuArithmeticKind.Multiply, static (left, right) => left * right, static (left, right) => left * right);
                 return $"fmul fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
             case 0x3:
             {
-                var detail = ExecuteFpuArithmetic(n, m, static (left, right) => left / right, static (left, right) => left / right);
+                var detail = ExecuteFpuArithmetic(n, m, FpuArithmeticKind.Divide, static (left, right) => left / right, static (left, right) => left / right);
                 return $"fdiv fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
@@ -2183,6 +2183,7 @@ public sealed class Sh4Cpu
                 }
 
                 State.Fr[destinationBase + 3] = BitConverter.SingleToUInt32Bits(sum);
+                RecordFpuSingleResult(destinationOperands, sourceOperands, sum);
                 var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
                 return float.IsFinite(sum)
                     ? trace
@@ -2191,14 +2192,18 @@ public sealed class Sh4Cpu
 
             case 0xE:
             {
+                var addendBits = State.Fr[n];
+                var factorBits = State.Fr[m];
+                var accumulatorBits = State.Fr[0];
                 var addend = BitConverter.UInt32BitsToSingle(State.Fr[n]);
-                var factor = BitConverter.UInt32BitsToSingle(State.Fr[m]);
-                var accumulator = BitConverter.UInt32BitsToSingle(State.Fr[0]);
+                var factor = BitConverter.UInt32BitsToSingle(factorBits);
+                var accumulator = BitConverter.UInt32BitsToSingle(accumulatorBits);
                 var result = addend + (factor * accumulator);
                 State.Fr[n] = BitConverter.SingleToUInt32Bits(result);
+                RecordFpuSingleResult([addendBits, factorBits, accumulatorBits], result);
                 var detail = float.IsFinite(result)
                     ? string.Empty
-                    : $" ; nonfinite fr{n}old=0x{BitConverter.SingleToUInt32Bits(addend):X8},fr{m}=0x{State.Fr[m]:X8},fr0=0x{State.Fr[0]:X8}";
+                    : $" ; nonfinite fr{n}old=0x{addendBits:X8},fr{m}=0x{factorBits:X8},fr0=0x{accumulatorBits:X8}";
                 return $"fmac fr0,fr{m},fr{n} ; fr{n}=0x{State.Fr[n]:X8}{detail}";
             }
 
@@ -2210,6 +2215,7 @@ public sealed class Sh4Cpu
     private string ExecuteFpuArithmetic(
         int n,
         int m,
+        FpuArithmeticKind kind,
         Func<float, float, float> singleOperation,
         Func<double, double, double> doubleOperation)
     {
@@ -2221,6 +2227,7 @@ public sealed class Sh4Cpu
             var leftBits = ReadDoubleRegisterBits(n);
             var rightBits = ReadDoubleRegisterBits(m);
             WriteDoubleRegister(n, result);
+            RecordFpuDoubleResult(kind, left, right, result);
             return double.IsFinite(result)
                 ? string.Empty
                 : $" ; nonfinite dr{n & ~1}old=0x{leftBits:X16},dr{m & ~1}=0x{rightBits:X16}";
@@ -2232,9 +2239,146 @@ public sealed class Sh4Cpu
         var rightSingle = BitConverter.UInt32BitsToSingle(rightBitsSingle);
         var resultSingle = singleOperation(leftSingle, rightSingle);
         State.Fr[n] = BitConverter.SingleToUInt32Bits(resultSingle);
+        RecordFpuSingleResult(kind, leftSingle, rightSingle, resultSingle);
         return float.IsFinite(resultSingle)
             ? string.Empty
             : $" ; nonfinite fr{n}old=0x{leftBitsSingle:X8},fr{m}=0x{rightBitsSingle:X8}";
+    }
+
+    private void RecordFpuSingleResult(FpuArithmeticKind kind, float left, float right, float result)
+    {
+        var cause = 0u;
+        if (float.IsNaN(left) || float.IsNaN(right) || IsInvalidSingleResult(kind, left, right, result))
+        {
+            cause |= Sh4State.FpscrCauseInvalidBit;
+        }
+
+        if (kind == FpuArithmeticKind.Divide && left != 0.0f && float.IsFinite(left) && right == 0.0f)
+        {
+            cause |= Sh4State.FpscrCauseDivisionByZeroBit;
+        }
+
+        if (float.IsInfinity(result) && float.IsFinite(left) && float.IsFinite(right) && (kind != FpuArithmeticKind.Divide || right != 0.0f))
+        {
+            cause |= Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit;
+        }
+
+        RecordFpuExceptionCause(cause);
+    }
+
+    private void RecordFpuSingleResult(ReadOnlySpan<uint> operands, float result)
+    {
+        var cause = 0u;
+        var finiteInputs = true;
+        foreach (var operandBits in operands)
+        {
+            var operand = BitConverter.UInt32BitsToSingle(operandBits);
+            if (float.IsNaN(operand))
+            {
+                cause |= Sh4State.FpscrCauseInvalidBit;
+            }
+
+            finiteInputs &= float.IsFinite(operand);
+        }
+
+        if (float.IsNaN(result) && cause == 0)
+        {
+            cause |= Sh4State.FpscrCauseInvalidBit;
+        }
+
+        if (float.IsInfinity(result) && finiteInputs)
+        {
+            cause |= Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit;
+        }
+
+        RecordFpuExceptionCause(cause);
+    }
+
+    private void RecordFpuSingleResult(
+        ReadOnlySpan<uint> leftOperands,
+        ReadOnlySpan<uint> rightOperands,
+        float result)
+    {
+        var cause = 0u;
+        var finiteInputs = true;
+        for (var index = 0; index < leftOperands.Length; index++)
+        {
+            AccumulateSingleOperandException(leftOperands[index], ref cause, ref finiteInputs);
+            AccumulateSingleOperandException(rightOperands[index], ref cause, ref finiteInputs);
+        }
+
+        if (float.IsNaN(result) && cause == 0)
+        {
+            cause |= Sh4State.FpscrCauseInvalidBit;
+        }
+
+        if (float.IsInfinity(result) && finiteInputs)
+        {
+            cause |= Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit;
+        }
+
+        RecordFpuExceptionCause(cause);
+    }
+
+    private static void AccumulateSingleOperandException(uint operandBits, ref uint cause, ref bool finiteInputs)
+    {
+        var operand = BitConverter.UInt32BitsToSingle(operandBits);
+        if (float.IsNaN(operand))
+        {
+            cause |= Sh4State.FpscrCauseInvalidBit;
+        }
+
+        finiteInputs &= float.IsFinite(operand);
+    }
+
+    private void RecordFpuDoubleResult(FpuArithmeticKind kind, double left, double right, double result)
+    {
+        var cause = 0u;
+        if (double.IsNaN(left) || double.IsNaN(right) || IsInvalidDoubleResult(kind, left, right, result))
+        {
+            cause |= Sh4State.FpscrCauseInvalidBit;
+        }
+
+        if (kind == FpuArithmeticKind.Divide && left != 0.0 && double.IsFinite(left) && right == 0.0)
+        {
+            cause |= Sh4State.FpscrCauseDivisionByZeroBit;
+        }
+
+        if (double.IsInfinity(result) && double.IsFinite(left) && double.IsFinite(right) && (kind != FpuArithmeticKind.Divide || right != 0.0))
+        {
+            cause |= Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit;
+        }
+
+        RecordFpuExceptionCause(cause);
+    }
+
+    private static bool IsInvalidSingleResult(FpuArithmeticKind kind, float left, float right, float result) =>
+        float.IsNaN(result)
+        && kind switch
+        {
+            FpuArithmeticKind.Add => float.IsInfinity(left) && float.IsInfinity(right) && MathF.Sign(left) != MathF.Sign(right),
+            FpuArithmeticKind.Subtract => float.IsInfinity(left) && float.IsInfinity(right) && MathF.Sign(left) == MathF.Sign(right),
+            FpuArithmeticKind.Multiply => (left == 0.0f && float.IsInfinity(right)) || (right == 0.0f && float.IsInfinity(left)),
+            FpuArithmeticKind.Divide => left == 0.0f && right == 0.0f,
+            _ => true
+        };
+
+    private static bool IsInvalidDoubleResult(FpuArithmeticKind kind, double left, double right, double result) =>
+        double.IsNaN(result)
+        && kind switch
+        {
+            FpuArithmeticKind.Add => double.IsInfinity(left) && double.IsInfinity(right) && Math.Sign(left) != Math.Sign(right),
+            FpuArithmeticKind.Subtract => double.IsInfinity(left) && double.IsInfinity(right) && Math.Sign(left) == Math.Sign(right),
+            FpuArithmeticKind.Multiply => (left == 0.0 && double.IsInfinity(right)) || (right == 0.0 && double.IsInfinity(left)),
+            FpuArithmeticKind.Divide => left == 0.0 && right == 0.0,
+            _ => true
+        };
+
+    private void RecordFpuExceptionCause(uint cause)
+    {
+        State.Fpscr = (State.Fpscr & ~Sh4State.FpscrCauseMask)
+            | cause
+            | ((cause >> 10) & Sh4State.FpscrFlagMask);
     }
 
     private bool CompareFpu(
@@ -2294,6 +2438,14 @@ public sealed class Sh4Cpu
         State.Fr[evenRegister] = (uint)(bits >> 32);
         State.Fr[evenRegister + 1] = (uint)bits;
     }
+
+    private enum FpuArithmeticKind
+    {
+        Add,
+        Subtract,
+        Multiply,
+        Divide
+    }
 }
 
 public sealed class Sh4State
@@ -2301,6 +2453,26 @@ public sealed class Sh4State
     public const uint FpscrSzBit = 1u << 20;
     public const uint FpscrFrBit = 1u << 21;
     public const uint FpscrPrBit = 1u << 19;
+    public const uint FpscrCauseInexactBit = 1u << 12;
+    public const uint FpscrCauseUnderflowBit = 1u << 13;
+    public const uint FpscrCauseOverflowBit = 1u << 14;
+    public const uint FpscrCauseDivisionByZeroBit = 1u << 15;
+    public const uint FpscrCauseInvalidBit = 1u << 16;
+    public const uint FpscrCauseMask = FpscrCauseInvalidBit
+        | FpscrCauseDivisionByZeroBit
+        | FpscrCauseOverflowBit
+        | FpscrCauseUnderflowBit
+        | FpscrCauseInexactBit;
+    public const uint FpscrFlagInexactBit = 1u << 2;
+    public const uint FpscrFlagUnderflowBit = 1u << 3;
+    public const uint FpscrFlagOverflowBit = 1u << 4;
+    public const uint FpscrFlagDivisionByZeroBit = 1u << 5;
+    public const uint FpscrFlagInvalidBit = 1u << 6;
+    public const uint FpscrFlagMask = FpscrFlagInvalidBit
+        | FpscrFlagDivisionByZeroBit
+        | FpscrFlagOverflowBit
+        | FpscrFlagUnderflowBit
+        | FpscrFlagInexactBit;
     public const uint SrBlockBit = 1u << 28;
     public const uint SrRegisterBankBit = 1u << 29;
     public const uint SrMachineBit = 1u << 30;
