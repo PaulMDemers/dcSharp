@@ -208,6 +208,31 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFpuSnapshotBeforeMatchingInstructionExecutes()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x53;
+        raw[1] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpuSnapshotCapture: new DreamcastFpuSnapshotCaptureOptions(
+                    Limit: 4,
+                    Ranges: [new DreamcastTracePcRange(0x8C01_0000, 0x8C01_0000)])));
+
+        var snapshot = Assert.Single(result.FpuSnapshots);
+        Assert.Equal(1UL, snapshot.Instruction);
+        Assert.Equal(0x8C01_0000u, snapshot.Pc);
+        Assert.Equal(0xF453, snapshot.Opcode);
+        Assert.Equal(0u, snapshot.Fr[4]);
+        Assert.Equal(0x0004_0001u, snapshot.Fpscr);
+        Assert.Contains("fdiv fr5,fr4", snapshot.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunCanStopOnUnmappedDeviceAccess()
     {
         var result = new DreamcastRunner().RunRawBinary(
