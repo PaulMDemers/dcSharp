@@ -47,6 +47,30 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFpuAnomalyLogWhenRegisterBecomesNonFinite()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x53;
+        raw[1] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(Limit: 4)));
+
+        var anomaly = Assert.Single(result.FpuAnomalies);
+        Assert.Equal(1UL, anomaly.Instruction);
+        Assert.Equal(0x8C01_0000u, anomaly.Pc);
+        Assert.Equal(0xF453, anomaly.Opcode);
+        Assert.Equal("fr4", anomaly.Register);
+        Assert.Equal(0u, anomaly.OldValue);
+        Assert.Equal("nan", anomaly.Kind);
+        Assert.Contains("fdiv fr5,fr4", anomaly.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunCanStopOnUnmappedDeviceAccess()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -347,6 +371,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            [],
             new DreamcastAsicSnapshot([], null, null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], [], []),
@@ -421,6 +446,7 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunResult(
             load,
             new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
             [],
             [],
             [],
