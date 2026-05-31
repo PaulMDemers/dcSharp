@@ -1211,7 +1211,7 @@ static void DumpTraceLog(DreamcastRunResult result, string path)
     {
         var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
         var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
-        writer.WriteLine($"0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
     }
 }
 
