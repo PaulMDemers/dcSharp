@@ -160,6 +160,54 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFpscrChangeLogWhenFpuStatusChanges()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x53;
+        raw[1] = 0xF4;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpscrWatch: new DreamcastFpscrWatchOptions(Limit: 4)));
+
+        var fpscrEvent = Assert.Single(result.FpscrEvents);
+        Assert.Equal(1UL, fpscrEvent.Instruction);
+        Assert.Equal(0x8C01_0000u, fpscrEvent.Pc);
+        Assert.Equal(0xF453, fpscrEvent.Opcode);
+        Assert.Equal(0x0004_0001u, fpscrEvent.OldValue);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit | Sh4State.FpscrFlagInvalidBit | 0x0004_0001u, fpscrEvent.NewValue);
+        Assert.Equal("change", fpscrEvent.Kind);
+        Assert.Contains("fdiv fr5,fr4", fpscrEvent.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CapturesFpscrAccessLogWhenInstructionReadsStatusRegister()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x6A;
+        raw[1] = 0x01;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FpscrWatch: new DreamcastFpscrWatchOptions(Limit: 4)));
+
+        var fpscrEvent = Assert.Single(result.FpscrEvents);
+        Assert.Equal(1UL, fpscrEvent.Instruction);
+        Assert.Equal(0x8C01_0000u, fpscrEvent.Pc);
+        Assert.Equal(0x016A, fpscrEvent.Opcode);
+        Assert.Equal(0x0004_0001u, fpscrEvent.OldValue);
+        Assert.Equal(0x0004_0001u, fpscrEvent.NewValue);
+        Assert.Equal("access", fpscrEvent.Kind);
+        Assert.Contains("sts fpscr,r1", fpscrEvent.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunCanStopOnUnmappedDeviceAccess()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -490,6 +538,7 @@ public class DreamcastRunnerTests
             [],
             [],
             [],
+            [],
             new DreamcastAsicSnapshot([], null, null, null, null),
             new DreamcastVideoSnapshot(0, 0, 0, "0x00000000", null, null, [], [], [], [], [], [], []),
             new DreamcastAudioSnapshot(0, 0, 0, "0x00000000", [], [], [], []),
@@ -564,6 +613,7 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunResult(
             load,
             new Sh4StateSnapshot(new uint[16], 0x8C01_0002, 0, 0, 0, 0, 0, 1),
+            [],
             [],
             [],
             [],
