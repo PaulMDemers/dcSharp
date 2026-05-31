@@ -25,20 +25,20 @@ public sealed class Sh4Cpu
         if (delayedBranchTarget is null && TryAcceptExternalInterrupt(pc, out var interruptTrace))
         {
             State.InstructionsExecuted++;
-            return new Sh4StepResult(pc, 0, interruptTrace);
+            return new Sh4StepResult(pc, 0, interruptTrace, State.InstructionsExecuted);
         }
 
         if (trapHandler?.Invoke(State, memory, out var trapTrace) == true)
         {
             State.InstructionsExecuted++;
-            return new Sh4StepResult(pc, 0, trapTrace);
+            return new Sh4StepResult(pc, 0, trapTrace, State.InstructionsExecuted);
         }
 
         var opcode = memory.ReadInstructionUInt16(pc);
         var trace = Execute(pc, opcode);
         State.InstructionsExecuted++;
 
-        return new Sh4StepResult(pc, opcode, trace);
+        return new Sh4StepResult(pc, opcode, trace, State.InstructionsExecuted);
     }
 
     internal bool TryFastForwardCountedIdleLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -2407,7 +2407,7 @@ public sealed class Sh4State
     }
 }
 
-public sealed record Sh4StepResult(uint Pc, ushort Opcode, string Trace);
+public sealed record Sh4StepResult(uint Pc, ushort Opcode, string Trace, ulong Instruction = 0);
 
 public delegate bool Sh4TrapHandler(Sh4State state, DreamcastMemory memory, out string trace);
 

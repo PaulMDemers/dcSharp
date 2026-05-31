@@ -474,11 +474,23 @@ public sealed record DreamcastTraceCaptureOptions(
     uint? StartPc = null,
     uint? EndPc = null,
     int Limit = 4096,
-    IReadOnlyList<DreamcastTracePcRange>? Ranges = null)
+    IReadOnlyList<DreamcastTracePcRange>? Ranges = null,
+    ulong? StartInstruction = null,
+    ulong? EndInstruction = null)
 {
     public bool ShouldCapture(Sh4StepResult step)
     {
         if (Limit <= 0)
+        {
+            return false;
+        }
+
+        if (StartInstruction is { } startInstruction && step.Instruction < startInstruction)
+        {
+            return false;
+        }
+
+        if (EndInstruction is { } endInstruction && step.Instruction > endInstruction)
         {
             return false;
         }

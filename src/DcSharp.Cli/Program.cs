@@ -1297,6 +1297,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? traceLogPath = null;
     uint? traceStartPc = null;
     uint? traceEndPc = null;
+    ulong? traceStartInstruction = null;
+    ulong? traceEndInstruction = null;
     var tracePcRanges = new List<AddressRange>();
     var traceLogLimit = 4096;
     string? fpuAnomalyLogPath = null;
@@ -1391,6 +1393,10 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--trace-pc" when index + 1 < args.Length:
                 (traceStartPc, traceEndPc) = ParseAddressRange(args[index + 1]);
                 tracePcRanges.Add(new AddressRange(traceStartPc ?? 0, traceEndPc ?? traceStartPc ?? uint.MaxValue));
+                index++;
+                break;
+            case "--trace-instruction" when index + 1 < args.Length:
+                (traceStartInstruction, traceEndInstruction) = ParseInstructionRange(args[index + 1]);
                 index++;
                 break;
             case "--trace-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedTraceLogLimit):
@@ -1516,7 +1522,9 @@ static CliRunOptions ParseRunOptions(string[] args)
             traceLogLimit,
             tracePcRanges.Count == 0
                 ? null
-                : tracePcRanges.Select(range => new DreamcastTracePcRange(range.Start, range.End)).ToArray());
+                : tracePcRanges.Select(range => new DreamcastTracePcRange(range.Start, range.End)).ToArray(),
+            traceStartInstruction,
+            traceEndInstruction);
     var media = mediaPath is null
         ? null
         : DreamcastMediaImageLoader.LoadFromFile(mediaPath);
@@ -1603,6 +1611,44 @@ static (uint? Start, uint? End) ParseAddressRange(string text)
     }
 
     return (start, end);
+}
+
+static (ulong? Start, ulong? End) ParseInstructionRange(string text)
+{
+    var separator = text.IndexOf('-');
+    if (separator < 0)
+    {
+        var instruction = ParseUnsigned64(text, "instruction");
+        return (instruction, instruction);
+    }
+
+    var start = string.IsNullOrWhiteSpace(text[..separator]) ? (ulong?)null : ParseUnsigned64(text[..separator], "instruction");
+    var end = string.IsNullOrWhiteSpace(text[(separator + 1)..]) ? (ulong?)null : ParseUnsigned64(text[(separator + 1)..], "instruction");
+    if (start is { } startValue && end is { } endValue && endValue < startValue)
+    {
+        throw new InvalidDataException("Instruction ranges must be ordered from low to high.");
+    }
+
+    return (start, end);
+}
+
+static ulong ParseUnsigned64(string text, string valueName)
+{
+    var value = text.Trim();
+    if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+    {
+        value = value[2..];
+        if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsedHex))
+        {
+            return parsedHex;
+        }
+    }
+    else if (ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDecimal))
+    {
+        return parsedDecimal;
+    }
+
+    throw new InvalidDataException($"Invalid {valueName}: {text}");
 }
 
 static uint ParseAddress(string text)
@@ -1761,8 +1807,8 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
-    Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges.");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("    --trace-pc, --memory-write-address, and --memory-read-address may be repeated for multiple ranges. --trace-instruction accepts N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
     Console.WriteLine("    Example controller state: --controller-a start,a,joyx=-16,ltrig=40");
