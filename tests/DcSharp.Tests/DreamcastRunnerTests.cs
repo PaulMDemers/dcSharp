@@ -233,6 +233,35 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFpuMemoryTransferLogForSelectedRegister()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x5B;
+        raw[1] = 0xFF;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                InitialStackPointer: 0x8C01_0100,
+                FpuMemoryWatch: new DreamcastFpuMemoryWatchOptions(
+                    Limit: 4,
+                    Register: "fr5",
+                    AddressRanges: [new DreamcastMemoryAddressRange(0x8C01_00F0, 0x8C01_0100)])));
+
+        var transfer = Assert.Single(result.FpuMemoryTransfers);
+        Assert.Equal(1UL, transfer.Instruction);
+        Assert.Equal(0x8C01_0000u, transfer.Pc);
+        Assert.Equal(0xFF5B, transfer.Opcode);
+        Assert.Equal("store", transfer.Direction);
+        Assert.Equal("fr5", transfer.Register);
+        Assert.Equal(0x8C01_00FCu, transfer.Address);
+        Assert.Equal(4, transfer.Size);
+        Assert.Contains("fmov.s fr5,@-r15", transfer.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RunCanStopOnUnmappedDeviceAccess()
     {
         var result = new DreamcastRunner().RunRawBinary(
