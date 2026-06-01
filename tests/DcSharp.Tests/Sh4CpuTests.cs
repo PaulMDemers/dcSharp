@@ -1455,6 +1455,95 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2RendererPrologueCommonPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererPrologueCommonPath(normalMemory);
+        WriteRendererPrologueData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererPrologueCommonPath(fastMemory);
+        WriteRendererPrologueData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_0430);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(normal);
+        InitializeDoa2RendererPrologueState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererPrologueCommonPath(fastStart, 40, out var skippedInstructions));
+        Assert.Equal(19UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 108; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_5000 - 108 + offset), fastMemory.ReadUInt32(0x8C20_5000 - 108 + offset));
+        }
+
+        Assert.Equal(0x8C10_04A0u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPrologueCommonPathWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPrologueCommonPath(memory);
+        WriteRendererPrologueData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPrologueCommonPath(start, 18, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPrologueCommonPathWhenAlternatePathIsSelected()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPrologueCommonPath(memory);
+        WriteRendererPrologueData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+        memory.WriteUInt32(0x8C20_1000, 0x0000_0800);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPrologueCommonPath(start, 40, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPrologueCommonPathWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPrologueCommonPath(memory);
+        WriteRendererPrologueData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPrologueCommonPath(start, 40, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -3806,6 +3895,57 @@ public class Sh4CpuTests
         cpu.State.R[4] = 0;
         cpu.State.R[14] = 1;
         cpu.State.R[15] = 0x8C20_4000;
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2RendererPrologueCommonPath(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_0430, 0x2FE6);
+        WriteInstruction(memory, 0x8C10_0432, 0x2FD6);
+        WriteInstruction(memory, 0x8C10_0434, 0x2FC6);
+        WriteInstruction(memory, 0x8C10_0436, 0x2FB6);
+        WriteInstruction(memory, 0x8C10_0438, 0x2FA6);
+        WriteInstruction(memory, 0x8C10_043A, 0x2F96);
+        WriteInstruction(memory, 0x8C10_043C, 0x2F86);
+        WriteInstruction(memory, 0x8C10_043E, 0xFFFB);
+        WriteInstruction(memory, 0x8C10_0440, 0xFFEB);
+        WriteInstruction(memory, 0x8C10_0442, 0xFFDB);
+        WriteInstruction(memory, 0x8C10_0444, 0xFFCB);
+        WriteInstruction(memory, 0x8C10_0446, 0x4F22);
+        WriteInstruction(memory, 0x8C10_0448, 0x7FC4);
+        WriteInstruction(memory, 0x8C10_044A, 0xD112);
+        WriteInstruction(memory, 0x8C10_044C, 0x6D43);
+        WriteInstruction(memory, 0x8C10_044E, 0x62D2);
+        WriteInstruction(memory, 0x8C10_0450, 0x6312);
+        WriteInstruction(memory, 0x8C10_0452, 0x3233);
+        WriteInstruction(memory, 0x8C10_0454, 0x8F24);
+        WriteInstruction(memory, 0x8C10_0456, 0xFF9D);
+        memory.WriteUInt32(0x8C10_0494, 0x8C2F_07D0);
+    }
+
+    private static void WriteRendererPrologueData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_1000, 0x0000_01A7);
+        memory.WriteUInt32(0x8C2F_07D0, 0x0000_0600);
+    }
+
+    private static void InitializeDoa2RendererPrologueState(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 0x8C20_1000;
+        cpu.State.R[8] = 0x8888_8888;
+        cpu.State.R[9] = 0x9999_9999;
+        cpu.State.R[10] = 0xAAAA_AAAA;
+        cpu.State.R[11] = 0xBBBB_BBBB;
+        cpu.State.R[12] = 0xCCCC_CCCC;
+        cpu.State.R[13] = 0xDDDD_DDDD;
+        cpu.State.R[14] = 0xEEEE_EEEE;
+        cpu.State.R[15] = 0x8C20_5000;
+        cpu.State.Pr = 0x8C0E_1EB2;
+        for (var index = 8; index <= 15; index++)
+        {
+            cpu.State.Fr[index] = BitConverter.SingleToUInt32Bits(index + 0.25f);
+        }
+
         cpu.State.T = true;
     }
 

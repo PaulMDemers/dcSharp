@@ -1651,6 +1651,76 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2RendererPrologueCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0430
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C10_0432)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 19;
+        var limitAddress = memory.ReadUInt32(0x8C10_0494);
+        if (!IsDoa2RendererPrologueCommonPath()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 104
+            || State.R[4] > uint.MaxValue - 3
+            || !memory.TryGetSystemRamOffset(State.R[15] - 104, 108, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4], 4, out _)
+            || !memory.TryGetSystemRamOffset(limitAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var row = memory.ReadUInt32(State.R[4]);
+        var limit = memory.ReadUInt32(limitAddress);
+        if (unchecked((int)row) >= unchecked((int)limit))
+        {
+            return false;
+        }
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[13]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[12]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[11]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[10]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[9]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[8]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[15]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[14]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[13]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[12]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Pr);
+        State.R[15] += unchecked((uint)-60);
+
+        State.R[1] = limitAddress;
+        State.R[13] = State.R[4];
+        State.R[2] = row;
+        State.R[3] = limit;
+        State.T = unchecked((int)State.R[2]) >= unchecked((int)State.R[3]);
+        ExecuteFpuMove(0xFF9D, 15, 9, 0xD);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = 0x8C10_04A0;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -2406,6 +2476,29 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_AC56) == 0x6EF6
         && memory.ReadInstructionUInt16(0x8C0F_AD20) == 0x4000
         && memory.ReadUInt32(0x8C0F_AD24) == 0x0000_8000;
+
+    private bool IsDoa2RendererPrologueCommonPath() =>
+        memory.ReadInstructionUInt16(0x8C10_0430) == 0x2FE6
+        && memory.ReadInstructionUInt16(0x8C10_0432) == 0x2FD6
+        && memory.ReadInstructionUInt16(0x8C10_0434) == 0x2FC6
+        && memory.ReadInstructionUInt16(0x8C10_0436) == 0x2FB6
+        && memory.ReadInstructionUInt16(0x8C10_0438) == 0x2FA6
+        && memory.ReadInstructionUInt16(0x8C10_043A) == 0x2F96
+        && memory.ReadInstructionUInt16(0x8C10_043C) == 0x2F86
+        && memory.ReadInstructionUInt16(0x8C10_043E) == 0xFFFB
+        && memory.ReadInstructionUInt16(0x8C10_0440) == 0xFFEB
+        && memory.ReadInstructionUInt16(0x8C10_0442) == 0xFFDB
+        && memory.ReadInstructionUInt16(0x8C10_0444) == 0xFFCB
+        && memory.ReadInstructionUInt16(0x8C10_0446) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C10_0448) == 0x7FC4
+        && memory.ReadInstructionUInt16(0x8C10_044A) == 0xD112
+        && memory.ReadInstructionUInt16(0x8C10_044C) == 0x6D43
+        && memory.ReadInstructionUInt16(0x8C10_044E) == 0x62D2
+        && memory.ReadInstructionUInt16(0x8C10_0450) == 0x6312
+        && memory.ReadInstructionUInt16(0x8C10_0452) == 0x3233
+        && memory.ReadInstructionUInt16(0x8C10_0454) == 0x8F24
+        && memory.ReadInstructionUInt16(0x8C10_0456) == 0xFF9D
+        && memory.ReadUInt32(0x8C10_0494) == 0x8C2F_07D0;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
