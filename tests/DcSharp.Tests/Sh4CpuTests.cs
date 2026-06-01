@@ -1152,6 +1152,95 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TableEntryAddressHelper()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_29DE);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_29DE);
+        InitializeDoa2TableEntryAddressHelperState(normal, 7);
+        InitializeDoa2TableEntryAddressHelperState(fast, 7);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TableEntryAddressHelper(fastStart, 10, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2TableEntryAddressHelperWithWrappedShiftCarry()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_29DE);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_29DE);
+        InitializeDoa2TableEntryAddressHelperState(normal, 0x0800_0000);
+        InitializeDoa2TableEntryAddressHelperState(fast, 0x0800_0000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TableEntryAddressHelper(fastStart, 10, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TableEntryAddressHelperWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_29DE);
+        InitializeDoa2TableEntryAddressHelperState(cpu, 3);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TableEntryAddressHelper(start, 9, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_29E0u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TableEntryAddressHelperWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TableEntryAddressHelper(memory);
+        memory.WriteUInt32(0x8C0F_2AD4, 0x8C20_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_29DE);
+        InitializeDoa2TableEntryAddressHelperState(cpu, 3);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TableEntryAddressHelper(start, 10, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorPackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -5117,6 +5206,32 @@ public class Sh4CpuTests
         cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(536870912.0f);
         cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(0.25f);
         cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2TableEntryAddressHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0F_29DE, 0x6043);
+        WriteInstruction(memory, 0x8C0F_29E0, 0x0009);
+        WriteInstruction(memory, 0x8C0F_29E2, 0x4000);
+        WriteInstruction(memory, 0x8C0F_29E4, 0x6343);
+        WriteInstruction(memory, 0x8C0F_29E6, 0x303C);
+        WriteInstruction(memory, 0x8C0F_29E8, 0xD23A);
+        WriteInstruction(memory, 0x8C0F_29EA, 0x4008);
+        WriteInstruction(memory, 0x8C0F_29EC, 0x4008);
+        WriteInstruction(memory, 0x8C0F_29EE, 0x4000);
+        WriteInstruction(memory, 0x8C0F_29F0, 0x000B);
+        WriteInstruction(memory, 0x8C0F_29F2, 0x302C);
+        memory.WriteUInt32(0x8C0F_2AD4, 0x8C2A_D770);
+    }
+
+    private static void InitializeDoa2TableEntryAddressHelperState(Sh4Cpu cpu, uint index)
+    {
+        cpu.State.R[1] = 0xCAFE_BABE;
+        cpu.State.R[2] = 0xDEAD_BEEF;
+        cpu.State.R[3] = 0xFEED_FACE;
+        cpu.State.R[4] = index;
+        cpu.State.Pr = 0x8C0F_367C;
         cpu.State.T = true;
     }
 

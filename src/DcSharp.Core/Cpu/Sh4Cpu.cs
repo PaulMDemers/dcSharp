@@ -1123,6 +1123,43 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2TableEntryAddressHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_29DE
+            || step.Opcode != 0x6043
+            || State.Pc != 0x8C0F_29E0
+            || State.R[0] != State.R[4])
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 10;
+        if (!IsDoa2TableEntryAddressHelper()
+            || maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var value = State.R[0];
+        value <<= 1;
+        State.R[3] = State.R[4];
+        value += State.R[3];
+        State.R[2] = 0x8C2A_D770;
+        value <<= 2;
+        value <<= 2;
+        State.T = (value & 0x8000_0000) != 0;
+        value <<= 1;
+        State.R[0] = value + State.R[2];
+
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ColorPackCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3214,6 +3251,20 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_E626) == 0x2132
         && memory.ReadInstructionUInt16(0x8C10_E628) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_E62A) == 0x63F6;
+
+    private bool IsDoa2TableEntryAddressHelper() =>
+        memory.ReadInstructionUInt16(0x8C0F_29DE) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C0F_29E0) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C0F_29E2) == 0x4000
+        && memory.ReadInstructionUInt16(0x8C0F_29E4) == 0x6343
+        && memory.ReadInstructionUInt16(0x8C0F_29E6) == 0x303C
+        && memory.ReadInstructionUInt16(0x8C0F_29E8) == 0xD23A
+        && memory.ReadInstructionUInt16(0x8C0F_29EA) == 0x4008
+        && memory.ReadInstructionUInt16(0x8C0F_29EC) == 0x4008
+        && memory.ReadInstructionUInt16(0x8C0F_29EE) == 0x4000
+        && memory.ReadInstructionUInt16(0x8C0F_29F0) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C0F_29F2) == 0x302C
+        && memory.ReadUInt32(0x8C0F_2AD4) == 0x8C2A_D770;
 
     private bool IsDoa2ColorPackCommonPath() =>
         memory.ReadInstructionUInt16(0x8C10_06EC) == 0x50DD
