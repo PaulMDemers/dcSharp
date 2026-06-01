@@ -2403,6 +2403,88 @@ public class Sh4CpuTests
         Assert.Equal(0x8C10_0AB8u, cpu.State.Pc);
     }
 
+    [Theory]
+    [InlineData(0u, 88ul)]
+    [InlineData(1u, 88ul)]
+    [InlineData(35u, 85ul)]
+    [InlineData(0xFFFF_FFFFu, 88ul)]
+    public void FastForwardsDoa2SignedRemainderHelper(uint dividend, ulong expectedSkippedInstructions)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2SignedRemainderHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2SignedRemainderHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_751C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_751C);
+        InitializeDoa2SignedRemainderState(normal, dividend, 6);
+        InitializeDoa2SignedRemainderState(fast, dividend, 6);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2SignedRemainderHelper(fastStart, 88, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2SignedRemainderHelperWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2SignedRemainderHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_751C);
+        InitializeDoa2SignedRemainderState(cpu, 35, 6);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2SignedRemainderHelper(start, 87, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_751Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2SignedRemainderHelperWhenDivisorIsZero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2SignedRemainderHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_751C);
+        InitializeDoa2SignedRemainderState(cpu, 35, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2SignedRemainderHelper(start, 88, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_751Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2SignedRemainderHelperWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2SignedRemainderHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_751C);
+        InitializeDoa2SignedRemainderState(cpu, 35, 6);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2SignedRemainderHelper(start, 88, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_751Eu, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
@@ -5232,6 +5314,55 @@ public class Sh4CpuTests
         cpu.State.Pr = 0x8C10_0A52;
         cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(2.0f);
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2SignedRemainderHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_751C, 0x2008);
+        WriteInstruction(memory, 0x8C10_751E, 0x2F26);
+        WriteInstruction(memory, 0x8C10_7520, 0x8955);
+        WriteInstruction(memory, 0x8C10_7522, 0x2F36);
+        WriteInstruction(memory, 0x8C10_7524, 0xE200);
+        WriteInstruction(memory, 0x8C10_7526, 0x2F46);
+        WriteInstruction(memory, 0x8C10_7528, 0x2127);
+        WriteInstruction(memory, 0x8C10_752A, 0x0429);
+        WriteInstruction(memory, 0x8C10_752C, 0x333A);
+        WriteInstruction(memory, 0x8C10_752E, 0x312A);
+        WriteInstruction(memory, 0x8C10_7530, 0x2307);
+        for (var address = 0x8C10_7532u; address <= 0x8C10_75B0; address += 4)
+        {
+            WriteInstruction(memory, address, 0x4124);
+            WriteInstruction(memory, address + 2, 0x3304);
+        }
+
+        WriteInstruction(memory, 0x8C10_75B2, 0x2327);
+        WriteInstruction(memory, 0x8C10_75B4, 0x0229);
+        WriteInstruction(memory, 0x8C10_75B6, 0x224A);
+        WriteInstruction(memory, 0x8C10_75B8, 0x4225);
+        WriteInstruction(memory, 0x8C10_75BA, 0x8B02);
+        WriteInstruction(memory, 0x8C10_75BC, 0x2307);
+        WriteInstruction(memory, 0x8C10_75BE, 0x4321);
+        WriteInstruction(memory, 0x8C10_75C0, 0x3304);
+        WriteInstruction(memory, 0x8C10_75C2, 0x334C);
+        WriteInstruction(memory, 0x8C10_75C4, 0x6033);
+        WriteInstruction(memory, 0x8C10_75C6, 0x64F6);
+        WriteInstruction(memory, 0x8C10_75C8, 0x63F6);
+        WriteInstruction(memory, 0x8C10_75CA, 0x000B);
+        WriteInstruction(memory, 0x8C10_75CC, 0x62F6);
+    }
+
+    private static void InitializeDoa2SignedRemainderState(Sh4Cpu cpu, uint dividend, uint divisor)
+    {
+        cpu.State.R[0] = divisor;
+        cpu.State.R[1] = dividend;
+        cpu.State.R[2] = 0x8C20_3000;
+        cpu.State.R[3] = 0x8C10_751C;
+        cpu.State.R[4] = 0x8C20_4000;
+        cpu.State.R[15] = 0x8C20_7000;
+        cpu.State.Pr = 0x8C11_753E;
+        cpu.State.T = true;
+        cpu.State.M = true;
+        cpu.State.Q = true;
     }
 
     private static void WriteDoa2ColorBytePackCommonPath(DreamcastMemory memory)

@@ -2332,6 +2332,83 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2SignedRemainderHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_751C
+            || step.Opcode != 0x2008
+            || State.Pc != 0x8C10_751E
+            || State.T)
+        {
+            return false;
+        }
+
+        const ulong maxSkippedInstructionCount = 88;
+        if (!IsDoa2SignedRemainderHelper()
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || State.R[15] < 12
+            || !memory.TryGetSystemRamOffset(State.R[15] - 12, 12, out _))
+        {
+            return false;
+        }
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[2]);
+        skippedInstructions++;
+        skippedInstructions++;
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[3]);
+        State.R[2] = 0;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[4]);
+        ExecuteDiv0S(2, 1);
+        State.R[4] = State.T ? 1u : 0u;
+        ExecuteSubc(3, 3);
+        ExecuteSubc(2, 1);
+        ExecuteDiv0S(0, 3);
+        skippedInstructions += 8;
+
+        for (var index = 0; index < 32; index++)
+        {
+            ExecuteRotcl(1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 2;
+        }
+
+        ExecuteDiv0S(2, 3);
+        State.R[2] = State.T ? 1u : 0u;
+        State.R[2] ^= State.R[4];
+        ExecuteRotcr(2);
+        skippedInstructions += 4;
+
+        skippedInstructions++;
+        if (State.T)
+        {
+            ExecuteDiv0S(0, 3);
+            State.T = (State.R[3] & 0x1) != 0;
+            State.R[3] = (uint)(unchecked((int)State.R[3]) >> 1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 3;
+        }
+
+        State.R[3] += State.R[4];
+        State.R[0] = State.R[3];
+        State.R[4] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[3] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[2] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        skippedInstructions += 6;
+
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3350,6 +3427,48 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_0AB8) == 0x4F26
         && memory.ReadInstructionUInt16(0x8C10_0ABA) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_0ABC) == 0xFEF9;
+
+    private bool IsDoa2SignedRemainderHelper()
+    {
+        if (memory.ReadInstructionUInt16(0x8C10_751C) != 0x2008
+            || memory.ReadInstructionUInt16(0x8C10_751E) != 0x2F26
+            || memory.ReadInstructionUInt16(0x8C10_7520) != 0x8955
+            || memory.ReadInstructionUInt16(0x8C10_7522) != 0x2F36
+            || memory.ReadInstructionUInt16(0x8C10_7524) != 0xE200
+            || memory.ReadInstructionUInt16(0x8C10_7526) != 0x2F46
+            || memory.ReadInstructionUInt16(0x8C10_7528) != 0x2127
+            || memory.ReadInstructionUInt16(0x8C10_752A) != 0x0429
+            || memory.ReadInstructionUInt16(0x8C10_752C) != 0x333A
+            || memory.ReadInstructionUInt16(0x8C10_752E) != 0x312A
+            || memory.ReadInstructionUInt16(0x8C10_7530) != 0x2307)
+        {
+            return false;
+        }
+
+        for (var address = 0x8C10_7532u; address <= 0x8C10_75B0; address += 4)
+        {
+            if (memory.ReadInstructionUInt16(address) != 0x4124
+                || memory.ReadInstructionUInt16(address + 2) != 0x3304)
+            {
+                return false;
+            }
+        }
+
+        return memory.ReadInstructionUInt16(0x8C10_75B2) == 0x2327
+            && memory.ReadInstructionUInt16(0x8C10_75B4) == 0x0229
+            && memory.ReadInstructionUInt16(0x8C10_75B6) == 0x224A
+            && memory.ReadInstructionUInt16(0x8C10_75B8) == 0x4225
+            && memory.ReadInstructionUInt16(0x8C10_75BA) == 0x8B02
+            && memory.ReadInstructionUInt16(0x8C10_75BC) == 0x2307
+            && memory.ReadInstructionUInt16(0x8C10_75BE) == 0x4321
+            && memory.ReadInstructionUInt16(0x8C10_75C0) == 0x3304
+            && memory.ReadInstructionUInt16(0x8C10_75C2) == 0x334C
+            && memory.ReadInstructionUInt16(0x8C10_75C4) == 0x6033
+            && memory.ReadInstructionUInt16(0x8C10_75C6) == 0x64F6
+            && memory.ReadInstructionUInt16(0x8C10_75C8) == 0x63F6
+            && memory.ReadInstructionUInt16(0x8C10_75CA) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C10_75CC) == 0x62F6;
+    }
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
@@ -4672,6 +4791,13 @@ public sealed class Sh4Cpu
 
     private static int SignExtend12(int value) => (value & 0x800) != 0 ? value | unchecked((int)0xFFFF_F000) : value;
 
+    private void ExecuteDiv0S(int m, int n)
+    {
+        State.M = (State.R[m] & 0x8000_0000) != 0;
+        State.Q = (State.R[n] & 0x8000_0000) != 0;
+        State.T = State.M != State.Q;
+    }
+
     private void ExecuteDiv1(int m, int n)
     {
         var oldQ = State.Q;
@@ -4714,6 +4840,28 @@ public sealed class Sh4Cpu
         }
 
         State.T = State.Q == State.M;
+    }
+
+    private void ExecuteSubc(int m, int n)
+    {
+        var original = State.R[n];
+        var subtrahend = State.R[m] + (State.T ? 1u : 0u);
+        State.R[n] -= subtrahend;
+        State.T = original < State.R[m] || (State.T && original == State.R[m]);
+    }
+
+    private void ExecuteRotcl(int n)
+    {
+        var oldT = State.T;
+        State.T = (State.R[n] & 0x8000_0000) != 0;
+        State.R[n] = (State.R[n] << 1) | (oldT ? 1u : 0u);
+    }
+
+    private void ExecuteRotcr(int n)
+    {
+        var oldT = State.T;
+        State.T = (State.R[n] & 0x1) != 0;
+        State.R[n] = (State.R[n] >> 1) | (oldT ? 0x8000_0000u : 0u);
     }
 
     private string ExecuteFpuMove(ushort opcode, int n, int m, int lowNibble)
