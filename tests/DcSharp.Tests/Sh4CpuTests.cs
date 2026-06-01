@@ -990,6 +990,76 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2VectorScaleLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2VectorScaleLoop(normalMemory);
+        WriteVectorScaleData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2VectorScaleLoop(fastMemory);
+        WriteVectorScaleData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_05B2);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_05B2);
+        InitializeDoa2VectorScaleState(normal);
+        InitializeDoa2VectorScaleState(fast);
+
+        var normalBranch = normal.Step();
+        var fastBranch = fast.Step();
+        Assert.Equal(normalBranch.Trace, fastBranch.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2VectorScaleLoop(fastBranch, 100, out var skippedInstructions));
+        Assert.Equal(30UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 4u; offset < 16; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_1000 + offset), fastMemory.ReadUInt32(0x8C20_1000 + offset));
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_2000 + offset), fastMemory.ReadUInt32(0x8C20_2000 + offset));
+        }
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2VectorScaleLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2VectorScaleLoop(memory);
+        WriteVectorScaleData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B2);
+        InitializeDoa2VectorScaleState(cpu);
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2VectorScaleLoop(branch, 29, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_05A0u, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2VectorScaleLoopWhenMemoryIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2VectorScaleLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B2);
+        InitializeDoa2VectorScaleState(cpu);
+        cpu.State.R[11] = 0xA500_0000;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2VectorScaleLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
@@ -2428,6 +2498,41 @@ public class Sh4CpuTests
         cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(3.0f);
         cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(9.0f);
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2VectorScaleLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_05A0, 0x6043);
+        WriteInstruction(memory, 0x8C10_05A2, 0xF3B6);
+        WriteInstruction(memory, 0x8C10_05A4, 0x7404);
+        WriteInstruction(memory, 0x8C10_05A6, 0xF342);
+        WriteInstruction(memory, 0x8C10_05A8, 0xFB37);
+        WriteInstruction(memory, 0x8C10_05AA, 0xF2A6);
+        WriteInstruction(memory, 0x8C10_05AC, 0xF252);
+        WriteInstruction(memory, 0x8C10_05AE, 0xFA27);
+        WriteInstruction(memory, 0x8C10_05B0, 0x3492);
+        WriteInstruction(memory, 0x8C10_05B2, 0x8BF5);
+        WriteInstruction(memory, 0x8C10_05B4, 0x0009);
+    }
+
+    private static void InitializeDoa2VectorScaleState(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 4;
+        cpu.State.R[9] = 16;
+        cpu.State.R[10] = 0x8C20_1000;
+        cpu.State.R[11] = 0x8C20_2000;
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(-3.0f);
+        cpu.State.T = false;
+    }
+
+    private static void WriteVectorScaleData(DreamcastMemory memory)
+    {
+        for (var offset = 0u; offset < 16; offset += 4)
+        {
+            memory.WriteUInt32(0x8C20_1000 + offset, BitConverter.SingleToUInt32Bits(1.0f + offset));
+            memory.WriteUInt32(0x8C20_2000 + offset, BitConverter.SingleToUInt32Bits(2.0f + offset));
+        }
     }
 
     private static void RaiseVBlankIrq9(DreamcastMemory memory)

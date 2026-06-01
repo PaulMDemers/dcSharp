@@ -1038,6 +1038,75 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2VectorScaleLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_05B2
+            || step.Opcode != 0x8BF5
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C10_05A0)
+        {
+            return false;
+        }
+
+        if (!IsDoa2VectorScaleLoop()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || (State.R[4] & 3) != 0
+            || (State.R[9] & 3) != 0
+            || State.R[4] >= State.R[9])
+        {
+            return false;
+        }
+
+        var remainingBytes = State.R[9] - State.R[4];
+        var remainingIterations = remainingBytes / 4;
+        const ulong instructionsPerIteration = 10;
+        if (remainingIterations == 0
+            || remainingIterations > int.MaxValue / 4)
+        {
+            return false;
+        }
+
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var firstOffset = State.R[4];
+        var bytesToTouch = checked((int)remainingIterations * 4);
+        if (firstOffset > uint.MaxValue - (uint)bytesToTouch
+            || State.R[11] > uint.MaxValue - firstOffset
+            || State.R[10] > uint.MaxValue - firstOffset
+            || !memory.TryGetSystemRamOffset(State.R[11] + firstOffset, bytesToTouch, out _)
+            || !memory.TryGetSystemRamOffset(State.R[10] + firstOffset, bytesToTouch, out _))
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        for (var index = 0ul; index < remainingIterations; index++)
+        {
+            var offset = firstOffset + ((uint)index * 4);
+            State.R[0] = offset;
+            State.Fr[3] = memory.ReadUInt32(State.R[11] + offset);
+            State.R[4] = offset + 4;
+            ExecuteFpuArithmetic(3, 4, FpuArithmeticKind.Multiply, static (left, right) => left * right, static (left, right) => left * right);
+            memory.WriteUInt32(State.R[11] + offset, State.Fr[3]);
+            State.Fr[2] = memory.ReadUInt32(State.R[10] + offset);
+            ExecuteFpuArithmetic(2, 5, FpuArithmeticKind.Multiply, static (left, right) => left * right, static (left, right) => left * right);
+            memory.WriteUInt32(State.R[10] + offset, State.Fr[2]);
+            State.T = State.R[4] >= State.R[9];
+        }
+
+        State.Pc = 0x8C10_05B4;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1081,6 +1150,18 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_B208) == 0xF56C
         && memory.ReadInstructionUInt16(0x8C0F_B20A) == 0x8DF8
         && memory.ReadInstructionUInt16(0x8C0F_B20C) == 0xF523;
+
+    private bool IsDoa2VectorScaleLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_05A0) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C10_05A2) == 0xF3B6
+        && memory.ReadInstructionUInt16(0x8C10_05A4) == 0x7404
+        && memory.ReadInstructionUInt16(0x8C10_05A6) == 0xF342
+        && memory.ReadInstructionUInt16(0x8C10_05A8) == 0xFB37
+        && memory.ReadInstructionUInt16(0x8C10_05AA) == 0xF2A6
+        && memory.ReadInstructionUInt16(0x8C10_05AC) == 0xF252
+        && memory.ReadInstructionUInt16(0x8C10_05AE) == 0xFA27
+        && memory.ReadInstructionUInt16(0x8C10_05B0) == 0x3492
+        && memory.ReadInstructionUInt16(0x8C10_05B2) == 0x8BF5;
 
     private bool IsDoa2BusyBitWaitLoop() =>
         memory.ReadInstructionUInt16(0x8C13_0460) == 0x4A0B
