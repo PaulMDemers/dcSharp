@@ -1858,6 +1858,84 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2RendererSecondTrigCallBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0536
+            || step.Opcode != 0xD314
+            || State.Pc != 0x8C10_0538)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 4;
+        if (!IsDoa2RendererSecondTrigCallBridge()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] > uint.MaxValue - 11
+            || State.R[13] > uint.MaxValue - 43
+            || State.R[3] != 0x8C0F_AC40
+            || !memory.TryGetSystemRamOffset(State.R[15] + 8, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[13] + 40, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[0] = 8;
+        ExecuteFpuMove(0xFF07, 15, 0, 0x7);
+        State.Pr = 0x8C10_0540;
+        State.R[4] = memory.ReadUInt32(State.R[13] + 40);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2RendererPostSecondTrigBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0540
+            || step.Opcode != 0xE008
+            || State.Pc != 0x8C10_0542)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 13;
+        if (!IsDoa2RendererPostSecondTrigBridge()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] > uint.MaxValue - 47
+            || !memory.TryGetSystemRamOffset(State.R[15] + 4, 8, out _))
+        {
+            return false;
+        }
+
+        State.R[10] = State.R[15];
+        ExecuteFpuMove(0xF6F6, 6, 15, 0x6);
+        State.R[0] = 4;
+        State.R[11] = State.R[15];
+        State.R[10] += 28;
+        ExecuteFpuMove(0xF5F6, 5, 15, 0x6);
+        State.R[11] += 44;
+        State.R[6] = State.R[10];
+        State.R[5] = State.R[11];
+        ExecuteFpuMove(0xF70C, 7, 0, 0xC);
+        ExecuteFpuMove(0xF4CC, 4, 12, 0xC);
+        State.Pr = 0x8C10_055C;
+        State.R[4] = State.R[13];
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = 0x8C10_0A30;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -2692,6 +2770,30 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_0534) == 0x54DA
         && memory.ReadUInt32(0x8C10_0580) == 0x3F00_0000
         && memory.ReadUInt32(0x8C10_0584) == 0x8C0F_B1C0;
+
+    private bool IsDoa2RendererSecondTrigCallBridge() =>
+        memory.ReadInstructionUInt16(0x8C10_0536) == 0xD314
+        && memory.ReadInstructionUInt16(0x8C10_0538) == 0xE008
+        && memory.ReadInstructionUInt16(0x8C10_053A) == 0xFF07
+        && memory.ReadInstructionUInt16(0x8C10_053C) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C10_053E) == 0x54DA
+        && memory.ReadUInt32(0x8C10_0588) == 0x8C0F_AC40;
+
+    private bool IsDoa2RendererPostSecondTrigBridge() =>
+        memory.ReadInstructionUInt16(0x8C10_0540) == 0xE008
+        && memory.ReadInstructionUInt16(0x8C10_0542) == 0x6AF3
+        && memory.ReadInstructionUInt16(0x8C10_0544) == 0xF6F6
+        && memory.ReadInstructionUInt16(0x8C10_0546) == 0xE004
+        && memory.ReadInstructionUInt16(0x8C10_0548) == 0x6BF3
+        && memory.ReadInstructionUInt16(0x8C10_054A) == 0x7A1C
+        && memory.ReadInstructionUInt16(0x8C10_054C) == 0xF5F6
+        && memory.ReadInstructionUInt16(0x8C10_054E) == 0x7B2C
+        && memory.ReadInstructionUInt16(0x8C10_0550) == 0x66A3
+        && memory.ReadInstructionUInt16(0x8C10_0552) == 0x65B3
+        && memory.ReadInstructionUInt16(0x8C10_0554) == 0xF70C
+        && memory.ReadInstructionUInt16(0x8C10_0556) == 0xF4CC
+        && memory.ReadInstructionUInt16(0x8C10_0558) == 0xB26A
+        && memory.ReadInstructionUInt16(0x8C10_055A) == 0x64D3;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
