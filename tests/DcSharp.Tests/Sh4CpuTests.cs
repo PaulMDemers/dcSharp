@@ -1241,6 +1241,123 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ZeroRecordGroupScan()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(normalMemory);
+        WriteZeroRecordGroupData(normalMemory);
+        WriteZeroRecordGroupStack(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(fastMemory);
+        WriteZeroRecordGroupData(fastMemory);
+        WriteZeroRecordGroupStack(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C01_3BF6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C01_3BF6);
+        InitializeDoa2ZeroRecordGroupScanState(normal, 0);
+        InitializeDoa2ZeroRecordGroupScanState(fast, 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ZeroRecordGroupScan(fastStart, 376, out var skippedInstructions));
+        Assert.Equal(376UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2ZeroRecordGroupScanFromFinalGroup()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(normalMemory);
+        WriteZeroRecordGroupData(normalMemory);
+        WriteZeroRecordGroupStack(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(fastMemory);
+        WriteZeroRecordGroupData(fastMemory);
+        WriteZeroRecordGroupStack(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C01_3BF6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C01_3BF6);
+        InitializeDoa2ZeroRecordGroupScanState(normal, 28);
+        InitializeDoa2ZeroRecordGroupScanState(fast, 28);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ZeroRecordGroupScan(fastStart, 54, out var skippedInstructions));
+        Assert.Equal(54UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroRecordGroupScanWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(memory);
+        WriteZeroRecordGroupData(memory);
+        WriteZeroRecordGroupStack(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_3BF6);
+        InitializeDoa2ZeroRecordGroupScanState(cpu, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroRecordGroupScan(start, 375, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C01_3BF8u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroRecordGroupScanWhenRecordIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(memory);
+        WriteZeroRecordGroupData(memory);
+        WriteZeroRecordGroupStack(memory);
+        memory.WriteUInt16(0x8C1E_FFB8 + (12 * 8), 1);
+        var cpu = new Sh4Cpu(memory, 0x8C01_3BF6);
+        InitializeDoa2ZeroRecordGroupScanState(cpu, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroRecordGroupScan(start, 376, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroRecordGroupScanWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroRecordGroupScan(memory);
+        WriteZeroRecordGroupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_3BF6);
+        InitializeDoa2ZeroRecordGroupScanState(cpu, 0);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroRecordGroupScan(start, 376, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorPackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -5233,6 +5350,100 @@ public class Sh4CpuTests
         cpu.State.R[4] = index;
         cpu.State.Pr = 0x8C0F_367C;
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2ZeroRecordGroupScan(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C01_3BF6, 0x63B3);
+        WriteInstruction(memory, 0x8C01_3BF8, 0x4308);
+        WriteInstruction(memory, 0x8C01_3BFA, 0x4300);
+        WriteInstruction(memory, 0x8C01_3BFC, 0x33AC);
+        WriteInstruction(memory, 0x8C01_3BFE, 0x6231);
+        WriteInstruction(memory, 0x8C01_3C00, 0x2228);
+        WriteInstruction(memory, 0x8C01_3C02, 0x890F);
+        WriteInstruction(memory, 0x8C01_3C24, 0x7B01);
+        WriteInstruction(memory, 0x8C01_3C26, 0x63B3);
+        WriteInstruction(memory, 0x8C01_3C28, 0x4308);
+        WriteInstruction(memory, 0x8C01_3C2A, 0x4300);
+        WriteInstruction(memory, 0x8C01_3C2C, 0x33AC);
+        WriteInstruction(memory, 0x8C01_3C2E, 0x6231);
+        WriteInstruction(memory, 0x8C01_3C30, 0x7C08);
+        WriteInstruction(memory, 0x8C01_3C32, 0x7E08);
+        WriteInstruction(memory, 0x8C01_3C34, 0x2228);
+        WriteInstruction(memory, 0x8C01_3C36, 0x8D10);
+        WriteInstruction(memory, 0x8C01_3C38, 0x7D08);
+        WriteInstruction(memory, 0x8C01_3C5A, 0x7B01);
+        WriteInstruction(memory, 0x8C01_3C5C, 0x63B3);
+        WriteInstruction(memory, 0x8C01_3C5E, 0x4308);
+        WriteInstruction(memory, 0x8C01_3C60, 0x4300);
+        WriteInstruction(memory, 0x8C01_3C62, 0x33AC);
+        WriteInstruction(memory, 0x8C01_3C64, 0x6231);
+        WriteInstruction(memory, 0x8C01_3C66, 0x7C08);
+        WriteInstruction(memory, 0x8C01_3C68, 0x7E08);
+        WriteInstruction(memory, 0x8C01_3C6A, 0x2228);
+        WriteInstruction(memory, 0x8C01_3C6C, 0x8D10);
+        WriteInstruction(memory, 0x8C01_3C6E, 0x7D08);
+        WriteInstruction(memory, 0x8C01_3C90, 0x7B01);
+        WriteInstruction(memory, 0x8C01_3C92, 0x63B3);
+        WriteInstruction(memory, 0x8C01_3C94, 0x4308);
+        WriteInstruction(memory, 0x8C01_3C96, 0x4300);
+        WriteInstruction(memory, 0x8C01_3C98, 0x33AC);
+        WriteInstruction(memory, 0x8C01_3C9A, 0x6231);
+        WriteInstruction(memory, 0x8C01_3C9C, 0x7C08);
+        WriteInstruction(memory, 0x8C01_3C9E, 0x7E08);
+        WriteInstruction(memory, 0x8C01_3CA0, 0x2228);
+        WriteInstruction(memory, 0x8C01_3CA2, 0x8D10);
+        WriteInstruction(memory, 0x8C01_3CA4, 0x7D08);
+        WriteInstruction(memory, 0x8C01_3CC6, 0x7B01);
+        WriteInstruction(memory, 0x8C01_3CC8, 0x3B82);
+        WriteInstruction(memory, 0x8C01_3CCA, 0x7C08);
+        WriteInstruction(memory, 0x8C01_3CCC, 0x7E08);
+        WriteInstruction(memory, 0x8C01_3CCE, 0x8F92);
+        WriteInstruction(memory, 0x8C01_3CD0, 0x7D08);
+        WriteInstruction(memory, 0x8C01_3CD2, 0x4F26);
+        WriteInstruction(memory, 0x8C01_3CD4, 0x68F6);
+        WriteInstruction(memory, 0x8C01_3CD6, 0x69F6);
+        WriteInstruction(memory, 0x8C01_3CD8, 0x6AF6);
+        WriteInstruction(memory, 0x8C01_3CDA, 0x6BF6);
+        WriteInstruction(memory, 0x8C01_3CDC, 0x6CF6);
+        WriteInstruction(memory, 0x8C01_3CDE, 0x6DF6);
+        WriteInstruction(memory, 0x8C01_3CE0, 0x000B);
+        WriteInstruction(memory, 0x8C01_3CE2, 0x6EF6);
+        memory.WriteUInt32(0x8C01_3CF8, 0x8C1E_FFB8);
+    }
+
+    private static void WriteZeroRecordGroupData(DreamcastMemory memory)
+    {
+        for (var index = 0u; index < 32; index++)
+        {
+            memory.WriteUInt16(0x8C1E_FFB8 + (index * 8), 0);
+        }
+    }
+
+    private static void WriteZeroRecordGroupStack(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_8000, 0x8C01_2DB8);
+        memory.WriteUInt32(0x8C20_8004, 0x8888_0008);
+        memory.WriteUInt32(0x8C20_8008, 0x9999_0009);
+        memory.WriteUInt32(0x8C20_800C, 0xAAAA_000A);
+        memory.WriteUInt32(0x8C20_8010, 0xBBBB_000B);
+        memory.WriteUInt32(0x8C20_8014, 0xCCCC_000C);
+        memory.WriteUInt32(0x8C20_8018, 0xDDDD_000D);
+        memory.WriteUInt32(0x8C20_801C, 0xEEEE_000E);
+    }
+
+    private static void InitializeDoa2ZeroRecordGroupScanState(Sh4Cpu cpu, uint index)
+    {
+        cpu.State.R[8] = 32;
+        cpu.State.R[9] = 0x8C10_56A0;
+        cpu.State.R[10] = 0x8C1E_FFB8;
+        cpu.State.R[11] = index;
+        cpu.State.R[12] = 0x8C1E_FFB8 + (index * 8);
+        cpu.State.R[13] = 0x8C1E_FFB8 + (index * 8);
+        cpu.State.R[14] = 0x8C1E_FFB8 + (index * 8);
+        cpu.State.R[15] = 0x8C20_8000;
+        cpu.State.Pr = 0x8C01_2DB8;
+        cpu.State.T = false;
     }
 
     private static void WriteDoa2ColorPackCommonPath(DreamcastMemory memory)
