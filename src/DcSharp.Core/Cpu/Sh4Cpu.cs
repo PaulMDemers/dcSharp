@@ -1107,6 +1107,116 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2InterpolationLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0AB2
+            || step.Opcode != 0x8FE2
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget != 0x8C10_0A7A
+            || State.Pc != 0x8C10_0AB4)
+        {
+            return false;
+        }
+
+        if (!IsDoa2InterpolationLoop()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[1];
+        const ulong maxInstructionsPerIteration = 30;
+        if (remainingIterations == 0
+            || remainingIterations > int.MaxValue / 8)
+        {
+            return false;
+        }
+
+        var maxSkippedInstructions = 1 + ((ulong)remainingIterations * maxInstructionsPerIteration);
+        if (maxSkippedInstructions > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        var sourceBytes = checked((int)remainingIterations * 8);
+        var destinationBytes = checked((int)remainingIterations * 4);
+        if (State.R[5] > uint.MaxValue - 4
+            || State.R[4] > uint.MaxValue - 12
+            || !memory.TryGetSystemRamOffset(State.R[7], sourceBytes, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4] + 4, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4] + 8, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[5] + 4, destinationBytes, out _)
+            || !memory.TryGetSystemRamOffset(State.R[6], destinationBytes, out _))
+        {
+            return false;
+        }
+
+        State.R[5] += 4;
+        skippedInstructions++;
+        while (true)
+        {
+            ExecuteFpuMove(0xFB79, 11, 7, 0x9);
+            State.R[0] = 4;
+            ExecuteFpuMove(0xF38D, 3, 8, 0xD);
+            ExecuteFpuMove(0xFB61, 11, 6, 0x1);
+            ExecuteFpuMove(0xFA79, 10, 7, 0x9);
+            ExecuteFpuMove(0xF146, 1, 4, 0x6);
+            State.R[0] = 8;
+            ExecuteFpuMove(0xFA71, 10, 7, 0x1);
+            ExecuteFpuMove(0xFB34, 11, 3, 0x4);
+            skippedInstructions += 9;
+
+            skippedInstructions++;
+            ExecuteFpuMove(0xFE46, 14, 4, 0x6);
+            skippedInstructions++;
+            if (!State.T)
+            {
+                ExecuteFpuMove(0xF24C, 2, 4, 0xC);
+                ExecuteFpuMove(0xF2B2, 2, 11, 0x2);
+                ExecuteFpuMove(0xF0BC, 0, 11, 0xC);
+                ExecuteFpuMove(0xF18E, 1, 8, 0xE);
+                ExecuteFpuMove(0xF24D, 2, 4, 0xD);
+                ExecuteFpuMove(0xFE20, 14, 2, 0x0);
+                skippedInstructions += 6;
+            }
+
+            ExecuteFpuMove(0xF38D, 3, 8, 0xD);
+            ExecuteFpuMove(0xFA34, 10, 3, 0x4);
+            skippedInstructions += 2;
+
+            skippedInstructions++;
+            if (!State.T)
+            {
+                ExecuteFpuMove(0xF0AC, 0, 10, 0xC);
+                ExecuteFpuMove(0xFE5E, 14, 5, 0xE);
+                ExecuteFpuMove(0xF19E, 1, 9, 0xE);
+                skippedInstructions += 3;
+            }
+
+            State.R[1]--;
+            ExecuteFpuMove(0xF51A, 5, 1, 0xA);
+            ExecuteFpuMove(0xF6EA, 6, 14, 0xA);
+            State.T = State.R[1] == 0;
+            State.R[6] += 4;
+            skippedInstructions += 5;
+
+            skippedInstructions++;
+            State.R[5] += 4;
+            skippedInstructions++;
+            if (State.T)
+            {
+                State.Pc = 0x8C10_0AB6;
+                break;
+            }
+        }
+
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1162,6 +1272,38 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_05AE) == 0xFA27
         && memory.ReadInstructionUInt16(0x8C10_05B0) == 0x3492
         && memory.ReadInstructionUInt16(0x8C10_05B2) == 0x8BF5;
+
+    private bool IsDoa2InterpolationLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_0A7A) == 0xFB79
+        && memory.ReadInstructionUInt16(0x8C10_0A7C) == 0xE004
+        && memory.ReadInstructionUInt16(0x8C10_0A7E) == 0xF38D
+        && memory.ReadInstructionUInt16(0x8C10_0A80) == 0xFB61
+        && memory.ReadInstructionUInt16(0x8C10_0A82) == 0xFA79
+        && memory.ReadInstructionUInt16(0x8C10_0A84) == 0xF146
+        && memory.ReadInstructionUInt16(0x8C10_0A86) == 0xE008
+        && memory.ReadInstructionUInt16(0x8C10_0A88) == 0xFA71
+        && memory.ReadInstructionUInt16(0x8C10_0A8A) == 0xFB34
+        && memory.ReadInstructionUInt16(0x8C10_0A8C) == 0x8D06
+        && memory.ReadInstructionUInt16(0x8C10_0A8E) == 0xFE46
+        && memory.ReadInstructionUInt16(0x8C10_0A90) == 0xF24C
+        && memory.ReadInstructionUInt16(0x8C10_0A92) == 0xF2B2
+        && memory.ReadInstructionUInt16(0x8C10_0A94) == 0xF0BC
+        && memory.ReadInstructionUInt16(0x8C10_0A96) == 0xF18E
+        && memory.ReadInstructionUInt16(0x8C10_0A98) == 0xF24D
+        && memory.ReadInstructionUInt16(0x8C10_0A9A) == 0xFE20
+        && memory.ReadInstructionUInt16(0x8C10_0A9C) == 0xF38D
+        && memory.ReadInstructionUInt16(0x8C10_0A9E) == 0xFA34
+        && memory.ReadInstructionUInt16(0x8C10_0AA0) == 0x8902
+        && memory.ReadInstructionUInt16(0x8C10_0AA2) == 0xF0AC
+        && memory.ReadInstructionUInt16(0x8C10_0AA4) == 0xFE5E
+        && memory.ReadInstructionUInt16(0x8C10_0AA6) == 0xF19E
+        && memory.ReadInstructionUInt16(0x8C10_0AA8) == 0x71FF
+        && memory.ReadInstructionUInt16(0x8C10_0AAA) == 0xF51A
+        && memory.ReadInstructionUInt16(0x8C10_0AAC) == 0xF6EA
+        && memory.ReadInstructionUInt16(0x8C10_0AAE) == 0x2118
+        && memory.ReadInstructionUInt16(0x8C10_0AB0) == 0x7604
+        && memory.ReadInstructionUInt16(0x8C10_0AB2) == 0x8FE2
+        && memory.ReadInstructionUInt16(0x8C10_0AB4) == 0x7504;
 
     private bool IsDoa2BusyBitWaitLoop() =>
         memory.ReadInstructionUInt16(0x8C13_0460) == 0x4A0B

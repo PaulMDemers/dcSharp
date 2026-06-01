@@ -1060,6 +1060,74 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2InterpolationLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2InterpolationLoop(normalMemory);
+        WriteInterpolationData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2InterpolationLoop(fastMemory);
+        WriteInterpolationData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_0A7A);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_0A7A);
+        InitializeDoa2InterpolationState(normal);
+        InitializeDoa2InterpolationState(fast);
+
+        var normalBranch = StepUntilPc(normal, 0x8C10_0AB2);
+        var fastBranch = StepUntilPc(fast, 0x8C10_0AB2);
+        Assert.Equal(normalBranch.Trace, fastBranch.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2InterpolationLoop(fastBranch, 100, out var skippedInstructions));
+        Assert.Equal(91UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 16; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_3000 + offset), fastMemory.ReadUInt32(0x8C20_3000 + offset));
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_4000 + offset), fastMemory.ReadUInt32(0x8C20_4000 + offset));
+        }
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2InterpolationLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2InterpolationLoop(memory);
+        WriteInterpolationData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0A7A);
+        InitializeDoa2InterpolationState(cpu);
+        var branch = StepUntilPc(cpu, 0x8C10_0AB2);
+
+        Assert.False(cpu.TryFastForwardDoa2InterpolationLoop(branch, 90, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0AB4u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2InterpolationLoopWhenSourceIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2InterpolationLoop(memory);
+        WriteInterpolationData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0A7A);
+        InitializeDoa2InterpolationState(cpu);
+        cpu.State.R[7] = 0xA500_0000;
+        var branch = StepUntilPc(cpu, 0x8C10_0AB2);
+
+        Assert.False(cpu.TryFastForwardDoa2InterpolationLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
@@ -2532,6 +2600,81 @@ public class Sh4CpuTests
         {
             memory.WriteUInt32(0x8C20_1000 + offset, BitConverter.SingleToUInt32Bits(1.0f + offset));
             memory.WriteUInt32(0x8C20_2000 + offset, BitConverter.SingleToUInt32Bits(2.0f + offset));
+        }
+    }
+
+    private static void WriteDoa2InterpolationLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_0A7A, 0xFB79);
+        WriteInstruction(memory, 0x8C10_0A7C, 0xE004);
+        WriteInstruction(memory, 0x8C10_0A7E, 0xF38D);
+        WriteInstruction(memory, 0x8C10_0A80, 0xFB61);
+        WriteInstruction(memory, 0x8C10_0A82, 0xFA79);
+        WriteInstruction(memory, 0x8C10_0A84, 0xF146);
+        WriteInstruction(memory, 0x8C10_0A86, 0xE008);
+        WriteInstruction(memory, 0x8C10_0A88, 0xFA71);
+        WriteInstruction(memory, 0x8C10_0A8A, 0xFB34);
+        WriteInstruction(memory, 0x8C10_0A8C, 0x8D06);
+        WriteInstruction(memory, 0x8C10_0A8E, 0xFE46);
+        WriteInstruction(memory, 0x8C10_0A90, 0xF24C);
+        WriteInstruction(memory, 0x8C10_0A92, 0xF2B2);
+        WriteInstruction(memory, 0x8C10_0A94, 0xF0BC);
+        WriteInstruction(memory, 0x8C10_0A96, 0xF18E);
+        WriteInstruction(memory, 0x8C10_0A98, 0xF24D);
+        WriteInstruction(memory, 0x8C10_0A9A, 0xFE20);
+        WriteInstruction(memory, 0x8C10_0A9C, 0xF38D);
+        WriteInstruction(memory, 0x8C10_0A9E, 0xFA34);
+        WriteInstruction(memory, 0x8C10_0AA0, 0x8902);
+        WriteInstruction(memory, 0x8C10_0AA2, 0xF0AC);
+        WriteInstruction(memory, 0x8C10_0AA4, 0xFE5E);
+        WriteInstruction(memory, 0x8C10_0AA6, 0xF19E);
+        WriteInstruction(memory, 0x8C10_0AA8, 0x71FF);
+        WriteInstruction(memory, 0x8C10_0AAA, 0xF51A);
+        WriteInstruction(memory, 0x8C10_0AAC, 0xF6EA);
+        WriteInstruction(memory, 0x8C10_0AAE, 0x2118);
+        WriteInstruction(memory, 0x8C10_0AB0, 0x7604);
+        WriteInstruction(memory, 0x8C10_0AB2, 0x8FE2);
+        WriteInstruction(memory, 0x8C10_0AB4, 0x7504);
+        WriteInstruction(memory, 0x8C10_0AB6, 0x0009);
+    }
+
+    private static void InitializeDoa2InterpolationState(Sh4Cpu cpu)
+    {
+        cpu.State.R[1] = 4;
+        cpu.State.R[4] = 0x8C20_5000;
+        cpu.State.R[5] = 0x8C20_2FFC;
+        cpu.State.R[6] = 0x8C20_4000;
+        cpu.State.R[7] = 0x8C20_6000;
+        cpu.State.Fr[1] = 0xFFC0_0000;
+        cpu.State.Fr[2] = 0xFFC0_0000;
+        cpu.State.Fr[3] = 0xFFC0_0000;
+        cpu.State.Fr[4] = 0xFFC0_0000;
+        cpu.State.Fr[5] = 0xFFC0_0000;
+        cpu.State.Fr[8] = 0xFFC0_0000;
+        cpu.State.Fr[9] = 0xFFC0_0000;
+        cpu.State.T = false;
+    }
+
+    private static void WriteInterpolationData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_5004, BitConverter.SingleToUInt32Bits(480.0f));
+        memory.WriteUInt32(0x8C20_5008, BitConverter.SingleToUInt32Bits(360.0f));
+        var sourceValues = new[] { 1.0f, 1.0f, 3.0f, 1.0f, 3.0f, 3.0f, 1.0f, 3.0f };
+        for (var index = 0; index < sourceValues.Length; index++)
+        {
+            memory.WriteUInt32(0x8C20_6000 + ((uint)index * 4), BitConverter.SingleToUInt32Bits(sourceValues[index]));
+        }
+    }
+
+    private static Sh4StepResult StepUntilPc(Sh4Cpu cpu, uint pc)
+    {
+        while (true)
+        {
+            var step = cpu.Step();
+            if (step.Pc == pc)
+            {
+                return step;
+            }
         }
     }
 
