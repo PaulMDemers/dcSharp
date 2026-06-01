@@ -714,6 +714,40 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryCompleteDoa2Slot8StubTaskCallback(Sh4StepResult step)
+    {
+        if (step.Pc != 0x8C13_0728 || step.Opcode != 0x0C36)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C13_0724) != 0x9010
+            || memory.ReadInstructionUInt16(0x8C13_0726) != 0xE302
+            || memory.ReadInstructionUInt16(0x8C13_0728) != 0x0C36
+            || memory.ReadInstructionUInt16(0x8C13_072A) != 0xD309
+            || memory.ReadInstructionUInt16(0x8C13_072C) != 0x430B
+            || memory.ReadInstructionUInt16(0x8C13_072E) != 0xE408
+            || memory.ReadUInt32(0x8C13_0750) != 0x8C12_D2C0
+            || State.Pc != 0x8C13_072A
+            || unchecked(State.R[12] + State.R[0]) != 0x8C2F_67DC
+            || State.R[3] != 2
+            || memory.ReadUInt32(0x8C30_C780) != 0x8C0F_9F00
+            || memory.ReadUInt32(0x8C30_C784) != 0x8C2F_67DC
+            || memory.ReadInstructionUInt16(0x8C0F_9F00) != 0x000B
+            || memory.ReadInstructionUInt16(0x8C0F_9F02) != 0x0009
+            || memory.ReadUInt32(0x8C2B_6CE8) != 0x0000_01F8
+            || memory.ReadUInt32(0x8C2B_6CEC) != 0x0000_0100
+            || memory.ReadUInt32(0x8C2F_67D4) != 1
+            || memory.ReadUInt32(0x8C2F_67D8) != 0
+            || memory.ReadUInt32(0x8C2F_67DC) != 2)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(0x8C2B_6CEC, 0x0000_0120);
+        return true;
+    }
+
     private bool IsDoa2BusyBitWorkItem(uint queueHead)
     {
         const uint firstWorkItem = 0x8C2F_6820;
@@ -1105,6 +1139,48 @@ public sealed class Sh4Cpu
             return $"mova @(0x{opcode & 0xFF:X2},pc),r0 ; r0=0x{State.R[0]:X8}";
         }
 
+        if ((opcode & 0xFF00) == 0xC000)
+        {
+            var address = State.Gbr + (uint)(opcode & 0xFF);
+            memory.Write(address, [(byte)State.R[0]]);
+            return $"mov.b r0,@(0x{opcode & 0xFF:X2},gbr) ; [0x{address:X8}]=0x{State.R[0] & 0xFF:X2}";
+        }
+
+        if ((opcode & 0xFF00) == 0xC100)
+        {
+            var address = State.Gbr + ((uint)(opcode & 0xFF) * 2);
+            memory.WriteUInt16(address, (ushort)State.R[0]);
+            return $"mov.w r0,@(0x{opcode & 0xFF:X2},gbr) ; [0x{address:X8}]=0x{State.R[0] & 0xFFFF:X4}";
+        }
+
+        if ((opcode & 0xFF00) == 0xC200)
+        {
+            var address = State.Gbr + ((uint)(opcode & 0xFF) * 4);
+            memory.WriteUInt32(address, State.R[0]);
+            return $"mov.l r0,@(0x{opcode & 0xFF:X2},gbr) ; [0x{address:X8}]=0x{State.R[0]:X8}";
+        }
+
+        if ((opcode & 0xFF00) == 0xC400)
+        {
+            var address = State.Gbr + (uint)(opcode & 0xFF);
+            State.R[0] = (uint)(sbyte)memory.ReadByte(address);
+            return $"mov.b @(0x{opcode & 0xFF:X2},gbr),r0 ; [0x{address:X8}]=0x{State.R[0]:X8}";
+        }
+
+        if ((opcode & 0xFF00) == 0xC500)
+        {
+            var address = State.Gbr + ((uint)(opcode & 0xFF) * 2);
+            State.R[0] = (uint)(short)memory.ReadUInt16(address);
+            return $"mov.w @(0x{opcode & 0xFF:X2},gbr),r0 ; [0x{address:X8}]=0x{State.R[0]:X8}";
+        }
+
+        if ((opcode & 0xFF00) == 0xC600)
+        {
+            var address = State.Gbr + ((uint)(opcode & 0xFF) * 4);
+            State.R[0] = memory.ReadUInt32(address);
+            return $"mov.l @(0x{opcode & 0xFF:X2},gbr),r0 ; [0x{address:X8}]=0x{State.R[0]:X8}";
+        }
+
         if (highNibble == 0x2 && lowNibble == 0x0)
         {
             memory.Write(State.R[n], [(byte)State.R[m]]);
@@ -1213,6 +1289,38 @@ public sealed class Sh4Cpu
         {
             State.R[0] ^= (uint)(opcode & 0xFF);
             return $"xor #0x{opcode & 0xFF:X2},r0 ; r0=0x{State.R[0]:X8}";
+        }
+
+        if ((opcode & 0xFF00) == 0xCC00)
+        {
+            var address = State.R[0] + State.Gbr;
+            var value = memory.ReadByte(address);
+            State.T = (value & (opcode & 0xFF)) == 0;
+            return $"tst.b #0x{opcode & 0xFF:X2},@(r0,gbr) ; [0x{address:X8}]=0x{value:X2}, t={(State.T ? 1 : 0)}";
+        }
+
+        if ((opcode & 0xFF00) == 0xCD00)
+        {
+            var address = State.R[0] + State.Gbr;
+            var value = (byte)(memory.ReadByte(address) & (opcode & 0xFF));
+            memory.Write(address, [value]);
+            return $"and.b #0x{opcode & 0xFF:X2},@(r0,gbr) ; [0x{address:X8}]=0x{value:X2}";
+        }
+
+        if ((opcode & 0xFF00) == 0xCE00)
+        {
+            var address = State.R[0] + State.Gbr;
+            var value = (byte)(memory.ReadByte(address) ^ (opcode & 0xFF));
+            memory.Write(address, [value]);
+            return $"xor.b #0x{opcode & 0xFF:X2},@(r0,gbr) ; [0x{address:X8}]=0x{value:X2}";
+        }
+
+        if ((opcode & 0xFF00) == 0xCF00)
+        {
+            var address = State.R[0] + State.Gbr;
+            var value = (byte)(memory.ReadByte(address) | (opcode & 0xFF));
+            memory.Write(address, [value]);
+            return $"or.b #0x{opcode & 0xFF:X2},@(r0,gbr) ; [0x{address:X8}]=0x{value:X2}";
         }
 
         if (highNibble == 0x3 && lowNibble == 0x0)

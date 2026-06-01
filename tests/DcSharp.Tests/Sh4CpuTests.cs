@@ -695,6 +695,62 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void CompletesDoa2Slot8StubTaskCallback()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2Slot8TaskCallback(memory);
+        WriteInstruction(memory, 0x8C0F_9F00, 0x000B);
+        WriteInstruction(memory, 0x8C0F_9F02, 0x0009);
+        memory.WriteUInt32(0x8C30_C780, 0x8C0F_9F00);
+        memory.WriteUInt32(0x8C30_C784, 0x8C2F_67DC);
+        memory.WriteUInt32(0x8C2B_6CE8, 0x0000_01F8);
+        memory.WriteUInt32(0x8C2B_6CEC, 0x0000_0100);
+        memory.WriteUInt32(0x8C2F_67D4, 1);
+        memory.WriteUInt32(0x8C2F_67D8, 0);
+        memory.WriteUInt32(0x8C2F_67DC, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C13_0728);
+        cpu.State.R[0] = 0x67DC;
+        cpu.State.R[3] = 2;
+        cpu.State.R[12] = 0x8C2F_0000;
+
+        var store = cpu.Step();
+
+        Assert.True(cpu.TryCompleteDoa2Slot8StubTaskCallback(store));
+        Assert.Equal(0x0000_0120u, memory.ReadUInt32(0x8C2B_6CEC));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67D8));
+        Assert.Equal(2u, memory.ReadUInt32(0x8C2F_67DC));
+        Assert.Equal(0x8C13_072Au, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotCompleteDoa2Slot8CallbackWhenHandlerIsNotStub()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2Slot8TaskCallback(memory);
+        WriteInstruction(memory, 0x8C0F_9F00, 0x4F22);
+        WriteInstruction(memory, 0x8C0F_9F02, 0x0009);
+        memory.WriteUInt32(0x8C30_C780, 0x8C0F_9F00);
+        memory.WriteUInt32(0x8C30_C784, 0x8C2F_67DC);
+        memory.WriteUInt32(0x8C2B_6CE8, 0x0000_01F8);
+        memory.WriteUInt32(0x8C2B_6CEC, 0x0000_0100);
+        memory.WriteUInt32(0x8C2F_67D4, 1);
+        memory.WriteUInt32(0x8C2F_67D8, 0);
+        memory.WriteUInt32(0x8C2F_67DC, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C13_0728);
+        cpu.State.R[0] = 0x67DC;
+        cpu.State.R[3] = 2;
+        cpu.State.R[12] = 0x8C2F_0000;
+
+        var store = cpu.Step();
+
+        Assert.False(cpu.TryCompleteDoa2Slot8StubTaskCallback(store));
+        Assert.Equal(0x0000_0100u, memory.ReadUInt32(0x8C2B_6CEC));
+        Assert.Equal(0u, memory.ReadUInt32(0x8C2F_67D8));
+        Assert.Equal(2u, memory.ReadUInt32(0x8C2F_67DC));
+    }
+
+    [Fact]
     public void FastForwardsPredecrementStoreDtLoop()
     {
         var memory = new DreamcastMemory();
@@ -854,6 +910,81 @@ public class Sh4CpuTests
         cpu.Step();
 
         Assert.Equal(0xA5, memory.ReadByte(0x8C02_0005));
+    }
+
+    [Fact]
+    public void ExecutesGbrDisplacementLoads()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xC401);
+        WriteInstruction(memory, 0x8C01_0002, 0xC502);
+        WriteInstruction(memory, 0x8C01_0004, 0xC603);
+        memory.Write(0x8C02_0001, [0xFE]);
+        memory.WriteUInt16(0x8C02_0004, 0x8001);
+        memory.WriteUInt32(0x8C02_000C, 0x1234_5678);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Gbr = 0x8C02_0000;
+
+        var byteLoad = cpu.Step();
+        Assert.Equal(0xFFFF_FFFEu, cpu.State.R[0]);
+        Assert.Equal("mov.b @(0x01,gbr),r0 ; [0x8C020001]=0xFFFFFFFE", byteLoad.Trace);
+
+        var wordLoad = cpu.Step();
+        Assert.Equal(0xFFFF_8001u, cpu.State.R[0]);
+        Assert.Equal("mov.w @(0x02,gbr),r0 ; [0x8C020004]=0xFFFF8001", wordLoad.Trace);
+
+        var longLoad = cpu.Step();
+        Assert.Equal(0x1234_5678u, cpu.State.R[0]);
+        Assert.Equal("mov.l @(0x03,gbr),r0 ; [0x8C02000C]=0x12345678", longLoad.Trace);
+    }
+
+    [Fact]
+    public void ExecutesGbrDisplacementStores()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xC001);
+        WriteInstruction(memory, 0x8C01_0002, 0xC102);
+        WriteInstruction(memory, 0x8C01_0004, 0xC203);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Gbr = 0x8C02_0000;
+
+        cpu.State.R[0] = 0x1234_56A5;
+        cpu.Step();
+        Assert.Equal(0xA5, memory.ReadByte(0x8C02_0001));
+
+        cpu.State.R[0] = 0xCAFE_BABE;
+        cpu.Step();
+        Assert.Equal(0xBABE, memory.ReadUInt16(0x8C02_0004));
+
+        cpu.State.R[0] = 0x1020_3040;
+        cpu.Step();
+        Assert.Equal(0x1020_3040u, memory.ReadUInt32(0x8C02_000C));
+    }
+
+    [Fact]
+    public void ExecutesGbrByteLogicalOperations()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xCC10);
+        WriteInstruction(memory, 0x8C01_0002, 0xCD3F);
+        WriteInstruction(memory, 0x8C01_0004, 0xCE0F);
+        WriteInstruction(memory, 0x8C01_0006, 0xCF80);
+        memory.Write(0x8C02_0004, [0x52]);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Gbr = 0x8C02_0000;
+        cpu.State.R[0] = 4;
+
+        cpu.Step();
+        Assert.False(cpu.State.T);
+
+        cpu.Step();
+        Assert.Equal(0x12, memory.ReadByte(0x8C02_0004));
+
+        cpu.Step();
+        Assert.Equal(0x1D, memory.ReadByte(0x8C02_0004));
+
+        cpu.Step();
+        Assert.Equal(0x9D, memory.ReadByte(0x8C02_0004));
     }
 
     [Fact]
@@ -2137,6 +2268,17 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C13_0524, 0x8C2F_6808);
         memory.WriteUInt32(0x8C13_0528, 0x8C2F_6814);
         memory.WriteUInt32(0x8C13_052C, 0x8C2F_67FC);
+    }
+
+    private static void WriteDoa2Slot8TaskCallback(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_0724, 0x9010);
+        WriteInstruction(memory, 0x8C13_0726, 0xE302);
+        WriteInstruction(memory, 0x8C13_0728, 0x0C36);
+        WriteInstruction(memory, 0x8C13_072A, 0xD309);
+        WriteInstruction(memory, 0x8C13_072C, 0x430B);
+        WriteInstruction(memory, 0x8C13_072E, 0xE408);
+        memory.WriteUInt32(0x8C13_0750, 0x8C12_D2C0);
     }
 
     private static void RaiseVBlankIrq9(DreamcastMemory memory)
