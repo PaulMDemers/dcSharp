@@ -2486,6 +2486,174 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ListEntrySetupToClassifier()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ListEntrySetupToClassifier(normalMemory);
+        WriteListEntrySetupData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ListEntrySetupToClassifier(fastMemory);
+        WriteListEntrySetupData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_750E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_750E);
+        InitializeDoa2ListEntrySetupState(normal);
+        InitializeDoa2ListEntrySetupState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ListEntrySetupToClassifier(fastStart, 17, out var skippedInstructions));
+        Assert.Equal(17UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C2F_B8E0), fastMemory.ReadUInt32(0x8C2F_B8E0));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C2F_B8DC), fastMemory.ReadUInt32(0x8C2F_B8DC));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FFC), fastMemory.ReadUInt32(0x8C20_6FFC));
+        Assert.Equal(0x8C11_7482u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntrySetupToClassifierWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntrySetupToClassifier(memory);
+        WriteListEntrySetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_750E);
+        InitializeDoa2ListEntrySetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntrySetupToClassifier(start, 16, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7510u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntrySetupToClassifierWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntrySetupToClassifier(memory);
+        WriteListEntrySetupData(memory);
+        memory.WriteUInt32(0x8C11_75D0, 0x8C20_1000);
+        var cpu = new Sh4Cpu(memory, 0x8C11_750E);
+        InitializeDoa2ListEntrySetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntrySetupToClassifier(start, 17, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7510u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntrySetupToClassifierWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntrySetupToClassifier(memory);
+        WriteListEntrySetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_750E);
+        InitializeDoa2ListEntrySetupState(cpu);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntrySetupToClassifier(start, 17, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7510u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2ListEntryPostClassifierToRemainder()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ListEntryPostClassifierToRemainder(normalMemory);
+        WriteListEntryPostClassifierStack(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ListEntryPostClassifierToRemainder(fastMemory);
+        WriteListEntryPostClassifierStack(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_7532);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_7532);
+        InitializeDoa2ListEntryPostClassifierState(normal);
+        InitializeDoa2ListEntryPostClassifierState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ListEntryPostClassifierToRemainder(fastStart, 5, out var skippedInstructions));
+        Assert.Equal(5UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_5000), fastMemory.ReadUInt32(0x8C20_5000));
+        Assert.Equal(0x8C10_751Cu, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryPostClassifierToRemainderWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryPostClassifierToRemainder(memory);
+        WriteListEntryPostClassifierStack(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7532);
+        InitializeDoa2ListEntryPostClassifierState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryPostClassifierToRemainder(start, 4, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7534u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryPostClassifierToRemainderWhenTargetLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryPostClassifierToRemainder(memory);
+        WriteListEntryPostClassifierStack(memory);
+        memory.WriteUInt32(0x8C11_75D8, 0x8C10_7520);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7532);
+        InitializeDoa2ListEntryPostClassifierState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryPostClassifierToRemainder(start, 5, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7534u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryPostClassifierToRemainderWhenDestinationIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryPostClassifierToRemainder(memory);
+        memory.WriteUInt32(0x8C20_6FFC, 0xA500_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7532);
+        InitializeDoa2ListEntryPostClassifierState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryPostClassifierToRemainder(start, 5, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7534u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ZeroByteClassifier()
     {
         var normalMemory = new DreamcastMemory();
@@ -5445,6 +5613,69 @@ public class Sh4CpuTests
         cpu.State.T = true;
         cpu.State.M = true;
         cpu.State.Q = true;
+    }
+
+    private static void WriteDoa2ListEntrySetupToClassifier(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_750E, 0xEE34);
+        WriteInstruction(memory, 0x8C11_7510, 0xD32F);
+        WriteInstruction(memory, 0x8C11_7512, 0x0DE7);
+        WriteInstruction(memory, 0x8C11_7514, 0x61D3);
+        WriteInstruction(memory, 0x8C11_7516, 0x4108);
+        WriteInstruction(memory, 0x8C11_7518, 0x6C03);
+        WriteInstruction(memory, 0x8C11_751A, 0x66B3);
+        WriteInstruction(memory, 0x8C11_751C, 0x65C3);
+        WriteInstruction(memory, 0x8C11_751E, 0x0E1A);
+        WriteInstruction(memory, 0x8C11_7520, 0x3E3C);
+        WriteInstruction(memory, 0x8C11_7522, 0xD32C);
+        WriteInstruction(memory, 0x8C11_7524, 0x1E0C);
+        WriteInstruction(memory, 0x8C11_7526, 0x52E2);
+        WriteInstruction(memory, 0x8C11_7528, 0x331C);
+        WriteInstruction(memory, 0x8C11_752A, 0x1E2B);
+        WriteInstruction(memory, 0x8C11_752C, 0x2F36);
+        WriteInstruction(memory, 0x8C11_752E, 0xBFA8);
+        WriteInstruction(memory, 0x8C11_7530, 0x64E3);
+        memory.WriteUInt32(0x8C11_75D0, 0x8C2F_B814);
+        memory.WriteUInt32(0x8C11_75D4, 0x8C2F_BCF4);
+    }
+
+    private static void WriteListEntrySetupData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C2F_B8B8, 0xCAFE_BABE);
+    }
+
+    private static void InitializeDoa2ListEntrySetupState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0x8C30_F534;
+        cpu.State.R[11] = 0x8C30_3704;
+        cpu.State.R[13] = 3;
+        cpu.State.R[15] = 0x8C20_7000;
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2ListEntryPostClassifierToRemainder(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_7532, 0x62F6);
+        WriteInstruction(memory, 0x8C11_7534, 0x61D3);
+        WriteInstruction(memory, 0x8C11_7536, 0xD328);
+        WriteInstruction(memory, 0x8C11_7538, 0x2202);
+        WriteInstruction(memory, 0x8C11_753A, 0x430B);
+        WriteInstruction(memory, 0x8C11_753C, 0x6093);
+        memory.WriteUInt32(0x8C11_75D8, 0x8C10_751C);
+    }
+
+    private static void WriteListEntryPostClassifierStack(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_6FFC, 0x8C20_5000);
+    }
+
+    private static void InitializeDoa2ListEntryPostClassifierState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0;
+        cpu.State.R[9] = 6;
+        cpu.State.R[13] = 4;
+        cpu.State.R[15] = 0x8C20_6FFC;
+        cpu.State.T = true;
     }
 
     private static void WriteDoa2ZeroByteClassifier(DreamcastMemory memory)

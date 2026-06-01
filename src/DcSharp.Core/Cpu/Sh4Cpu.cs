@@ -2441,6 +2441,94 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ListEntrySetupToClassifier(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_750E
+            || step.Opcode != 0xEE34
+            || State.Pc != 0x8C11_7510
+            || State.R[14] != 52)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 17;
+        if (!IsDoa2ListEntrySetupToClassifier()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 4)
+        {
+            return false;
+        }
+
+        var entryTableBase = memory.ReadUInt32(0x8C11_75D0);
+        var resultTableBase = memory.ReadUInt32(0x8C11_75D4);
+        var product = unchecked((uint)((long)(int)State.R[14] * (int)State.R[13]));
+        var entryAddress = unchecked(entryTableBase + product);
+        var resultSlot = unchecked(resultTableBase + (State.R[13] << 2));
+        var stackAddress = State.R[15] - 4;
+        if (entryAddress > uint.MaxValue - 0x30
+            || !memory.TryGetSystemRamOffset(entryAddress + 8, 4, out _)
+            || !memory.TryGetSystemRamOffset(entryAddress + 0x2C, 4, out _)
+            || !memory.TryGetSystemRamOffset(entryAddress + 0x30, 4, out _)
+            || !memory.TryGetSystemRamOffset(stackAddress, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[3] = entryTableBase;
+        State.Macl = product;
+        State.R[1] = State.R[13] << 2;
+        State.R[12] = State.R[0];
+        State.R[6] = State.R[11];
+        State.R[5] = State.R[12];
+        State.R[14] = entryAddress;
+        State.R[3] = resultSlot;
+        memory.WriteUInt32(entryAddress + 0x30, State.R[0]);
+        State.R[2] = memory.ReadUInt32(entryAddress + 8);
+        memory.WriteUInt32(entryAddress + 0x2C, State.R[2]);
+        State.R[15] = stackAddress;
+        memory.WriteUInt32(State.R[15], State.R[3]);
+        State.Pr = 0x8C11_7532;
+        State.R[4] = State.R[14];
+        State.Pc = 0x8C11_7482;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2ListEntryPostClassifierToRemainder(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_7532
+            || step.Opcode != 0x62F6
+            || State.Pc != 0x8C11_7534)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 5;
+        if (!IsDoa2ListEntryPostClassifierToRemainder()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(State.R[2], 4, out _))
+        {
+            return false;
+        }
+
+        State.R[1] = State.R[13];
+        State.R[3] = 0x8C10_751C;
+        memory.WriteUInt32(State.R[2], State.R[0]);
+        State.Pr = 0x8C11_753E;
+        State.R[0] = State.R[9];
+        State.Pc = 0x8C10_751C;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3523,6 +3611,37 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_74AE) == 0xE000
         && memory.ReadUInt16(0x8C11_74C4) == 0x00FC
         && memory.ReadUInt16(0x8C11_74C6) == 0x00FF;
+
+    private bool IsDoa2ListEntrySetupToClassifier() =>
+        memory.ReadInstructionUInt16(0x8C11_750E) == 0xEE34
+        && memory.ReadInstructionUInt16(0x8C11_7510) == 0xD32F
+        && memory.ReadInstructionUInt16(0x8C11_7512) == 0x0DE7
+        && memory.ReadInstructionUInt16(0x8C11_7514) == 0x61D3
+        && memory.ReadInstructionUInt16(0x8C11_7516) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C11_7518) == 0x6C03
+        && memory.ReadInstructionUInt16(0x8C11_751A) == 0x66B3
+        && memory.ReadInstructionUInt16(0x8C11_751C) == 0x65C3
+        && memory.ReadInstructionUInt16(0x8C11_751E) == 0x0E1A
+        && memory.ReadInstructionUInt16(0x8C11_7520) == 0x3E3C
+        && memory.ReadInstructionUInt16(0x8C11_7522) == 0xD32C
+        && memory.ReadInstructionUInt16(0x8C11_7524) == 0x1E0C
+        && memory.ReadInstructionUInt16(0x8C11_7526) == 0x52E2
+        && memory.ReadInstructionUInt16(0x8C11_7528) == 0x331C
+        && memory.ReadInstructionUInt16(0x8C11_752A) == 0x1E2B
+        && memory.ReadInstructionUInt16(0x8C11_752C) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C11_752E) == 0xBFA8
+        && memory.ReadInstructionUInt16(0x8C11_7530) == 0x64E3
+        && memory.ReadUInt32(0x8C11_75D0) == 0x8C2F_B814
+        && memory.ReadUInt32(0x8C11_75D4) == 0x8C2F_BCF4;
+
+    private bool IsDoa2ListEntryPostClassifierToRemainder() =>
+        memory.ReadInstructionUInt16(0x8C11_7532) == 0x62F6
+        && memory.ReadInstructionUInt16(0x8C11_7534) == 0x61D3
+        && memory.ReadInstructionUInt16(0x8C11_7536) == 0xD328
+        && memory.ReadInstructionUInt16(0x8C11_7538) == 0x2202
+        && memory.ReadInstructionUInt16(0x8C11_753A) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C11_753C) == 0x6093
+        && memory.ReadUInt32(0x8C11_75D8) == 0x8C10_751C;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
