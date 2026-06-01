@@ -1142,6 +1142,93 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ColorBytePackCommonPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ColorBytePackCommonPath(normalMemory);
+        WriteColorBytePackConstants(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ColorBytePackCommonPath(fastMemory);
+        WriteColorBytePackConstants(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_0AC0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_0AC0);
+        InitializeDoa2ColorBytePackState(normal);
+        InitializeDoa2ColorBytePackState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ColorBytePackCommonPath(fastStart, 100, out var skippedInstructions));
+        Assert.Equal(49UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_0670u, fast.State.Pc);
+        Assert.Equal(0x193F7FBFu, fast.State.R[0]);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ColorBytePackCommonPathWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ColorBytePackCommonPath(memory);
+        WriteColorBytePackConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0AC0);
+        InitializeDoa2ColorBytePackState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ColorBytePackCommonPath(start, 48, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0AC2u, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ColorBytePackCommonPathWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ColorBytePackCommonPath(memory);
+        WriteColorBytePackConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0AC0);
+        InitializeDoa2ColorBytePackState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ColorBytePackCommonPath(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0AC2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ColorBytePackCommonPathWhenComponentNeedsClamp()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ColorBytePackCommonPath(memory);
+        WriteColorBytePackConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0AC0);
+        InitializeDoa2ColorBytePackState(cpu);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(2.0f);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ColorBytePackCommonPath(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0AC2u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2FpuRecurrenceLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -3056,6 +3143,83 @@ public class Sh4CpuTests
         cpu.State.R[13] = 0x8C20_1000;
         cpu.State.R[15] = 0x8C20_2000;
         cpu.State.Fr[15] = BitConverter.SingleToUInt32Bits(4096.0f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2ColorBytePackCommonPath(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_0AC0, 0xC72B);
+        WriteInstruction(memory, 0x8C10_0AC2, 0xF808);
+        WriteInstruction(memory, 0x8C10_0AC4, 0xC72B);
+        WriteInstruction(memory, 0x8C10_0AC6, 0xF908);
+        WriteInstruction(memory, 0x8C10_0AC8, 0xF482);
+        WriteInstruction(memory, 0x8C10_0ACA, 0xF582);
+        WriteInstruction(memory, 0x8C10_0ACC, 0xF682);
+        WriteInstruction(memory, 0x8C10_0ACE, 0xF782);
+        WriteInstruction(memory, 0x8C10_0AD0, 0xF495);
+        WriteInstruction(memory, 0x8C10_0AD2, 0x8F0D);
+        WriteInstruction(memory, 0x8C10_0AD4, 0xF84C);
+        WriteInstruction(memory, 0x8C10_0AF0, 0xF38C);
+        WriteInstruction(memory, 0x8C10_0AF2, 0xF33D);
+        WriteInstruction(memory, 0x8C10_0AF4, 0xF595);
+        WriteInstruction(memory, 0x8C10_0AF6, 0x045A);
+        WriteInstruction(memory, 0x8C10_0AF8, 0x8F0A);
+        WriteInstruction(memory, 0x8C10_0AFA, 0xF45C);
+        WriteInstruction(memory, 0x8C10_0B10, 0xF34C);
+        WriteInstruction(memory, 0x8C10_0B12, 0xF33D);
+        WriteInstruction(memory, 0x8C10_0B14, 0xF695);
+        WriteInstruction(memory, 0x8C10_0B16, 0x055A);
+        WriteInstruction(memory, 0x8C10_0B18, 0x8F0A);
+        WriteInstruction(memory, 0x8C10_0B1A, 0xF46C);
+        WriteInstruction(memory, 0x8C10_0B30, 0xF34C);
+        WriteInstruction(memory, 0x8C10_0B32, 0xF33D);
+        WriteInstruction(memory, 0x8C10_0B34, 0xF795);
+        WriteInstruction(memory, 0x8C10_0B36, 0x065A);
+        WriteInstruction(memory, 0x8C10_0B38, 0x8F22);
+        WriteInstruction(memory, 0x8C10_0B3A, 0xF47C);
+        WriteInstruction(memory, 0x8C10_0B80, 0xF34C);
+        WriteInstruction(memory, 0x8C10_0B82, 0xF33D);
+        WriteInstruction(memory, 0x8C10_0B84, 0x907B);
+        WriteInstruction(memory, 0x8C10_0B86, 0x3406);
+        WriteInstruction(memory, 0x8C10_0B88, 0x075A);
+        WriteInstruction(memory, 0x8C10_0B8A, 0x8F01);
+        WriteInstruction(memory, 0x8C10_0B8C, 0xE100);
+        WriteInstruction(memory, 0x8C10_0B90, 0x3506);
+        WriteInstruction(memory, 0x8C10_0B92, 0x8B00);
+        WriteInstruction(memory, 0x8C10_0B96, 0x3606);
+        WriteInstruction(memory, 0x8C10_0B98, 0x8B00);
+        WriteInstruction(memory, 0x8C10_0B9C, 0x3706);
+        WriteInstruction(memory, 0x8C10_0B9E, 0x8F01);
+        WriteInstruction(memory, 0x8C10_0BA0, 0x4418);
+        WriteInstruction(memory, 0x8C10_0BA4, 0x245B);
+        WriteInstruction(memory, 0x8C10_0BA6, 0x4418);
+        WriteInstruction(memory, 0x8C10_0BA8, 0x246B);
+        WriteInstruction(memory, 0x8C10_0BAA, 0x4418);
+        WriteInstruction(memory, 0x8C10_0BAC, 0x247B);
+        WriteInstruction(memory, 0x8C10_0BAE, 0x000B);
+        WriteInstruction(memory, 0x8C10_0BB0, 0x6043);
+    }
+
+    private static void WriteColorBytePackConstants(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C10_0B70, BitConverter.SingleToUInt32Bits(255.0f));
+        memory.WriteUInt32(0x8C10_0B74, BitConverter.SingleToUInt32Bits(2147483648.0f));
+        WriteInstruction(memory, 0x8C10_0C7E, 0x00FF);
+    }
+
+    private static void InitializeDoa2ColorBytePackState(Sh4Cpu cpu)
+    {
+        cpu.State.Pr = 0x8C10_0670;
+        cpu.State.R[1] = 0x1111_1111;
+        cpu.State.R[3] = 0x3333_3333;
+        cpu.State.R[4] = 0x4444_4444;
+        cpu.State.R[5] = 0x5555_5555;
+        cpu.State.R[6] = 0x6666_6666;
+        cpu.State.R[7] = 0x7777_7777;
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(0.1f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(0.25f);
+        cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(0.5f);
+        cpu.State.Fr[7] = BitConverter.SingleToUInt32Bits(0.75f);
         cpu.State.T = true;
     }
 
