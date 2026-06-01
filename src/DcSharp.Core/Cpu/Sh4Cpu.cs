@@ -1078,6 +1078,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ScratchVectorCopyWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_3AF0
+            || step.Opcode != 0xD416
+            || State.Pc != 0x8C10_3AF2
+            || State.R[4] != 0x8C1C_A920)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 27;
+        if (!IsDoa2ScratchVectorCopyWrapper()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 8
+            || !memory.TryGetSystemRamOffset(State.R[15] - 8, 8, out _)
+            || !memory.TryGetSystemRamOffset(0x8C1C_A920, 28, out _))
+        {
+            return false;
+        }
+
+        var originalPr = State.Pr;
+        memory.WriteUInt32(State.R[15] - 4, originalPr);
+        memory.WriteUInt32(0x8C1C_A920, State.Fr[4]);
+        memory.WriteUInt32(0x8C1C_A924, State.Fr[5]);
+        memory.WriteUInt32(0x8C1C_A928, State.Fr[6]);
+        memory.WriteUInt32(State.R[15] - 8, 0x8C10_E5D8);
+        memory.WriteUInt32(0x8C1C_A938, State.Fr[6]);
+        memory.WriteUInt32(0x8C1C_A934, State.Fr[5]);
+        memory.WriteUInt32(0x8C1C_A930, State.Fr[4]);
+
+        State.R[0] = State.Fr[5];
+        State.R[1] = 0x8C1C_A930;
+        State.R[2] = 0x8C1C_A920;
+        State.R[3] = 0x8C10_E5D8;
+        State.R[4] = 0x8C1C_A920;
+        State.Pc = originalPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ColorPackCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3127,6 +3172,41 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_E618) == 0x1134
         && memory.ReadInstructionUInt16(0x8C10_E61A) == 0x5322
         && memory.ReadInstructionUInt16(0x8C10_E61C) == 0x1103
+        && memory.ReadInstructionUInt16(0x8C10_E61E) == 0x5021
+        && memory.ReadInstructionUInt16(0x8C10_E620) == 0x1132
+        && memory.ReadInstructionUInt16(0x8C10_E622) == 0x6322
+        && memory.ReadInstructionUInt16(0x8C10_E624) == 0x1101
+        && memory.ReadInstructionUInt16(0x8C10_E626) == 0x2132
+        && memory.ReadInstructionUInt16(0x8C10_E628) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_E62A) == 0x63F6;
+
+    private bool IsDoa2ScratchVectorCopyWrapper() =>
+        memory.ReadInstructionUInt16(0x8C10_3AF0) == 0xD416
+        && memory.ReadInstructionUInt16(0x8C10_3AF2) == 0xE004
+        && memory.ReadInstructionUInt16(0x8C10_3AF4) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C10_3AF6) == 0xD116
+        && memory.ReadInstructionUInt16(0x8C10_3AF8) == 0x6243
+        && memory.ReadInstructionUInt16(0x8C10_3AFA) == 0xD316
+        && memory.ReadInstructionUInt16(0x8C10_3AFC) == 0xF44A
+        && memory.ReadInstructionUInt16(0x8C10_3AFE) == 0xF457
+        && memory.ReadInstructionUInt16(0x8C10_3B00) == 0xE008
+        && memory.ReadInstructionUInt16(0x8C10_3B02) == 0xF467
+        && memory.ReadInstructionUInt16(0x8C10_3B04) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C10_3B06) == 0xE00C
+        && memory.ReadInstructionUInt16(0x8C10_3B08) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C10_3B0A) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_3B0C) == 0x0009
+        && memory.ReadUInt32(0x8C10_3B4C) == 0x8C1C_A920
+        && memory.ReadUInt32(0x8C10_3B50) == 0x8C1C_A930
+        && memory.ReadUInt32(0x8C10_3B54) == 0x8C10_E5D8
+        && memory.ReadInstructionUInt16(0x8C10_E5D8) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C10_E5DA) == 0xD302
+        && memory.ReadInstructionUInt16(0x8C10_E5DC) == 0x033E
+        && memory.ReadInstructionUInt16(0x8C10_E5DE) == 0x70FC
+        && memory.ReadInstructionUInt16(0x8C10_E5E0) == 0x432B
+        && memory.ReadInstructionUInt16(0x8C10_E5E2) == 0x032E
+        && memory.ReadUInt32(0x8C10_E5E4) == 0x8C10_E62C
+        && memory.ReadUInt32(0x8C10_E638) == 0x8C10_E61E
         && memory.ReadInstructionUInt16(0x8C10_E61E) == 0x5021
         && memory.ReadInstructionUInt16(0x8C10_E620) == 0x1132
         && memory.ReadInstructionUInt16(0x8C10_E622) == 0x6322
