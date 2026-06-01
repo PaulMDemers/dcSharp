@@ -981,6 +981,56 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ByteFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_7874
+            || step.Opcode != 0x8FFB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget != 0x8C10_786E
+            || State.Pc != 0x8C10_7876)
+        {
+            return false;
+        }
+
+        if (!IsDoa2ByteFillLoop()
+            || State.R[7] >= State.R[6])
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[6] - State.R[7];
+        if (remainingIterations > int.MaxValue)
+        {
+            return false;
+        }
+
+        skippedInstructions = 1 + ((ulong)remainingIterations * 5);
+        if (skippedInstructions > maxInstructionsToSkip
+            || State.R[0] > uint.MaxValue - remainingIterations
+            || !memory.TryGetSystemRamOffset(State.R[0] + 1, checked((int)remainingIterations), out _))
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var address = State.R[0] + 1;
+        var value = (byte)State.R[5];
+        for (var index = 0u; index < remainingIterations; index++)
+        {
+            memory.Write(address + index, [value]);
+        }
+
+        State.R[0] = address + remainingIterations;
+        State.R[7] = State.R[6];
+        State.T = true;
+        State.Pc = 0x8C10_7878;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1374,6 +1424,18 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_B208) == 0xF56C
         && memory.ReadInstructionUInt16(0x8C0F_B20A) == 0x8DF8
         && memory.ReadInstructionUInt16(0x8C0F_B20C) == 0xF523;
+
+    private bool IsDoa2ByteFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_7864) == 0xE700
+        && memory.ReadInstructionUInt16(0x8C10_7866) == 0x6373
+        && memory.ReadInstructionUInt16(0x8C10_7868) == 0x3362
+        && memory.ReadInstructionUInt16(0x8C10_786A) == 0x8D05
+        && memory.ReadInstructionUInt16(0x8C10_786C) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C10_786E) == 0x7701
+        && memory.ReadInstructionUInt16(0x8C10_7870) == 0x2050
+        && memory.ReadInstructionUInt16(0x8C10_7872) == 0x3762
+        && memory.ReadInstructionUInt16(0x8C10_7874) == 0x8FFB
+        && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D

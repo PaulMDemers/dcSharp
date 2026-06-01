@@ -922,6 +922,70 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ByteFillLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ByteFillLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ByteFillLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_7874);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_7874);
+        InitializeDoa2ByteFillState(normal);
+        InitializeDoa2ByteFillState(fast);
+
+        var normalBranch = normal.Step();
+        var fastBranch = fast.Step();
+        Assert.Equal(normalBranch.Trace, fastBranch.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ByteFillLoop(fastBranch, 100, out var skippedInstructions));
+        Assert.Equal(26UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 1u; offset <= 5; offset++)
+        {
+            Assert.Equal(normalMemory.ReadByte(0x8C20_1000 + offset), fastMemory.ReadByte(0x8C20_1000 + offset));
+            Assert.Equal(0x5A, fastMemory.ReadByte(0x8C20_1000 + offset));
+        }
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ByteFillLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ByteFillLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7874);
+        InitializeDoa2ByteFillState(cpu);
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ByteFillLoop(branch, 25, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7876u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ByteFillLoopWhenDestinationIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ByteFillLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7874);
+        InitializeDoa2ByteFillState(cpu);
+        cpu.State.R[0] = 0xA500_0000;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ByteFillLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2FpuRecurrenceLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -2696,6 +2760,30 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C13_072C, 0x430B);
         WriteInstruction(memory, 0x8C13_072E, 0xE408);
         memory.WriteUInt32(0x8C13_0750, 0x8C12_D2C0);
+    }
+
+    private static void WriteDoa2ByteFillLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_7864, 0xE700);
+        WriteInstruction(memory, 0x8C10_7866, 0x6373);
+        WriteInstruction(memory, 0x8C10_7868, 0x3362);
+        WriteInstruction(memory, 0x8C10_786A, 0x8D05);
+        WriteInstruction(memory, 0x8C10_786C, 0x6043);
+        WriteInstruction(memory, 0x8C10_786E, 0x7701);
+        WriteInstruction(memory, 0x8C10_7870, 0x2050);
+        WriteInstruction(memory, 0x8C10_7872, 0x3762);
+        WriteInstruction(memory, 0x8C10_7874, 0x8FFB);
+        WriteInstruction(memory, 0x8C10_7876, 0x7001);
+        WriteInstruction(memory, 0x8C10_7878, 0x0009);
+    }
+
+    private static void InitializeDoa2ByteFillState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0x8C20_1000;
+        cpu.State.R[5] = 0x5A;
+        cpu.State.R[6] = 8;
+        cpu.State.R[7] = 3;
+        cpu.State.T = false;
     }
 
     private static void WriteDoa2FpuRecurrenceLoop(DreamcastMemory memory)
