@@ -1883,6 +1883,260 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2RendererPostCallScaleSetup()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererPostCallScaleSetup(normalMemory);
+        WriteRendererPostCallScaleSetupData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererPostCallScaleSetup(fastMemory);
+        WriteRendererPostCallScaleSetupData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_055C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_055C);
+        InitializeDoa2RendererPostCallScaleSetupState(normal);
+        InitializeDoa2RendererPostCallScaleSetupState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererPostCallScaleSetup(fastStart, 20, out var skippedInstructions));
+        Assert.Equal(12UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_05B0u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPostCallScaleSetupWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPostCallScaleSetup(memory);
+        WriteRendererPostCallScaleSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_055C);
+        InitializeDoa2RendererPostCallScaleSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPostCallScaleSetup(start, 11, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_055Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPostCallScaleSetupWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPostCallScaleSetup(memory);
+        WriteRendererPostCallScaleSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_055C);
+        InitializeDoa2RendererPostCallScaleSetupState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPostCallScaleSetup(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_055Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererPostCallScaleSetupWhenConstantMemoryIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererPostCallScaleSetup(memory);
+        WriteRendererPostCallScaleSetupData(memory);
+        memory.WriteUInt32(0x8C10_0594, 0xA500_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C10_055C);
+        InitializeDoa2RendererPostCallScaleSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererPostCallScaleSetup(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_055Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2RendererModeWordSetupToColorPack()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(normalMemory);
+        WriteRendererModeWordSetupData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(fastMemory);
+        WriteRendererModeWordSetupData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_05B4);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_05B4);
+        InitializeDoa2RendererModeWordSetupState(normal);
+        InitializeDoa2RendererModeWordSetupState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererModeWordSetupToColorPack(fastStart, 80, out var skippedInstructions));
+        Assert.Equal(68UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 12; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_2000 + offset), fastMemory.ReadUInt32(0x8C20_2000 + offset));
+        }
+
+        Assert.Equal(0x8C10_0AC0u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererModeWordSetupToColorPackWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(memory);
+        WriteRendererModeWordSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B4);
+        InitializeDoa2RendererModeWordSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererModeWordSetupToColorPack(start, 67, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_05B6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererModeWordSetupToColorPackWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(memory);
+        WriteRendererModeWordSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B4);
+        InitializeDoa2RendererModeWordSetupState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererModeWordSetupToColorPack(start, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_05B6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererModeWordSetupToColorPackWhenModeFlagsChooseAlternatePath()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(memory);
+        WriteRendererModeWordSetupData(memory);
+        memory.WriteUInt32(0x8C20_1000 + 52, 0x0000_2005);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B4);
+        InitializeDoa2RendererModeWordSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererModeWordSetupToColorPack(start, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_05B6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererModeWordSetupToColorPackWhenMemoryIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererModeWordSetupToColorPack(memory);
+        WriteRendererModeWordSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_05B4);
+        InitializeDoa2RendererModeWordSetupState(cpu);
+        cpu.State.R[12] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererModeWordSetupToColorPack(start, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_05B6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2RendererColorPackReturnBridge()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererColorPackReturnBridge(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererColorPackReturnBridge(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_0670);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_0670);
+        InitializeDoa2RendererColorPackReturnState(normal);
+        InitializeDoa2RendererColorPackReturnState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererColorPackReturnBridge(fastStart, 2, out var skippedInstructions));
+        Assert.Equal(1UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_2010), fastMemory.ReadUInt32(0x8C20_2010));
+        Assert.Equal(0x8C10_06ECu, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererColorPackReturnBridgeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererColorPackReturnBridge(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0670);
+        InitializeDoa2RendererColorPackReturnState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererColorPackReturnBridge(start, 0, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0672u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererColorPackReturnBridgeWhenMemoryIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererColorPackReturnBridge(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0670);
+        InitializeDoa2RendererColorPackReturnState(cpu);
+        cpu.State.R[12] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererColorPackReturnBridge(start, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0672u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -4436,6 +4690,160 @@ public class Sh4CpuTests
         cpu.State.R[15] = 0x8C20_3000;
         cpu.State.Fr[0] = 0xFFC0_0000;
         cpu.State.Fr[12] = BitConverter.SingleToUInt32Bits(0.125f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2RendererPostCallScaleSetup(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_055C, 0xD20D);
+        WriteInstruction(memory, 0x8C10_055E, 0xE004);
+        WriteInstruction(memory, 0x8C10_0560, 0xD30B);
+        WriteInstruction(memory, 0x8C10_0562, 0xD40A);
+        WriteInstruction(memory, 0x8C10_0564, 0xF228);
+        WriteInstruction(memory, 0x8C10_0566, 0xF546);
+        WriteInstruction(memory, 0x8C10_0568, 0xF338);
+        WriteInstruction(memory, 0x8C10_056A, 0xF448);
+        WriteInstruction(memory, 0x8C10_056C, 0xF522);
+        WriteInstruction(memory, 0x8C10_056E, 0xE400);
+        WriteInstruction(memory, 0x8C10_0570, 0xF432);
+        WriteInstruction(memory, 0x8C10_0572, 0xA01D);
+        WriteInstruction(memory, 0x8C10_0574, 0xE910);
+        memory.WriteUInt32(0x8C10_058C, 0x8C2F_07E0);
+        memory.WriteUInt32(0x8C10_0590, 0x8C1C_A8D4);
+        memory.WriteUInt32(0x8C10_0594, 0x8C1C_A8D8);
+    }
+
+    private static void WriteRendererPostCallScaleSetupData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C1C_A8D4, BitConverter.SingleToUInt32Bits(8.0f));
+        memory.WriteUInt32(0x8C1C_A8D8, BitConverter.SingleToUInt32Bits(0.5f));
+        memory.WriteUInt32(0x8C2F_07E0, BitConverter.SingleToUInt32Bits(0.25f));
+        memory.WriteUInt32(0x8C2F_07E4, BitConverter.SingleToUInt32Bits(2.0f));
+    }
+
+    private static void InitializeDoa2RendererPostCallScaleSetupState(Sh4Cpu cpu)
+    {
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2RendererModeWordSetupToColorPack(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_05B4, 0x62C2);
+        WriteInstruction(memory, 0x8C10_05B6, 0xD331);
+        WriteInstruction(memory, 0x8C10_05B8, 0x2239);
+        WriteInstruction(memory, 0x8C10_05BA, 0x935B);
+        WriteInstruction(memory, 0x8C10_05BC, 0x2C22);
+        WriteInstruction(memory, 0x8C10_05BE, 0x51C1);
+        WriteInstruction(memory, 0x8C10_05C0, 0xD22F);
+        WriteInstruction(memory, 0x8C10_05C2, 0x2129);
+        WriteInstruction(memory, 0x8C10_05C4, 0x1C11);
+        WriteInstruction(memory, 0x8C10_05C6, 0x50C2);
+        WriteInstruction(memory, 0x8C10_05C8, 0xD12E);
+        WriteInstruction(memory, 0x8C10_05CA, 0x2019);
+        WriteInstruction(memory, 0x8C10_05CC, 0x1C02);
+        WriteInstruction(memory, 0x8C10_05CE, 0x50DD);
+        WriteInstruction(memory, 0x8C10_05D0, 0x2038);
+        WriteInstruction(memory, 0x8C10_05D2, 0x8B03);
+        WriteInstruction(memory, 0x8C10_05DC, 0x53DD);
+        WriteInstruction(memory, 0x8C10_05DE, 0x944A);
+        WriteInstruction(memory, 0x8C10_05E0, 0x954A);
+        WriteInstruction(memory, 0x8C10_05E2, 0x2348);
+        WriteInstruction(memory, 0x8C10_05E4, 0x8902);
+        WriteInstruction(memory, 0x8C10_05EC, 0x52DD);
+        WriteInstruction(memory, 0x8C10_05EE, 0xD327);
+        WriteInstruction(memory, 0x8C10_05F0, 0x2238);
+        WriteInstruction(memory, 0x8C10_05F2, 0x8902);
+        WriteInstruction(memory, 0x8C10_05FA, 0x50DD);
+        WriteInstruction(memory, 0x8C10_05FC, 0xE3F8);
+        WriteInstruction(memory, 0x8C10_05FE, 0xE407);
+        WriteInstruction(memory, 0x8C10_0600, 0x403C);
+        WriteInstruction(memory, 0x8C10_0602, 0x2409);
+        WriteInstruction(memory, 0x8C10_0604, 0x2448);
+        WriteInstruction(memory, 0x8C10_0606, 0x8F01);
+        WriteInstruction(memory, 0x8C10_0608, 0xE31D);
+        WriteInstruction(memory, 0x8C10_060A, 0xE404);
+        WriteInstruction(memory, 0x8C10_060C, 0x52C1);
+        WriteInstruction(memory, 0x8C10_060E, 0x443C);
+        WriteInstruction(memory, 0x8C10_0610, 0x2EE8);
+        WriteInstruction(memory, 0x8C10_0612, 0x224B);
+        WriteInstruction(memory, 0x8C10_0614, 0x8D1C);
+        WriteInstruction(memory, 0x8C10_0616, 0x1C21);
+        WriteInstruction(memory, 0x8C10_0618, 0x50DC);
+        WriteInstruction(memory, 0x8C10_061A, 0x8804);
+        WriteInstruction(memory, 0x8C10_061C, 0x8B08);
+        WriteInstruction(memory, 0x8C10_0630, 0xD219);
+        WriteInstruction(memory, 0x8C10_0632, 0xD11A);
+        WriteInstruction(memory, 0x8C10_0634, 0x6022);
+        WriteInstruction(memory, 0x8C10_0636, 0x53C2);
+        WriteInstruction(memory, 0x8C10_0638, 0xCAFC);
+        WriteInstruction(memory, 0x8C10_063A, 0x4028);
+        WriteInstruction(memory, 0x8C10_063C, 0x4018);
+        WriteInstruction(memory, 0x8C10_063E, 0x201B);
+        WriteInstruction(memory, 0x8C10_0640, 0x230B);
+        WriteInstruction(memory, 0x8C10_0642, 0x1C32);
+        WriteInstruction(memory, 0x8C10_0644, 0x60C2);
+        WriteInstruction(memory, 0x8C10_0646, 0xD316);
+        WriteInstruction(memory, 0x8C10_0648, 0x203B);
+        WriteInstruction(memory, 0x8C10_064A, 0xA006);
+        WriteInstruction(memory, 0x8C10_064C, 0x2C02);
+        WriteInstruction(memory, 0x8C10_065A, 0x53DD);
+        WriteInstruction(memory, 0x8C10_065C, 0x2538);
+        WriteInstruction(memory, 0x8C10_065E, 0x892F);
+        WriteInstruction(memory, 0x8C10_0660, 0xD312);
+        WriteInstruction(memory, 0x8C10_0662, 0xD213);
+        WriteInstruction(memory, 0x8C10_0664, 0xD110);
+        WriteInstruction(memory, 0x8C10_0666, 0xF528);
+        WriteInstruction(memory, 0x8C10_0668, 0xF718);
+        WriteInstruction(memory, 0x8C10_066A, 0xF638);
+        WriteInstruction(memory, 0x8C10_066C, 0xB228);
+        WriteInstruction(memory, 0x8C10_066E, 0xF4EC);
+        memory.WriteUInt16(0x8C10_0674, 0x0800);
+        memory.WriteUInt16(0x8C10_0676, 0x1000);
+        memory.WriteUInt16(0x8C10_0678, 0x2000);
+        memory.WriteUInt32(0x8C10_067C, 0xF8FC_FFFF);
+        memory.WriteUInt32(0x8C10_0680, 0x1FFF_FFFF);
+        memory.WriteUInt32(0x8C10_0684, 0x0327_8FFF);
+        memory.WriteUInt32(0x8C10_068C, 0x0001_0000);
+        memory.WriteUInt32(0x8C10_0698, 0x8C1C_A5D8);
+        memory.WriteUInt32(0x8C10_069C, 0x0010_0000);
+        memory.WriteUInt32(0x8C10_06A0, 0x0200_0000);
+        memory.WriteUInt32(0x8C10_06A8, 0x8C1C_A928);
+        memory.WriteUInt32(0x8C10_06AC, 0x8C1C_A924);
+        memory.WriteUInt32(0x8C10_06B0, 0x8C1C_A920);
+    }
+
+    private static void WriteRendererModeWordSetupData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_1000 + 48, 2);
+        memory.WriteUInt32(0x8C20_1000 + 52, 0x0000_2805);
+        memory.WriteUInt32(0x8C20_2000, 0xA200_0009);
+        memory.WriteUInt32(0x8C20_2004, 0x8000_0000);
+        memory.WriteUInt32(0x8C20_2008, 0x9410_04C0);
+        memory.WriteUInt32(0x8C1C_A5D8, 0x0000_0068);
+        memory.WriteUInt32(0x8C1C_A920, BitConverter.SingleToUInt32Bits(0.25f));
+        memory.WriteUInt32(0x8C1C_A924, BitConverter.SingleToUInt32Bits(0.5f));
+        memory.WriteUInt32(0x8C1C_A928, BitConverter.SingleToUInt32Bits(0.75f));
+    }
+
+    private static void InitializeDoa2RendererModeWordSetupState(Sh4Cpu cpu)
+    {
+        cpu.State.R[12] = 0x8C20_2000;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[14] = 1;
+        cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(0.1f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2RendererColorPackReturnBridge(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_0670, 0xA03C);
+        WriteInstruction(memory, 0x8C10_0672, 0x1C04);
+    }
+
+    private static void InitializeDoa2RendererColorPackReturnState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0x3D3F_3F3F;
+        cpu.State.R[12] = 0x8C20_2000;
         cpu.State.T = true;
     }
 

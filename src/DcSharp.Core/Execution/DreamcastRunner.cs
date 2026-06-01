@@ -250,6 +250,23 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2RendererPostSecondTrigSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_055C, 0x8C10_0574)
+                        && cpu.TryFastForwardDoa2RendererPostCallScaleSetup(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererPostCallScaleSetupSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererPostCallScaleSetupSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_05B4, 0x8C10_066E)
+                        && cpu.TryFastForwardDoa2RendererModeWordSetupToColorPack(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererModeWordSetupSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererModeWordSetupSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0670, 0x8C10_0672)
+                        && cpu.TryFastForwardDoa2RendererColorPackReturnBridge(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererColorPackReturnSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererColorPackReturnSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0E_1EB2, 0x8C0E_1EF8)
                         && cpu.TryFastForwardDoa2TextAdvanceToNextGlyph(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TextAdvanceSkippedInstructions))
                     {
