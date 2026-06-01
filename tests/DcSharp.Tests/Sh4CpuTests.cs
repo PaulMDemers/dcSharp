@@ -990,6 +990,76 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TrigSetupAndRecurrenceLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(normalMemory);
+        WriteDoa2TrigSetupConstants(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(fastMemory);
+        WriteDoa2TrigSetupConstants(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B1C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(normal);
+        InitializeDoa2TrigSetupState(fast);
+
+        var normalSetupStart = normal.Step();
+        var fastSetupStart = fast.Step();
+        Assert.Equal(normalSetupStart.Trace, fastSetupStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TrigSetupAndRecurrenceLoop(fastSetupStart, 100, out var skippedInstructions));
+        Assert.Equal(74UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C0F_B216u, fast.State.Pc);
+        Assert.False(fast.State.T);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TrigSetupAndRecurrenceLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(memory);
+        WriteDoa2TrigSetupConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(cpu);
+
+        var setupStart = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TrigSetupAndRecurrenceLoop(setupStart, 73, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TrigSetupAndRecurrenceLoopWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(memory);
+        WriteDoa2TrigSetupConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var setupStart = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TrigSetupAndRecurrenceLoop(setupStart, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2VectorScaleLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -2566,6 +2636,67 @@ public class Sh4CpuTests
         cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(3.0f);
         cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(9.0f);
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2TrigSetupAndRecurrenceLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0F_B1C0, 0x644D);
+        WriteInstruction(memory, 0x8C0F_B1C2, 0xF79D);
+        WriteInstruction(memory, 0x8C0F_B1C4, 0x445A);
+        WriteInstruction(memory, 0x8C0F_B1C6, 0xC71D);
+        WriteInstruction(memory, 0x8C0F_B1C8, 0xF208);
+        WriteInstruction(memory, 0x8C0F_B1CA, 0xC71D);
+        WriteInstruction(memory, 0x8C0F_B1CC, 0xF108);
+        WriteInstruction(memory, 0x8C0F_B1CE, 0xF770);
+        WriteInstruction(memory, 0x8C0F_B1D0, 0xF32D);
+        WriteInstruction(memory, 0x8C0F_B1D2, 0xC71C);
+        WriteInstruction(memory, 0x8C0F_B1D4, 0xF508);
+        WriteInstruction(memory, 0x8C0F_B1D6, 0xC71C);
+        WriteInstruction(memory, 0x8C0F_B1D8, 0xF008);
+        WriteInstruction(memory, 0x8C0F_B1DA, 0xE40B);
+        WriteInstruction(memory, 0x8C0F_B1DC, 0xE503);
+        WriteInstruction(memory, 0x8C0F_B1DE, 0xF322);
+        WriteInstruction(memory, 0x8C0F_B1E0, 0xF313);
+        WriteInstruction(memory, 0x8C0F_B1E2, 0xF43C);
+        WriteInstruction(memory, 0x8C0F_B1E4, 0xF473);
+        WriteInstruction(memory, 0x8C0F_B1E6, 0xF34C);
+        WriteInstruction(memory, 0x8C0F_B1E8, 0xF353);
+        WriteInstruction(memory, 0x8C0F_B1EA, 0xF300);
+        WriteInstruction(memory, 0x8C0F_B1EC, 0xF33D);
+        WriteInstruction(memory, 0x8C0F_B1EE, 0x065A);
+        WriteInstruction(memory, 0x8C0F_B1F0, 0x465A);
+        WriteInstruction(memory, 0x8C0F_B1F2, 0xF32D);
+        WriteInstruction(memory, 0x8C0F_B1F4, 0xF352);
+        WriteInstruction(memory, 0x8C0F_B1F6, 0xF58D);
+        WriteInstruction(memory, 0x8C0F_B1F8, 0xF431);
+        WriteInstruction(memory, 0x8C0F_B1FA, 0xF64C);
+        WriteInstruction(memory, 0x8C0F_B1FC, 0xF642);
+        WriteDoa2FpuRecurrenceLoop(memory);
+        WriteInstruction(memory, 0x8C0F_B20E, 0xF69D);
+        WriteInstruction(memory, 0x8C0F_B210, 0xE301);
+        WriteInstruction(memory, 0x8C0F_B212, 0xF36C);
+        WriteInstruction(memory, 0x8C0F_B214, 0xF351);
+    }
+
+    private static void WriteDoa2TrigSetupConstants(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C0F_B23C, BitConverter.SingleToUInt32Bits(MathF.PI));
+        memory.WriteUInt32(0x8C0F_B240, BitConverter.SingleToUInt32Bits(65536.0f));
+        memory.WriteUInt32(0x8C0F_B244, BitConverter.SingleToUInt32Bits(MathF.PI / 2.0f));
+        memory.WriteUInt32(0x8C0F_B248, BitConverter.SingleToUInt32Bits(0.5f));
+    }
+
+    private static void InitializeDoa2TrigSetupState(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 0xFFFF_4000;
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(0.25f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(0.5f);
+        cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(0.75f);
+        cpu.State.Fr[7] = BitConverter.SingleToUInt32Bits(1.0f);
+        cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(1.25f);
+        cpu.State.Fr[9] = BitConverter.SingleToUInt32Bits(1.5f);
+        cpu.State.Fr[10] = BitConverter.SingleToUInt32Bits(1.75f);
+        cpu.State.Fr[11] = BitConverter.SingleToUInt32Bits(2.0f);
     }
 
     private static void WriteDoa2VectorScaleLoop(DreamcastMemory memory)
