@@ -1231,6 +1231,117 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TextGlyphSetupCommonPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(normalMemory);
+        WriteTextGlyphSetupData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(fastMemory);
+        WriteTextGlyphSetupData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0E_1E08);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0E_1E08);
+        InitializeDoa2TextGlyphSetupState(normal);
+        InitializeDoa2TextGlyphSetupState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TextGlyphSetupCommonPath(fastStart, 100, out var skippedInstructions));
+        Assert.Equal(62UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset <= 36; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_4000 + offset), fastMemory.ReadUInt32(0x8C20_4000 + offset));
+        }
+
+        Assert.Equal(0x8C10_0430u, fast.State.Pc);
+        Assert.Equal(0x8C0E_1EB2u, fast.State.Pr);
+        Assert.Equal(0x8C20_4000u, fast.State.R[4]);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextGlyphSetupCommonPathWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(memory);
+        WriteTextGlyphSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1E08);
+        InitializeDoa2TextGlyphSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextGlyphSetupCommonPath(start, 61, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1E0Au, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextGlyphSetupCommonPathWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(memory);
+        WriteTextGlyphSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1E08);
+        InitializeDoa2TextGlyphSetupState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextGlyphSetupCommonPath(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1E0Au, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextGlyphSetupCommonPathWhenAlternateCharacterPathIsSelected()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(memory);
+        WriteTextGlyphSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1E08);
+        InitializeDoa2TextGlyphSetupState(cpu);
+        memory.Write(0x8C20_2000, [(byte)'@']);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextGlyphSetupCommonPath(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1E0Au, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextGlyphSetupCommonPathOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextGlyphSetupCommonPath(memory);
+        WriteTextGlyphSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1E08);
+        InitializeDoa2TextGlyphSetupState(cpu);
+        cpu.State.R[8] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextGlyphSetupCommonPath(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1E0Au, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -3435,6 +3546,101 @@ public class Sh4CpuTests
         cpu.State.R[15] = 0x8C20_2000;
         cpu.State.Fr[13] = BitConverter.SingleToUInt32Bits(4096.0f);
         cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(0.1f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2TextGlyphSetupCommonPath(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0E_1E08, 0x64E0);
+        WriteInstruction(memory, 0x8C0E_1E0A, 0x644C);
+        WriteInstruction(memory, 0x8C0E_1E0C, 0x34A3);
+        WriteInstruction(memory, 0x8C0E_1E0E, 0x8B65);
+        WriteInstruction(memory, 0x8C0E_1E10, 0x9257);
+        WriteInstruction(memory, 0x8C0E_1E12, 0x3427);
+        WriteInstruction(memory, 0x8C0E_1E14, 0x8962);
+        WriteInstruction(memory, 0x8C0E_1E16, 0x60E0);
+        WriteInstruction(memory, 0x8C0E_1E18, 0x600C);
+        WriteInstruction(memory, 0x8C0E_1E1A, 0x8840);
+        WriteInstruction(memory, 0x8C0E_1E1C, 0x8B15);
+        WriteInstruction(memory, 0x8C0E_1E4A, 0x6CE0);
+        WriteInstruction(memory, 0x8C0E_1E4C, 0xE018);
+        WriteInstruction(memory, 0x8C0E_1E4E, 0x2FB2);
+        WriteInstruction(memory, 0x8C0E_1E50, 0x6CCC);
+        WriteInstruction(memory, 0x8C0E_1E52, 0x7CE0);
+        WriteInstruction(memory, 0x8C0E_1E54, 0x63C3);
+        WriteInstruction(memory, 0x8C0E_1E56, 0x4C08);
+        WriteInstruction(memory, 0x8C0E_1E58, 0x3C3C);
+        WriteInstruction(memory, 0x8C0E_1E5A, 0x4C08);
+        WriteInstruction(memory, 0x8C0E_1E5C, 0x3C8C);
+        WriteInstruction(memory, 0x8C0E_1E5E, 0xF3C8);
+        WriteInstruction(memory, 0x8C0E_1E60, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E62, 0xE008);
+        WriteInstruction(memory, 0x8C0E_1E64, 0xF3C6);
+        WriteInstruction(memory, 0x8C0E_1E66, 0xE01C);
+        WriteInstruction(memory, 0x8C0E_1E68, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E6A, 0xE004);
+        WriteInstruction(memory, 0x8C0E_1E6C, 0xF3C6);
+        WriteInstruction(memory, 0x8C0E_1E6E, 0xE020);
+        WriteInstruction(memory, 0x8C0E_1E70, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E72, 0xE00C);
+        WriteInstruction(memory, 0x8C0E_1E74, 0xF3C6);
+        WriteInstruction(memory, 0x8C0E_1E76, 0xE024);
+        WriteInstruction(memory, 0x8C0E_1E78, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E7A, 0xE010);
+        WriteInstruction(memory, 0x8C0E_1E7C, 0x03CC);
+        WriteInstruction(memory, 0x8C0E_1E7E, 0xE010);
+        WriteInstruction(memory, 0x8C0E_1E80, 0x435A);
+        WriteInstruction(memory, 0x8C0E_1E82, 0xF32D);
+        WriteInstruction(memory, 0x8C0E_1E84, 0xF3E2);
+        WriteInstruction(memory, 0x8C0E_1E86, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E88, 0xE011);
+        WriteInstruction(memory, 0x8C0E_1E8A, 0x03CC);
+        WriteInstruction(memory, 0x8C0E_1E8C, 0xE014);
+        WriteInstruction(memory, 0x8C0E_1E8E, 0x435A);
+        WriteInstruction(memory, 0x8C0E_1E90, 0xF32D);
+        WriteInstruction(memory, 0x8C0E_1E92, 0xF3F2);
+        WriteInstruction(memory, 0x8C0E_1E94, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1E96, 0x85DB);
+        WriteInstruction(memory, 0x8C0E_1E98, 0x6303);
+        WriteInstruction(memory, 0x8C0E_1E9A, 0x435A);
+        WriteInstruction(memory, 0x8C0E_1E9C, 0xE004);
+        WriteInstruction(memory, 0x8C0E_1E9E, 0xF32D);
+        WriteInstruction(memory, 0x8C0E_1EA0, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1EA2, 0x85DC);
+        WriteInstruction(memory, 0x8C0E_1EA4, 0x6303);
+        WriteInstruction(memory, 0x8C0E_1EA6, 0x435A);
+        WriteInstruction(memory, 0x8C0E_1EA8, 0xE008);
+        WriteInstruction(memory, 0x8C0E_1EAA, 0xF32D);
+        WriteInstruction(memory, 0x8C0E_1EAC, 0xFF37);
+        WriteInstruction(memory, 0x8C0E_1EAE, 0x490B);
+        WriteInstruction(memory, 0x8C0E_1EB0, 0x64F3);
+        WriteInstruction(memory, 0x8C0E_1EC2, 0x00FF);
+    }
+
+    private static void WriteTextGlyphSetupData(DreamcastMemory memory)
+    {
+        memory.Write(0x8C20_2000, [(byte)' ']);
+        memory.WriteUInt32(0x8C20_3000, BitConverter.SingleToUInt32Bits(0.9f));
+        memory.WriteUInt32(0x8C20_3004, BitConverter.SingleToUInt32Bits(1.2f));
+        memory.WriteUInt32(0x8C20_3008, BitConverter.SingleToUInt32Bits(0.5625f));
+        memory.WriteUInt32(0x8C20_300C, BitConverter.SingleToUInt32Bits(0.75f));
+        memory.Write(0x8C20_3010, [7]);
+        memory.Write(0x8C20_3011, [24]);
+        memory.WriteUInt16(0x8C20_1000 + 22, 0x0198);
+        memory.WriteUInt16(0x8C20_1000 + 24, 0x0168);
+    }
+
+    private static void InitializeDoa2TextGlyphSetupState(Sh4Cpu cpu)
+    {
+        cpu.State.R[8] = 0x8C20_3000;
+        cpu.State.R[9] = 0x8C10_0430;
+        cpu.State.R[10] = 0x20;
+        cpu.State.R[11] = 0x0000_01A7;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[14] = 0x8C20_2000;
+        cpu.State.R[15] = 0x8C20_4000;
+        cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(0.125f);
+        cpu.State.Fr[15] = BitConverter.SingleToUInt32Bits(0.25f);
         cpu.State.T = true;
     }
 
