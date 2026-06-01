@@ -1250,6 +1250,215 @@ public sealed class Sh4Cpu
         }
     }
 
+    internal bool TryFastForwardDoa2TaEmitCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_077C
+            || step.Opcode != 0x50DC
+            || State.Pc != 0x8C10_077E)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 132;
+        var tableIndexOffset = State.R[0] << 2;
+        var tablePointerAddress = memory.ReadUInt32(0x8C10_0910);
+        var tableBase = memory.ReadUInt32(tablePointerAddress);
+        var tableEntryAddress = tableBase + tableIndexOffset;
+        var auxTable = memory.ReadUInt32(0x8C10_0924);
+        var flags = memory.ReadUInt32(State.R[13] + 52);
+        if (!IsDoa2TaEmitCommonPath()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[0] == 0xFFFF_FFFF
+            || State.R[0] > uint.MaxValue >> 2
+            || (flags & memory.ReadUInt32(0x8C10_08FC)) != 0
+            || !IsCommonDoa2TaAlpha(State.Fr[14])
+            || State.R[10] > uint.MaxValue - 15
+            || State.R[11] > uint.MaxValue - 15
+            || State.R[12] > uint.MaxValue - 19
+            || State.R[13] > uint.MaxValue - 63
+            || State.R[15] > uint.MaxValue - 107
+            || tableBase > uint.MaxValue - tableIndexOffset
+            || !memory.TryGetSystemRamOffset(State.R[10], 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[11], 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[12], 20, out _)
+            || !memory.TryGetSystemRamOffset(State.R[13] + 48, 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 108, out _)
+            || !memory.TryGetSystemRamOffset(tablePointerAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(tableEntryAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(auxTable, 8, out _))
+        {
+            return false;
+        }
+
+        State.T = false;
+        State.R[4] = State.R[0];
+        State.R[3] = tablePointerAddress;
+        State.R[4] <<= 2;
+        memory.WriteUInt32(State.R[15] + 16, State.R[4]);
+        State.R[0] = tableBase;
+        State.R[3] = memory.ReadUInt32(0x8C10_0918);
+        State.R[4] = memory.ReadUInt32(State.R[0] + State.R[4]);
+        State.R[14] = memory.ReadUInt32(0x8C10_091C);
+        State.R[2] = State.R[4];
+        State.R[2] >>= 16;
+        State.R[2] >>= 8;
+        State.R[1] = memory.ReadUInt32(0x8C10_0914);
+        State.R[14] &= State.R[4];
+        State.R[4] = auxTable;
+        WriteUInt32WithPc(State.R[1], State.R[2], 0x8C10_07AC);
+        WriteUInt32WithPc(State.R[3], State.R[2], 0x8C10_07AE);
+        State.R[3] = memory.ReadUInt32(0x8C10_08FC);
+        State.R[0] = flags;
+        State.R[2] = memory.ReadUInt32(0x8C10_0920);
+        State.T = (State.R[0] & State.R[3]) == 0;
+        State.R[14] |= State.R[2];
+
+        State.R[0] = memory.ReadUInt32(State.R[12]);
+        State.R[1] = memory.ReadUInt32(State.R[4]);
+        State.R[0] |= State.R[1];
+        WriteUInt32WithPc(State.R[14], State.R[0], 0x8C10_07D6);
+        State.R[3] = memory.ReadUInt32(State.R[12] + 4);
+        WriteUInt32WithPc(State.R[14] + 4, State.R[3], 0x8C10_07DA);
+        State.R[2] = memory.ReadUInt32(State.R[12] + 8);
+        State.R[3] = memory.ReadUInt32(State.R[4] + 4);
+        State.R[2] |= State.R[3];
+        WriteUInt32WithPc(State.R[14] + 8, State.R[2], 0x8C10_07E2);
+        State.R[3] = memory.ReadUInt32(State.R[12] + 12);
+        WriteUInt32WithPc(State.R[14] + 12, State.R[3], 0x8C10_07E6);
+        State.R[2] = memory.ReadUInt32(State.R[12] + 16);
+        WriteUInt32WithPc(State.R[14] + 16, State.R[2], 0x8C10_07EA);
+
+        State.Pr = 0x8C10_07F0;
+        ExecuteFpuMove(0xF4EC, 4, 14, 0xC);
+        State.R[0] = 0x8C10_0D3C;
+        ExecuteFpuMove(0xF308, 3, 0, 0x8);
+        State.R[0] = 0x8C10_0D40;
+        ExecuteFpuMove(0xF108, 1, 0, 0x8);
+        ExecuteFpuMove(0xF432, 4, 3, 0x2);
+        ExecuteFpuMove(0xF415, 4, 1, 0x5);
+        ExecuteFpuMove(0xF54C, 5, 4, 0xC);
+        ExecuteFpuMove(0xF25C, 2, 5, 0xC);
+        State.Fpul = (uint)(int)BitConverter.UInt32BitsToSingle(State.Fr[2]);
+        State.R[5] = (uint)(short)memory.ReadUInt16(0x8C10_0D32);
+        State.R[4] = State.Fpul;
+        State.T = State.R[4] > State.R[5];
+        State.R[0] = State.R[4];
+
+        State.R[2] = memory.ReadUInt32(State.R[13] + 60);
+        State.R[0] <<= 16;
+        State.R[0] <<= 8;
+        State.R[0] |= State.R[2];
+        WriteUInt32WithPc(State.R[14] + 20, State.R[0], 0x8C10_07F8);
+        State.R[3] = memory.ReadUInt32(0x8C10_0928);
+        State.R[14] += 32;
+        State.R[4] = State.R[10];
+        State.R[5] = State.R[11];
+        WriteUInt32WithPc(State.R[14], State.R[3], 0x8C10_0804);
+        State.R[0] = 12;
+        State.R[2] = memory.ReadUInt32(State.R[5]);
+        WriteUInt32WithPc(State.R[14] + 4, State.R[2], 0x8C10_080A);
+        State.R[3] = memory.ReadUInt32(State.R[4]);
+        WriteUInt32WithPc(State.R[14] + 8, State.R[3], 0x8C10_080E);
+        WriteUInt32WithPc(State.R[14] + State.R[0], State.Fr[13], 0x8C10_0810);
+        State.R[0] = 24;
+        State.R[3] = memory.ReadUInt32(State.R[5] + 4);
+        WriteUInt32WithPc(State.R[14] + 16, State.R[3], 0x8C10_0816);
+        State.R[2] = memory.ReadUInt32(State.R[4] + 4);
+        WriteUInt32WithPc(State.R[14] + 20, State.R[2], 0x8C10_081A);
+        WriteUInt32WithPc(State.R[14] + State.R[0], State.Fr[13], 0x8C10_081C);
+        State.R[0] = 36;
+        State.R[3] = memory.ReadUInt32(State.R[5] + 8);
+        WriteUInt32WithPc(State.R[14] + 28, State.R[3], 0x8C10_0822);
+        State.R[2] = memory.ReadUInt32(State.R[4] + 8);
+        WriteUInt32WithPc(State.R[14] + 32, State.R[2], 0x8C10_0826);
+        WriteUInt32WithPc(State.R[14] + State.R[0], State.Fr[13], 0x8C10_0828);
+        State.R[3] = memory.ReadUInt32(State.R[5] + 12);
+        WriteUInt32WithPc(State.R[14] + 40, State.R[3], 0x8C10_082C);
+        State.R[2] = memory.ReadUInt32(State.R[4] + 12);
+        State.R[3] = memory.ReadUInt32(0x8C10_092C);
+        WriteUInt32WithPc(State.R[14] + 44, State.R[2], 0x8C10_0832);
+        State.R[8] |= State.R[3];
+        WriteUInt32WithPc(State.R[14] + 48, State.R[8], 0x8C10_0836);
+        State.R[2] = memory.ReadUInt32(State.R[15] + 20);
+        State.R[2] |= State.R[9];
+        WriteUInt32WithPc(State.R[14] + 52, State.R[2], 0x8C10_083C);
+        State.R[1] = memory.ReadUInt32(State.R[15]);
+        State.R[9] |= State.R[1];
+        WriteUInt32WithPc(State.R[14] + 56, State.R[9], 0x8C10_0842);
+        State.R[2] = memory.ReadUInt32(State.R[15] + 12);
+        State.R[1] = memory.ReadUInt32(State.R[15]);
+        State.R[1] |= State.R[2];
+        WriteUInt32WithPc(State.R[14] + 60, State.R[1], 0x8C10_084A);
+        State.R[14] += 32;
+        State.R[1] = tablePointerAddress;
+        State.R[14] += 32;
+        State.R[4] = memory.ReadUInt32(State.R[15] + 16);
+        State.R[2] = memory.ReadUInt32(State.R[1]);
+        State.R[3] = memory.ReadUInt32(0x8C10_0930);
+        State.R[4] += State.R[2];
+        State.R[2] = memory.ReadUInt32(0x8C10_091C);
+        State.R[0] = memory.ReadUInt32(State.R[4]);
+        State.R[14] &= State.R[2];
+        State.R[0] &= State.R[3];
+        State.R[0] |= State.R[14];
+        memory.WriteUInt32(State.R[4], State.R[0]);
+        State.R[0] = 0;
+        State.R[15] += 60;
+        State.Pr = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Fr[12] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Fr[13] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Fr[14] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Fr[15] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[8] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[9] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[10] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[11] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[12] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[13] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[14] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+
+        void WriteUInt32WithPc(uint address, uint value, uint pc)
+        {
+            memory.CurrentInstructionPc = pc;
+            memory.WriteUInt32(address, value);
+        }
+
+        bool IsCommonDoa2TaAlpha(uint bits)
+        {
+            var alpha = BitConverter.UInt32BitsToSingle(bits);
+            var scaled = alpha * BitConverter.UInt32BitsToSingle(memory.ReadUInt32(0x8C10_0D3C));
+            if (!float.IsFinite(alpha)
+                || !float.IsFinite(scaled)
+                || scaled > BitConverter.UInt32BitsToSingle(memory.ReadUInt32(0x8C10_0D40)))
+            {
+                return false;
+            }
+
+            return (uint)(int)scaled <= 0xFF;
+        }
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1779,6 +1988,141 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_0BAC) == 0x247B
         && memory.ReadInstructionUInt16(0x8C10_0BAE) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_0BB0) == 0x6043;
+
+    private bool IsDoa2TaEmitCommonPath() =>
+        memory.ReadInstructionUInt16(0x8C10_077C) == 0x50DC
+        && memory.ReadInstructionUInt16(0x8C10_077E) == 0x88FF
+        && memory.ReadInstructionUInt16(0x8C10_0780) == 0x8F07
+        && memory.ReadInstructionUInt16(0x8C10_0782) == 0x6403
+        && memory.ReadInstructionUInt16(0x8C10_0792) == 0xD35F
+        && memory.ReadInstructionUInt16(0x8C10_0794) == 0x4408
+        && memory.ReadInstructionUInt16(0x8C10_0796) == 0x1F44
+        && memory.ReadInstructionUInt16(0x8C10_0798) == 0x6032
+        && memory.ReadInstructionUInt16(0x8C10_079A) == 0xD35F
+        && memory.ReadInstructionUInt16(0x8C10_079C) == 0x044E
+        && memory.ReadInstructionUInt16(0x8C10_079E) == 0xDE5F
+        && memory.ReadInstructionUInt16(0x8C10_07A0) == 0x6243
+        && memory.ReadInstructionUInt16(0x8C10_07A2) == 0x4229
+        && memory.ReadInstructionUInt16(0x8C10_07A4) == 0x4219
+        && memory.ReadInstructionUInt16(0x8C10_07A6) == 0xD15B
+        && memory.ReadInstructionUInt16(0x8C10_07A8) == 0x2E49
+        && memory.ReadInstructionUInt16(0x8C10_07AA) == 0xD45E
+        && memory.ReadInstructionUInt16(0x8C10_07AC) == 0x2122
+        && memory.ReadInstructionUInt16(0x8C10_07AE) == 0x2322
+        && memory.ReadInstructionUInt16(0x8C10_07B0) == 0xD352
+        && memory.ReadInstructionUInt16(0x8C10_07B2) == 0x50DD
+        && memory.ReadInstructionUInt16(0x8C10_07B4) == 0xD25A
+        && memory.ReadInstructionUInt16(0x8C10_07B6) == 0x2038
+        && memory.ReadInstructionUInt16(0x8C10_07B8) == 0x8D0A
+        && memory.ReadInstructionUInt16(0x8C10_07BA) == 0x2E2B
+        && memory.ReadInstructionUInt16(0x8C10_07D0) == 0x60C2
+        && memory.ReadInstructionUInt16(0x8C10_07D2) == 0x6142
+        && memory.ReadInstructionUInt16(0x8C10_07D4) == 0x201B
+        && memory.ReadInstructionUInt16(0x8C10_07D6) == 0x2E02
+        && memory.ReadInstructionUInt16(0x8C10_07D8) == 0x53C1
+        && memory.ReadInstructionUInt16(0x8C10_07DA) == 0x1E31
+        && memory.ReadInstructionUInt16(0x8C10_07DC) == 0x52C2
+        && memory.ReadInstructionUInt16(0x8C10_07DE) == 0x5341
+        && memory.ReadInstructionUInt16(0x8C10_07E0) == 0x223B
+        && memory.ReadInstructionUInt16(0x8C10_07E2) == 0x1E22
+        && memory.ReadInstructionUInt16(0x8C10_07E4) == 0x53C3
+        && memory.ReadInstructionUInt16(0x8C10_07E6) == 0x1E33
+        && memory.ReadInstructionUInt16(0x8C10_07E8) == 0x52C4
+        && memory.ReadInstructionUInt16(0x8C10_07EA) == 0x1E24
+        && memory.ReadInstructionUInt16(0x8C10_07EC) == 0xB288
+        && memory.ReadInstructionUInt16(0x8C10_07EE) == 0xF4EC
+        && memory.ReadInstructionUInt16(0x8C10_07F0) == 0x52DF
+        && memory.ReadInstructionUInt16(0x8C10_07F2) == 0x4028
+        && memory.ReadInstructionUInt16(0x8C10_07F4) == 0x4018
+        && memory.ReadInstructionUInt16(0x8C10_07F6) == 0x202B
+        && memory.ReadInstructionUInt16(0x8C10_07F8) == 0x1E05
+        && memory.ReadInstructionUInt16(0x8C10_07FA) == 0x0E83
+        && memory.ReadInstructionUInt16(0x8C10_07FC) == 0xD34A
+        && memory.ReadInstructionUInt16(0x8C10_07FE) == 0x7E20
+        && memory.ReadInstructionUInt16(0x8C10_0800) == 0x64A3
+        && memory.ReadInstructionUInt16(0x8C10_0802) == 0x65B3
+        && memory.ReadInstructionUInt16(0x8C10_0804) == 0x2E32
+        && memory.ReadInstructionUInt16(0x8C10_0806) == 0xE00C
+        && memory.ReadInstructionUInt16(0x8C10_0808) == 0x6252
+        && memory.ReadInstructionUInt16(0x8C10_080A) == 0x1E21
+        && memory.ReadInstructionUInt16(0x8C10_080C) == 0x6342
+        && memory.ReadInstructionUInt16(0x8C10_080E) == 0x1E32
+        && memory.ReadInstructionUInt16(0x8C10_0810) == 0xFED7
+        && memory.ReadInstructionUInt16(0x8C10_0812) == 0xE018
+        && memory.ReadInstructionUInt16(0x8C10_0814) == 0x5351
+        && memory.ReadInstructionUInt16(0x8C10_0816) == 0x1E34
+        && memory.ReadInstructionUInt16(0x8C10_0818) == 0x5241
+        && memory.ReadInstructionUInt16(0x8C10_081A) == 0x1E25
+        && memory.ReadInstructionUInt16(0x8C10_081C) == 0xFED7
+        && memory.ReadInstructionUInt16(0x8C10_081E) == 0xE024
+        && memory.ReadInstructionUInt16(0x8C10_0820) == 0x5352
+        && memory.ReadInstructionUInt16(0x8C10_0822) == 0x1E37
+        && memory.ReadInstructionUInt16(0x8C10_0824) == 0x5242
+        && memory.ReadInstructionUInt16(0x8C10_0826) == 0x1E28
+        && memory.ReadInstructionUInt16(0x8C10_0828) == 0xFED7
+        && memory.ReadInstructionUInt16(0x8C10_082A) == 0x5353
+        && memory.ReadInstructionUInt16(0x8C10_082C) == 0x1E3A
+        && memory.ReadInstructionUInt16(0x8C10_082E) == 0x5243
+        && memory.ReadInstructionUInt16(0x8C10_0830) == 0xD33E
+        && memory.ReadInstructionUInt16(0x8C10_0832) == 0x1E2B
+        && memory.ReadInstructionUInt16(0x8C10_0834) == 0x283B
+        && memory.ReadInstructionUInt16(0x8C10_0836) == 0x1E8C
+        && memory.ReadInstructionUInt16(0x8C10_0838) == 0x52F5
+        && memory.ReadInstructionUInt16(0x8C10_083A) == 0x229B
+        && memory.ReadInstructionUInt16(0x8C10_083C) == 0x1E2D
+        && memory.ReadInstructionUInt16(0x8C10_083E) == 0x61F2
+        && memory.ReadInstructionUInt16(0x8C10_0840) == 0x291B
+        && memory.ReadInstructionUInt16(0x8C10_0842) == 0x1E9E
+        && memory.ReadInstructionUInt16(0x8C10_0844) == 0x52F3
+        && memory.ReadInstructionUInt16(0x8C10_0846) == 0x61F2
+        && memory.ReadInstructionUInt16(0x8C10_0848) == 0x212B
+        && memory.ReadInstructionUInt16(0x8C10_084A) == 0x1E1F
+        && memory.ReadInstructionUInt16(0x8C10_084C) == 0x0E83
+        && memory.ReadInstructionUInt16(0x8C10_084E) == 0x7E20
+        && memory.ReadInstructionUInt16(0x8C10_0850) == 0x0E83
+        && memory.ReadInstructionUInt16(0x8C10_0852) == 0xD12F
+        && memory.ReadInstructionUInt16(0x8C10_0854) == 0x7E20
+        && memory.ReadInstructionUInt16(0x8C10_0856) == 0x54F4
+        && memory.ReadInstructionUInt16(0x8C10_0858) == 0x6212
+        && memory.ReadInstructionUInt16(0x8C10_085A) == 0xD335
+        && memory.ReadInstructionUInt16(0x8C10_085C) == 0x342C
+        && memory.ReadInstructionUInt16(0x8C10_085E) == 0xD22F
+        && memory.ReadInstructionUInt16(0x8C10_0860) == 0x6042
+        && memory.ReadInstructionUInt16(0x8C10_0862) == 0x2E29
+        && memory.ReadInstructionUInt16(0x8C10_0864) == 0x2039
+        && memory.ReadInstructionUInt16(0x8C10_0866) == 0x20EB
+        && memory.ReadInstructionUInt16(0x8C10_0868) == 0x2402
+        && memory.ReadInstructionUInt16(0x8C10_086A) == 0xE000
+        && memory.ReadInstructionUInt16(0x8C10_086C) == 0x7F3C
+        && memory.ReadInstructionUInt16(0x8C10_086E) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C10_0870) == 0xFCF9
+        && memory.ReadInstructionUInt16(0x8C10_0872) == 0xFDF9
+        && memory.ReadInstructionUInt16(0x8C10_0874) == 0xFEF9
+        && memory.ReadInstructionUInt16(0x8C10_0876) == 0xFFF9
+        && memory.ReadInstructionUInt16(0x8C10_0878) == 0x68F6
+        && memory.ReadInstructionUInt16(0x8C10_087A) == 0x69F6
+        && memory.ReadInstructionUInt16(0x8C10_087C) == 0x6AF6
+        && memory.ReadInstructionUInt16(0x8C10_087E) == 0x6BF6
+        && memory.ReadInstructionUInt16(0x8C10_0880) == 0x6CF6
+        && memory.ReadInstructionUInt16(0x8C10_0882) == 0x6DF6
+        && memory.ReadInstructionUInt16(0x8C10_0884) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_0886) == 0x6EF6
+        && memory.ReadInstructionUInt16(0x8C10_0D00) == 0xC70E
+        && memory.ReadInstructionUInt16(0x8C10_0D02) == 0xF308
+        && memory.ReadInstructionUInt16(0x8C10_0D04) == 0xC70E
+        && memory.ReadInstructionUInt16(0x8C10_0D06) == 0xF108
+        && memory.ReadInstructionUInt16(0x8C10_0D08) == 0xF432
+        && memory.ReadInstructionUInt16(0x8C10_0D0A) == 0xF415
+        && memory.ReadInstructionUInt16(0x8C10_0D0C) == 0x8F08
+        && memory.ReadInstructionUInt16(0x8C10_0D0E) == 0xF54C
+        && memory.ReadInstructionUInt16(0x8C10_0D20) == 0xF25C
+        && memory.ReadInstructionUInt16(0x8C10_0D22) == 0xF23D
+        && memory.ReadInstructionUInt16(0x8C10_0D24) == 0x9505
+        && memory.ReadInstructionUInt16(0x8C10_0D26) == 0x045A
+        && memory.ReadInstructionUInt16(0x8C10_0D28) == 0x3456
+        && memory.ReadInstructionUInt16(0x8C10_0D2A) == 0x8B00
+        && memory.ReadInstructionUInt16(0x8C10_0D2E) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_0D30) == 0x6043;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D

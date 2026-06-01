@@ -1142,6 +1142,95 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TaEmitCommonPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TaEmitCommonPath(normalMemory);
+        WriteTaEmitData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TaEmitCommonPath(fastMemory);
+        WriteTaEmitData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_077C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_077C);
+        InitializeDoa2TaEmitState(normal);
+        InitializeDoa2TaEmitState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TaEmitCommonPath(fastStart, 200, out var skippedInstructions));
+        Assert.Equal(132UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_5008), fastMemory.ReadUInt32(0x8C20_5008));
+        Assert.Equal(
+            normalMemory.DeviceAccesses.Select(access => access with { Pc = null }),
+            fastMemory.DeviceAccesses.Select(access => access with { Pc = null }));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TaEmitCommonPathWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TaEmitCommonPath(memory);
+        WriteTaEmitData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_077C);
+        InitializeDoa2TaEmitState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TaEmitCommonPath(start, 131, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_077Eu, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TaEmitCommonPathWhenAlternateFlagPathIsSelected()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TaEmitCommonPath(memory);
+        WriteTaEmitData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_077C);
+        InitializeDoa2TaEmitState(cpu);
+        memory.WriteUInt32(0x8C20_1000 + 52, 0x0002_0000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TaEmitCommonPath(start, 200, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_077Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TaEmitCommonPathWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TaEmitCommonPath(memory);
+        WriteTaEmitData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_077C);
+        InitializeDoa2TaEmitState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TaEmitCommonPath(start, 200, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_077Eu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -3143,6 +3232,209 @@ public class Sh4CpuTests
         cpu.State.R[13] = 0x8C20_1000;
         cpu.State.R[15] = 0x8C20_2000;
         cpu.State.Fr[15] = BitConverter.SingleToUInt32Bits(4096.0f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2TaEmitCommonPath(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_077C, 0x50DC);
+        WriteInstruction(memory, 0x8C10_077E, 0x88FF);
+        WriteInstruction(memory, 0x8C10_0780, 0x8F07);
+        WriteInstruction(memory, 0x8C10_0782, 0x6403);
+        WriteInstruction(memory, 0x8C10_0792, 0xD35F);
+        WriteInstruction(memory, 0x8C10_0794, 0x4408);
+        WriteInstruction(memory, 0x8C10_0796, 0x1F44);
+        WriteInstruction(memory, 0x8C10_0798, 0x6032);
+        WriteInstruction(memory, 0x8C10_079A, 0xD35F);
+        WriteInstruction(memory, 0x8C10_079C, 0x044E);
+        WriteInstruction(memory, 0x8C10_079E, 0xDE5F);
+        WriteInstruction(memory, 0x8C10_07A0, 0x6243);
+        WriteInstruction(memory, 0x8C10_07A2, 0x4229);
+        WriteInstruction(memory, 0x8C10_07A4, 0x4219);
+        WriteInstruction(memory, 0x8C10_07A6, 0xD15B);
+        WriteInstruction(memory, 0x8C10_07A8, 0x2E49);
+        WriteInstruction(memory, 0x8C10_07AA, 0xD45E);
+        WriteInstruction(memory, 0x8C10_07AC, 0x2122);
+        WriteInstruction(memory, 0x8C10_07AE, 0x2322);
+        WriteInstruction(memory, 0x8C10_07B0, 0xD352);
+        WriteInstruction(memory, 0x8C10_07B2, 0x50DD);
+        WriteInstruction(memory, 0x8C10_07B4, 0xD25A);
+        WriteInstruction(memory, 0x8C10_07B6, 0x2038);
+        WriteInstruction(memory, 0x8C10_07B8, 0x8D0A);
+        WriteInstruction(memory, 0x8C10_07BA, 0x2E2B);
+        WriteInstruction(memory, 0x8C10_07D0, 0x60C2);
+        WriteInstruction(memory, 0x8C10_07D2, 0x6142);
+        WriteInstruction(memory, 0x8C10_07D4, 0x201B);
+        WriteInstruction(memory, 0x8C10_07D6, 0x2E02);
+        WriteInstruction(memory, 0x8C10_07D8, 0x53C1);
+        WriteInstruction(memory, 0x8C10_07DA, 0x1E31);
+        WriteInstruction(memory, 0x8C10_07DC, 0x52C2);
+        WriteInstruction(memory, 0x8C10_07DE, 0x5341);
+        WriteInstruction(memory, 0x8C10_07E0, 0x223B);
+        WriteInstruction(memory, 0x8C10_07E2, 0x1E22);
+        WriteInstruction(memory, 0x8C10_07E4, 0x53C3);
+        WriteInstruction(memory, 0x8C10_07E6, 0x1E33);
+        WriteInstruction(memory, 0x8C10_07E8, 0x52C4);
+        WriteInstruction(memory, 0x8C10_07EA, 0x1E24);
+        WriteInstruction(memory, 0x8C10_07EC, 0xB288);
+        WriteInstruction(memory, 0x8C10_07EE, 0xF4EC);
+        WriteInstruction(memory, 0x8C10_07F0, 0x52DF);
+        WriteInstruction(memory, 0x8C10_07F2, 0x4028);
+        WriteInstruction(memory, 0x8C10_07F4, 0x4018);
+        WriteInstruction(memory, 0x8C10_07F6, 0x202B);
+        WriteInstruction(memory, 0x8C10_07F8, 0x1E05);
+        WriteInstruction(memory, 0x8C10_07FA, 0x0E83);
+        WriteInstruction(memory, 0x8C10_07FC, 0xD34A);
+        WriteInstruction(memory, 0x8C10_07FE, 0x7E20);
+        WriteInstruction(memory, 0x8C10_0800, 0x64A3);
+        WriteInstruction(memory, 0x8C10_0802, 0x65B3);
+        WriteInstruction(memory, 0x8C10_0804, 0x2E32);
+        WriteInstruction(memory, 0x8C10_0806, 0xE00C);
+        WriteInstruction(memory, 0x8C10_0808, 0x6252);
+        WriteInstruction(memory, 0x8C10_080A, 0x1E21);
+        WriteInstruction(memory, 0x8C10_080C, 0x6342);
+        WriteInstruction(memory, 0x8C10_080E, 0x1E32);
+        WriteInstruction(memory, 0x8C10_0810, 0xFED7);
+        WriteInstruction(memory, 0x8C10_0812, 0xE018);
+        WriteInstruction(memory, 0x8C10_0814, 0x5351);
+        WriteInstruction(memory, 0x8C10_0816, 0x1E34);
+        WriteInstruction(memory, 0x8C10_0818, 0x5241);
+        WriteInstruction(memory, 0x8C10_081A, 0x1E25);
+        WriteInstruction(memory, 0x8C10_081C, 0xFED7);
+        WriteInstruction(memory, 0x8C10_081E, 0xE024);
+        WriteInstruction(memory, 0x8C10_0820, 0x5352);
+        WriteInstruction(memory, 0x8C10_0822, 0x1E37);
+        WriteInstruction(memory, 0x8C10_0824, 0x5242);
+        WriteInstruction(memory, 0x8C10_0826, 0x1E28);
+        WriteInstruction(memory, 0x8C10_0828, 0xFED7);
+        WriteInstruction(memory, 0x8C10_082A, 0x5353);
+        WriteInstruction(memory, 0x8C10_082C, 0x1E3A);
+        WriteInstruction(memory, 0x8C10_082E, 0x5243);
+        WriteInstruction(memory, 0x8C10_0830, 0xD33E);
+        WriteInstruction(memory, 0x8C10_0832, 0x1E2B);
+        WriteInstruction(memory, 0x8C10_0834, 0x283B);
+        WriteInstruction(memory, 0x8C10_0836, 0x1E8C);
+        WriteInstruction(memory, 0x8C10_0838, 0x52F5);
+        WriteInstruction(memory, 0x8C10_083A, 0x229B);
+        WriteInstruction(memory, 0x8C10_083C, 0x1E2D);
+        WriteInstruction(memory, 0x8C10_083E, 0x61F2);
+        WriteInstruction(memory, 0x8C10_0840, 0x291B);
+        WriteInstruction(memory, 0x8C10_0842, 0x1E9E);
+        WriteInstruction(memory, 0x8C10_0844, 0x52F3);
+        WriteInstruction(memory, 0x8C10_0846, 0x61F2);
+        WriteInstruction(memory, 0x8C10_0848, 0x212B);
+        WriteInstruction(memory, 0x8C10_084A, 0x1E1F);
+        WriteInstruction(memory, 0x8C10_084C, 0x0E83);
+        WriteInstruction(memory, 0x8C10_084E, 0x7E20);
+        WriteInstruction(memory, 0x8C10_0850, 0x0E83);
+        WriteInstruction(memory, 0x8C10_0852, 0xD12F);
+        WriteInstruction(memory, 0x8C10_0854, 0x7E20);
+        WriteInstruction(memory, 0x8C10_0856, 0x54F4);
+        WriteInstruction(memory, 0x8C10_0858, 0x6212);
+        WriteInstruction(memory, 0x8C10_085A, 0xD335);
+        WriteInstruction(memory, 0x8C10_085C, 0x342C);
+        WriteInstruction(memory, 0x8C10_085E, 0xD22F);
+        WriteInstruction(memory, 0x8C10_0860, 0x6042);
+        WriteInstruction(memory, 0x8C10_0862, 0x2E29);
+        WriteInstruction(memory, 0x8C10_0864, 0x2039);
+        WriteInstruction(memory, 0x8C10_0866, 0x20EB);
+        WriteInstruction(memory, 0x8C10_0868, 0x2402);
+        WriteInstruction(memory, 0x8C10_086A, 0xE000);
+        WriteInstruction(memory, 0x8C10_086C, 0x7F3C);
+        WriteInstruction(memory, 0x8C10_086E, 0x4F26);
+        WriteInstruction(memory, 0x8C10_0870, 0xFCF9);
+        WriteInstruction(memory, 0x8C10_0872, 0xFDF9);
+        WriteInstruction(memory, 0x8C10_0874, 0xFEF9);
+        WriteInstruction(memory, 0x8C10_0876, 0xFFF9);
+        WriteInstruction(memory, 0x8C10_0878, 0x68F6);
+        WriteInstruction(memory, 0x8C10_087A, 0x69F6);
+        WriteInstruction(memory, 0x8C10_087C, 0x6AF6);
+        WriteInstruction(memory, 0x8C10_087E, 0x6BF6);
+        WriteInstruction(memory, 0x8C10_0880, 0x6CF6);
+        WriteInstruction(memory, 0x8C10_0882, 0x6DF6);
+        WriteInstruction(memory, 0x8C10_0884, 0x000B);
+        WriteInstruction(memory, 0x8C10_0886, 0x6EF6);
+        WriteInstruction(memory, 0x8C10_0D00, 0xC70E);
+        WriteInstruction(memory, 0x8C10_0D02, 0xF308);
+        WriteInstruction(memory, 0x8C10_0D04, 0xC70E);
+        WriteInstruction(memory, 0x8C10_0D06, 0xF108);
+        WriteInstruction(memory, 0x8C10_0D08, 0xF432);
+        WriteInstruction(memory, 0x8C10_0D0A, 0xF415);
+        WriteInstruction(memory, 0x8C10_0D0C, 0x8F08);
+        WriteInstruction(memory, 0x8C10_0D0E, 0xF54C);
+        WriteInstruction(memory, 0x8C10_0D20, 0xF25C);
+        WriteInstruction(memory, 0x8C10_0D22, 0xF23D);
+        WriteInstruction(memory, 0x8C10_0D24, 0x9505);
+        WriteInstruction(memory, 0x8C10_0D26, 0x045A);
+        WriteInstruction(memory, 0x8C10_0D28, 0x3456);
+        WriteInstruction(memory, 0x8C10_0D2A, 0x8B00);
+        WriteInstruction(memory, 0x8C10_0D2E, 0x000B);
+        WriteInstruction(memory, 0x8C10_0D30, 0x6043);
+    }
+
+    private static void WriteTaEmitData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C10_08FC, 0x0002_0000);
+        memory.WriteUInt32(0x8C10_0910, 0x8C20_4000);
+        memory.WriteUInt32(0x8C10_0914, 0xFF00_0038);
+        memory.WriteUInt32(0x8C10_0918, 0xFF00_003C);
+        memory.WriteUInt32(0x8C10_091C, 0x03FF_FFFF);
+        memory.WriteUInt32(0x8C10_0920, 0xE000_0000);
+        memory.WriteUInt32(0x8C10_0924, 0x8C20_6000);
+        memory.WriteUInt32(0x8C10_0928, 0xF000_0000);
+        memory.WriteUInt32(0x8C10_092C, 0x5350_0000);
+        memory.WriteUInt32(0x8C10_0930, 0xFC00_0000);
+        memory.WriteUInt32(0x8C10_0D3C, BitConverter.SingleToUInt32Bits(255.0f));
+        memory.WriteUInt32(0x8C10_0D40, BitConverter.SingleToUInt32Bits(2147483648.0f));
+        WriteInstruction(memory, 0x8C10_0D32, 0x00FF);
+
+        memory.WriteUInt32(0x8C20_1000 + 48, 2);
+        memory.WriteUInt32(0x8C20_1000 + 52, 0x0000_2805);
+        memory.WriteUInt32(0x8C20_1000 + 60, 1);
+        memory.WriteUInt32(0x8C20_3000, 0xA200_0009);
+        memory.WriteUInt32(0x8C20_3004, 0x8000_0000);
+        memory.WriteUInt32(0x8C20_3008, 0x9410_04C0);
+        memory.WriteUInt32(0x8C20_300C, 0);
+        memory.WriteUInt32(0x8C20_3010, 0x193F_3F3F);
+        memory.WriteUInt32(0x8C20_4000, 0x8C20_5000);
+        memory.WriteUInt32(0x8C20_5008, 0x0000_0120);
+        memory.WriteUInt32(0x8C20_6000, 0);
+        memory.WriteUInt32(0x8C20_6004, 0);
+
+        for (var index = 0u; index < 4; index++)
+        {
+            memory.WriteUInt32(0x8C20_7000 + (index * 4), 0xFFC0_0000 + index);
+            memory.WriteUInt32(0x8C20_8000 + (index * 4), 0x1111_0000 + index);
+        }
+
+        memory.WriteUInt32(0x8C20_2000, 0x3F64_0000);
+        memory.WriteUInt32(0x8C20_200C, 0x0000_4E00);
+        memory.WriteUInt32(0x8C20_2014, 0x3F5D_0000);
+        memory.WriteUInt32(0x8C20_203C, 0x8C0E_1EB2);
+        memory.WriteUInt32(0x8C20_2040, BitConverter.SingleToUInt32Bits(0.02f));
+        memory.WriteUInt32(0x8C20_2044, BitConverter.SingleToUInt32Bits(0.25f));
+        memory.WriteUInt32(0x8C20_2048, BitConverter.SingleToUInt32Bits(0.5f));
+        memory.WriteUInt32(0x8C20_204C, BitConverter.SingleToUInt32Bits(0.75f));
+        memory.WriteUInt32(0x8C20_2050, 0x8C2A_AE2C);
+        memory.WriteUInt32(0x8C20_2054, 0x8C10_0430);
+        memory.WriteUInt32(0x8C20_2058, 0x20);
+        memory.WriteUInt32(0x8C20_205C, 0x1A7);
+        memory.WriteUInt32(0x8C20_2060, 0x8C2A_AE2C);
+        memory.WriteUInt32(0x8C20_2064, 0x8C2A_BFAC);
+        memory.WriteUInt32(0x8C20_2068, 0x8C14_80B6);
+    }
+
+    private static void InitializeDoa2TaEmitState(Sh4Cpu cpu)
+    {
+        cpu.State.R[8] = 0x23;
+        cpu.State.R[9] = 0x4E00;
+        cpu.State.R[10] = 0x8C20_7000;
+        cpu.State.R[11] = 0x8C20_8000;
+        cpu.State.R[12] = 0x8C20_3000;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[15] = 0x8C20_2000;
+        cpu.State.Fr[13] = BitConverter.SingleToUInt32Bits(4096.0f);
+        cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(0.1f);
         cpu.State.T = true;
     }
 
