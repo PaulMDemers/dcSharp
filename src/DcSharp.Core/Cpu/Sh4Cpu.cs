@@ -1116,6 +1116,42 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2PostTrigHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_B216
+            || step.Opcode != 0x2638
+            || !State.T
+            || State.Pc != 0x8C0F_B218)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 10;
+        if (!IsDoa2PostTrigHelperReturn()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        ExecuteFpuMove(0xF433, 4, 3, 0x3);
+        ExecuteFpuMove(0xF24C, 2, 4, 0xC);
+        ExecuteFpuMove(0xF272, 2, 7, 0x2);
+        ExecuteFpuMove(0xF04C, 0, 4, 0xC);
+        ExecuteFpuMove(0xF64E, 6, 4, 0xE);
+        ExecuteFpuMove(0xF42C, 4, 2, 0xC);
+        ExecuteFpuMove(0xF463, 4, 6, 0x3);
+        ExecuteFpuMove(0xF04C, 0, 4, 0xC);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2VectorScaleLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1376,6 +1412,19 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_B210) == 0xE301
         && memory.ReadInstructionUInt16(0x8C0F_B212) == 0xF36C
         && memory.ReadInstructionUInt16(0x8C0F_B214) == 0xF351;
+
+    private bool IsDoa2PostTrigHelperReturn() =>
+        memory.ReadInstructionUInt16(0x8C0F_B216) == 0x2638
+        && memory.ReadInstructionUInt16(0x8C0F_B218) == 0xF433
+        && memory.ReadInstructionUInt16(0x8C0F_B21A) == 0xF24C
+        && memory.ReadInstructionUInt16(0x8C0F_B21C) == 0xF272
+        && memory.ReadInstructionUInt16(0x8C0F_B21E) == 0xF04C
+        && memory.ReadInstructionUInt16(0x8C0F_B220) == 0xF64E
+        && memory.ReadInstructionUInt16(0x8C0F_B222) == 0xF42C
+        && memory.ReadInstructionUInt16(0x8C0F_B224) == 0x8F14
+        && memory.ReadInstructionUInt16(0x8C0F_B226) == 0xF463
+        && memory.ReadInstructionUInt16(0x8C0F_B228) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C0F_B22A) == 0xF04C;
 
     private bool IsDoa2VectorScaleLoop() =>
         memory.ReadInstructionUInt16(0x8C10_05A0) == 0x6043

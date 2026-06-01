@@ -1060,6 +1060,88 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2PostTrigHelperReturn()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B216);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B216);
+        InitializeDoa2PostTrigHelperReturnState(normal);
+        InitializeDoa2PostTrigHelperReturnState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2PostTrigHelperReturn(fastStart, 100, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_0536u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2PostTrigHelperReturnWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B216);
+        InitializeDoa2PostTrigHelperReturnState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2PostTrigHelperReturn(start, 9, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B218u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2PostTrigHelperReturnWhenBranchPathIsTaken()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B216);
+        InitializeDoa2PostTrigHelperReturnState(cpu);
+        cpu.State.R[3] = 1;
+        cpu.State.R[6] = 1;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2PostTrigHelperReturn(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B218u, cpu.State.Pc);
+        Assert.False(cpu.State.T);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2PostTrigHelperReturnWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B216);
+        InitializeDoa2PostTrigHelperReturnState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2PostTrigHelperReturn(start, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B218u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2VectorScaleLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -2697,6 +2779,34 @@ public class Sh4CpuTests
         cpu.State.Fr[9] = BitConverter.SingleToUInt32Bits(1.5f);
         cpu.State.Fr[10] = BitConverter.SingleToUInt32Bits(1.75f);
         cpu.State.Fr[11] = BitConverter.SingleToUInt32Bits(2.0f);
+    }
+
+    private static void WriteDoa2PostTrigHelperReturn(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0F_B216, 0x2638);
+        WriteInstruction(memory, 0x8C0F_B218, 0xF433);
+        WriteInstruction(memory, 0x8C0F_B21A, 0xF24C);
+        WriteInstruction(memory, 0x8C0F_B21C, 0xF272);
+        WriteInstruction(memory, 0x8C0F_B21E, 0xF04C);
+        WriteInstruction(memory, 0x8C0F_B220, 0xF64E);
+        WriteInstruction(memory, 0x8C0F_B222, 0xF42C);
+        WriteInstruction(memory, 0x8C0F_B224, 0x8F14);
+        WriteInstruction(memory, 0x8C0F_B226, 0xF463);
+        WriteInstruction(memory, 0x8C0F_B228, 0x000B);
+        WriteInstruction(memory, 0x8C0F_B22A, 0xF04C);
+    }
+
+    private static void InitializeDoa2PostTrigHelperReturnState(Sh4Cpu cpu)
+    {
+        cpu.State.Pr = 0x8C10_0536;
+        cpu.State.R[3] = 0;
+        cpu.State.R[6] = 0;
+        cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(0.25f);
+        cpu.State.Fr[2] = BitConverter.SingleToUInt32Bits(1.5f);
+        cpu.State.Fr[3] = BitConverter.SingleToUInt32Bits(2.0f);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(8.0f);
+        cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(5.0f);
+        cpu.State.Fr[7] = BitConverter.SingleToUInt32Bits(3.0f);
     }
 
     private static void WriteDoa2VectorScaleLoop(DreamcastMemory memory)
