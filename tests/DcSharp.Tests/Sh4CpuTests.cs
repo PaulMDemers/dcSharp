@@ -922,6 +922,74 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2FpuRecurrenceLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2FpuRecurrenceLoop(normalMemory);
+        WriteInstruction(normalMemory, 0x8C0F_B20E, 0x0009);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2FpuRecurrenceLoop(fastMemory);
+        WriteInstruction(fastMemory, 0x8C0F_B20E, 0x0009);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B20A);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B20A);
+        InitializeDoa2FpuRecurrenceState(normal);
+        InitializeDoa2FpuRecurrenceState(fast);
+
+        var normalBranch = normal.Step();
+        var fastBranch = fast.Step();
+        Assert.Equal(normalBranch.Trace, fastBranch.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2FpuRecurrenceLoop(fastBranch, 100, out var skippedInstructions));
+        Assert.Equal(33UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C0F_B20Eu, fast.State.Pc);
+        Assert.False(fast.State.T);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FpuRecurrenceLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FpuRecurrenceLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B20A);
+        InitializeDoa2FpuRecurrenceState(cpu);
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2FpuRecurrenceLoop(branch, 32, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B20Cu, cpu.State.Pc);
+        Assert.Equal(1UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FpuRecurrenceLoopWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FpuRecurrenceLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B20A);
+        InitializeDoa2FpuRecurrenceState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2FpuRecurrenceLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B20Cu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
@@ -2338,6 +2406,28 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C13_072C, 0x430B);
         WriteInstruction(memory, 0x8C13_072E, 0xE408);
         memory.WriteUInt32(0x8C13_0750, 0x8C12_D2C0);
+    }
+
+    private static void WriteDoa2FpuRecurrenceLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0F_B1FE, 0x445A);
+        WriteInstruction(memory, 0x8C0F_B200, 0x74FE);
+        WriteInstruction(memory, 0x8C0F_B202, 0x3453);
+        WriteInstruction(memory, 0x8C0F_B204, 0xF22D);
+        WriteInstruction(memory, 0x8C0F_B206, 0xF251);
+        WriteInstruction(memory, 0x8C0F_B208, 0xF56C);
+        WriteInstruction(memory, 0x8C0F_B20A, 0x8DF8);
+        WriteInstruction(memory, 0x8C0F_B20C, 0xF523);
+    }
+
+    private static void InitializeDoa2FpuRecurrenceState(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 9;
+        cpu.State.R[5] = 3;
+        cpu.State.Fr[2] = BitConverter.SingleToUInt32Bits(6.0f);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(3.0f);
+        cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(9.0f);
+        cpu.State.T = true;
     }
 
     private static void RaiseVBlankIrq9(DreamcastMemory memory)

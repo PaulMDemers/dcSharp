@@ -981,6 +981,63 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_B20A
+            || step.Opcode != 0x8DF8
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget != 0x8C0F_B1FE
+            || State.Pc != 0x8C0F_B20C)
+        {
+            return false;
+        }
+
+        if (!IsDoa2FpuRecurrenceLoop()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0)
+        {
+            return false;
+        }
+
+        var current = unchecked((int)State.R[4]);
+        var limit = unchecked((int)State.R[5]);
+        if (current < limit || current < int.MinValue + 2 || limit < int.MinValue + 2)
+        {
+            return false;
+        }
+
+        var futureIterations = (((ulong)((long)current - limit)) / 2) + 1;
+        if (futureIterations > (ulong.MaxValue - 1) / 8)
+        {
+            return false;
+        }
+
+        skippedInstructions = 1 + (futureIterations * 8);
+        if (skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        ExecuteFpuArithmetic(5, 2, FpuArithmeticKind.Divide, static (left, right) => left / right, static (left, right) => left / right);
+        for (var iteration = 0ul; iteration < futureIterations; iteration++)
+        {
+            State.Fpul = State.R[4];
+            State.R[4] -= 2;
+            State.T = unchecked((int)State.R[4]) >= unchecked((int)State.R[5]);
+            State.Fr[2] = BitConverter.SingleToUInt32Bits(unchecked((int)State.Fpul));
+            ExecuteFpuArithmetic(2, 5, FpuArithmeticKind.Subtract, static (left, right) => left - right, static (left, right) => left - right);
+            State.Fr[5] = State.Fr[6];
+            ExecuteFpuArithmetic(5, 2, FpuArithmeticKind.Divide, static (left, right) => left / right, static (left, right) => left / right);
+        }
+
+        State.Pc = 0x8C0F_B20E;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1014,6 +1071,16 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C30_C77C) == 0
         && memory.ReadInstructionUInt16(0x8C12_BE60) == 0x000B
         && memory.ReadInstructionUInt16(0x8C12_BE62) == 0x0009;
+
+    private bool IsDoa2FpuRecurrenceLoop() =>
+        memory.ReadInstructionUInt16(0x8C0F_B1FE) == 0x445A
+        && memory.ReadInstructionUInt16(0x8C0F_B200) == 0x74FE
+        && memory.ReadInstructionUInt16(0x8C0F_B202) == 0x3453
+        && memory.ReadInstructionUInt16(0x8C0F_B204) == 0xF22D
+        && memory.ReadInstructionUInt16(0x8C0F_B206) == 0xF251
+        && memory.ReadInstructionUInt16(0x8C0F_B208) == 0xF56C
+        && memory.ReadInstructionUInt16(0x8C0F_B20A) == 0x8DF8
+        && memory.ReadInstructionUInt16(0x8C0F_B20C) == 0xF523;
 
     private bool IsDoa2BusyBitWaitLoop() =>
         memory.ReadInstructionUInt16(0x8C13_0460) == 0x4A0B

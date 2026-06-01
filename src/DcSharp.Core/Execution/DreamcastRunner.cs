@@ -168,6 +168,12 @@ public sealed class DreamcastRunner
                     else if (cpu.TryCompleteDoa2Slot8StubTaskCallback(step))
                     {
                     }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B1FE, 0x8C0F_B20E)
+                        && cpu.TryFastForwardDoa2FpuRecurrenceLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2FpuRecurrenceSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2FpuRecurrenceSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (TryGetDelayedBranchRange(step, out var predecrementStoreBranchStartPc, out var predecrementStoreBranchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, predecrementStoreBranchStartPc, predecrementStoreBranchEndPc)
                         && cpu.TryFastForwardPredecrementStoreDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var predecrementStoreSkippedInstructions))
@@ -567,6 +573,13 @@ public sealed class DreamcastRunner
 
     private static bool CanFastForwardTraceRange(DreamcastTraceCaptureOptions? traceCapture, List<Sh4StepResult> traceLog, uint startPc, uint endPc) =>
         traceCapture is null || traceLog.Count >= traceCapture.Limit || !traceCapture.ShouldCaptureAny(startPc, endPc);
+
+    private static bool CanFastForwardFpuRecurrence(DreamcastRunOptions options) =>
+        options.FpuAnomalyCapture is null
+        && options.FpuRegisterWatch is null
+        && options.FpscrWatch is null
+        && options.FpuSnapshotCapture is null
+        && options.FpuMemoryWatch is null;
 
     private static bool HasKosExitBanner(IReadOnlyList<byte> serialOutput)
     {
