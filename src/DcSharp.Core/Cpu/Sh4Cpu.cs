@@ -1721,6 +1721,84 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2RendererMode2LookupCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_04A0
+            || step.Opcode != 0xD335
+            || State.Pc != 0x8C10_04A2)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 20;
+        if (!IsDoa2RendererMode2LookupCommonPath()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[13] > uint.MaxValue - 51
+            || !memory.TryGetSystemRamOffset(State.R[13], 52, out _)
+            || !memory.TryGetSystemRamOffset(State.R[3], 4, out _))
+        {
+            return false;
+        }
+
+        var indexTablePointerAddress = State.R[3];
+        var row = memory.ReadUInt32(State.R[13]);
+        var indexTable = memory.ReadUInt32(indexTablePointerAddress);
+        var doubledRow = row << 1;
+        if (indexTable > uint.MaxValue - doubledRow
+            || !memory.TryGetSystemRamOffset(indexTable + doubledRow, 2, out _))
+        {
+            return false;
+        }
+
+        var indexAddress = indexTable + doubledRow;
+        var index = (uint)(short)memory.ReadUInt16(indexAddress);
+        if (index == 0xFFFF_FFFF)
+        {
+            return false;
+        }
+
+        var renderTablePointerAddress = memory.ReadUInt32(0x8C10_057C);
+        if (!memory.TryGetSystemRamOffset(renderTablePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var mode = memory.ReadUInt32(State.R[13] + 48);
+        if (mode != 2)
+        {
+            return false;
+        }
+
+        var renderBase = memory.ReadUInt32(renderTablePointerAddress);
+        State.R[8] = row;
+        State.R[0] = indexTable;
+        State.T = (State.R[8] & 0x8000_0000) != 0;
+        State.R[8] <<= 1;
+        State.R[8] = index;
+        State.R[0] = State.R[8];
+        State.T = State.R[0] == 0xFFFF_FFFF;
+        State.R[2] = renderTablePointerAddress;
+        State.R[12] = State.R[8];
+        State.R[12] <<= 2;
+        State.R[0] = mode;
+        State.R[3] = renderBase;
+        State.R[12] <<= 2;
+        State.T = (State.R[12] & 0x8000_0000) != 0;
+        State.R[12] <<= 1;
+        State.T = State.R[0] == 0;
+        State.R[12] += State.R[3];
+        State.R[4] = 0;
+        State.T = State.R[0] == 2;
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = 0x8C10_0500;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -2499,6 +2577,31 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_0454) == 0x8F24
         && memory.ReadInstructionUInt16(0x8C10_0456) == 0xFF9D
         && memory.ReadUInt32(0x8C10_0494) == 0x8C2F_07D0;
+
+    private bool IsDoa2RendererMode2LookupCommonPath() =>
+        memory.ReadInstructionUInt16(0x8C10_04A0) == 0xD335
+        && memory.ReadInstructionUInt16(0x8C10_04A2) == 0x68D2
+        && memory.ReadInstructionUInt16(0x8C10_04A4) == 0x6032
+        && memory.ReadInstructionUInt16(0x8C10_04A6) == 0x4800
+        && memory.ReadInstructionUInt16(0x8C10_04A8) == 0x088D
+        && memory.ReadInstructionUInt16(0x8C10_04AA) == 0x6083
+        && memory.ReadInstructionUInt16(0x8C10_04AC) == 0x88FF
+        && memory.ReadInstructionUInt16(0x8C10_04AE) == 0x8B01
+        && memory.ReadInstructionUInt16(0x8C10_04B4) == 0xD231
+        && memory.ReadInstructionUInt16(0x8C10_04B6) == 0x6C83
+        && memory.ReadInstructionUInt16(0x8C10_04B8) == 0x4C08
+        && memory.ReadInstructionUInt16(0x8C10_04BA) == 0x50DC
+        && memory.ReadInstructionUInt16(0x8C10_04BC) == 0x6322
+        && memory.ReadInstructionUInt16(0x8C10_04BE) == 0x4C08
+        && memory.ReadInstructionUInt16(0x8C10_04C0) == 0x4C00
+        && memory.ReadInstructionUInt16(0x8C10_04C2) == 0x8800
+        && memory.ReadInstructionUInt16(0x8C10_04C4) == 0x3C3C
+        && memory.ReadInstructionUInt16(0x8C10_04C6) == 0x8D13
+        && memory.ReadInstructionUInt16(0x8C10_04C8) == 0xE400
+        && memory.ReadInstructionUInt16(0x8C10_04CA) == 0x8802
+        && memory.ReadInstructionUInt16(0x8C10_04CC) == 0x8918
+        && memory.ReadUInt32(0x8C10_0578) == 0x8C2F_07CC
+        && memory.ReadUInt32(0x8C10_057C) == 0x8C2F_07DC;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
