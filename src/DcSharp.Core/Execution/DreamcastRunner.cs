@@ -274,6 +274,18 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2RendererInterpolationPrologueSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0A52, 0x8C10_0AB6)
+                        && cpu.TryFastForwardDoa2RendererInterpolationSetupToLoopExit(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererInterpolationSetupSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererInterpolationSetupSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0AB6, 0x8C10_0ABC)
+                        && cpu.TryFastForwardDoa2RendererInterpolationEpilogueReturn(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererInterpolationEpilogueSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererInterpolationEpilogueSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0E_1EB2, 0x8C0E_1EF8)
                         && cpu.TryFastForwardDoa2TextAdvanceToNextGlyph(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TextAdvanceSkippedInstructions))
                     {

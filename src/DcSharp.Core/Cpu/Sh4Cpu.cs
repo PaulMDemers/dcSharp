@@ -2178,6 +2178,160 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2RendererInterpolationSetupToLoopExit(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0A52
+            || step.Opcode != 0x504D
+            || State.Pc != 0x8C10_0A54)
+        {
+            return false;
+        }
+
+        const ulong maxSkippedInstructionCount = 135;
+        if (!IsDoa2RendererInterpolationSetupToLoopExit()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || State.R[0] != 0x2805
+            || State.R[4] > uint.MaxValue - 52
+            || State.R[5] > uint.MaxValue - 15
+            || State.R[6] > uint.MaxValue - 15
+            || State.R[7] > uint.MaxValue - 31
+            || !memory.TryGetSystemRamOffset(State.R[4] + 4, 8, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4] + 52, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[5], 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[6], 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[7], 32, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        State.T = (State.R[0] & 0x0F) == 0;
+        if (State.T)
+        {
+            return false;
+        }
+
+        skippedInstructions += 2;
+        memory.WriteUInt32(State.R[15], State.R[0]);
+        State.R[0] &= 0x03;
+        State.Fpul = State.R[0];
+        State.R[0] = memory.ReadUInt32(State.R[15]);
+        State.T = (State.R[0] & 1) != 0;
+        State.R[0] = (uint)((int)State.R[0] >> 1);
+        State.Fr[3] = BitConverter.SingleToUInt32Bits(unchecked((int)State.Fpul));
+        State.T = (State.R[0] & 1) != 0;
+        State.R[0] = (uint)((int)State.R[0] >> 1);
+        State.R[0] &= 0x03;
+        State.Fpul = State.R[0];
+        ExecuteFpuMove(0xF63C, 6, 3, 0xC);
+        State.Fr[3] = BitConverter.SingleToUInt32Bits(unchecked((int)State.Fpul));
+        ExecuteFpuMove(0xF73C, 7, 3, 0xC);
+        State.R[1] = 4;
+        skippedInstructions += 13;
+
+        while (true)
+        {
+            ExecuteFpuMove(0xFB79, 11, 7, 0x9);
+            State.R[0] = 4;
+            ExecuteFpuMove(0xF38D, 3, 8, 0xD);
+            ExecuteFpuMove(0xFB61, 11, 6, 0x1);
+            ExecuteFpuMove(0xFA79, 10, 7, 0x9);
+            ExecuteFpuMove(0xF146, 1, 4, 0x6);
+            State.R[0] = 8;
+            ExecuteFpuMove(0xFA71, 10, 7, 0x1);
+            ExecuteFpuMove(0xFB34, 11, 3, 0x4);
+            skippedInstructions += 9;
+
+            skippedInstructions++;
+            ExecuteFpuMove(0xFE46, 14, 4, 0x6);
+            skippedInstructions++;
+            if (!State.T)
+            {
+                ExecuteFpuMove(0xF24C, 2, 4, 0xC);
+                ExecuteFpuMove(0xF2B2, 2, 11, 0x2);
+                ExecuteFpuMove(0xF0BC, 0, 11, 0xC);
+                ExecuteFpuMove(0xF18E, 1, 8, 0xE);
+                ExecuteFpuMove(0xF24D, 2, 4, 0xD);
+                ExecuteFpuMove(0xFE20, 14, 2, 0x0);
+                skippedInstructions += 6;
+            }
+
+            ExecuteFpuMove(0xF38D, 3, 8, 0xD);
+            ExecuteFpuMove(0xFA34, 10, 3, 0x4);
+            skippedInstructions += 2;
+
+            skippedInstructions++;
+            if (!State.T)
+            {
+                ExecuteFpuMove(0xF0AC, 0, 10, 0xC);
+                ExecuteFpuMove(0xFE5E, 14, 5, 0xE);
+                ExecuteFpuMove(0xF19E, 1, 9, 0xE);
+                skippedInstructions += 3;
+            }
+
+            State.R[1]--;
+            ExecuteFpuMove(0xF51A, 5, 1, 0xA);
+            ExecuteFpuMove(0xF6EA, 6, 14, 0xA);
+            State.T = State.R[1] == 0;
+            State.R[6] += 4;
+            skippedInstructions += 5;
+
+            skippedInstructions++;
+            State.R[5] += 4;
+            skippedInstructions++;
+            if (State.T)
+            {
+                State.Pc = 0x8C10_0AB6;
+                break;
+            }
+        }
+
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2RendererInterpolationEpilogueReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0AB6
+            || step.Opcode != 0x7F24
+            || State.Pc != 0x8C10_0AB8)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 3;
+        if (!IsDoa2RendererInterpolationEpilogueReturn()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] > uint.MaxValue - 7
+            || !memory.TryGetSystemRamOffset(State.R[15], 8, out _))
+        {
+            return false;
+        }
+
+        var returnAddress = memory.ReadUInt32(State.R[15]);
+        if (returnAddress != 0x8C10_055C)
+        {
+            return false;
+        }
+
+        State.Pr = returnAddress;
+        State.R[15] += 4;
+        ExecuteFpuMove(0xFEF9, 14, 15, 0x9);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = returnAddress;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2FpuRecurrenceLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3171,6 +3325,31 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C10_0B6C) == 0x8C10_E5CC
         && memory.ReadUInt32(0x8C10_E5E4) == 0x8C10_E62C
         && memory.ReadUInt32(0x8C10_E64C) == 0x8C10_E60A;
+
+    private bool IsDoa2RendererInterpolationSetupToLoopExit() =>
+        memory.ReadInstructionUInt16(0x8C10_0A52) == 0x504D
+        && memory.ReadInstructionUInt16(0x8C10_0A54) == 0xC80F
+        && memory.ReadInstructionUInt16(0x8C10_0A56) == 0x8B03
+        && memory.ReadInstructionUInt16(0x8C10_0A60) == 0x2F02
+        && memory.ReadInstructionUInt16(0x8C10_0A62) == 0xC903
+        && memory.ReadInstructionUInt16(0x8C10_0A64) == 0x405A
+        && memory.ReadInstructionUInt16(0x8C10_0A66) == 0x60F2
+        && memory.ReadInstructionUInt16(0x8C10_0A68) == 0x4021
+        && memory.ReadInstructionUInt16(0x8C10_0A6A) == 0xF32D
+        && memory.ReadInstructionUInt16(0x8C10_0A6C) == 0x4021
+        && memory.ReadInstructionUInt16(0x8C10_0A6E) == 0xC903
+        && memory.ReadInstructionUInt16(0x8C10_0A70) == 0x405A
+        && memory.ReadInstructionUInt16(0x8C10_0A72) == 0xF63C
+        && memory.ReadInstructionUInt16(0x8C10_0A74) == 0xF32D
+        && memory.ReadInstructionUInt16(0x8C10_0A76) == 0xF73C
+        && memory.ReadInstructionUInt16(0x8C10_0A78) == 0xE104
+        && IsDoa2InterpolationLoop();
+
+    private bool IsDoa2RendererInterpolationEpilogueReturn() =>
+        memory.ReadInstructionUInt16(0x8C10_0AB6) == 0x7F24
+        && memory.ReadInstructionUInt16(0x8C10_0AB8) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C10_0ABA) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_0ABC) == 0xFEF9;
 
     private bool IsDoa2TrigSetupAndRecurrenceLoop() =>
         memory.ReadInstructionUInt16(0x8C0F_B1C0) == 0x644D
