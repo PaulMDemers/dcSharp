@@ -112,6 +112,35 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CanCaptureDistinctFpuAnomalySites()
+    {
+        var raw = new byte[8];
+        raw[0] = 0x53; // fdiv fr5,fr4
+        raw[1] = 0xF4;
+        raw[2] = 0x6C; // fmov.s fr6,fr4
+        raw[3] = 0xF4;
+        raw[4] = 0xFC; // bra 0x8C010000
+        raw[5] = 0xAF;
+        raw[6] = 0x09; // nop
+        raw[7] = 0x00;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 5,
+                TraceTailLength: 0,
+                FpuAnomalyCapture: new DreamcastFpuAnomalyCaptureOptions(
+                    Limit: 4,
+                    Register: "fr4",
+                    Distinct: true)));
+
+        var anomaly = Assert.Single(result.FpuAnomalies);
+        Assert.Equal(1UL, anomaly.Instruction);
+        Assert.Equal(0x8C01_0000u, anomaly.Pc);
+        Assert.Equal("fr4", anomaly.Register);
+    }
+
+    [Fact]
     public void CapturesFpuRegisterWriteLogForSelectedRegister()
     {
         var raw = new byte[4];

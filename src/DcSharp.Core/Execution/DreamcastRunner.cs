@@ -415,9 +415,11 @@ public sealed class DreamcastRunner
             var oldValue = before[index];
             var newValue = after[index];
             var register = $"{bank}{index}";
+            var kind = GetFpuAnomalyKind(newValue);
             if (oldValue == newValue
                 || !ShouldCaptureRegister(register, options.Register)
-                || !ShouldCaptureNonFiniteSingle(newValue, options.Kind))
+                || !ShouldCaptureNonFiniteSingle(newValue, options.Kind)
+                || (options.Distinct && ContainsFpuAnomaly(anomalies, step.Pc, register, kind)))
             {
                 continue;
             }
@@ -433,6 +435,12 @@ public sealed class DreamcastRunner
                 state.Fpscr));
         }
     }
+
+    private static bool ContainsFpuAnomaly(List<Sh4FpuAnomaly> anomalies, uint pc, string register, string kind) =>
+        anomalies.Any(anomaly =>
+            anomaly.Pc == pc
+            && string.Equals(anomaly.Register, register, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(anomaly.Kind, kind, StringComparison.Ordinal));
 
     private static bool ShouldCaptureRegister(string register, string? filter) =>
         filter is null || string.Equals(register, filter, StringComparison.OrdinalIgnoreCase);
@@ -496,6 +504,9 @@ public sealed class DreamcastRunner
             _ => true
         };
     }
+
+    private static string GetFpuAnomalyKind(uint value) =>
+        (value & 0x007F_FFFFu) == 0 ? "infinity" : "nan";
 
     private static bool TryCaptureTraceStep(DreamcastTraceCaptureOptions? traceCapture, List<Sh4StepResult> traceLog, Sh4StepResult step)
     {
@@ -716,7 +727,8 @@ public sealed record DreamcastFpuAnomalyCaptureOptions(
     DreamcastFpuAnomalyKind Kind = DreamcastFpuAnomalyKind.All,
     ulong? StartInstruction = null,
     ulong? EndInstruction = null,
-    string? Register = null);
+    string? Register = null,
+    bool Distinct = false);
 
 public enum DreamcastFpuAnomalyKind
 {

@@ -1432,6 +1432,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     ulong? fpuAnomalyStartInstruction = null;
     ulong? fpuAnomalyEndInstruction = null;
     string? fpuAnomalyRegister = null;
+    var fpuAnomalyDistinct = false;
     string? fpuWriteLogPath = null;
     var fpuWriteLimit = 4096;
     string? fpuWriteRegister = null;
@@ -1570,6 +1571,9 @@ static CliRunOptions ParseRunOptions(string[] args)
             case "--fpu-anomaly-register" when index + 1 < args.Length:
                 fpuAnomalyRegister = args[index + 1];
                 index++;
+                break;
+            case "--fpu-anomaly-distinct":
+                fpuAnomalyDistinct = true;
                 break;
             case "--fpu-write-log" when index + 1 < args.Length:
                 fpuWriteLogPath = args[index + 1];
@@ -1807,7 +1811,7 @@ static CliRunOptions ParseRunOptions(string[] args)
             initialStatusRegister,
             MemoryWriteWatch: memoryWriteWatch,
             MemoryReadWatch: memoryReadWatch,
-            FpuAnomalyCapture: fpuAnomalyLogPath is null ? null : new DreamcastFpuAnomalyCaptureOptions(fpuAnomalyLimit, fpuAnomalyKind, fpuAnomalyStartInstruction, fpuAnomalyEndInstruction, fpuAnomalyRegister),
+            FpuAnomalyCapture: fpuAnomalyLogPath is null ? null : new DreamcastFpuAnomalyCaptureOptions(fpuAnomalyLimit, fpuAnomalyKind, fpuAnomalyStartInstruction, fpuAnomalyEndInstruction, fpuAnomalyRegister, fpuAnomalyDistinct),
             FpuRegisterWatch: fpuWriteLogPath is null ? null : new DreamcastFpuRegisterWatchOptions(fpuWriteLimit, fpuWriteRegister, fpuWriteStartInstruction, fpuWriteEndInstruction),
             FpscrWatch: fpscrLogPath is null ? null : new DreamcastFpscrWatchOptions(fpscrLimit, fpscrStartInstruction, fpscrEndInstruction),
             FpuSnapshotCapture: fpuSnapshotLogPath is null ? null : new DreamcastFpuSnapshotCaptureOptions(
@@ -2070,7 +2074,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --fpu-memory-address, --memory-write-address, and --memory-read-address may be repeated for multiple ranges. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, and --fpu-memory-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
