@@ -67,7 +67,7 @@ public sealed class DreamcastEventScheduler
     {
         var effectiveTicks = Math.Max(instructionsExecuted, hardwareAdvanceTicks);
         ApplyInputScripts(effectiveTicks);
-        RaiseDueVBlankEvents(effectiveTicks);
+        AdvanceDueVBlankEvents(effectiveTicks, latchEvents: true);
         AdvanceHardwareThrough(instructionsExecuted);
     }
 
@@ -90,7 +90,7 @@ public sealed class DreamcastEventScheduler
         var targetTicks = SaturatingAdd(hardwareAdvanceTicks, ticks.Value);
         RecordIdleAdvance(ticks.Value, nextTimerInterrupt, nextVblank, nextInputChange);
         ApplyInputScripts(targetTicks);
-        RaiseDueVBlankEvents(targetTicks);
+        AdvanceDueVBlankEvents(targetTicks, latchEvents: true);
         AdvanceHardwareTo(targetTicks);
         return true;
     }
@@ -107,11 +107,11 @@ public sealed class DreamcastEventScheduler
         maxCpuFastForwardBatch = Math.Max(maxCpuFastForwardBatch, instructions);
     }
 
-    public void AdvanceAfterCpuFastForward(ulong skippedInstructions, ulong instructionsExecuted)
+    public void AdvanceAfterCpuFastForward(ulong skippedInstructions, ulong instructionsExecuted, bool latchVBlankEvents = true)
     {
         RecordCpuFastForward(skippedInstructions);
         ApplyInputScripts(instructionsExecuted);
-        RaiseDueVBlankEvents(instructionsExecuted);
+        AdvanceDueVBlankEvents(instructionsExecuted, latchVBlankEvents);
         AdvanceHardwareTo(instructionsExecuted);
     }
 
@@ -237,7 +237,7 @@ public sealed class DreamcastEventScheduler
         lastControllerStates[address] = memory.GetController(address) ?? DreamcastControllerState.Neutral;
     }
 
-    private void RaiseDueVBlankEvents(ulong instructionsExecuted)
+    private void AdvanceDueVBlankEvents(ulong instructionsExecuted, bool latchEvents)
     {
         if (vblankInterval == 0 || instructionsExecuted == 0)
         {
@@ -246,8 +246,12 @@ public sealed class DreamcastEventScheduler
 
         while (instructionsExecuted >= nextVblankInstruction)
         {
-            memory.RaiseVBlankBegin();
-            vblankEventsRaised++;
+            if (latchEvents)
+            {
+                memory.RaiseVBlankBegin();
+                vblankEventsRaised++;
+            }
+
             nextVblankInstruction += vblankInterval;
         }
     }

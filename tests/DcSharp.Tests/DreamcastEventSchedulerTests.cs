@@ -244,4 +244,27 @@ public class DreamcastEventSchedulerTests
         Assert.Equal(1UL, snapshot.CpuFastForwardBatches);
         Assert.Equal(9UL, snapshot.MaxCpuFastForwardBatch);
     }
+
+    [Fact]
+    public void AdvanceAfterCpuFastForwardCanConsumeVBlankScheduleWithoutLatchingEvent()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 5));
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+
+        scheduler.AdvanceBeforeInstruction(0);
+        scheduler.AdvanceAfterCpuFastForward(9, 10, latchVBlankEvents: false);
+
+        var snapshot = scheduler.CreateSnapshot();
+        Assert.Equal(10UL, snapshot.HardwareAdvanceTicks);
+        Assert.Equal(15UL, snapshot.NextVBlankInstruction);
+        Assert.Equal(0UL, snapshot.VBlankEventsRaised);
+        Assert.Equal(9UL, snapshot.CpuFastForwardInstructions);
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+
+        scheduler.AdvanceBeforeInstruction(10);
+
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+        Assert.Equal(15UL, scheduler.CreateSnapshot().NextVBlankInstruction);
+    }
 }

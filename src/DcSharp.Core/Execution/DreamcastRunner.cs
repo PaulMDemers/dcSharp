@@ -156,7 +156,7 @@ public sealed class DreamcastRunner
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_F99A, 0x8C12_F9B6)
                         && cpu.TryFastForwardDoa2CallbackTimeoutLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2CallbackTimeoutSkippedInstructions))
                     {
-                        scheduler.AdvanceAfterCpuFastForward(doa2CallbackTimeoutSkippedInstructions, cpu.State.InstructionsExecuted);
+                        scheduler.AdvanceAfterCpuFastForward(doa2CallbackTimeoutSkippedInstructions, cpu.State.InstructionsExecuted, latchVBlankEvents: false);
                     }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_0460, 0x8C13_0490)
                         && cpu.TryFastForwardDoa2BusyBitWaitLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2BusyBitSkippedInstructions))
