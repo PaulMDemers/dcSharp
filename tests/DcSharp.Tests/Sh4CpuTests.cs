@@ -2486,6 +2486,87 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ListEntryAllocatorPair()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ListEntryAllocatorPair(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ListEntryAllocatorPair(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_7500);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_7500);
+        InitializeDoa2ListEntryAllocatorState(normal);
+        InitializeDoa2ListEntryAllocatorState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ListEntryAllocatorPair(fastStart, 31, out var skippedInstructions));
+        Assert.Equal(31UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C11_750Eu, fast.State.Pc);
+        Assert.Equal(0x8C30_F534u, fast.State.R[0]);
+        Assert.Equal(0x8C30_3704u, fast.State.R[11]);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryAllocatorPairWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryAllocatorPair(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7500);
+        InitializeDoa2ListEntryAllocatorState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryAllocatorPair(start, 30, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7502u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryAllocatorPairWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryAllocatorPair(memory);
+        memory.WriteUInt32(0x8C11_75C8, 0x8C12_4638);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7500);
+        InitializeDoa2ListEntryAllocatorState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryAllocatorPair(start, 31, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7502u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ListEntryAllocatorPairWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ListEntryAllocatorPair(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7500);
+        InitializeDoa2ListEntryAllocatorState(cpu);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ListEntryAllocatorPair(start, 31, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7502u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ListEntrySetupToClassifier()
     {
         var normalMemory = new DreamcastMemory();
@@ -5613,6 +5694,60 @@ public class Sh4CpuTests
         cpu.State.T = true;
         cpu.State.M = true;
         cpu.State.Q = true;
+    }
+
+    private static void WriteDoa2ListEntryAllocatorPair(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_7500, 0xD331);
+        WriteInstruction(memory, 0x8C11_7502, 0x430B);
+        WriteInstruction(memory, 0x8C11_7504, 0x64D3);
+        WriteInstruction(memory, 0x8C11_7506, 0xD231);
+        WriteInstruction(memory, 0x8C11_7508, 0x6B03);
+        WriteInstruction(memory, 0x8C11_750A, 0x420B);
+        WriteInstruction(memory, 0x8C11_750C, 0x64D3);
+        memory.WriteUInt32(0x8C11_75C8, 0x8C12_4634);
+        memory.WriteUInt32(0x8C11_75CC, 0x8C12_4646);
+
+        WriteInstruction(memory, 0x8C12_4634, 0x6043);
+        WriteInstruction(memory, 0x8C12_4636, 0x4000);
+        WriteInstruction(memory, 0x8C12_4638, 0x6343);
+        WriteInstruction(memory, 0x8C12_463A, 0x303C);
+        WriteInstruction(memory, 0x8C12_463C, 0xD212);
+        WriteInstruction(memory, 0x8C12_463E, 0x4008);
+        WriteInstruction(memory, 0x8C12_4640, 0x4000);
+        WriteInstruction(memory, 0x8C12_4642, 0x000B);
+        WriteInstruction(memory, 0x8C12_4644, 0x302C);
+        memory.WriteUInt32(0x8C12_4688, 0x8C30_36BC);
+
+        WriteInstruction(memory, 0x8C12_4646, 0x4F22);
+        WriteInstruction(memory, 0x8C12_4648, 0xD311);
+        WriteInstruction(memory, 0x8C12_464A, 0x430B);
+        WriteInstruction(memory, 0x8C12_464C, 0x0009);
+        WriteInstruction(memory, 0x8C12_464E, 0x4F26);
+        WriteInstruction(memory, 0x8C12_4650, 0x000B);
+        WriteInstruction(memory, 0x8C12_4652, 0x0009);
+        memory.WriteUInt32(0x8C12_4690, 0x8C13_4F48);
+
+        WriteInstruction(memory, 0x8C13_4F48, 0xE278);
+        WriteInstruction(memory, 0x8C13_4F4A, 0xD30D);
+        WriteInstruction(memory, 0x8C13_4F4C, 0x0427);
+        WriteInstruction(memory, 0x8C13_4F4E, 0x9110);
+        WriteInstruction(memory, 0x8C13_4F50, 0x6032);
+        WriteInstruction(memory, 0x8C13_4F52, 0x041A);
+        WriteInstruction(memory, 0x8C13_4F54, 0x301C);
+        WriteInstruction(memory, 0x8C13_4F56, 0x000B);
+        WriteInstruction(memory, 0x8C13_4F58, 0x304C);
+        memory.WriteUInt16(0x8C13_4F72, 0x044C);
+        memory.WriteUInt32(0x8C13_4F80, 0x8C31_007C);
+        memory.WriteUInt32(0x8C31_007C, 0x8C30_EF80);
+    }
+
+    private static void InitializeDoa2ListEntryAllocatorState(Sh4Cpu cpu)
+    {
+        cpu.State.R[13] = 3;
+        cpu.State.R[15] = 0x8C20_7000;
+        cpu.State.Pr = 0x8C01_266E;
+        cpu.State.T = true;
     }
 
     private static void WriteDoa2ListEntrySetupToClassifier(DreamcastMemory memory)

@@ -2498,6 +2498,58 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ListEntryAllocatorPair(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_7500
+            || step.Opcode != 0xD331
+            || State.Pc != 0x8C11_7502
+            || State.R[3] != 0x8C12_4634)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 31;
+        if (!IsDoa2ListEntryAllocatorPair()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 4
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 4, out _)
+            || !memory.TryGetSystemRamOffset(0x8C31_007C, 4, out _))
+        {
+            return false;
+        }
+
+        var index = State.R[13];
+        var firstScaledBeforeFinalShift = unchecked((index * 3u) << 2);
+        var firstOffset = unchecked(firstScaledBeforeFinalShift << 1);
+        var secondOffset = unchecked(index * 120u);
+        var secondBase = unchecked(memory.ReadUInt32(0x8C31_007C) + 0x44Cu);
+
+        State.R[0] = unchecked(0x8C30_36BCu + firstOffset);
+        State.T = (firstScaledBeforeFinalShift & 0x8000_0000u) != 0;
+        State.R[2] = 0x8C12_4646;
+        State.R[11] = State.R[0];
+        State.Pr = 0x8C11_750E;
+        State.R[4] = index;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Pr);
+        State.R[3] = 0x8C13_4F48;
+        State.R[2] = 120;
+        State.R[3] = 0x8C31_007C;
+        State.Macl = secondOffset;
+        State.R[1] = 0x0000_044C;
+        State.R[0] = unchecked(secondBase + secondOffset);
+        State.R[4] = secondOffset;
+        State.Pr = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ListEntryPostClassifierToRemainder(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3633,6 +3685,46 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_7530) == 0x64E3
         && memory.ReadUInt32(0x8C11_75D0) == 0x8C2F_B814
         && memory.ReadUInt32(0x8C11_75D4) == 0x8C2F_BCF4;
+
+    private bool IsDoa2ListEntryAllocatorPair() =>
+        memory.ReadInstructionUInt16(0x8C11_7500) == 0xD331
+        && memory.ReadInstructionUInt16(0x8C11_7502) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C11_7504) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C11_7506) == 0xD231
+        && memory.ReadInstructionUInt16(0x8C11_7508) == 0x6B03
+        && memory.ReadInstructionUInt16(0x8C11_750A) == 0x420B
+        && memory.ReadInstructionUInt16(0x8C11_750C) == 0x64D3
+        && memory.ReadUInt32(0x8C11_75C8) == 0x8C12_4634
+        && memory.ReadUInt32(0x8C11_75CC) == 0x8C12_4646
+        && memory.ReadInstructionUInt16(0x8C12_4634) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C12_4636) == 0x4000
+        && memory.ReadInstructionUInt16(0x8C12_4638) == 0x6343
+        && memory.ReadInstructionUInt16(0x8C12_463A) == 0x303C
+        && memory.ReadInstructionUInt16(0x8C12_463C) == 0xD212
+        && memory.ReadInstructionUInt16(0x8C12_463E) == 0x4008
+        && memory.ReadInstructionUInt16(0x8C12_4640) == 0x4000
+        && memory.ReadInstructionUInt16(0x8C12_4642) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C12_4644) == 0x302C
+        && memory.ReadUInt32(0x8C12_4688) == 0x8C30_36BC
+        && memory.ReadInstructionUInt16(0x8C12_4646) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C12_4648) == 0xD311
+        && memory.ReadInstructionUInt16(0x8C12_464A) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C12_464C) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C12_464E) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C12_4650) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C12_4652) == 0x0009
+        && memory.ReadUInt32(0x8C12_4690) == 0x8C13_4F48
+        && memory.ReadInstructionUInt16(0x8C13_4F48) == 0xE278
+        && memory.ReadInstructionUInt16(0x8C13_4F4A) == 0xD30D
+        && memory.ReadInstructionUInt16(0x8C13_4F4C) == 0x0427
+        && memory.ReadInstructionUInt16(0x8C13_4F4E) == 0x9110
+        && memory.ReadInstructionUInt16(0x8C13_4F50) == 0x6032
+        && memory.ReadInstructionUInt16(0x8C13_4F52) == 0x041A
+        && memory.ReadInstructionUInt16(0x8C13_4F54) == 0x301C
+        && memory.ReadInstructionUInt16(0x8C13_4F56) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C13_4F58) == 0x304C
+        && memory.ReadUInt16(0x8C13_4F72) == 0x044C
+        && memory.ReadUInt32(0x8C13_4F80) == 0x8C31_007C;
 
     private bool IsDoa2ListEntryPostClassifierToRemainder() =>
         memory.ReadInstructionUInt16(0x8C11_7532) == 0x62F6
