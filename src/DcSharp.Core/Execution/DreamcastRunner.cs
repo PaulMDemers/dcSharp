@@ -168,6 +168,11 @@ public sealed class DreamcastRunner
                     else if (cpu.TryCompleteDoa2Slot8StubTaskCallback(step))
                     {
                     }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_AC40, 0x8C0F_AC56)
+                        && cpu.TryFastForwardDoa2Fac40TrigArgumentWrapper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2Fac40SkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2Fac40SkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardFpuRecurrence(options)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B1C0, 0x8C0F_B216)
                         && cpu.TryFastForwardDoa2TrigSetupAndRecurrenceLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TrigSetupSkippedInstructions))
@@ -215,6 +220,11 @@ public sealed class DreamcastRunner
                         && cpu.TryFastForwardDoa2TextGlyphSetupCommonPath(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TextGlyphSetupSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2TextGlyphSetupSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0E_1EB2, 0x8C0E_1EF8)
+                        && cpu.TryFastForwardDoa2TextAdvanceToNextGlyph(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TextAdvanceSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2TextAdvanceSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
                     else if (CanFastForwardFpuRecurrence(options)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B1FE, 0x8C0F_B20E)

@@ -1342,6 +1342,119 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TextAdvanceToNextGlyph()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TextAdvanceToNextGlyph(normalMemory);
+        WriteTextAdvanceData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TextAdvanceToNextGlyph(fastMemory);
+        WriteTextAdvanceData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0E_1EB2);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0E_1EB2);
+        InitializeDoa2TextAdvanceState(normal);
+        InitializeDoa2TextAdvanceState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TextAdvanceToNextGlyph(fastStart, 20, out var skippedInstructions));
+        Assert.Equal(9UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt16(0x8C20_1000 + 22), fastMemory.ReadUInt16(0x8C20_1000 + 22));
+        Assert.Equal(0x8C0E_1E08u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextAdvanceToNextGlyphWhenStringEnds()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextAdvanceToNextGlyph(memory);
+        WriteTextAdvanceData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1EB2);
+        InitializeDoa2TextAdvanceState(cpu);
+        memory.Write(0x8C20_2001, [0]);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextAdvanceToNextGlyph(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1EB4u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TextAdvanceToNextGlyphWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TextAdvanceToNextGlyph(memory);
+        WriteTextAdvanceData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0E_1EB2);
+        InitializeDoa2TextAdvanceState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TextAdvanceToNextGlyph(start, 8, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0E_1EB4u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2Fac40TrigArgumentWrapper()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2Fac40TrigArgumentWrapper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2Fac40TrigArgumentWrapper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_AC40);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_AC40);
+        InitializeDoa2Fac40State(normal);
+        InitializeDoa2Fac40State(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2Fac40TrigArgumentWrapper(fastStart, 20, out var skippedInstructions));
+        Assert.Equal(8UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_3FFC), fastMemory.ReadUInt32(0x8C20_3FFC));
+        Assert.Equal(0x8C0F_B1C0u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2Fac40TrigArgumentWrapperWhenAlternatePathIsSelected()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2Fac40TrigArgumentWrapper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_AC40);
+        InitializeDoa2Fac40State(cpu);
+        cpu.State.R[4] = 0x8001;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2Fac40TrigArgumentWrapper(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_AC42u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -3641,6 +3754,58 @@ public class Sh4CpuTests
         cpu.State.R[15] = 0x8C20_4000;
         cpu.State.Fr[14] = BitConverter.SingleToUInt32Bits(0.125f);
         cpu.State.Fr[15] = BitConverter.SingleToUInt32Bits(0.25f);
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2TextAdvanceToNextGlyph(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0E_1EB2, 0xE010);
+        WriteInstruction(memory, 0x8C0E_1EB4, 0x03CC);
+        WriteInstruction(memory, 0x8C0E_1EB6, 0x85DB);
+        WriteInstruction(memory, 0x8C0E_1EB8, 0x303C);
+        WriteInstruction(memory, 0x8C0E_1EBA, 0xA01A);
+        WriteInstruction(memory, 0x8C0E_1EBC, 0x81DB);
+        WriteInstruction(memory, 0x8C0E_1EF2, 0x7E01);
+        WriteInstruction(memory, 0x8C0E_1EF4, 0x63E0);
+        WriteInstruction(memory, 0x8C0E_1EF6, 0x2338);
+        WriteInstruction(memory, 0x8C0E_1EF8, 0x8B86);
+    }
+
+    private static void WriteTextAdvanceData(DreamcastMemory memory)
+    {
+        memory.Write(0x8C20_2010, [10]);
+        memory.Write(0x8C20_2001, [(byte)'A']);
+        memory.WriteUInt16(0x8C20_1000 + 22, 0x0198);
+    }
+
+    private static void InitializeDoa2TextAdvanceState(Sh4Cpu cpu)
+    {
+        cpu.State.R[12] = 0x8C20_2000;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[14] = 0x8C20_2000;
+        cpu.State.T = true;
+    }
+
+    private static void WriteDoa2Fac40TrigArgumentWrapper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0F_AC40, 0xD338);
+        WriteInstruction(memory, 0x8C0F_AC42, 0x2FE6);
+        WriteInstruction(memory, 0x8C0F_AC44, 0x6E4D);
+        WriteInstruction(memory, 0x8C0F_AC46, 0x3E37);
+        WriteInstruction(memory, 0x8C0F_AC48, 0x8B02);
+        WriteInstruction(memory, 0x8C0F_AC50, 0x9466);
+        WriteInstruction(memory, 0x8C0F_AC52, 0x34E8);
+        WriteInstruction(memory, 0x8C0F_AC54, 0xA2B4);
+        WriteInstruction(memory, 0x8C0F_AC56, 0x6EF6);
+        WriteInstruction(memory, 0x8C0F_AD20, 0x4000);
+        memory.WriteUInt32(0x8C0F_AD24, 0x0000_8000);
+    }
+
+    private static void InitializeDoa2Fac40State(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 0;
+        cpu.State.R[14] = 1;
+        cpu.State.R[15] = 0x8C20_4000;
         cpu.State.T = true;
     }
 
