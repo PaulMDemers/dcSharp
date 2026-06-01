@@ -47,6 +47,52 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesPcProfile()
+    {
+        var raw = new byte[]
+        {
+            0xFE, 0xAF, // bra 0x8C010000
+            0x09, 0x00  // nop
+        };
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 6,
+                TraceTailLength: 0,
+                PcProfile: new DreamcastPcProfileOptions(Limit: 2)));
+
+        Assert.Equal(
+            [new DreamcastPcProfileEntry(0x8C01_0000, 3), new DreamcastPcProfileEntry(0x8C01_0002, 3)],
+            result.PcProfile);
+    }
+
+    [Fact]
+    public void CapturesPcProfileAcrossInstructionRange()
+    {
+        var raw = new byte[8];
+        for (var offset = 0; offset < raw.Length; offset += 2)
+        {
+            raw[offset] = 0x09;
+            raw[offset + 1] = 0x00;
+        }
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 4,
+                TraceTailLength: 0,
+                PcProfile: new DreamcastPcProfileOptions(
+                    Limit: 8,
+                    StartInstruction: 2,
+                    EndInstruction: 3)));
+
+        Assert.Equal(
+            [new DreamcastPcProfileEntry(0x8C01_0002, 1), new DreamcastPcProfileEntry(0x8C01_0004, 1)],
+            result.PcProfile);
+    }
+
+    [Fact]
     public void CapturesFpuAnomalyLogWhenRegisterBecomesNonFinite()
     {
         var raw = new byte[4];
