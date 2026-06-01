@@ -2486,6 +2486,88 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ZeroByteClassifier()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ZeroByteClassifier(normalMemory);
+        WriteZeroByteClassifierData(normalMemory, 0);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ZeroByteClassifier(fastMemory);
+        WriteZeroByteClassifierData(fastMemory, 0);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_7482);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_7482);
+        InitializeDoa2ZeroByteClassifierState(normal);
+        InitializeDoa2ZeroByteClassifierState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ZeroByteClassifier(fastStart, 17, out var skippedInstructions));
+        Assert.Equal(17UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C11_7532u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroByteClassifierWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroByteClassifier(memory);
+        WriteZeroByteClassifierData(memory, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7482);
+        InitializeDoa2ZeroByteClassifierState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroByteClassifier(start, 16, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7484u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroByteClassifierWhenByteIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroByteClassifier(memory);
+        WriteZeroByteClassifierData(memory, 5);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7482);
+        InitializeDoa2ZeroByteClassifierState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroByteClassifier(start, 17, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7484u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroByteClassifierWhenReturnAddressDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroByteClassifier(memory);
+        WriteZeroByteClassifierData(memory, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C11_7482);
+        InitializeDoa2ZeroByteClassifierState(cpu);
+        cpu.State.Pr = 0x8C11_7540;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroByteClassifier(start, 17, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_7484u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ColorBytePackCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -5363,6 +5445,44 @@ public class Sh4CpuTests
         cpu.State.T = true;
         cpu.State.M = true;
         cpu.State.Q = true;
+    }
+
+    private static void WriteDoa2ZeroByteClassifier(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_7482, 0x8464);
+        WriteInstruction(memory, 0x8C11_7484, 0x911E);
+        WriteInstruction(memory, 0x8C11_7486, 0x600C);
+        WriteInstruction(memory, 0x8C11_7488, 0x3010);
+        WriteInstruction(memory, 0x8C11_748A, 0x890C);
+        WriteInstruction(memory, 0x8C11_748C, 0x911B);
+        WriteInstruction(memory, 0x8C11_748E, 0x3010);
+        WriteInstruction(memory, 0x8C11_7490, 0x890C);
+        WriteInstruction(memory, 0x8C11_7492, 0x8808);
+        WriteInstruction(memory, 0x8C11_7494, 0x890A);
+        WriteInstruction(memory, 0x8C11_7496, 0x8805);
+        WriteInstruction(memory, 0x8C11_7498, 0x8908);
+        WriteInstruction(memory, 0x8C11_749A, 0x8806);
+        WriteInstruction(memory, 0x8C11_749C, 0x8906);
+        WriteInstruction(memory, 0x8C11_749E, 0x8800);
+        WriteInstruction(memory, 0x8C11_74A0, 0x8904);
+        WriteInstruction(memory, 0x8C11_74AC, 0x000B);
+        WriteInstruction(memory, 0x8C11_74AE, 0xE000);
+        memory.WriteUInt16(0x8C11_74C4, 0x00FC);
+        memory.WriteUInt16(0x8C11_74C6, 0x00FF);
+    }
+
+    private static void WriteZeroByteClassifierData(DreamcastMemory memory, byte value)
+    {
+        memory.Write(0x8C20_1004, [value]);
+    }
+
+    private static void InitializeDoa2ZeroByteClassifierState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0xFFFF_FFFF;
+        cpu.State.R[1] = 0x1234_5678;
+        cpu.State.R[6] = 0x8C20_1000;
+        cpu.State.Pr = 0x8C11_7532;
+        cpu.State.T = false;
     }
 
     private static void WriteDoa2ColorBytePackCommonPath(DreamcastMemory memory)
