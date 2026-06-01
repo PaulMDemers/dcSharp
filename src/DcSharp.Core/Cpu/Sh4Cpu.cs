@@ -892,6 +892,95 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardPredecrementByteCopyDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (delayedBranchTarget != branchTarget || State.Pc != step.Pc + 2 || branchTarget + 6 != step.Pc)
+        {
+            return false;
+        }
+
+        var sourceDecrementOpcode = memory.ReadInstructionUInt16(branchTarget);
+        var loadOpcode = memory.ReadInstructionUInt16(branchTarget + 2);
+        var dtOpcode = memory.ReadInstructionUInt16(branchTarget + 4);
+        var delaySlotOpcode = memory.ReadInstructionUInt16(step.Pc + 2);
+        if ((sourceDecrementOpcode & 0xF0FF) != 0x70FF
+            || (loadOpcode & 0xF00F) != 0x6000
+            || (dtOpcode & 0xF0FF) != 0x4010
+            || (delaySlotOpcode & 0xF00F) != 0x2004)
+        {
+            return false;
+        }
+
+        var sourceRegister = (sourceDecrementOpcode >> 8) & 0xF;
+        var loadSourceRegister = (loadOpcode >> 4) & 0xF;
+        var valueRegister = (loadOpcode >> 8) & 0xF;
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var destinationRegister = (delaySlotOpcode >> 8) & 0xF;
+        var storeValueRegister = (delaySlotOpcode >> 4) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (sourceRegister != loadSourceRegister
+            || valueRegister != storeValueRegister
+            || sourceRegister == destinationRegister
+            || valueRegister == sourceRegister
+            || valueRegister == destinationRegister
+            || valueRegister == counterRegister
+            || counterRegister == sourceRegister
+            || counterRegister == destinationRegister
+            || remainingIterations == 0
+            || remainingIterations > int.MaxValue - 1)
+        {
+            return false;
+        }
+
+        var instructionsToSkip = 1ul + ((ulong)remainingIterations * 5);
+        if (maxInstructionsToSkip < instructionsToSkip)
+        {
+            return false;
+        }
+
+        var bytesToCopy = checked((int)remainingIterations + 1);
+        var firstSource = State.R[sourceRegister];
+        var lastSource = firstSource - remainingIterations;
+        var firstDestination = State.R[destinationRegister] - 1;
+        var lastDestination = State.R[destinationRegister] - (uint)bytesToCopy;
+        if (lastSource > firstSource
+            || lastDestination > firstDestination
+            || !memory.TryGetSystemRamOffset(lastSource, bytesToCopy, out _)
+            || !memory.TryGetSystemRamOffset(lastDestination, bytesToCopy, out _))
+        {
+            return false;
+        }
+
+        var lastValue = (byte)State.R[valueRegister];
+        for (var index = 0; index < bytesToCopy; index++)
+        {
+            var value = index == 0
+                ? (byte)State.R[valueRegister]
+                : memory.ReadByte(firstSource - (uint)index);
+            memory.Write(firstDestination - (uint)index, [value]);
+            lastValue = value;
+        }
+
+        skippedInstructions = instructionsToSkip;
+        State.R[sourceRegister] -= remainingIterations;
+        State.R[destinationRegister] -= (uint)bytesToCopy;
+        State.R[counterRegister] = 0;
+        State.R[valueRegister] = (uint)(sbyte)lastValue;
+        State.T = true;
+        State.Pc = step.Pc + 4;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

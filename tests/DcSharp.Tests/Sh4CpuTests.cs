@@ -863,6 +863,65 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsPredecrementByteCopyDtLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C10_784E, 0x77FF); // add #-1,r7
+        WriteInstruction(memory, 0x8C10_7850, 0x6370); // mov.b @r7,r3
+        WriteInstruction(memory, 0x8C10_7852, 0x4610); // dt r6
+        WriteInstruction(memory, 0x8C10_7854, 0x8FFB); // bf/s 0x8C10784E
+        WriteInstruction(memory, 0x8C10_7856, 0x2534); // mov.b r3,@-r5
+        memory.Write(0x8C20_0000, [0x10, 0x20, 0x30, 0x40]);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7854);
+        cpu.State.R[3] = 0x40;
+        cpu.State.R[5] = 0x8C20_1004;
+        cpu.State.R[6] = 3;
+        cpu.State.R[7] = 0x8C20_0003;
+        cpu.State.T = false;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardPredecrementByteCopyDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(16UL, skippedInstructions);
+        Assert.Equal(0x8C20_0000u, cpu.State.R[7]);
+        Assert.Equal(0x8C20_1000u, cpu.State.R[5]);
+        Assert.Equal(0u, cpu.State.R[6]);
+        Assert.Equal(0x10u, cpu.State.R[3]);
+        Assert.Equal(0x10, memory.ReadByte(0x8C20_1000));
+        Assert.Equal(0x20, memory.ReadByte(0x8C20_1001));
+        Assert.Equal(0x30, memory.ReadByte(0x8C20_1002));
+        Assert.Equal(0x40, memory.ReadByte(0x8C20_1003));
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C10_7858u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardPredecrementByteCopyDtLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C10_784E, 0x77FF);
+        WriteInstruction(memory, 0x8C10_7850, 0x6370);
+        WriteInstruction(memory, 0x8C10_7852, 0x4610);
+        WriteInstruction(memory, 0x8C10_7854, 0x8FFB);
+        WriteInstruction(memory, 0x8C10_7856, 0x2534);
+        memory.Write(0x8C20_0000, [0x10, 0x20, 0x30, 0x40]);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7854);
+        cpu.State.R[3] = 0x40;
+        cpu.State.R[5] = 0x8C20_1004;
+        cpu.State.R[6] = 3;
+        cpu.State.R[7] = 0x8C20_0003;
+        cpu.State.T = false;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardPredecrementByteCopyDtLoop(branch, 15, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7856u, cpu.State.Pc);
+        Assert.Equal(0, memory.ReadByte(0x8C20_1003));
+    }
+
+    [Fact]
     public void DoesNotFastForwardCountedIdleLoopWhenInterruptsAreUnmasked()
     {
         var memory = new DreamcastMemory();
