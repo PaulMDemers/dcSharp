@@ -267,4 +267,50 @@ public class DreamcastEventSchedulerTests
         Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
         Assert.Equal(15UL, scheduler.CreateSnapshot().NextVBlankInstruction);
     }
+
+    [Fact]
+    public void ReportsWhetherCpuFastForwardWouldCrossEnabledVBlankWake()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 5));
+        memory.WriteUInt32(0xA05F_6930, 1u << 3);
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.CanFastForwardWithoutExternalWake(4));
+        Assert.False(scheduler.CanFastForwardWithoutExternalWake(5));
+    }
+
+    [Fact]
+    public void ReportsWhetherCpuFastForwardWouldCrossTimerWake()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(VBlankInterval: 0));
+        memory.WriteUInt32(0xFFD8_0008, 5);
+        memory.WriteUInt32(0xFFD8_000C, 5);
+        memory.WriteUInt16(0xFFD8_0010, 0x20);
+        memory.WriteUInt16(0xFFD0_0004, 0xF000);
+        memory.Write(0xFFD8_0004, [0x01]);
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.CanFastForwardWithoutExternalWake(5));
+        Assert.False(scheduler.CanFastForwardWithoutExternalWake(6));
+    }
+
+    [Fact]
+    public void ReportsWhetherCpuFastForwardWouldCrossInputScriptWake()
+    {
+        var memory = new DreamcastMemory();
+        var scheduler = new DreamcastEventScheduler(memory, new DreamcastRunOptions(
+            VBlankInterval: 0,
+            ControllerAScript: new DreamcastControllerScript(
+                new DreamcastControllerScriptFrame(0, DreamcastControllerState.Neutral),
+                new DreamcastControllerScriptFrame(5, new DreamcastControllerState(Buttons: DreamcastControllerButtons.Start)))));
+
+        scheduler.AdvanceBeforeInstruction(0);
+
+        Assert.True(scheduler.CanFastForwardWithoutExternalWake(4));
+        Assert.False(scheduler.CanFastForwardWithoutExternalWake(5));
+    }
 }

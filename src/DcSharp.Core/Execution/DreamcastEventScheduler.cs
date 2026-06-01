@@ -115,6 +115,23 @@ public sealed class DreamcastEventScheduler
         AdvanceHardwareTo(instructionsExecuted);
     }
 
+    public bool CanFastForwardWithoutExternalWake(ulong skippedInstructions)
+    {
+        if (skippedInstructions == 0)
+        {
+            return true;
+        }
+
+        var nextTimerInterrupt = memory.TicksUntilNextTimerInterrupt();
+        var nextVblank = vblankInterval == 0 || !memory.IsVBlankBeginInterruptEnabled() ? null : TicksUntilNextVBlank();
+        var nextInputChange = TicksUntilNextInputScriptChange();
+        return IsNotBeforeFastForwardEnd(nextTimerInterrupt)
+            && IsNotBeforeFastForwardEnd(nextVblank)
+            && IsNotBeforeFastForwardEnd(nextInputChange);
+
+        bool IsNotBeforeFastForwardEnd(ulong? ticks) => ticks is null || ticks.Value >= skippedInstructions;
+    }
+
     private void RecordIdleAdvance(ulong ticks, ulong? nextTimerInterrupt, ulong? nextVblank, ulong? nextInputChange)
     {
         idleAdvanceTicks += ticks;
