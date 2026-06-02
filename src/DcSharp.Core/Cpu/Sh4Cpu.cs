@@ -1160,6 +1160,75 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ZeroStatusByteTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_3678
+            || step.Opcode != 0x480B
+            || State.Pc != 0x8C0F_367A
+            || State.Pr != 0x8C0F_367C
+            || delayedBranchTarget != 0x8C0F_29DE)
+        {
+            return false;
+        }
+
+        const uint tableBase = 0x8C2A_D770;
+        const uint tableStride = 96;
+        const uint tableEntryCount = 8;
+        const uint progressAddress = 0x8C2A_DA94;
+        var currentIndex = State.R[14];
+        if (!IsDoa2ZeroStatusByteTableScan()
+            || State.R[8] != 0x8C0F_29DE
+            || State.R[10] != tableEntryCount
+            || currentIndex >= tableEntryCount
+            || !memory.TryGetSystemRamOffset(State.R[15], 32, out _)
+            || !memory.TryGetSystemRamOffset(progressAddress, 1, out _))
+        {
+            return false;
+        }
+
+        for (var index = currentIndex; index < tableEntryCount; index++)
+        {
+            var address = tableBase + (index * tableStride);
+            if (!memory.TryGetSystemRamOffset(address, 1, out _) || memory.ReadByte(address) != 0)
+            {
+                return false;
+            }
+        }
+
+        var remainingEntries = tableEntryCount - currentIndex;
+        var computedSkippedInstructions = remainingEntries == 1
+            ? 33UL
+            : 54UL + ((ulong)remainingEntries - 2) * 21UL;
+        if (maxInstructionsToSkip < computedSkippedInstructions)
+        {
+            return false;
+        }
+
+        var localReturnValue = State.R[12];
+        memory.Write(progressAddress, [(byte)tableEntryCount]);
+        State.R[0] = localReturnValue;
+        State.R[2] = tableBase;
+        State.R[3] = progressAddress;
+        State.R[4] = tableBase + ((tableEntryCount - 1) * tableStride);
+        State.T = true;
+        State.Pr = memory.ReadUInt32(State.R[15]);
+        State.R[8] = memory.ReadUInt32(State.R[15] + 4);
+        State.R[9] = memory.ReadUInt32(State.R[15] + 8);
+        State.R[10] = memory.ReadUInt32(State.R[15] + 12);
+        State.R[11] = memory.ReadUInt32(State.R[15] + 16);
+        State.R[12] = memory.ReadUInt32(State.R[15] + 20);
+        State.R[13] = memory.ReadUInt32(State.R[15] + 24);
+        State.R[14] = memory.ReadUInt32(State.R[15] + 28);
+        State.R[15] += 32;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += computedSkippedInstructions;
+        skippedInstructions = computedSkippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ZeroRecordGroupScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3332,6 +3401,48 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_29F0) == 0x000B
         && memory.ReadInstructionUInt16(0x8C0F_29F2) == 0x302C
         && memory.ReadUInt32(0x8C0F_2AD4) == 0x8C2A_D770;
+
+    private bool IsDoa2ZeroStatusByteTableScan() =>
+        memory.ReadInstructionUInt16(0x8C0F_3660) == 0x2FC6
+        && memory.ReadInstructionUInt16(0x8C0F_3662) == 0x6C43
+        && memory.ReadInstructionUInt16(0x8C0F_3664) == 0x2FB6
+        && memory.ReadInstructionUInt16(0x8C0F_3666) == 0xEB01
+        && memory.ReadInstructionUInt16(0x8C0F_3668) == 0x2FA6
+        && memory.ReadInstructionUInt16(0x8C0F_366A) == 0xEA08
+        && memory.ReadInstructionUInt16(0x8C0F_366C) == 0x2F96
+        && memory.ReadInstructionUInt16(0x8C0F_366E) == 0x2F86
+        && memory.ReadInstructionUInt16(0x8C0F_3670) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C0F_3672) == 0xD822
+        && memory.ReadInstructionUInt16(0x8C0F_3674) == 0xD922
+        && memory.ReadInstructionUInt16(0x8C0F_3676) == 0xDD23
+        && memory.ReadInstructionUInt16(0x8C0F_3678) == 0x480B
+        && memory.ReadInstructionUInt16(0x8C0F_367A) == 0x64E3
+        && memory.ReadInstructionUInt16(0x8C0F_367C) == 0x6403
+        && memory.ReadInstructionUInt16(0x8C0F_367E) == 0x6040
+        && memory.ReadInstructionUInt16(0x8C0F_3680) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C0F_3682) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C0F_3684) == 0x8B12
+        && memory.ReadInstructionUInt16(0x8C0F_36AC) == 0x7E01
+        && memory.ReadInstructionUInt16(0x8C0F_36AE) == 0x3EA3
+        && memory.ReadInstructionUInt16(0x8C0F_36B0) == 0x8BE2
+        && memory.ReadInstructionUInt16(0x8C0F_36B2) == 0xD315
+        && memory.ReadInstructionUInt16(0x8C0F_36B4) == 0x23E0
+        && memory.ReadInstructionUInt16(0x8C0F_36B6) == 0x60C3
+        && memory.ReadInstructionUInt16(0x8C0F_36B8) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C0F_36BA) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C0F_36BC) == 0x68F6
+        && memory.ReadInstructionUInt16(0x8C0F_36BE) == 0x69F6
+        && memory.ReadInstructionUInt16(0x8C0F_36C0) == 0x6AF6
+        && memory.ReadInstructionUInt16(0x8C0F_36C2) == 0x6BF6
+        && memory.ReadInstructionUInt16(0x8C0F_36C4) == 0x6CF6
+        && memory.ReadInstructionUInt16(0x8C0F_36C6) == 0x6DF6
+        && memory.ReadInstructionUInt16(0x8C0F_36C8) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C0F_36CA) == 0x6EF6
+        && memory.ReadUInt32(0x8C0F_36FC) == 0x8C0F_29DE
+        && memory.ReadUInt32(0x8C0F_3700) == 0x8CE7_E1D0
+        && memory.ReadUInt32(0x8C0F_3704) == 0x8C1C_938C
+        && memory.ReadUInt32(0x8C0F_3708) == 0x8C2A_DA94
+        && IsDoa2TableEntryAddressHelper();
 
     private bool IsDoa2ZeroRecordGroupScan() =>
         memory.ReadInstructionUInt16(0x8C01_3BF6) == 0x63B3

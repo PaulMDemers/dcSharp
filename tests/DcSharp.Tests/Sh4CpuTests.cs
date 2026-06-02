@@ -1241,6 +1241,146 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2ZeroStatusByteTableScan()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(normalMemory);
+        WriteZeroStatusByteTableScanData(normalMemory);
+        WriteZeroStatusByteTableScanStack(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(fastMemory);
+        WriteZeroStatusByteTableScanData(fastMemory);
+        WriteZeroStatusByteTableScanStack(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_3678);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(normal, 0);
+        InitializeDoa2ZeroStatusByteTableScanState(fast, 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ZeroStatusByteTableScan(fastStart, 180, out var skippedInstructions));
+        Assert.Equal(180UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(8, fastMemory.ReadByte(0x8C2A_DA94));
+    }
+
+    [Fact]
+    public void FastForwardsDoa2ZeroStatusByteTableScanFromFinalEntry()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(normalMemory);
+        WriteZeroStatusByteTableScanData(normalMemory);
+        WriteZeroStatusByteTableScanStack(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(fastMemory);
+        WriteZeroStatusByteTableScanData(fastMemory);
+        WriteZeroStatusByteTableScanStack(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_3678);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(normal, 7);
+        InitializeDoa2ZeroStatusByteTableScanState(fast, 7);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2ZeroStatusByteTableScan(fastStart, 33, out var skippedInstructions));
+        Assert.Equal(33UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(8, fastMemory.ReadByte(0x8C2A_DA94));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroStatusByteTableScanWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(memory);
+        WriteZeroStatusByteTableScanData(memory);
+        WriteZeroStatusByteTableScanStack(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(cpu, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroStatusByteTableScan(start, 179, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_367Au, cpu.State.Pc);
+        Assert.Equal(0, memory.ReadByte(0x8C2A_DA94));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroStatusByteTableScanWhenStatusByteIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(memory);
+        WriteZeroStatusByteTableScanData(memory);
+        WriteZeroStatusByteTableScanStack(memory);
+        memory.Write(0x8C2A_D830, [1]);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(cpu, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroStatusByteTableScan(start, 180, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_367Au, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroStatusByteTableScanWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(memory);
+        WriteZeroStatusByteTableScanData(memory);
+        WriteZeroStatusByteTableScanStack(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(cpu, 0);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroStatusByteTableScan(start, 180, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2ZeroStatusByteTableScanWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2ZeroStatusByteTableScan(memory);
+        WriteZeroStatusByteTableScanData(memory);
+        WriteZeroStatusByteTableScanStack(memory);
+        memory.WriteUInt32(0x8C0F_3708, 0x8C20_1000);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_3678);
+        InitializeDoa2ZeroStatusByteTableScanState(cpu, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2ZeroStatusByteTableScan(start, 180, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ZeroRecordGroupScan()
     {
         var normalMemory = new DreamcastMemory();
@@ -5350,6 +5490,88 @@ public class Sh4CpuTests
         cpu.State.R[4] = index;
         cpu.State.Pr = 0x8C0F_367C;
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2ZeroStatusByteTableScan(DreamcastMemory memory)
+    {
+        WriteDoa2TableEntryAddressHelper(memory);
+        WriteInstruction(memory, 0x8C0F_3660, 0x2FC6);
+        WriteInstruction(memory, 0x8C0F_3662, 0x6C43);
+        WriteInstruction(memory, 0x8C0F_3664, 0x2FB6);
+        WriteInstruction(memory, 0x8C0F_3666, 0xEB01);
+        WriteInstruction(memory, 0x8C0F_3668, 0x2FA6);
+        WriteInstruction(memory, 0x8C0F_366A, 0xEA08);
+        WriteInstruction(memory, 0x8C0F_366C, 0x2F96);
+        WriteInstruction(memory, 0x8C0F_366E, 0x2F86);
+        WriteInstruction(memory, 0x8C0F_3670, 0x4F22);
+        WriteInstruction(memory, 0x8C0F_3672, 0xD822);
+        WriteInstruction(memory, 0x8C0F_3674, 0xD922);
+        WriteInstruction(memory, 0x8C0F_3676, 0xDD23);
+        WriteInstruction(memory, 0x8C0F_3678, 0x480B);
+        WriteInstruction(memory, 0x8C0F_367A, 0x64E3);
+        WriteInstruction(memory, 0x8C0F_367C, 0x6403);
+        WriteInstruction(memory, 0x8C0F_367E, 0x6040);
+        WriteInstruction(memory, 0x8C0F_3680, 0x600C);
+        WriteInstruction(memory, 0x8C0F_3682, 0x8801);
+        WriteInstruction(memory, 0x8C0F_3684, 0x8B12);
+        WriteInstruction(memory, 0x8C0F_36AC, 0x7E01);
+        WriteInstruction(memory, 0x8C0F_36AE, 0x3EA3);
+        WriteInstruction(memory, 0x8C0F_36B0, 0x8BE2);
+        WriteInstruction(memory, 0x8C0F_36B2, 0xD315);
+        WriteInstruction(memory, 0x8C0F_36B4, 0x23E0);
+        WriteInstruction(memory, 0x8C0F_36B6, 0x60C3);
+        WriteInstruction(memory, 0x8C0F_36B8, 0x0009);
+        WriteInstruction(memory, 0x8C0F_36BA, 0x4F26);
+        WriteInstruction(memory, 0x8C0F_36BC, 0x68F6);
+        WriteInstruction(memory, 0x8C0F_36BE, 0x69F6);
+        WriteInstruction(memory, 0x8C0F_36C0, 0x6AF6);
+        WriteInstruction(memory, 0x8C0F_36C2, 0x6BF6);
+        WriteInstruction(memory, 0x8C0F_36C4, 0x6CF6);
+        WriteInstruction(memory, 0x8C0F_36C6, 0x6DF6);
+        WriteInstruction(memory, 0x8C0F_36C8, 0x000B);
+        WriteInstruction(memory, 0x8C0F_36CA, 0x6EF6);
+        memory.WriteUInt32(0x8C0F_36FC, 0x8C0F_29DE);
+        memory.WriteUInt32(0x8C0F_3700, 0x8CE7_E1D0);
+        memory.WriteUInt32(0x8C0F_3704, 0x8C1C_938C);
+        memory.WriteUInt32(0x8C0F_3708, 0x8C2A_DA94);
+    }
+
+    private static void WriteZeroStatusByteTableScanData(DreamcastMemory memory)
+    {
+        for (var index = 0u; index < 8; index++)
+        {
+            memory.Write(0x8C2A_D770 + (index * 96), [0]);
+        }
+    }
+
+    private static void WriteZeroStatusByteTableScanStack(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_8000, 0x8C0F_31D4);
+        memory.WriteUInt32(0x8C20_8004, 0x8888_0008);
+        memory.WriteUInt32(0x8C20_8008, 0x9999_0009);
+        memory.WriteUInt32(0x8C20_800C, 0xAAAA_000A);
+        memory.WriteUInt32(0x8C20_8010, 0xBBBB_000B);
+        memory.WriteUInt32(0x8C20_8014, 0xCCCC_000C);
+        memory.WriteUInt32(0x8C20_8018, 0xDDDD_000D);
+        memory.WriteUInt32(0x8C20_801C, 0xEEEE_000E);
+    }
+
+    private static void InitializeDoa2ZeroStatusByteTableScanState(Sh4Cpu cpu, uint index)
+    {
+        cpu.State.R[0] = 0xDEAD_BEEF;
+        cpu.State.R[2] = 0xCAFE_BABE;
+        cpu.State.R[3] = 0xFEED_FACE;
+        cpu.State.R[4] = 0x1234_5678;
+        cpu.State.R[8] = 0x8C0F_29DE;
+        cpu.State.R[9] = 0x8CE7_E1D0;
+        cpu.State.R[10] = 8;
+        cpu.State.R[11] = 1;
+        cpu.State.R[12] = 0x1357_2468;
+        cpu.State.R[13] = 0x8C1C_938C;
+        cpu.State.R[14] = index;
+        cpu.State.R[15] = 0x8C20_8000;
+        cpu.State.Pr = 0x8C0F_367C;
+        cpu.State.T = false;
     }
 
     private static void WriteDoa2ZeroRecordGroupScan(DreamcastMemory memory)
