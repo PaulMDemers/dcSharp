@@ -566,7 +566,7 @@ public sealed class DreamcastRunner
         DreamcastMemory memory)
     {
         if (!TryDecodeFpuMemoryTransfer(step, state, memory, out var transfer)
-            || !ShouldCaptureRegister(transfer.Register, options.Register)
+            || !ShouldCaptureRegister(transfer.Register, options.Register, options.Registers)
             || !options.ContainsAddress(transfer.Address))
         {
             return;
@@ -751,7 +751,17 @@ public sealed class DreamcastRunner
             && string.Equals(anomaly.Kind, kind, StringComparison.Ordinal));
 
     private static bool ShouldCaptureRegister(string register, string? filter) =>
-        filter is null || string.Equals(register, filter, StringComparison.OrdinalIgnoreCase);
+        ShouldCaptureRegister(register, filter, null);
+
+    private static bool ShouldCaptureRegister(string register, string? filter, IReadOnlyList<string>? filters)
+    {
+        if (filters is { Count: > 0 })
+        {
+            return filters.Any(candidate => string.Equals(register, candidate, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return filter is null || string.Equals(register, filter, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void CaptureFpuRegisterWrites(
         DreamcastFpuRegisterWatchOptions options,
@@ -779,7 +789,7 @@ public sealed class DreamcastRunner
             var oldValue = before[index];
             var newValue = after[index];
             var register = $"{bank}{index}";
-            if (oldValue == newValue || !ShouldCaptureRegister(register, options.Register))
+            if (oldValue == newValue || !ShouldCaptureRegister(register, options.Register, options.Registers))
             {
                 continue;
             }
@@ -1062,7 +1072,8 @@ public sealed record DreamcastFpuRegisterWatchOptions(
     int Limit = 4096,
     string? Register = null,
     ulong? StartInstruction = null,
-    ulong? EndInstruction = null);
+    ulong? EndInstruction = null,
+    IReadOnlyList<string>? Registers = null);
 
 public sealed record DreamcastFpscrWatchOptions(
     int Limit = 4096,
@@ -1081,7 +1092,8 @@ public sealed record DreamcastFpuMemoryWatchOptions(
     string? Register = null,
     ulong? StartInstruction = null,
     ulong? EndInstruction = null,
-    IReadOnlyList<DreamcastMemoryAddressRange>? AddressRanges = null)
+    IReadOnlyList<DreamcastMemoryAddressRange>? AddressRanges = null,
+    IReadOnlyList<string>? Registers = null)
 {
     public bool ContainsAddress(uint address) =>
         AddressRanges is not { Count: > 0 } || AddressRanges.Any(range => range.Overlaps(address, 1));
