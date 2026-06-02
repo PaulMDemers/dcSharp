@@ -6591,9 +6591,9 @@ public sealed class Sh4Cpu
 
         if ((opcode & 0xF0FF) == 0xF03D)
         {
-            State.Fpul = (uint)((State.Fpscr & Sh4State.FpscrPrBit) != 0
-                ? (int)ReadDoubleRegister(n)
-                : (int)BitConverter.UInt32BitsToSingle(State.Fr[n]));
+            State.Fpul = (State.Fpscr & Sh4State.FpscrPrBit) != 0
+                ? ConvertDoubleToFpul(ReadDoubleRegisterBits(n))
+                : ConvertSingleToFpul(State.Fr[n]);
             return $"ftrc fr{n},fpul ; fpul=0x{State.Fpul:X8}";
         }
 
@@ -7084,6 +7084,64 @@ public sealed class Sh4Cpu
         State.Fpscr = (State.Fpscr & ~Sh4State.FpscrCauseMask)
             | cause
             | ((cause >> 10) & Sh4State.FpscrFlagMask);
+    }
+
+    private uint ConvertSingleToFpul(uint bits)
+    {
+        var value = BitConverter.UInt32BitsToSingle(bits);
+        var cause = 0u;
+        int result;
+        if (float.IsNaN(value))
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MinValue;
+        }
+        else if (value >= 2147483648.0f)
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MaxValue;
+        }
+        else if (value < int.MinValue)
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MinValue;
+        }
+        else
+        {
+            result = (int)value;
+        }
+
+        RecordFpuExceptionCause(cause);
+        return unchecked((uint)result);
+    }
+
+    private uint ConvertDoubleToFpul(ulong bits)
+    {
+        var value = BitConverter.UInt64BitsToDouble(bits);
+        var cause = 0u;
+        int result;
+        if (double.IsNaN(value))
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MinValue;
+        }
+        else if (value > int.MaxValue)
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MaxValue;
+        }
+        else if (value < int.MinValue)
+        {
+            cause = Sh4State.FpscrCauseInvalidBit;
+            result = int.MinValue;
+        }
+        else
+        {
+            result = (int)value;
+        }
+
+        RecordFpuExceptionCause(cause);
+        return unchecked((uint)result);
     }
 
     private bool CompareFpu(

@@ -5415,6 +5415,81 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ConvertsFloatingPointRegisterToFpulByTruncatingTowardZero()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF43D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(-3.75f);
+
+        cpu.Step();
+
+        Assert.Equal(unchecked((uint)-3), cpu.State.Fpul);
+        Assert.Equal(0u, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+    }
+
+    [Fact]
+    public void FloatingPointToFpulConversionSaturatesPositiveOverflowAndSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF43D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(2147483648.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x7FFF_FFFFu, cpu.State.Fpul);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointToFpulConversionSaturatesNegativeOverflowAndSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF43D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(-2147483904.0f);
+
+        cpu.Step();
+
+        Assert.Equal(0x8000_0000u, cpu.State.Fpul);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointToFpulConversionMapsNanToMinimumIntegerAndSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF43D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = Sh4State.DefaultSingleQNaN;
+
+        cpu.Step();
+
+        Assert.Equal(0x8000_0000u, cpu.State.Fpul);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void DoublePrecisionFloatingPointToFpulConversionSaturatesOverflowAndSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF43D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+        WriteDouble(cpu, 4, 2147483648.0);
+
+        cpu.Step();
+
+        Assert.Equal(0x7FFF_FFFFu, cpu.State.Fpul);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
     public void ExecutesFloatingPointVectorInnerProduct()
     {
         var memory = new DreamcastMemory();
