@@ -295,13 +295,13 @@ public class DreamcastPvrTaStreamDecoderTests
     }
 
     [Fact]
-    public void TracksGenericVertexPayloadWords()
+    public void DoesNotTrackStandaloneVertexPayloadWordsWithoutActivePolygon()
     {
         var writes = new[]
         {
             CreateWrite("TA_INPUT", 0xE000_0000),
-            CreateWrite("TA_INPUT", 0x3F80_0000),
-            CreateWrite("TA_INPUT", 0x3F80_0000)
+            CreateWrite("TA_INPUT", 0x0102_0304),
+            CreateWrite("TA_INPUT", 0x1122_3344)
         };
 
         var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
@@ -313,25 +313,58 @@ public class DreamcastPvrTaStreamDecoderTests
                 Assert.Equal("Control", write.Role);
                 Assert.Equal("Vertex", write.ControlKind);
                 Assert.Null(write.PayloadWordIndex);
-                Assert.Equal(7, write.PayloadWordsRemaining);
+                Assert.Null(write.PayloadWordsRemaining);
                 Assert.Null(write.PayloadWordName);
             },
             write =>
             {
-                Assert.Equal("Payload", write.Role);
-                Assert.Equal("Vertex", write.ControlKind);
-                Assert.Equal(0, write.PayloadWordIndex);
-                Assert.Equal(6, write.PayloadWordsRemaining);
+                Assert.Equal("Control", write.Role);
+                Assert.Equal("Unknown", write.ControlKind);
+                Assert.Null(write.PayloadWordIndex);
+                Assert.Null(write.PayloadWordsRemaining);
                 Assert.Null(write.PayloadWordName);
             },
             write =>
             {
-                Assert.Equal("Payload", write.Role);
-                Assert.Equal("Vertex", write.ControlKind);
-                Assert.Equal(1, write.PayloadWordIndex);
-                Assert.Equal(5, write.PayloadWordsRemaining);
+                Assert.Equal("Control", write.Role);
+                Assert.Equal("Unknown", write.ControlKind);
+                Assert.Null(write.PayloadWordIndex);
+                Assert.Null(write.PayloadWordsRemaining);
                 Assert.Null(write.PayloadWordName);
             });
+    }
+
+    [Fact]
+    public void TracksPolygonVertexPayloadWordsAfterCompleteHeader()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8084_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xE000_0000),
+            CreateWrite("TA_INPUT", 0x3F80_0000),
+            CreateWrite("TA_INPUT", 0x4000_0000)
+        };
+
+        var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
+
+        Assert.Equal("Control", decoded[8].Role);
+        Assert.Equal("Vertex", decoded[8].ControlKind);
+        Assert.Equal(7, decoded[8].PayloadWordsRemaining);
+        Assert.Equal("Payload", decoded[9].Role);
+        Assert.Equal("Vertex", decoded[9].ControlKind);
+        Assert.Equal(0, decoded[9].PayloadWordIndex);
+        Assert.Equal(6, decoded[9].PayloadWordsRemaining);
+        Assert.Equal("Payload", decoded[10].Role);
+        Assert.Equal("Vertex", decoded[10].ControlKind);
+        Assert.Equal(1, decoded[10].PayloadWordIndex);
+        Assert.Equal(5, decoded[10].PayloadWordsRemaining);
     }
 
     private static DreamcastPvrTaCommandWrite CreateWrite(string region, uint value)

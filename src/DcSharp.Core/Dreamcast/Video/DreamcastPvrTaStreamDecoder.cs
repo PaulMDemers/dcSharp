@@ -9,6 +9,7 @@ public static class DreamcastPvrTaStreamDecoder
         var decoded = new List<DreamcastPvrTaStreamWrite>(writes.Count);
         PayloadControl? payloadControl = null;
         PendingSpriteHeader? pendingSpriteHeader = null;
+        var activePolygonVertices = false;
         var payloadWordsRemaining = 0;
         var payloadWordIndex = 0;
 
@@ -33,6 +34,18 @@ public static class DreamcastPvrTaStreamDecoder
                     if (string.Equals(payloadControl.Kind, "SpriteHeader", StringComparison.Ordinal))
                     {
                         pendingSpriteHeader = new PendingSpriteHeader(payloadControl.Region, SpriteHeaderTextureEnabled(payloadControl.PayloadWords));
+                    }
+                    else if (string.Equals(payloadControl.Kind, "PolygonHeader", StringComparison.Ordinal))
+                    {
+                        activePolygonVertices = IsRenderableInput(payloadControl.Region, payloadControl.ListTypeName);
+                    }
+                    else if (string.Equals(payloadControl.Kind, "VertexEndOfStrip", StringComparison.Ordinal))
+                    {
+                        activePolygonVertices = false;
+                    }
+                    else if (!IsVertexControlKind(payloadControl.Kind))
+                    {
+                        activePolygonVertices = false;
                     }
 
                     payloadControl = null;
@@ -62,6 +75,7 @@ public static class DreamcastPvrTaStreamDecoder
                     payloadWordsRemaining = 15;
                     payloadWordIndex = 0;
                     pendingSpriteHeader = null;
+                    activePolygonVertices = false;
                     continue;
                 }
 
@@ -69,6 +83,7 @@ public static class DreamcastPvrTaStreamDecoder
             }
 
             var header = DreamcastPvrTaParameterDecoder.Decode(write.Region, write.Value);
+            var expectedPayloadWords = ExpectedPayloadWords(header, activePolygonVertices);
             decoded.Add(new DreamcastPvrTaStreamWrite(
                 write,
                 "Control",
@@ -76,16 +91,17 @@ public static class DreamcastPvrTaStreamDecoder
                 header.Value,
                 header.ValueHex,
                 null,
-                ExpectedPayloadWords(header),
+                expectedPayloadWords,
                 null));
-            if (ExpectedPayloadWords(header) is > 0 and var expectedPayloadWords)
+            if (expectedPayloadWords is > 0 and var expectedPayloadWordCount)
             {
-                payloadControl = new PayloadControl(header.Region, header.Kind, header.Value, header.ValueHex);
-                payloadWordsRemaining = expectedPayloadWords;
+                payloadControl = new PayloadControl(header.Region, header.Kind, header.Value, header.ValueHex, ListTypeName: header.ListTypeName);
+                payloadWordsRemaining = expectedPayloadWordCount;
                 payloadWordIndex = 0;
             }
             else
             {
+                activePolygonVertices = false;
                 payloadControl = null;
                 payloadWordsRemaining = 0;
                 payloadWordIndex = 0;
@@ -95,13 +111,23 @@ public static class DreamcastPvrTaStreamDecoder
         return decoded;
     }
 
-    private static int? ExpectedPayloadWords(DreamcastPvrTaParameterHeader header) =>
+    private static int? ExpectedPayloadWords(DreamcastPvrTaParameterHeader header, bool activePolygonVertices) =>
         header.ExpectedPayloadWords
-        ?? (header.Kind is "Vertex" or "VertexEndOfStrip" ? 7 : null);
+        ?? (activePolygonVertices && IsVertexControl(header) ? 7 : null);
+
+    private static bool IsVertexControl(DreamcastPvrTaParameterHeader header) =>
+        header.Kind is "Vertex" or "VertexEndOfStrip";
+
+    private static bool IsVertexControlKind(string kind) =>
+        kind is "Vertex" or "VertexEndOfStrip" or "SpriteVertex" or "SpriteVertexEndOfStrip";
 
     private static bool IsVertexControl(DreamcastPvrTaCommandWrite write) =>
         string.Equals(write.Kind, "Vertex", StringComparison.Ordinal)
         || string.Equals(write.Kind, "VertexEndOfStrip", StringComparison.Ordinal);
+
+    private static bool IsRenderableInput(string region, string? listTypeName) =>
+        string.Equals(region, "TA_INPUT", StringComparison.Ordinal)
+        && listTypeName is "OpaquePolygon" or "TranslucentPolygon" or "PunchThroughPolygon";
 
     private static bool SpriteHeaderTextureEnabled(IReadOnlyList<uint> payloadWords) =>
         payloadWords.Count > 0 && (payloadWords[0] & 0x0200_0000u) != 0;
@@ -196,7 +222,8 @@ internal sealed record PayloadControl(
     string Kind,
     uint Value,
     string ValueHex,
-    bool? SpriteTextureEnabled = null)
+    bool? SpriteTextureEnabled = null,
+    string? ListTypeName = null)
 {
     private readonly List<uint> payloadWords = [];
 
