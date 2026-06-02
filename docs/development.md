@@ -133,7 +133,7 @@ Useful run options:
 - `--controller-a start,a,joyx=-12,joyy=13,ltrig=40,rtrig=80` and `--controller-b b,ltrig=7` are compatibility shorthands for A0 and B0.
 - `--controller-a-script "0:none;200000:start,a"` is a compatibility shorthand for A0 scripts.
 - `--dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240` writes the current RGB565 VRAM snapshot as a PNG.
-- `--pvr-ta-log artifacts/logs/ta-stream.txt --pvr-ta-log-limit 512` writes a decoded PVR TA stream tail with original stream indexes, raw command kind, control/payload role, named payload slots, control value, and written value. The default limit is 4096 decoded writes.
+- `--pvr-ta-log artifacts/logs/ta-stream.txt --pvr-ta-log-limit 512` writes a decoded PVR TA stream tail with original stream indexes, guest instruction PC when known, raw command kind, control/payload role, named payload slots, control value, and written value. The default limit is 4096 decoded writes.
 - `--pixel-format rgb565` is accepted explicitly; RGB565 is currently the only framebuffer dump format.
 - `--audio-wav artifacts/audio/probe.wav` writes a deterministic stereo PCM16 WAV from modeled AICA PCM16/PCM8 playback diagnostics plus Yamaha-style 4-bit ADPCM channel decode.
 - `--media path` accepts raw 2048-byte sector images, 2352-byte CD-sector dumps, simple CUE sheets, and GDI descriptors with local data tracks.

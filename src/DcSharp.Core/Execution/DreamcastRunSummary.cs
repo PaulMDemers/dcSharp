@@ -547,10 +547,24 @@ public sealed record DreamcastPvrTaCommandWriteSummary(
     bool EndOfStrip,
     int Size,
     uint Value,
-    string ValueHex)
+    string ValueHex,
+    uint? InstructionPc = null,
+    string? InstructionPcHex = null)
 {
     public static DreamcastPvrTaCommandWriteSummary FromWrite(DreamcastPvrTaCommandWrite write) =>
-        new(write.Address, write.AddressHex, write.Region, write.Kind, write.ListType, write.ListTypeName, write.EndOfStrip, write.Size, write.Value, write.ValueHex);
+        new(
+            write.Address,
+            write.AddressHex,
+            write.Region,
+            write.Kind,
+            write.ListType,
+            write.ListTypeName,
+            write.EndOfStrip,
+            write.Size,
+            write.Value,
+            write.ValueHex,
+            write.InstructionPc,
+            write.InstructionPcHex);
 }
 
 public sealed record DreamcastPvrTaStreamWriteSummary(
@@ -567,7 +581,9 @@ public sealed record DreamcastPvrTaStreamWriteSummary(
     string ControlValueHex,
     int? PayloadWordIndex,
     int? PayloadWordsRemaining,
-    string? PayloadWordName)
+    string? PayloadWordName,
+    uint? InstructionPc = null,
+    string? InstructionPcHex = null)
 {
     public static DreamcastPvrTaStreamWriteSummary FromWrite(DreamcastPvrTaStreamWrite write) =>
         new(
@@ -584,7 +600,9 @@ public sealed record DreamcastPvrTaStreamWriteSummary(
             write.ControlValueHex,
             write.PayloadWordIndex,
             write.PayloadWordsRemaining,
-            write.PayloadWordName);
+            write.PayloadWordName,
+            write.Write.InstructionPc,
+            write.Write.InstructionPcHex);
 }
 
 public sealed record DreamcastPvrTaPolygonHeaderPayloadSummary(

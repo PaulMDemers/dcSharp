@@ -506,7 +506,9 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
+        memory.CurrentInstructionPc = 0x8C10_07D6;
         memory.WriteUInt32(0x1000_0000, 0x8084_0000);
+        memory.CurrentInstructionPc = null;
         memory.WriteUInt32(0x1080_0000, 0x0000_0001);
 
         var snapshot = memory.CreateVideoSnapshot();
@@ -520,12 +522,16 @@ public class DreamcastMemoryTests
                 Assert.Equal("OpaquePolygon", write.ListTypeName);
                 Assert.Equal("0x10000000", write.AddressHex);
                 Assert.Equal("0x80840000", write.ValueHex);
+                Assert.Equal(0x8C10_07D6u, write.InstructionPc);
+                Assert.Equal("0x8C1007D6", write.InstructionPcHex);
             },
             write =>
             {
                 Assert.Equal("TA_YUV_CONV", write.Region);
                 Assert.Equal("YuvConverterData", write.Kind);
                 Assert.Equal("0x10800000", write.AddressHex);
+                Assert.Null(write.InstructionPc);
+                Assert.Null(write.InstructionPcHex);
             });
     }
 

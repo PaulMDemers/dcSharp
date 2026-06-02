@@ -1975,7 +1975,9 @@ public sealed class DreamcastMemory
             command.EndOfStrip,
             data.Length,
             value,
-            $"0x{value:X8}");
+            $"0x{value:X8}",
+            CurrentInstructionPc,
+            CurrentInstructionPc is { } instructionPc ? $"0x{instructionPc:X8}" : null);
         pvrTaCommandWrites.Add(write);
         if (pvrTaState.Accept(write) is { } renderCommand)
         {
@@ -1989,7 +1991,7 @@ public sealed class DreamcastMemory
             }
         }
 
-        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value, CurrentInstructionPc));
         return true;
     }
 

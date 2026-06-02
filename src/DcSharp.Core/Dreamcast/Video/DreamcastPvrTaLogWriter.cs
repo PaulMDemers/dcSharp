@@ -24,7 +24,7 @@ public static class DreamcastPvrTaLogWriter
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"# writes={writes.Count} decoded={decoded.Count} skipped={skipped} limit={FormatLimit(limit)}"));
-        writer.WriteLine("# columns: index address region role controlKind rawKind list endOfStrip payloadIndex payloadRemaining payloadName controlValue value");
+        writer.WriteLine("# columns: index pc address region role controlKind rawKind list endOfStrip payloadIndex payloadRemaining payloadName controlValue value");
 
         for (var index = skipped; index < decoded.Count; index++)
         {
@@ -33,7 +33,7 @@ public static class DreamcastPvrTaLogWriter
             writer.WriteLine(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"#{index} addr={write.AddressHex} region={write.Region} role={streamWrite.Role} controlKind={streamWrite.ControlKind} rawKind={write.Kind} list={write.ListTypeName ?? "-"} endOfStrip={write.EndOfStrip} payloadIndex={FormatNullable(streamWrite.PayloadWordIndex)} payloadRemaining={FormatNullable(streamWrite.PayloadWordsRemaining)} payloadName={streamWrite.PayloadWordName ?? "-"} controlValue={streamWrite.ControlValueHex} value={write.ValueHex}"));
+                    $"#{index} pc={write.InstructionPcHex ?? "-"} addr={write.AddressHex} region={write.Region} role={streamWrite.Role} controlKind={streamWrite.ControlKind} rawKind={write.Kind} list={write.ListTypeName ?? "-"} endOfStrip={write.EndOfStrip} payloadIndex={FormatNullable(streamWrite.PayloadWordIndex)} payloadRemaining={FormatNullable(streamWrite.PayloadWordsRemaining)} payloadName={streamWrite.PayloadWordName ?? "-"} controlValue={streamWrite.ControlValueHex} value={write.ValueHex}"));
         }
     }
 

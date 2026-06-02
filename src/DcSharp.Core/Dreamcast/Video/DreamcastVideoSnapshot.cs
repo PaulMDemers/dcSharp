@@ -52,4 +52,6 @@ public sealed record DreamcastPvrTaCommandWrite(
     bool EndOfStrip,
     int Size,
     uint Value,
-    string ValueHex);
+    string ValueHex,
+    uint? InstructionPc = null,
+    string? InstructionPcHex = null);
