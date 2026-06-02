@@ -2926,6 +2926,96 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2RendererMode2EntryToFirstTrigCall()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererMode2EntryToFirstTrigCall(normalMemory);
+        WriteRendererMode2EntryToFirstTrigCallData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererMode2EntryToFirstTrigCall(fastMemory);
+        WriteRendererMode2EntryToFirstTrigCallData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_0430);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(normal);
+        InitializeDoa2RendererPrologueState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererMode2EntryToFirstTrigCall(fastStart, 80, out var skippedInstructions));
+        Assert.Equal(67UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 108; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_5000 - 108 + offset), fastMemory.ReadUInt32(0x8C20_5000 - 108 + offset));
+        }
+
+        Assert.Equal(0x8C0F_B1C0u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererMode2EntryToFirstTrigCallWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererMode2EntryToFirstTrigCall(memory);
+        WriteRendererMode2EntryToFirstTrigCallData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererMode2EntryToFirstTrigCall(start, 66, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererMode2EntryToFirstTrigCallWhenModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererMode2EntryToFirstTrigCall(memory);
+        WriteRendererMode2EntryToFirstTrigCallData(memory);
+        memory.WriteUInt32(0x8C20_1000 + 48, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererMode2EntryToFirstTrigCall(start, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererMode2EntryToFirstTrigCallWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererMode2EntryToFirstTrigCall(memory);
+        WriteRendererMode2EntryToFirstTrigCallData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_0430);
+        InitializeDoa2RendererPrologueState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererMode2EntryToFirstTrigCall(start, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_0432u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2RendererMode2LookupCommonPath()
     {
         var normalMemory = new DreamcastMemory();
@@ -7646,6 +7736,26 @@ public class Sh4CpuTests
         }
 
         cpu.State.T = true;
+    }
+
+    private static void WriteDoa2RendererMode2EntryToFirstTrigCall(DreamcastMemory memory)
+    {
+        WriteDoa2RendererPrologueCommonPath(memory);
+        WriteDoa2RendererMode2LookupCommonPath(memory);
+        WriteDoa2RendererMode2TrigSetupToFirstCall(memory);
+    }
+
+    private static void WriteRendererMode2EntryToFirstTrigCallData(DreamcastMemory memory)
+    {
+        WriteRendererPrologueData(memory);
+        WriteRendererMode2LookupData(memory);
+        memory.WriteUInt32(0x8C20_1000 + 12, BitConverter.SingleToUInt32Bits(1.25f));
+        memory.WriteUInt32(0x8C20_1000 + 16, BitConverter.SingleToUInt32Bits(0.5f));
+        memory.WriteUInt32(0x8C20_1000 + 20, BitConverter.SingleToUInt32Bits(0.75f));
+        memory.WriteUInt32(0x8C20_1000 + 40, 0x0000_1234);
+        memory.WriteUInt32(0x8C20_1000 + 44, BitConverter.SingleToUInt32Bits(0.1f));
+        memory.WriteUInt32(0x8C20_C4F4 + 24, BitConverter.SingleToUInt32Bits(8.0f));
+        memory.WriteUInt32(0x8C20_C4F4 + 28, BitConverter.SingleToUInt32Bits(6.0f));
     }
 
     private static void WriteDoa2RendererMode2LookupCommonPath(DreamcastMemory memory)

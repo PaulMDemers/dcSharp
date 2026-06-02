@@ -2515,6 +2515,169 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2RendererMode2EntryToFirstTrigCall(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0430
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C10_0432)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 67;
+        var limitAddress = memory.ReadUInt32(0x8C10_0494);
+        if (!IsDoa2RendererPrologueCommonPath()
+            || !IsDoa2RendererMode2LookupCommonPath()
+            || !IsDoa2RendererMode2TrigSetupToFirstCall()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 104
+            || State.R[4] > uint.MaxValue - 51
+            || !memory.TryGetSystemRamOffset(State.R[15] - 104, 108, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4], 52, out _)
+            || !memory.TryGetSystemRamOffset(limitAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var row = memory.ReadUInt32(State.R[4]);
+        var limit = memory.ReadUInt32(limitAddress);
+        if (unchecked((int)row) >= unchecked((int)limit))
+        {
+            return false;
+        }
+
+        var indexTablePointerAddress = memory.ReadUInt32(0x8C10_0578);
+        if (!memory.TryGetSystemRamOffset(indexTablePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var indexTable = memory.ReadUInt32(indexTablePointerAddress);
+        var doubledRow = row << 1;
+        if (indexTable > uint.MaxValue - doubledRow
+            || !memory.TryGetSystemRamOffset(indexTable + doubledRow, 2, out _))
+        {
+            return false;
+        }
+
+        var index = (uint)(short)memory.ReadUInt16(indexTable + doubledRow);
+        if (index == 0xFFFF_FFFF)
+        {
+            return false;
+        }
+
+        var renderTablePointerAddress = memory.ReadUInt32(0x8C10_057C);
+        if (!memory.TryGetSystemRamOffset(renderTablePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var mode = memory.ReadUInt32(State.R[4] + 48);
+        if (mode != 2)
+        {
+            return false;
+        }
+
+        var renderBase = memory.ReadUInt32(renderTablePointerAddress);
+        var renderEntry = unchecked(renderBase + (index * 32));
+        if (renderEntry > uint.MaxValue - 31
+            || State.R[15] > uint.MaxValue - 7
+            || !memory.TryGetSystemRamOffset(renderEntry + 24, 8, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15] + 4, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[13]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[12]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[11]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[10]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[9]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[8]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[15]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[14]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[13]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Fr[12]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Pr);
+        State.R[15] += unchecked((uint)-60);
+
+        State.R[1] = limitAddress;
+        State.R[13] = State.R[4];
+        State.R[2] = row;
+        State.R[3] = limit;
+        State.T = unchecked((int)State.R[2]) >= unchecked((int)State.R[3]);
+        ExecuteFpuMove(0xFF9D, 15, 9, 0xD);
+
+        State.R[3] = memory.ReadUInt32(0x8C10_0578);
+        State.R[8] = row;
+        State.R[0] = indexTable;
+        State.T = (State.R[8] & 0x8000_0000) != 0;
+        State.R[8] <<= 1;
+        State.R[8] = index;
+        State.R[0] = State.R[8];
+        State.T = State.R[0] == 0xFFFF_FFFF;
+        State.R[2] = renderTablePointerAddress;
+        State.R[12] = State.R[8];
+        State.R[12] <<= 2;
+        State.R[0] = mode;
+        State.R[3] = renderBase;
+        State.R[12] <<= 2;
+        State.T = (State.R[12] & 0x8000_0000) != 0;
+        State.R[12] <<= 1;
+        State.T = State.R[0] == 0;
+        State.R[12] += State.R[3];
+        State.R[4] = 0;
+        State.T = State.R[0] == 2;
+
+        State.R[0] = 44;
+        ExecuteFpuMove(0xFED6, 14, 13, 0x6);
+        State.R[14] = 1;
+        State.R[0] = 0x8C10_0580;
+        ExecuteFpuMove(0xFDFC, 13, 15, 0xC);
+        ExecuteFpuMove(0xF408, 4, 0, 0x8);
+        State.R[0] = 16;
+        ExecuteFpuMove(0xF3D6, 3, 13, 0x6);
+        State.R[0] = 24;
+        ExecuteFpuMove(0xF2C6, 2, 12, 0x6);
+        State.R[0] = 20;
+        State.R[3] = memory.ReadUInt32(0x8C10_0584);
+        ExecuteFpuMove(0xF232, 2, 3, 0x2);
+        ExecuteFpuMove(0xF3D6, 3, 13, 0x6);
+        State.R[0] = 28;
+        ExecuteFpuMove(0xFC2C, 12, 2, 0xC);
+        ExecuteFpuMove(0xFC42, 12, 4, 0x2);
+        ExecuteFpuMove(0xF2C6, 2, 12, 0x6);
+        State.R[0] = 4;
+        ExecuteFpuMove(0xF232, 2, 3, 0x2);
+        ExecuteFpuMove(0xF242, 2, 4, 0x2);
+        ExecuteFpuMove(0xFF27, 15, 2, 0x7);
+        State.R[0] = 12;
+        ExecuteFpuMove(0xF3D6, 3, 13, 0x6);
+        ExecuteFpuMove(0xFD33, 13, 3, 0x3);
+        State.Pr = 0x8C10_0536;
+        State.R[4] = memory.ReadUInt32(State.R[13] + 40);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2RendererMode2LookupCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
