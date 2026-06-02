@@ -14,7 +14,7 @@ public static class DreamcastPvrPreviewRenderer
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram)
     {
-        if (sprite.Vertices.Count < 4)
+        if (!sprite.HasRenderablePreviewArea)
         {
             return;
         }

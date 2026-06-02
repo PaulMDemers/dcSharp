@@ -365,7 +365,12 @@ public sealed record DreamcastPvrTaSpriteVertex(
     float U,
     float V,
     uint UvValue,
-    string UvValueHex);
+    string UvValueHex)
+{
+    public float RawX => BitConverter.UInt32BitsToSingle(XValue);
+    public float RawY => BitConverter.UInt32BitsToSingle(YValue);
+    public bool HasFinitePosition => float.IsFinite(RawX) && float.IsFinite(RawY) && float.IsFinite(Z);
+}
 
 public sealed record DreamcastPvrTaSprite(
     string Region,
@@ -379,7 +384,38 @@ public sealed record DreamcastPvrTaSprite(
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
-    IReadOnlyList<DreamcastPvrTaSpriteVertex> Vertices);
+    IReadOnlyList<DreamcastPvrTaSpriteVertex> Vertices)
+{
+    public bool HasFinitePreviewCoordinates =>
+        Vertices.Count >= 4 && Vertices.Take(4).All(vertex => vertex.HasFinitePosition);
+
+    public bool HasRenderablePreviewArea =>
+        Rgb565 != 0
+        && HasFinitePreviewCoordinates
+        && MathF.Abs(SignedPreviewArea(OrderPreviewVertices(Vertices.Take(4).ToArray()))) > 0.0001f;
+
+    private static IReadOnlyList<DreamcastPvrTaSpriteVertex> OrderPreviewVertices(IReadOnlyList<DreamcastPvrTaSpriteVertex> vertices)
+    {
+        var centerX = (float)vertices.Average(vertex => vertex.X);
+        var centerY = (float)vertices.Average(vertex => vertex.Y);
+        return vertices
+            .OrderBy(vertex => MathF.Atan2(vertex.Y - centerY, vertex.X - centerX))
+            .ToArray();
+    }
+
+    private static float SignedPreviewArea(IReadOnlyList<DreamcastPvrTaSpriteVertex> vertices)
+    {
+        var area = 0.0f;
+        for (var index = 0; index < vertices.Count; index++)
+        {
+            var current = vertices[index];
+            var next = vertices[(index + 1) % vertices.Count];
+            area += (current.X * next.Y) - (next.X * current.Y);
+        }
+
+        return area * 0.5f;
+    }
+}
 
 public sealed record DreamcastPvrTaRenderCommand(DreamcastPvrTaStrip? Strip, DreamcastPvrTaSprite? Sprite)
 {

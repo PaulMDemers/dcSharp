@@ -475,6 +475,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Watched memory writes: {result.WatchedMemoryWrites.Count}");
     Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
+    PrintVideoActivity(summary.Video);
     PrintRuntimeScheduling(summary);
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
@@ -513,6 +514,26 @@ static void PrintRuntimeScheduling(DreamcastRunSummary summary)
         ? $", source={pendingAsic.RegisterName}:bit{pendingAsic.Bit}, mask={pendingAsic.BitMaskHex}, levelName={pendingAsic.LevelName}"
         : string.Empty;
     Console.WriteLine($"ASIC: pending={summary.Asic.PendingEventCodeHex ?? "none"}, level={summary.Asic.PendingLevel?.ToString(CultureInfo.InvariantCulture) ?? "none"}{asicSource}");
+}
+
+static void PrintVideoActivity(DreamcastVideoSummary video)
+{
+    Console.WriteLine($"Video VRAM: nonzero={video.NonZeroBytes}, checksum={video.Fnv1A32Hex}, first={video.FirstNonZeroOffsetHex ?? "none"}");
+    Console.WriteLine($"PVR: registers={video.PvrRegisterAccessCount}, taWrites={video.PvrTaCommandWriteCount}, taStrips={video.PvrTaStrips.Count}, taSprites={video.PvrTaSprites.Count}");
+    if (video.PvrTaLists.Count > 0)
+    {
+        Console.WriteLine($"PVR TA lists: {FormatPvrTaLists(video.PvrTaLists)}");
+    }
+
+    if (video.PvrTaStrips.Count > 0)
+    {
+        Console.WriteLine($"PVR TA strips: {FormatPvrTaStrips(video.PvrTaStrips)}");
+    }
+
+    if (video.PvrTaSprites.Count > 0)
+    {
+        Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(video.PvrTaSprites.TakeLast(8).ToArray())}");
+    }
 }
 
 static void PrintGdromActivity(DreamcastGdromSnapshot gdrom)
@@ -2061,7 +2082,12 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
 static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
-    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}"))}"));
+    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} preview={FormatPvrTaSpritePreviewStatus(sprite)} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}"))}"));
+
+static string FormatPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
+    sprite.HasRenderablePreviewArea
+        ? "renderable"
+        : sprite.HasFinitePreviewCoordinates ? "degenerate" : "nonfinite";
 
 static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
     payload is null

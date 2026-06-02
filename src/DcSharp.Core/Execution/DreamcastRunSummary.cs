@@ -912,7 +912,8 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
     float U,
     float V,
     uint UvValue,
-    string UvValueHex)
+    string UvValueHex,
+    bool HasFinitePosition)
 {
     public static DreamcastPvrTaSpriteVertexSummary FromVertex(DreamcastPvrTaSpriteVertex vertex) =>
         new(
@@ -929,7 +930,8 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
             vertex.U,
             vertex.V,
             vertex.UvValue,
-            vertex.UvValueHex);
+            vertex.UvValueHex,
+            vertex.HasFinitePosition);
 }
 
 public sealed record DreamcastPvrTaSpriteSummary(
@@ -944,6 +946,8 @@ public sealed record DreamcastPvrTaSpriteSummary(
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
+    bool HasFinitePreviewCoordinates,
+    bool HasRenderablePreviewArea,
     int VertexCount,
     IReadOnlyList<DreamcastPvrTaSpriteVertexSummary> Vertices)
 {
@@ -960,6 +964,8 @@ public sealed record DreamcastPvrTaSpriteSummary(
             sprite.EndOfStrip,
             sprite.Rgb565,
             sprite.Rgb565Hex,
+            sprite.HasFinitePreviewCoordinates,
+            sprite.HasRenderablePreviewArea,
             sprite.Vertices.Count,
             sprite.Vertices.Select(DreamcastPvrTaSpriteVertexSummary.FromVertex).ToArray());
 }

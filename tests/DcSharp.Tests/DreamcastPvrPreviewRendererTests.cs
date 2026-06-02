@@ -168,6 +168,35 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void SkipsSpriteWithNonFinitePreviewCoordinates()
+    {
+        var vram = new byte[4096];
+        var sprite = CreateSprite(
+            0x07E0,
+            [(1, 1, 0.0f, 0.0f), (3, 1, 0.0f, 0.0f), (3, 3, 0.0f, 0.0f), (1, 3, 0.0f, 0.0f)],
+            argb: 0xFF00_FF00);
+        var invalidSprite = sprite with
+        {
+            Vertices = sprite.Vertices
+                .Select(vertex => vertex with
+                {
+                    XValue = 0xFFC0_0000,
+                    XValueHex = "0xFFC00000"
+                })
+                .ToArray()
+        };
+
+        Assert.False(invalidSprite.HasFinitePreviewCoordinates);
+        Assert.False(invalidSprite.HasRenderablePreviewArea);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(invalidSprite, vram);
+
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
     public void LaterStripOverwritesSpritePreviewPixels()
     {
         var vram = new byte[4096];

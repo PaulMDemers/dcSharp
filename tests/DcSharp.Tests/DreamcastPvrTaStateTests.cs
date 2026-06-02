@@ -287,6 +287,30 @@ public class DreamcastPvrTaStateTests
             });
     }
 
+    [Fact]
+    public void CompletesSpritePacketWithNonFiniteCoordinatesForDiagnostics()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("SpriteHeader", 0xA000_0009)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x8000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x2088_04C0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFF0C_0C0C)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        var render = AcceptNonFiniteSpritePacket(state);
+
+        Assert.NotNull(render);
+        var sprite = Assert.Single(state.CompletedSprites);
+        Assert.Equal("0xA0000009", sprite.HeaderValueHex);
+        Assert.Equal("0x0861", sprite.Rgb565Hex);
+        Assert.False(sprite.HasFinitePreviewCoordinates);
+        Assert.False(sprite.HasRenderablePreviewArea);
+        Assert.All(sprite.Vertices, vertex => Assert.False(vertex.HasFinitePosition));
+    }
+
     private static DreamcastPvrTaRenderCommand? AcceptVertexPacket(
         DreamcastPvrTaState state,
         string kind,
@@ -331,6 +355,26 @@ public class DreamcastPvrTaStateTests
         Assert.Null(state.Accept(CreateWrite("Unknown", 0x3F80_0000)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0x4040_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
+        return state.Accept(CreateWrite("Unknown", 0));
+    }
+
+    private static DreamcastPvrTaRenderCommand? AcceptNonFiniteSpritePacket(DreamcastPvrTaState state)
+    {
+        Assert.Null(state.Accept(CreateWrite("VertexEndOfStrip", 0xF000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x43B5_8A2C)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x43B5_8A2C)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x43B5_8A2C)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFC0_0000)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
