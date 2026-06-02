@@ -6870,7 +6870,7 @@ public sealed class Sh4Cpu
                 && (kind != FpuArithmeticKind.Divide || right != 0.0);
             var rounded = ApplyDoubleResultRounding(result, isOverflow);
             WriteDoubleRegisterBits(n, DoubleResultToBits(rounded));
-            RecordFpuDoubleResult(kind, left, right, result);
+            RecordFpuDoubleResult(kind, leftBits, rightBits, left, right, result);
             return double.IsFinite(rounded)
                 ? isOverflow && double.IsInfinity(result) ? " ; overflow-rounded" : string.Empty
                 : $" ; nonfinite dr{n & ~1}old=0x{leftBits:X16},dr{m & ~1}=0x{rightBits:X16}";
@@ -6887,7 +6887,7 @@ public sealed class Sh4Cpu
             && (kind != FpuArithmeticKind.Divide || rightSingle != 0.0f);
         var roundedSingle = ApplySingleResultRounding(resultSingle, isSingleOverflow);
         State.Fr[n] = SingleResultToBits(roundedSingle);
-        RecordFpuSingleResult(kind, leftSingle, rightSingle, resultSingle);
+        RecordFpuSingleResult(kind, leftBitsSingle, rightBitsSingle, leftSingle, rightSingle, resultSingle);
         return float.IsFinite(roundedSingle)
             ? isSingleOverflow && float.IsInfinity(resultSingle) ? " ; overflow-rounded" : string.Empty
             : $" ; nonfinite fr{n}old=0x{leftBitsSingle:X8},fr{m}=0x{rightBitsSingle:X8}";
@@ -6933,10 +6933,10 @@ public sealed class Sh4Cpu
         return true;
     }
 
-    private void RecordFpuSingleResult(FpuArithmeticKind kind, float left, float right, float result)
+    private void RecordFpuSingleResult(FpuArithmeticKind kind, uint leftBits, uint rightBits, float left, float right, float result)
     {
         var cause = 0u;
-        if (float.IsNaN(left) || float.IsNaN(right) || IsInvalidSingleResult(kind, left, right, result))
+        if (IsSingleSignalingNaN(leftBits) || IsSingleSignalingNaN(rightBits) || IsInvalidSingleResult(kind, left, right, result))
         {
             cause |= Sh4State.FpscrCauseInvalidBit;
         }
@@ -6958,10 +6958,12 @@ public sealed class Sh4Cpu
     {
         var cause = 0u;
         var finiteInputs = true;
+        var hasNaNInput = false;
         foreach (var operandBits in operands)
         {
             var operand = BitConverter.UInt32BitsToSingle(operandBits);
-            if (float.IsNaN(operand))
+            hasNaNInput |= IsSingleNaN(operandBits);
+            if (IsSingleSignalingNaN(operandBits))
             {
                 cause |= Sh4State.FpscrCauseInvalidBit;
             }
@@ -6969,7 +6971,7 @@ public sealed class Sh4Cpu
             finiteInputs &= float.IsFinite(operand);
         }
 
-        if (float.IsNaN(result) && cause == 0)
+        if (float.IsNaN(result) && cause == 0 && !hasNaNInput)
         {
             cause |= Sh4State.FpscrCauseInvalidBit;
         }
@@ -6990,13 +6992,14 @@ public sealed class Sh4Cpu
     {
         var cause = forceInexact ? Sh4State.FpscrCauseInexactBit : 0u;
         var finiteInputs = true;
+        var hasNaNInput = false;
         for (var index = 0; index < leftOperands.Length; index++)
         {
-            AccumulateSingleOperandException(leftOperands[index], ref cause, ref finiteInputs);
-            AccumulateSingleOperandException(rightOperands[index], ref cause, ref finiteInputs);
+            AccumulateSingleOperandException(leftOperands[index], ref cause, ref finiteInputs, ref hasNaNInput);
+            AccumulateSingleOperandException(rightOperands[index], ref cause, ref finiteInputs, ref hasNaNInput);
         }
 
-        if (float.IsNaN(result) && cause == 0)
+        if (float.IsNaN(result) && cause == 0 && !hasNaNInput)
         {
             cause |= Sh4State.FpscrCauseInvalidBit;
         }
@@ -7009,10 +7012,11 @@ public sealed class Sh4Cpu
         RecordFpuExceptionCause(cause);
     }
 
-    private static void AccumulateSingleOperandException(uint operandBits, ref uint cause, ref bool finiteInputs)
+    private static void AccumulateSingleOperandException(uint operandBits, ref uint cause, ref bool finiteInputs, ref bool hasNaNInput)
     {
         var operand = BitConverter.UInt32BitsToSingle(operandBits);
-        if (float.IsNaN(operand))
+        hasNaNInput |= IsSingleNaN(operandBits);
+        if (IsSingleSignalingNaN(operandBits))
         {
             cause |= Sh4State.FpscrCauseInvalidBit;
         }
@@ -7020,10 +7024,10 @@ public sealed class Sh4Cpu
         finiteInputs &= float.IsFinite(operand);
     }
 
-    private void RecordFpuDoubleResult(FpuArithmeticKind kind, double left, double right, double result)
+    private void RecordFpuDoubleResult(FpuArithmeticKind kind, ulong leftBits, ulong rightBits, double left, double right, double result)
     {
         var cause = 0u;
-        if (double.IsNaN(left) || double.IsNaN(right) || IsInvalidDoubleResult(kind, left, right, result))
+        if (IsDoubleSignalingNaN(leftBits) || IsDoubleSignalingNaN(rightBits) || IsInvalidDoubleResult(kind, left, right, result))
         {
             cause |= Sh4State.FpscrCauseInvalidBit;
         }
@@ -7062,6 +7066,18 @@ public sealed class Sh4Cpu
             FpuArithmeticKind.Divide => left == 0.0 && right == 0.0,
             _ => true
         };
+
+    private static bool IsSingleNaN(uint bits) =>
+        (bits & 0x7F80_0000u) == 0x7F80_0000u && (bits & 0x007F_FFFFu) != 0;
+
+    private static bool IsSingleSignalingNaN(uint bits) =>
+        IsSingleNaN(bits) && (bits & 0x0040_0000u) != 0;
+
+    private static bool IsDoubleNaN(ulong bits) =>
+        (bits & 0x7FF0_0000_0000_0000ul) == 0x7FF0_0000_0000_0000ul && (bits & 0x000F_FFFF_FFFF_FFFFul) != 0;
+
+    private static bool IsDoubleSignalingNaN(ulong bits) =>
+        IsDoubleNaN(bits) && (bits & 0x0008_0000_0000_0000ul) != 0;
 
     private void RecordFpuExceptionCause(uint cause)
     {

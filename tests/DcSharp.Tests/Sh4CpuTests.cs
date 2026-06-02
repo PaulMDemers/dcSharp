@@ -5540,6 +5540,39 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointQuietNanInputDoesNotSetInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF450);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fpscr = Sh4State.FpscrDnBit;
+        cpu.State.Fr[4] = Sh4State.DefaultSingleQNaN;
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(1.0f);
+
+        cpu.Step();
+
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[4]);
+        Assert.Equal(0u, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(0u, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void FloatingPointSignalingNanInputSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF450);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[4] = 0x7FC0_0000;
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(1.0f);
+
+        cpu.Step();
+
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[4]);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
     public void NormalFloatingPointArithmeticClearsCauseBitsButKeepsStickyFlagBits()
     {
         var memory = new DreamcastMemory();
