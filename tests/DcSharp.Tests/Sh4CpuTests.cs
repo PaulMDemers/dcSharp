@@ -1655,6 +1655,137 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2EmptyTaskHelperReturn()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(normalMemory);
+        WriteDoa2EmptyTaskHelperReturnData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(fastMemory);
+        WriteDoa2EmptyTaskHelperReturnData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_06A0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(normal, index: 0);
+        InitializeDoa2EmptyTaskHelperReturnState(fast, index: 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyTaskHelperReturn(fastStart, 51, out var skippedInstructions));
+        Assert.Equal(51UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FFC), fastMemory.ReadUInt32(0x8C20_6FFC));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF8), fastMemory.ReadUInt32(0x8C20_6FF8));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF4), fastMemory.ReadUInt32(0x8C20_6FF4));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF0), fastMemory.ReadUInt32(0x8C20_6FF0));
+    }
+
+    [Fact]
+    public void FastForwardsDoa2EmptyTaskHelperReturnForLaterEntry()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(normalMemory);
+        WriteDoa2EmptyTaskHelperReturnData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(fastMemory);
+        WriteDoa2EmptyTaskHelperReturnData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_06A0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(normal, index: 4);
+        InitializeDoa2EmptyTaskHelperReturnState(fast, index: 4);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyTaskHelperReturn(fastStart, 51, out var skippedInstructions));
+        Assert.Equal(51UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperReturnWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(memory);
+        WriteDoa2EmptyTaskHelperReturnData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(cpu, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperReturn(start, 50, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_06A2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperReturnWhenPrimaryTableEntryIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(memory);
+        WriteDoa2EmptyTaskHelperReturnData(memory);
+        memory.WriteUInt32(0x8C2F_6650, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(cpu, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperReturn(start, 51, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperReturnWhenQueueEntryIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(memory);
+        WriteDoa2EmptyTaskHelperReturnData(memory);
+        memory.WriteUInt32(0x8C2F_6910, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(cpu, index: 3);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperReturn(start, 51, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperReturnWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperReturn(memory);
+        WriteDoa2EmptyTaskHelperReturnData(memory);
+        WriteInstruction(memory, 0x8C13_06BC, 0x8D08);
+        var cpu = new Sh4Cpu(memory, 0x8C13_06A0);
+        InitializeDoa2EmptyTaskHelperReturnState(cpu, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperReturn(start, 51, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2UnrolledWordCopyReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -6419,6 +6550,93 @@ public class Sh4CpuTests
         cpu.State.R[7] = startAddress;
         cpu.State.R[10] = 0x0100_0000;
         cpu.State.R[13] = 0x8C20_1014;
+        cpu.State.T = false;
+    }
+
+    private static void WriteDoa2EmptyTaskHelperReturn(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_06A0, 0x2FE6);
+        WriteInstruction(memory, 0x8C13_06A2, 0x6363);
+        WriteInstruction(memory, 0x8C13_06A4, 0x2FD6);
+        WriteInstruction(memory, 0x8C13_06A6, 0x6D63);
+        WriteInstruction(memory, 0x8C13_06A8, 0x2FC6);
+        WriteInstruction(memory, 0x8C13_06AA, 0x4D08);
+        WriteInstruction(memory, 0x8C13_06AC, 0xDC27);
+        WriteInstruction(memory, 0x8C13_06AE, 0x3D3C);
+        WriteInstruction(memory, 0x8C13_06B0, 0x9046);
+        WriteInstruction(memory, 0x8C13_06B2, 0x4D08);
+        WriteInstruction(memory, 0x8C13_06B4, 0x4F22);
+        WriteInstruction(memory, 0x8C13_06B6, 0x02CE);
+        WriteInstruction(memory, 0x8C13_06B8, 0x6E73);
+        WriteInstruction(memory, 0x8C13_06BA, 0x2228);
+        WriteInstruction(memory, 0x8C13_06BC, 0x8D09);
+        WriteInstruction(memory, 0x8C13_06BE, 0x4E08);
+        WriteInstruction(memory, 0x8C13_06D2, 0xE400);
+        WriteInstruction(memory, 0x8C13_06D4, 0x9736);
+        WriteInstruction(memory, 0x8C13_06D6, 0x6243);
+        WriteInstruction(memory, 0x8C13_06D8, 0x3262);
+        WriteInstruction(memory, 0x8C13_06DA, 0x6143);
+        WriteInstruction(memory, 0x8C13_06DC, 0x8D07);
+        WriteInstruction(memory, 0x8C13_06DE, 0x375C);
+        WriteInstruction(memory, 0x8C13_06EE, 0x9328);
+        WriteInstruction(memory, 0x8C13_06F0, 0x9028);
+        WriteInstruction(memory, 0x8C13_06F2, 0x33CC);
+        WriteInstruction(memory, 0x8C13_06F4, 0x305C);
+        WriteInstruction(memory, 0x8C13_06F6, 0x30DC);
+        WriteInstruction(memory, 0x8C13_06F8, 0x33EC);
+        WriteInstruction(memory, 0x8C13_06FA, 0x06EE);
+        WriteInstruction(memory, 0x8C13_06FC, 0x6232);
+        WriteInstruction(memory, 0x8C13_06FE, 0x364C);
+        WriteInstruction(memory, 0x8C13_0700, 0x3248);
+        WriteInstruction(memory, 0x8C13_0702, 0x6423);
+        WriteInstruction(memory, 0x8C13_0704, 0x901F);
+        WriteInstruction(memory, 0x8C13_0706, 0x30CC);
+        WriteInstruction(memory, 0x8C13_0708, 0x30DC);
+        WriteInstruction(memory, 0x8C13_070A, 0x03EE);
+        WriteInstruction(memory, 0x8C13_070C, 0x3636);
+        WriteInstruction(memory, 0x8C13_070E, 0x8B03);
+        WriteInstruction(memory, 0x8C13_0718, 0x9014);
+        WriteInstruction(memory, 0x8C13_071A, 0x305C);
+        WriteInstruction(memory, 0x8C13_071C, 0x30DC);
+        WriteInstruction(memory, 0x8C13_071E, 0x03EE);
+        WriteInstruction(memory, 0x8C13_0720, 0x3432);
+        WriteInstruction(memory, 0x8C13_0722, 0x8905);
+        WriteInstruction(memory, 0x8C13_0730, 0x4F26);
+        WriteInstruction(memory, 0x8C13_0732, 0xE000);
+        WriteInstruction(memory, 0x8C13_0734, 0x6CF6);
+        WriteInstruction(memory, 0x8C13_0736, 0x6DF6);
+        WriteInstruction(memory, 0x8C13_0738, 0x000B);
+        WriteInstruction(memory, 0x8C13_073A, 0x6EF6);
+        WriteInstruction(memory, 0x8C13_0740, 0x07D0);
+        WriteInstruction(memory, 0x8C13_0742, 0x0730);
+        WriteInstruction(memory, 0x8C13_0744, 0x00E4);
+        WriteInstruction(memory, 0x8C13_0746, 0x0854);
+        memory.WriteUInt32(0x8C13_074C, 0x8C2F_5E80);
+    }
+
+    private static void WriteDoa2EmptyTaskHelperReturnData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C2F_6650, 0);
+        for (var index = 0u; index < 5; index++)
+        {
+            var offset = index * 4;
+            memory.WriteUInt32(0x8C2F_6904 + offset, 0);
+            memory.WriteUInt32(0x8C2F_65B0 + offset, 0);
+            memory.WriteUInt32(0x8C2F_66D4 + offset, 0);
+        }
+    }
+
+    private static void InitializeDoa2EmptyTaskHelperReturnState(Sh4Cpu cpu, uint index)
+    {
+        cpu.State.Pr = 0x8C13_081C;
+        cpu.State.R[4] = 0x8C2E_26C0;
+        cpu.State.R[5] = 0x8C2F_6820;
+        cpu.State.R[6] = 0;
+        cpu.State.R[7] = index;
+        cpu.State.R[12] = 0x8C2E_26C0;
+        cpu.State.R[13] = index;
+        cpu.State.R[14] = 0x8C2F_6820;
+        cpu.State.R[15] = 0x8C20_7000;
         cpu.State.T = false;
     }
 
