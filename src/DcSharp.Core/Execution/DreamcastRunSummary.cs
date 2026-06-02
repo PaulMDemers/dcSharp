@@ -457,6 +457,9 @@ public sealed record DreamcastVideoSummary(
 
     public int PvrTaNonfiniteSpriteCount => PvrTaSprites.Count(sprite => !sprite.HasFinitePreviewCoordinates);
 
+    public IReadOnlyList<DreamcastPvrTaSpriteSourceGroupSummary> PvrTaSpriteSourceGroups =>
+        DreamcastPvrTaSpriteSourceGroupSummary.FromSprites(PvrTaSprites);
+
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
         new(
             snapshot.VramBytes,
@@ -508,6 +511,59 @@ public sealed record DreamcastVideoSummary(
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
                 .ToArray());
+
+    internal static string GetPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
+        sprite.HasRenderablePreviewArea
+            ? "renderable"
+            : sprite.HasFinitePreviewCoordinates ? "degenerate" : "nonfinite";
+}
+
+public sealed record DreamcastPvrTaSpriteSourceGroupSummary(
+    string PreviewStatus,
+    int Count,
+    uint? HeaderInstructionPc,
+    string? HeaderInstructionPcHex,
+    uint? ControlInstructionPc,
+    string? ControlInstructionPcHex,
+    uint? FirstPayloadInstructionPc,
+    string? FirstPayloadInstructionPcHex,
+    uint? LastPayloadInstructionPc,
+    string? LastPayloadInstructionPcHex,
+    string PayloadInstructionPcRangeHex)
+{
+    public static IReadOnlyList<DreamcastPvrTaSpriteSourceGroupSummary> FromSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
+        sprites
+            .GroupBy(sprite => new PvrTaSpriteSourceGroupKey(
+                DreamcastVideoSummary.GetPvrTaSpritePreviewStatus(sprite),
+                sprite.HeaderInstructionPc,
+                sprite.HeaderInstructionPcHex,
+                sprite.ControlInstructionPc,
+                sprite.ControlInstructionPcHex,
+                sprite.FirstPayloadInstructionPc,
+                sprite.FirstPayloadInstructionPcHex,
+                sprite.LastPayloadInstructionPc,
+                sprite.LastPayloadInstructionPcHex))
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key.PreviewStatus, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.HeaderInstructionPcHex ?? string.Empty, StringComparer.Ordinal)
+            .Select(group => new DreamcastPvrTaSpriteSourceGroupSummary(
+                group.Key.PreviewStatus,
+                group.Count(),
+                group.Key.HeaderInstructionPc,
+                group.Key.HeaderInstructionPcHex,
+                group.Key.ControlInstructionPc,
+                group.Key.ControlInstructionPcHex,
+                group.Key.FirstPayloadInstructionPc,
+                group.Key.FirstPayloadInstructionPcHex,
+                group.Key.LastPayloadInstructionPc,
+                group.Key.LastPayloadInstructionPcHex,
+                FormatPayloadPcRange(group.Key.FirstPayloadInstructionPcHex, group.Key.LastPayloadInstructionPcHex)))
+            .ToArray();
+
+    private static string FormatPayloadPcRange(string? firstPayloadInstructionPcHex, string? lastPayloadInstructionPcHex) =>
+        firstPayloadInstructionPcHex == lastPayloadInstructionPcHex
+            ? firstPayloadInstructionPcHex ?? "-"
+            : $"{firstPayloadInstructionPcHex ?? "-"}-{lastPayloadInstructionPcHex ?? "-"}";
 }
 
 public sealed record DreamcastVideoSampleSummary(
@@ -1013,6 +1069,17 @@ public sealed record DreamcastPvrTaSpriteSummary(
 public sealed record DreamcastPvrTaCommandKindSummary(string Kind, int Count);
 
 internal sealed record PvrTaListKey(string Region, int? ListType, string? ListTypeName);
+
+internal sealed record PvrTaSpriteSourceGroupKey(
+    string PreviewStatus,
+    uint? HeaderInstructionPc,
+    string? HeaderInstructionPcHex,
+    uint? ControlInstructionPc,
+    string? ControlInstructionPcHex,
+    uint? FirstPayloadInstructionPc,
+    string? FirstPayloadInstructionPcHex,
+    uint? LastPayloadInstructionPc,
+    string? LastPayloadInstructionPcHex);
 
 public sealed record DreamcastAudioSummary(
     int AudioRamBytes,

@@ -730,6 +730,55 @@ public class DreamcastFixtureRunnerTests
         Assert.Equal(1, summary.PvrTaNonfiniteSpriteCount);
     }
 
+    [Fact]
+    public void VideoSummaryGroupsSpriteSourcesByPreviewStatusAndInstructionPcs()
+    {
+        var summary = CreateVideoSummary(
+            null,
+            null,
+            null,
+            [
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: false,
+                    hasRenderablePreviewArea: false,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850),
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: false,
+                    hasRenderablePreviewArea: false,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850),
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: true,
+                    hasRenderablePreviewArea: true,
+                    headerPc: 0x8C20_0000,
+                    controlPc: 0x8C20_0004,
+                    firstPayloadPc: 0x8C20_0008,
+                    lastPayloadPc: 0x8C20_0008)
+            ]);
+
+        Assert.Collection(
+            summary.PvrTaSpriteSourceGroups,
+            group =>
+            {
+                Assert.Equal("nonfinite", group.PreviewStatus);
+                Assert.Equal(2, group.Count);
+                Assert.Equal("0x8C1007FA", group.HeaderInstructionPcHex);
+                Assert.Equal("0x8C10084C", group.ControlInstructionPcHex);
+                Assert.Equal("0x8C10084C-0x8C100850", group.PayloadInstructionPcRangeHex);
+            },
+            group =>
+            {
+                Assert.Equal("renderable", group.PreviewStatus);
+                Assert.Equal(1, group.Count);
+                Assert.Equal("0x8C200008", group.PayloadInstructionPcRangeHex);
+            });
+    }
+
     private static DreamcastRunSummary CreateSummary(
         ulong vblankEvents,
         ulong hardwareTicks,
@@ -908,7 +957,13 @@ public class DreamcastFixtureRunnerTests
                 .ToArray());
     }
 
-    private static DreamcastPvrTaSpriteSummary CreatePvrTaSpriteSummary(bool hasFinitePreviewCoordinates, bool hasRenderablePreviewArea)
+    private static DreamcastPvrTaSpriteSummary CreatePvrTaSpriteSummary(
+        bool hasFinitePreviewCoordinates,
+        bool hasRenderablePreviewArea,
+        uint? headerPc = null,
+        uint? controlPc = null,
+        uint? firstPayloadPc = null,
+        uint? lastPayloadPc = null)
     {
         var header = new DreamcastPvrTaCommandWrite(
             0x1000_0000,
@@ -929,17 +984,17 @@ public class DreamcastFixtureRunnerTests
             "TranslucentPolygon",
             header.Value,
             header.ValueHex,
-            null,
-            null,
+            headerPc,
+            headerPc is { } headerPcValue ? $"0x{headerPcValue:X8}" : null,
             DreamcastPvrTaSpriteHeaderPayloadSummary.FromPayload(payload),
             0xF000_0000,
             "0xF0000000",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
+            controlPc,
+            controlPc is { } controlPcValue ? $"0x{controlPcValue:X8}" : null,
+            firstPayloadPc,
+            firstPayloadPc is { } firstPayloadPcValue ? $"0x{firstPayloadPcValue:X8}" : null,
+            lastPayloadPc,
+            lastPayloadPc is { } lastPayloadPcValue ? $"0x{lastPayloadPcValue:X8}" : null,
             true,
             0,
             "0x0000",

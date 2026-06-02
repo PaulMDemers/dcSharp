@@ -532,7 +532,7 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
 
     if (video.PvrTaSprites.Count > 0)
     {
-        Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(video.PvrTaSprites)}");
+        Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(video.PvrTaSpriteSourceGroups)}");
         Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(video.PvrTaSprites.TakeLast(8).ToArray())}");
     }
 }
@@ -906,7 +906,7 @@ static void RunElf(string path, string[] args)
     var pvrTaSprites = videoSummary.PvrTaSprites;
     if (pvrTaSprites.Count > 0)
     {
-        Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(pvrTaSprites)}");
+        Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(videoSummary.PvrTaSpriteSourceGroups)}");
         Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(pvrTaSprites)}");
     }
 
@@ -1184,7 +1184,7 @@ static int RunFixtures(string manifestPath, string[] args)
 
                 if (result.Summary.Video.PvrTaSprites.Count > 0)
                 {
-                    Console.WriteLine($"  pvrTaSpriteSources={FormatPvrTaSpriteSourceGroups(result.Summary.Video.PvrTaSprites)}");
+                    Console.WriteLine($"  pvrTaSpriteSources={FormatPvrTaSpriteSourceGroups(result.Summary.Video.PvrTaSpriteSourceGroups)}");
                     Console.WriteLine($"  pvrTaSprites={FormatPvrTaSprites(result.Summary.Video.PvrTaSprites)}");
                 }
 
@@ -2124,20 +2124,10 @@ static string FormatPvrTaSpriteCounts(DreamcastVideoSummary video) =>
         ? string.Empty
         : $", taSpritePreview=renderable:{video.PvrTaRenderableSpriteCount}/degenerate:{video.PvrTaDegenerateSpriteCount}/nonfinite:{video.PvrTaNonfiniteSpriteCount}";
 
-static string FormatPvrTaSpriteSourceGroups(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
-    string.Join(", ", sprites
-        .GroupBy(sprite => new
-        {
-            Preview = FormatPvrTaSpritePreviewStatus(sprite),
-            sprite.HeaderInstructionPcHex,
-            sprite.ControlInstructionPcHex,
-            Payload = FormatPvrTaSpritePayloadPcRange(sprite)
-        })
-        .OrderByDescending(group => group.Count())
-        .ThenBy(group => group.Key.Preview, StringComparer.Ordinal)
-        .ThenBy(group => group.Key.HeaderInstructionPcHex ?? string.Empty, StringComparer.Ordinal)
+static string FormatPvrTaSpriteSourceGroups(IReadOnlyList<DreamcastPvrTaSpriteSourceGroupSummary> groups) =>
+    string.Join(", ", groups
         .Take(8)
-        .Select(group => $"{group.Key.Preview}:{group.Count()} pc=h:{group.Key.HeaderInstructionPcHex ?? "-"}/c:{group.Key.ControlInstructionPcHex ?? "-"}/p:{group.Key.Payload}"));
+        .Select(group => $"{group.PreviewStatus}:{group.Count} pc=h:{group.HeaderInstructionPcHex ?? "-"}/c:{group.ControlInstructionPcHex ?? "-"}/p:{group.PayloadInstructionPcRangeHex}"));
 
 static string FormatPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
     sprite.HasRenderablePreviewArea
