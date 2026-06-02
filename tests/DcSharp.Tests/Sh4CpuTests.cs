@@ -1543,6 +1543,118 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2EmptyStackWordScanLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(normalMemory);
+        WriteDoa2EmptyStackWordScanData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(fastMemory);
+        WriteDoa2EmptyStackWordScanData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_B33C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_B33C);
+        InitializeDoa2EmptyStackWordScanState(normal, 0x8C20_1000);
+        InitializeDoa2EmptyStackWordScanState(fast, 0x8C20_1000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyStackWordScanLoop(fastStart, 41, out var skippedInstructions));
+        Assert.Equal(41UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C11_B340u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2EmptyStackWordScanLoopFromMiddle()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(normalMemory);
+        WriteDoa2EmptyStackWordScanData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(fastMemory);
+        WriteDoa2EmptyStackWordScanData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_B33C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_B33C);
+        InitializeDoa2EmptyStackWordScanState(normal, 0x8C20_1008);
+        InitializeDoa2EmptyStackWordScanState(fast, 0x8C20_1008);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyStackWordScanLoop(fastStart, 25, out var skippedInstructions));
+        Assert.Equal(25UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyStackWordScanLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(memory);
+        WriteDoa2EmptyStackWordScanData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B33C);
+        InitializeDoa2EmptyStackWordScanState(cpu, 0x8C20_1000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyStackWordScanLoop(start, 40, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_B33Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyStackWordScanLoopWhenEntryIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(memory);
+        WriteDoa2EmptyStackWordScanData(memory);
+        memory.WriteUInt32(0x8C20_1008, 0x0000_0001);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B33C);
+        InitializeDoa2EmptyStackWordScanState(cpu, 0x8C20_1000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyStackWordScanLoop(start, 41, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_B33Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyStackWordScanLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyStackWordScanLoop(memory);
+        WriteDoa2EmptyStackWordScanData(memory);
+        WriteInstruction(memory, 0x8C11_B304, 0x8916);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B33C);
+        InitializeDoa2EmptyStackWordScanState(cpu, 0x8C20_1000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyStackWordScanLoop(start, 41, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2UnrolledWordCopyReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -6276,6 +6388,37 @@ public class Sh4CpuTests
         cpu.State.R[4] = 5;
         cpu.State.R[5] = 0x8C20_2000;
         cpu.State.R[6] = 0x8C20_1000;
+        cpu.State.T = false;
+    }
+
+    private static void WriteDoa2EmptyStackWordScanLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_B300, 0x6272);
+        WriteInstruction(memory, 0x8C11_B302, 0x2228);
+        WriteInstruction(memory, 0x8C11_B304, 0x8917);
+        WriteInstruction(memory, 0x8C11_B336, 0x7704);
+        WriteInstruction(memory, 0x8C11_B338, 0x7604);
+        WriteInstruction(memory, 0x8C11_B33A, 0x35AC);
+        WriteInstruction(memory, 0x8C11_B33C, 0x37D2);
+        WriteInstruction(memory, 0x8C11_B33E, 0x8BDF);
+    }
+
+    private static void WriteDoa2EmptyStackWordScanData(DreamcastMemory memory)
+    {
+        for (var offset = 0u; offset < 20; offset += 4)
+        {
+            memory.WriteUInt32(0x8C20_1000 + offset, 0);
+        }
+    }
+
+    private static void InitializeDoa2EmptyStackWordScanState(Sh4Cpu cpu, uint startAddress)
+    {
+        cpu.State.R[2] = 0xDEAD_BEEF;
+        cpu.State.R[5] = 0;
+        cpu.State.R[6] = 0x8C20_2000;
+        cpu.State.R[7] = startAddress;
+        cpu.State.R[10] = 0x0100_0000;
+        cpu.State.R[13] = 0x8C20_1014;
         cpu.State.T = false;
     }
 

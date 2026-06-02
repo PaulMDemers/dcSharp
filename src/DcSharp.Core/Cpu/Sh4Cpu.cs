@@ -1398,6 +1398,59 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2EmptyStackWordScanLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_B33C
+            || step.Opcode != 0x37D2
+            || State.Pc != 0x8C11_B33E
+            || State.T
+            || State.R[7] >= State.R[13]
+            || ((State.R[13] - State.R[7]) & 0x3) != 0)
+        {
+            return false;
+        }
+
+        var remainingIterations = (State.R[13] - State.R[7]) / 4;
+        var remainingByteCount = remainingIterations * 4;
+        skippedInstructions = ((ulong)remainingIterations * 8) + 1;
+        if (!IsDoa2EmptyStackWordScanLoop()
+            || skippedInstructions > maxInstructionsToSkip
+            || remainingIterations > int.MaxValue / 4
+            || State.R[7] > uint.MaxValue - (remainingByteCount - 1))
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        for (var offset = 0u; offset < remainingByteCount; offset += 4)
+        {
+            var address = State.R[7] + offset;
+            if (!memory.TryGetSystemRamOffset(address, 4, out _)
+                || memory.ReadUInt32(address) != 0)
+            {
+                skippedInstructions = 0;
+                return false;
+            }
+        }
+
+        while (State.R[7] < State.R[13])
+        {
+            State.R[2] = memory.ReadUInt32(State.R[7]);
+            State.T = State.R[2] == 0;
+            State.R[7] += 4;
+            State.R[6] += 4;
+            State.R[5] += State.R[10];
+            State.T = State.R[7] >= State.R[13];
+        }
+
+        State.Pc = 0x8C11_B340;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2UnrolledWordCopyReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3861,6 +3914,16 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_90C6) == 0x0009
         && memory.ReadUInt32(0x8C0F_9180) == 0x8C2B_6F34
         && memory.ReadUInt32(0x8C0F_9184) == 0x8C2B_6F68;
+
+    private bool IsDoa2EmptyStackWordScanLoop() =>
+        memory.ReadInstructionUInt16(0x8C11_B300) == 0x6272
+        && memory.ReadInstructionUInt16(0x8C11_B302) == 0x2228
+        && memory.ReadInstructionUInt16(0x8C11_B304) == 0x8917
+        && memory.ReadInstructionUInt16(0x8C11_B336) == 0x7704
+        && memory.ReadInstructionUInt16(0x8C11_B338) == 0x7604
+        && memory.ReadInstructionUInt16(0x8C11_B33A) == 0x35AC
+        && memory.ReadInstructionUInt16(0x8C11_B33C) == 0x37D2
+        && memory.ReadInstructionUInt16(0x8C11_B33E) == 0x8BDF;
 
     private bool IsDoa2UnrolledWordCopyReturn() =>
         memory.ReadInstructionUInt16(0x8C10_E60A) == 0x5326
