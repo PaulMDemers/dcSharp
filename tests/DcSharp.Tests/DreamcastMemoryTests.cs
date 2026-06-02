@@ -530,6 +530,56 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void StoreQueuePrefetchFlushesQacr0DestinationToPvrTa()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xFF00_0038, 0x10);
+        memory.WriteUInt32(0xE000_0000, 0x8084_0000);
+        memory.WriteUInt32(0xE000_0004, 0x0600_0000);
+
+        memory.Prefetch(0xE000_0000);
+
+        var snapshot = memory.CreateVideoSnapshot();
+        Assert.Equal(8, snapshot.PvrTaCommandWrites.Count);
+        Assert.Equal("0x10000000", snapshot.PvrTaCommandWrites[0].AddressHex);
+        Assert.Equal("0x80840000", snapshot.PvrTaCommandWrites[0].ValueHex);
+        Assert.Equal("PolygonHeader", snapshot.PvrTaCommandWrites[0].Kind);
+        Assert.Equal("0x10000004", snapshot.PvrTaCommandWrites[1].AddressHex);
+        Assert.Equal("0x06000000", snapshot.PvrTaCommandWrites[1].ValueHex);
+    }
+
+    [Fact]
+    public void StoreQueuePrefetchUsesQacr1ForSecondQueue()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xFF00_003C, 0x10);
+        memory.WriteUInt32(0xE000_0020, 0xE000_0000);
+
+        memory.Prefetch(0xE000_0020);
+
+        var snapshot = memory.CreateVideoSnapshot();
+        Assert.Equal("0x10000020", snapshot.PvrTaCommandWrites[0].AddressHex);
+        Assert.Equal("Vertex", snapshot.PvrTaCommandWrites[0].Kind);
+    }
+
+    [Fact]
+    public void StoreQueuePrefetchUsesTaFallbackWhenQacrAreaIsZero()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xFF00_0038, 0);
+        memory.WriteUInt32(0xE000_3340, 0xF000_0000);
+
+        memory.Prefetch(0xE000_3340);
+
+        var write = memory.CreateVideoSnapshot().PvrTaCommandWrites[0];
+        Assert.Equal("0x10003340", write.AddressHex);
+        Assert.Equal("VertexEndOfStrip", write.Kind);
+    }
+
+    [Fact]
     public void VideoSummaryGroupsPvrTaWritesByRegionAndList()
     {
         var memory = new DreamcastMemory();

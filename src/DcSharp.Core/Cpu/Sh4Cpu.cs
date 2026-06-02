@@ -2146,6 +2146,7 @@ public sealed class Sh4Cpu
         State.R[0] |= State.R[2];
         WriteUInt32WithPc(State.R[14] + 20, State.R[0], 0x8C10_07F8);
         State.R[3] = memory.ReadUInt32(0x8C10_0928);
+        PrefetchWithPc(State.R[14], 0x8C10_07FA);
         State.R[14] += 32;
         State.R[4] = State.R[10];
         State.R[5] = State.R[11];
@@ -2185,8 +2186,10 @@ public sealed class Sh4Cpu
         State.R[1] = memory.ReadUInt32(State.R[15]);
         State.R[1] |= State.R[2];
         WriteUInt32WithPc(State.R[14] + 60, State.R[1], 0x8C10_084A);
+        PrefetchWithPc(State.R[14], 0x8C10_084C);
         State.R[14] += 32;
         State.R[1] = tablePointerAddress;
+        PrefetchWithPc(State.R[14], 0x8C10_0850);
         State.R[14] += 32;
         State.R[4] = memory.ReadUInt32(State.R[15] + 16);
         State.R[2] = memory.ReadUInt32(State.R[1]);
@@ -2236,6 +2239,12 @@ public sealed class Sh4Cpu
         {
             memory.CurrentInstructionPc = pc;
             memory.WriteUInt32(address, value);
+        }
+
+        void PrefetchWithPc(uint address, uint pc)
+        {
+            memory.CurrentInstructionPc = pc;
+            memory.Prefetch(address);
         }
 
         bool IsCommonDoa2TaAlpha(uint bits)
@@ -5572,6 +5581,7 @@ public sealed class Sh4Cpu
 
         if ((opcode & 0xF0FF) == 0x0083)
         {
+            memory.Prefetch(State.R[n]);
             return $"pref @r{n}";
         }
 

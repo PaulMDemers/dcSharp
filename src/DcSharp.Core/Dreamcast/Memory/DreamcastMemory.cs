@@ -58,6 +58,13 @@ public sealed class DreamcastMemory
     private const uint Sh4Tra = 0xFF00_0020;
     private const uint Sh4Expevt = 0xFF00_0024;
     private const uint Sh4Intevt = 0xFF00_0028;
+    private const uint Sh4Qacr0 = 0xFF00_0038;
+    private const uint Sh4Qacr1 = 0xFF00_003C;
+    private const uint StoreQueueBase = 0xE000_0000;
+    private const uint StoreQueueLimit = 0xE400_0000;
+    private const uint StoreQueueAddressMask = 0x03FF_FFE0;
+    private const int StoreQueueCount = 2;
+    private const int StoreQueueBytes = 32;
     private const uint PortAData = 0xFF80_0030;
     private const uint DefaultPortAData = 0x0000_0300;
     private const uint TimerStart = 0xFFD8_0004;
@@ -101,6 +108,7 @@ public sealed class DreamcastMemory
     private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
     private readonly byte[] operandCacheRamArea1 = new byte[OperandCacheRamAreaBytes];
     private readonly byte[] operandCacheRamArea2 = new byte[OperandCacheRamAreaBytes];
+    private readonly byte[] storeQueues = new byte[StoreQueueCount * StoreQueueBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly Dictionary<uint, uint> aicaRegisters = [];
@@ -363,6 +371,12 @@ public sealed class DreamcastMemory
     public void Write(uint address, ReadOnlySpan<byte> data)
     {
         RecordWatchedWrite(address, data);
+
+        if (IsStoreQueueAddress(address))
+        {
+            WriteStoreQueue(address, data);
+            return;
+        }
 
         if (IsP4Address(address))
         {
@@ -1168,6 +1182,9 @@ public sealed class DreamcastMemory
 
     private static bool IsP4Address(uint address) => address >= P4Base;
 
+    private static bool IsStoreQueueAddress(uint address) =>
+        address >= StoreQueueBase && address < StoreQueueLimit;
+
     private static bool TryTranslateExternalRegister(uint address, out uint externalAddress)
     {
         externalAddress = TranslateAddress(address);
@@ -1826,6 +1843,59 @@ public sealed class DreamcastMemory
         {
             serialOutput.Add(data[0]);
         }
+    }
+
+    public void Prefetch(uint address)
+    {
+        if (!IsStoreQueueAddress(address))
+        {
+            return;
+        }
+
+        FlushStoreQueue(address);
+    }
+
+    private void WriteStoreQueue(uint address, ReadOnlySpan<byte> data)
+    {
+        if (data.Length is not (1 or 2 or 4))
+        {
+            throw new MemoryMapException($"Unsupported store queue write size: {data.Length}");
+        }
+
+        var queueIndex = StoreQueueIndex(address);
+        var queueOffset = (int)(address & (StoreQueueBytes - 1));
+        if (queueOffset + data.Length > StoreQueueBytes)
+        {
+            throw new MemoryMapException($"Store queue write crosses queue boundary: address=0x{address:X8}, size={data.Length}");
+        }
+
+        data.CopyTo(storeQueues.AsSpan((queueIndex * StoreQueueBytes) + queueOffset));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc));
+    }
+
+    private void FlushStoreQueue(uint address)
+    {
+        var queueIndex = StoreQueueIndex(address);
+        var destination = StoreQueueDestinationBase(address, queueIndex);
+        var queue = storeQueues.AsSpan(queueIndex * StoreQueueBytes, StoreQueueBytes);
+        for (var offset = 0; offset < StoreQueueBytes; offset += 4)
+        {
+            WriteUInt32(destination + (uint)offset, ToValue(queue.Slice(offset, 4)));
+        }
+    }
+
+    private int StoreQueueIndex(uint address) =>
+        (int)((address >> 5) & 1);
+
+    private uint StoreQueueDestinationBase(uint address, int queueIndex)
+    {
+        var qacrAddress = queueIndex == 0 ? Sh4Qacr0 : Sh4Qacr1;
+        var qacr = p4Registers.GetValueOrDefault(qacrAddress);
+        var highBits = qacr & 0x1Cu;
+        var baseAddress = highBits == 0
+            ? PvrTaInputBase
+            : highBits << 24;
+        return baseAddress | (address & StoreQueueAddressMask);
     }
 
     private static uint ToValue(ReadOnlySpan<byte> data)

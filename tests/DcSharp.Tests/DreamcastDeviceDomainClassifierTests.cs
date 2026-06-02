@@ -15,6 +15,8 @@ public class DreamcastDeviceDomainClassifierTests
     [InlineData(0xFFD8_0010u, MemoryAccessKind.Read, "tmu")]
     [InlineData(0xFFD0_0004u, MemoryAccessKind.Read, "sh4")]
     [InlineData(0xFF00_0028u, MemoryAccessKind.Read, "sh4")]
+    [InlineData(0xFF00_0038u, MemoryAccessKind.Write, "sh4")]
+    [InlineData(0xE000_0000u, MemoryAccessKind.Write, "sh4")]
     [InlineData(0x0000_000Cu, MemoryAccessKind.UnmappedWrite, "unmapped")]
     public void ClassifiesDeviceAccessDomains(uint address, MemoryAccessKind kind, string expectedDomain)
     {

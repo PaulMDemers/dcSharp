@@ -5675,6 +5675,22 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ExecutesPrefetchAsStoreQueueFlush()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0483);
+        memory.WriteUInt32(0xFF00_0038, 0x10);
+        memory.WriteUInt32(0xE000_0000, 0x8084_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[4] = 0xE000_0000;
+
+        var step = cpu.Step();
+
+        Assert.Equal("pref @r4", step.Trace);
+        Assert.Equal("0x10000000", memory.CreateVideoSnapshot().PvrTaCommandWrites[0].AddressHex);
+    }
+
+    [Fact]
     public void StoresFpscrToPredecrementedRegister()
     {
         var memory = new DreamcastMemory();
