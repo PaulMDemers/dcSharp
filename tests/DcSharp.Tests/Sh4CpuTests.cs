@@ -1346,6 +1346,120 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2FiveWordTableCopyLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(normalMemory);
+        WriteDoa2FiveWordTableCopyData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(fastMemory);
+        WriteDoa2FiveWordTableCopyData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_B226);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_B226);
+        InitializeDoa2FiveWordTableCopyState(normal, offset: 0);
+        InitializeDoa2FiveWordTableCopyState(fast, offset: 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2FiveWordTableCopyLoop(fastStart, 119, out var skippedInstructions));
+        Assert.Equal(119UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 20; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_11B0 + offset), fastMemory.ReadUInt32(0x8C20_11B0 + offset));
+        }
+    }
+
+    [Fact]
+    public void FastForwardsDoa2FiveWordTableCopyLoopFromMiddle()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(normalMemory);
+        WriteDoa2FiveWordTableCopyData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(fastMemory);
+        WriteDoa2FiveWordTableCopyData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_B226);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_B226);
+        InitializeDoa2FiveWordTableCopyState(normal, offset: 8);
+        InitializeDoa2FiveWordTableCopyState(fast, offset: 8);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2FiveWordTableCopyLoop(fastStart, 71, out var skippedInstructions));
+        Assert.Equal(71UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FiveWordTableCopyLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(memory);
+        WriteDoa2FiveWordTableCopyData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B226);
+        InitializeDoa2FiveWordTableCopyState(cpu, offset: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2FiveWordTableCopyLoop(start, 118, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_B228u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FiveWordTableCopyLoopWhenDestinationIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(memory);
+        WriteDoa2FiveWordTableCopyData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B226);
+        InitializeDoa2FiveWordTableCopyState(cpu, offset: 0);
+        cpu.State.R[12] = 0x1900_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2FiveWordTableCopyLoop(start, 119, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FiveWordTableCopyLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FiveWordTableCopyLoop(memory);
+        WriteDoa2FiveWordTableCopyData(memory);
+        WriteInstruction(memory, 0x8C11_B2C0, 0x00B4);
+        var cpu = new Sh4Cpu(memory, 0x8C11_B226);
+        InitializeDoa2FiveWordTableCopyState(cpu, offset: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2FiveWordTableCopyLoop(start, 119, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2UnrolledWordCopyReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -5990,6 +6104,59 @@ public class Sh4CpuTests
         cpu.State.R[6] = 0x5555_6666;
         cpu.State.R[7] = 0x7777_8888;
         cpu.State.Pr = 0x8C13_057E;
+        cpu.State.T = false;
+    }
+
+    private static void WriteDoa2FiveWordTableCopyLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_B226, 0xE340);
+        WriteInstruction(memory, 0x8C11_B228, 0x914B);
+        WriteInstruction(memory, 0x8C11_B22A, 0x33EC);
+        WriteInstruction(memory, 0x8C11_B22C, 0x9048);
+        WriteInstruction(memory, 0x8C11_B22E, 0x6332);
+        WriteInstruction(memory, 0x8C11_B230, 0x31EC);
+        WriteInstruction(memory, 0x8C11_B232, 0x30EC);
+        WriteInstruction(memory, 0x8C11_B234, 0x6233);
+        WriteInstruction(memory, 0x8C11_B236, 0x4308);
+        WriteInstruction(memory, 0x8C11_B238, 0x332C);
+        WriteInstruction(memory, 0x8C11_B23A, 0x4308);
+        WriteInstruction(memory, 0x8C11_B23C, 0x4308);
+        WriteInstruction(memory, 0x8C11_B23E, 0x4300);
+        WriteInstruction(memory, 0x8C11_B240, 0x331C);
+        WriteInstruction(memory, 0x8C11_B242, 0x6233);
+        WriteInstruction(memory, 0x8C11_B244, 0x32CC);
+        WriteInstruction(memory, 0x8C11_B246, 0x6323);
+        WriteInstruction(memory, 0x8C11_B248, 0x334C);
+        WriteInstruction(memory, 0x8C11_B24A, 0x6232);
+        WriteInstruction(memory, 0x8C11_B24C, 0x30CC);
+        WriteInstruction(memory, 0x8C11_B24E, 0x0426);
+        WriteInstruction(memory, 0x8C11_B250, 0x7404);
+        WriteInstruction(memory, 0x8C11_B252, 0x3452);
+        WriteInstruction(memory, 0x8C11_B254, 0x8BE7);
+        WriteInstruction(memory, 0x8C11_B2C0, 0x00B0);
+        WriteInstruction(memory, 0x8C11_B2C2, 0x0170);
+    }
+
+    private static void WriteDoa2FiveWordTableCopyData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C20_1040, 2);
+        for (var offset = 0u; offset < 20; offset += 4)
+        {
+            memory.WriteUInt32(0x8C20_1370 + offset, 0x7000_0000 + offset);
+            memory.WriteUInt32(0x8C20_11B0 + offset, 0xDEAD_BEEF);
+        }
+    }
+
+    private static void InitializeDoa2FiveWordTableCopyState(Sh4Cpu cpu, uint offset)
+    {
+        cpu.State.R[0] = 0xCAFE_BABE;
+        cpu.State.R[1] = 0x1111_2222;
+        cpu.State.R[2] = 0x3333_4444;
+        cpu.State.R[3] = 0x5555_6666;
+        cpu.State.R[4] = offset;
+        cpu.State.R[5] = 20;
+        cpu.State.R[12] = 0x100;
+        cpu.State.R[14] = 0x8C20_1000;
         cpu.State.T = false;
     }
 
