@@ -392,6 +392,11 @@ static void BootSmoke(string path, string[] args)
         DumpTraceLog(result, options.TraceLogPath);
     }
 
+    if (options.PvrTaLogPath is not null)
+    {
+        DumpPvrTaLog(result, options);
+    }
+
     if (options.FpuAnomalyLogPath is not null)
     {
         DumpFpuAnomalyLog(result, options.FpuAnomalyLogPath);
@@ -762,6 +767,11 @@ static void RunElf(string path, string[] args)
     if (options.TraceLogPath is not null)
     {
         DumpTraceLog(result, options.TraceLogPath);
+    }
+
+    if (options.PvrTaLogPath is not null)
+    {
+        DumpPvrTaLog(result, options);
     }
 
     if (options.FpuAnomalyLogPath is not null)
@@ -1264,6 +1274,12 @@ static void DumpTraceLog(DreamcastRunResult result, string path)
     }
 }
 
+static void DumpPvrTaLog(DreamcastRunResult result, CliRunOptions options)
+{
+    using var writer = CreateTextLog(options.PvrTaLogPath!);
+    DreamcastPvrTaLogWriter.WriteText(writer, result.Video.PvrTaCommandWrites, options.PvrTaLogLimit);
+}
+
 static string FormatFpscr(uint value)
 {
     var summary = Sh4FpscrSummary.FromValue(value);
@@ -1447,6 +1463,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     var framebufferHeight = 240;
     string? audioWavPath = null;
     string? traceLogPath = null;
+    string? pvrTaLogPath = null;
+    var pvrTaLogLimit = 4096;
     uint? traceStartPc = null;
     uint? traceEndPc = null;
     ulong? traceStartInstruction = null;
@@ -1568,6 +1586,14 @@ static CliRunOptions ParseRunOptions(string[] args)
                 break;
             case "--trace-log" when index + 1 < args.Length:
                 traceLogPath = args[index + 1];
+                index++;
+                break;
+            case "--pvr-ta-log" when index + 1 < args.Length:
+                pvrTaLogPath = args[index + 1];
+                index++;
+                break;
+            case "--pvr-ta-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedPvrTaLogLimit):
+                pvrTaLogLimit = parsedPvrTaLogLimit;
                 index++;
                 break;
             case "--trace-pc" when index + 1 < args.Length:
@@ -1768,6 +1794,11 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--trace-log-limit must be zero or greater.");
     }
 
+    if (pvrTaLogLimit < 0)
+    {
+        throw new InvalidDataException("--pvr-ta-log-limit must be zero or greater.");
+    }
+
     if (fpuAnomalyLimit < 0)
     {
         throw new InvalidDataException("--fpu-anomaly-limit must be zero or greater.");
@@ -1886,6 +1917,8 @@ static CliRunOptions ParseRunOptions(string[] args)
         framebufferHeight,
         audioWavPath,
         traceLogPath,
+        pvrTaLogPath,
+        pvrTaLogLimit,
         fpuAnomalyLogPath,
         fpuWriteLogPath,
         fpscrLogPath,
@@ -2124,7 +2157,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 320x240] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --fpu-memory-address, --memory-write-address, and --memory-read-address may be repeated for multiple ranges. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, --fpu-memory-instruction, and --pc-profile-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -2165,6 +2198,8 @@ internal sealed record CliRunOptions(
     int FramebufferHeight,
     string? AudioWavPath,
     string? TraceLogPath,
+    string? PvrTaLogPath,
+    int PvrTaLogLimit,
     string? FpuAnomalyLogPath,
     string? FpuWriteLogPath,
     string? FpscrLogPath,

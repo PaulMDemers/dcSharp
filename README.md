@@ -133,6 +133,12 @@ Capture narrow trace/device logs while keeping the normal run summary readable:
 dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_minimal.elf --instructions 14000000 --trace-log artifacts/logs/minimal-trace.txt --trace-pc 0x8C01B218-0x8C01B220 --device-log artifacts/logs/minimal-scif-writes.txt --device-domain scif --device-kind Write
 ```
 
+Capture a bounded decoded PVR TA stream tail while renderer work is being matched against real command traffic:
+
+```bash
+dotnet run --project src/DcSharp.Cli -- media boot-smoke path/to/disc.cue --instructions 122000000 --pvr-ta-log artifacts/logs/retail-ta-stream.txt --pvr-ta-log-limit 512
+```
+
 Use `--controller` to map virtual controllers to Maple addresses. The older `--controller-a` and `--controller-b` shorthands still work:
 
 ```bash
@@ -187,6 +193,7 @@ Current state:
 - The SH-4 TMU slice includes TSTR, TCOR/TCNT countdown, TCR underflow/interrupt bits, and IPRA priority lookup; the timer fixture now wakes from `thd_sleep()`.
 - PVR VRAM is backed for the 32-bit and 64-bit apertures, and run summaries include a checksum, non-zero byte count, first changed offset, and RGB565 samples.
 - The CLI can dump the current RGB565 VRAM snapshot to a PNG file for quick visual fixture checks.
+- The CLI can write decoded PVR TA stream logs with original stream indexes, raw command kind, control/payload role, named payload slots, and optional tail limiting for retail renderer diagnostics.
 - KOS fixture expectations live in `fixtures/kos.json`, and the CLI can run the manifest as a compact regression suite.
 - Fixture manifests can assert ASIC pending interrupt state and event ACK/mask registers.
 - When ELF symbols are present, run summaries annotate stop PCs and trace-tail entries with nearest function names.
