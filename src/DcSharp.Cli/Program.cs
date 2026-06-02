@@ -1254,6 +1254,7 @@ static string SerializeJson<T>(T value)
 {
     var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
     {
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         WriteIndented = true
     };
     jsonOptions.Converters.Add(new JsonStringEnumConverter());

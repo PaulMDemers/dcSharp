@@ -3,6 +3,8 @@ param(
     [int]$VBlankInterval = 1000,
     [int]$BootstrapInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
+    [switch]$Doa2SpriteProbe,
+    [long]$Doa2SpriteProbeInstructions = 150000000,
     [switch]$LongDoa2,
     [long]$LongDoa2Instructions = 650000000
 )
@@ -56,6 +58,50 @@ function Invoke-BootSmoke {
     return ($output -join "`n")
 }
 
+function Invoke-BootSmokeJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][long]$Instructions,
+        [int]$TraceTail = 0
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Warning "Skipping $Name; media file not found: $Path"
+        return $null
+    }
+
+    Write-Host "== $Name =="
+    $commandArgs = if (Test-Path -LiteralPath $cliDll) {
+        @($cliDll, 'media', 'boot-smoke', $Path)
+    }
+    else {
+        @('run', '--no-build', '--project', $cliProject, '--', 'media', 'boot-smoke', $Path)
+    }
+
+    $commandArgs += @(
+        '--scan-sectors', $ScanSectors,
+        '--instructions', $Instructions,
+        '--trace-tail', $TraceTail,
+        '--json')
+
+    $output = & dotnet @commandArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name JSON boot-smoke failed with exit code $LASTEXITCODE"
+    }
+
+    $json = $output -join "`n"
+    $report = $json | ConvertFrom-Json
+    Write-Host "Instructions: $($report.summary.instructionsExecuted)"
+    Write-Host "PC: $($report.summary.pcHex)"
+    Write-Host "Stopped: $($report.summary.stopReason)"
+    Write-Host "GD-ROM: reads=$($report.summary.gdrom.readCommandCount), ok=$($report.summary.gdrom.successfulReadCommandCount), failed=$($report.summary.gdrom.failedReadCommandCount)"
+    Write-Host "PVR: taSprites=$($report.summary.video.pvrTaSprites.Count), sourceGroups=$($report.summary.video.pvrTaSpriteSourceGroups.Count)"
+
+    return $report
+}
+
 function Assert-Contains {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -80,6 +126,34 @@ function Assert-NotContains {
     }
 }
 
+function Assert-PvrTaSpriteSourceGroup {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)]$Report,
+        [Parameter(Mandatory = $true)][string]$PreviewStatus,
+        [Parameter(Mandatory = $true)][int]$Count,
+        [Parameter(Mandatory = $true)][string]$HeaderPc,
+        [Parameter(Mandatory = $true)][string]$ControlPc,
+        [Parameter(Mandatory = $true)][string]$PayloadPcRange
+    )
+
+    $groups = @($Report.summary.video.pvrTaSpriteSourceGroups)
+    $group = $groups | Where-Object {
+        $_.previewStatus -eq $PreviewStatus `
+            -and $_.count -eq $Count `
+            -and $_.headerInstructionPcHex -eq $HeaderPc `
+            -and $_.controlInstructionPcHex -eq $ControlPc `
+            -and $_.payloadInstructionPcRangeHex -eq $PayloadPcRange
+    } | Select-Object -First 1
+
+    if (-not $group) {
+        $actual = ($groups | ForEach-Object {
+            "$($_.previewStatus):$($_.count) pc=h:$($_.headerInstructionPcHex)/c:$($_.controlInstructionPcHex)/p:$($_.payloadInstructionPcRangeHex)"
+        }) -join ", "
+        throw "$Name did not contain expected PVR TA sprite source group ${PreviewStatus}:$Count pc=h:$HeaderPc/c:$ControlPc/p:$PayloadPcRange. Actual groups: $actual"
+    }
+}
+
 $deadOrAlive = Join-Path $repoRoot "retail_discs\Dead or Alive 2 (USA)\Dead or Alive 2 (USA).cue"
 $rayman = Join-Path $repoRoot "retail_discs\Rayman 2 - The Great Escape (USA) (EnFrDeEsIt)\Rayman 2 - The Great Escape (USA) (En,Fr,De,Es,It).cue"
 $legacy = Join-Path $repoRoot "retail_discs\Legacy of Kain - Soul Reaver (USA)\Legacy of Kain - Soul Reaver (USA).cue"
@@ -91,6 +165,28 @@ if ($doaOutput) {
     Assert-Contains "Dead or Alive 2" $doaOutput "GD-ROM: media=True, reads="
     Assert-Contains "Dead or Alive 2" $doaOutput "Boot binary: writes="
     Assert-NotContains "Dead or Alive 2" $doaOutput "Stopped on Unmapped"
+}
+
+if ($Doa2SpriteProbe) {
+    $doaSpriteReport = Invoke-BootSmokeJson "Dead or Alive 2 sprite source probe" $deadOrAlive $Doa2SpriteProbeInstructions
+    if ($doaSpriteReport) {
+        if ($doaSpriteReport.summary.stopReason -ne "InstructionLimit") {
+            throw "Dead or Alive 2 sprite source probe stopped with $($doaSpriteReport.summary.stopReason), expected InstructionLimit"
+        }
+
+        if ($doaSpriteReport.summary.pcHex -ne "0x8C10076E") {
+            throw "Dead or Alive 2 sprite source probe reached $($doaSpriteReport.summary.pcHex), expected 0x8C10076E"
+        }
+
+        Assert-PvrTaSpriteSourceGroup `
+            "Dead or Alive 2 sprite source probe" `
+            $doaSpriteReport `
+            "nonfinite" `
+            32397 `
+            "0x8C1007FA" `
+            "0x8C10084C" `
+            "0x8C10084C-0x8C100850"
+    }
 }
 
 if ($LongDoa2) {
