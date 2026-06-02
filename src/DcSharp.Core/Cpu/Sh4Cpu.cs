@@ -1221,6 +1221,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2EmptyCallbackTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_FDA0
+            || step.Opcode != 0x974E
+            || State.Pc != 0x8C12_FDA2
+            || State.R[7] != 0xE20)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 70;
+        const uint tableLimit = 0xE20;
+        const uint tableStride = 0x1C4;
+        if (!IsDoa2EmptyCallbackTableScan()
+            || maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var tableBase = memory.ReadUInt32(0x8C12_FE44);
+        for (var offset = 0u; offset < tableLimit; offset += tableStride)
+        {
+            if (tableBase > uint.MaxValue - offset
+                || !memory.TryGetSystemRamOffset(tableBase + offset, 4, out _)
+                || memory.ReadUInt32(tableBase + offset) == 1)
+            {
+                return false;
+            }
+        }
+
+        State.R[0] = 0;
+        State.R[4] = tableLimit;
+        State.R[5] = tableLimit;
+        State.R[6] = tableStride;
+        State.R[7] = tableLimit;
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2UnrolledWordCopyReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3620,6 +3665,26 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_C800) == 0x8FF5
         && memory.ReadInstructionUInt16(0x8C11_C802) == 0x2212
         && memory.ReadInstructionUInt16(0x8C11_C8AC) == 0x08F4;
+
+    private bool IsDoa2EmptyCallbackTableScan() =>
+        memory.ReadInstructionUInt16(0x8C12_FDA0) == 0x974E
+        && memory.ReadInstructionUInt16(0x8C12_FDA2) == 0xE400
+        && memory.ReadInstructionUInt16(0x8C12_FDA4) == 0x964D
+        && memory.ReadInstructionUInt16(0x8C12_FDA6) == 0x6543
+        && memory.ReadInstructionUInt16(0x8C12_FDA8) == 0xD026
+        && memory.ReadInstructionUInt16(0x8C12_FDAA) == 0x004E
+        && memory.ReadInstructionUInt16(0x8C12_FDAC) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C12_FDAE) == 0x8B06
+        && memory.ReadInstructionUInt16(0x8C12_FDBE) == 0x346C
+        && memory.ReadInstructionUInt16(0x8C12_FDC0) == 0x3472
+        && memory.ReadInstructionUInt16(0x8C12_FDC2) == 0x8FF1
+        && memory.ReadInstructionUInt16(0x8C12_FDC4) == 0x356C
+        && memory.ReadInstructionUInt16(0x8C12_FDC6) == 0xE000
+        && memory.ReadInstructionUInt16(0x8C12_FDC8) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C12_FDCA) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C12_FE40) == 0x0E20
+        && memory.ReadInstructionUInt16(0x8C12_FE42) == 0x01C4
+        && memory.ReadUInt32(0x8C12_FE44) == 0x8C2F_6820;
 
     private bool IsDoa2UnrolledWordCopyReturn() =>
         memory.ReadInstructionUInt16(0x8C10_E60A) == 0x5326
