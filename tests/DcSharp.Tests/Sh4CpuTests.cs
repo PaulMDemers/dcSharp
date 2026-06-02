@@ -5542,6 +5542,20 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FloatingPointDivideZeroByZeroProducesDefaultQNanAndSetsInvalidCause()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF453);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+
+        cpu.Step();
+
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[4]);
+        Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
     public void FloatingPointMultiplyOverflowRoundToZeroSaturatesAndSetsFpscrBits()
     {
         var memory = new DreamcastMemory();
