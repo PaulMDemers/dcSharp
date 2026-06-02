@@ -1083,6 +1083,97 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2TableDivideSetupLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_C7B0
+            || step.Opcode != 0x8928
+            || !step.Trace.EndsWith(" ; not taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C11_C7B2
+            || State.T)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 759;
+        if (!IsDoa2TableDivideSetupLoop()
+            || !IsDoa2UnsignedDivideHelper()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[13] > uint.MaxValue - 0x938
+            || State.R[14] > uint.MaxValue - 36
+            || State.R[15] < 4)
+        {
+            return false;
+        }
+
+        var tableBase = State.R[13] + 0x914;
+        var counterAddress = State.R[13] + 0x938;
+        var destination = State.R[14] + 4;
+        var savedR2StackAddress = State.R[15] - 4;
+        if (!memory.TryGetSystemRamOffset(tableBase, 32, out _)
+            || !memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(destination, 32, out _)
+            || !memory.TryGetSystemRamOffset(savedR2StackAddress, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[0] = 0x938;
+        State.R[4] = destination;
+        State.R[5] = memory.ReadUInt32(counterAddress);
+        State.R[6] = 100;
+        State.R[7] = 7;
+        State.R[5]--;
+
+        for (var iteration = 0; iteration < 8; iteration++)
+        {
+            State.R[3] = 0x914;
+            State.R[5] &= State.R[7];
+            State.R[1] = State.R[5];
+            State.R[1] <<= 2;
+            State.R[3] += State.R[13];
+            State.R[1] += State.R[3];
+            State.R[3] = 0x8C10_7424;
+            State.R[1] = memory.ReadUInt32(State.R[1]);
+            State.R[5]--;
+            State.R[1] <<= 2;
+            State.R[1] <<= 2;
+            State.R[1] <<= 2;
+            State.T = (State.R[1] & 0x8000_0000) != 0;
+            State.R[1] <<= 1;
+
+            State.Pr = 0x8C11_C7DE;
+            State.R[0] = State.R[6];
+            State.T = false;
+            memory.WriteUInt32(savedR2StackAddress, State.R[2]);
+            State.R[2] = 0;
+            State.M = false;
+            State.Q = false;
+            for (var index = 0; index < 32; index++)
+            {
+                ExecuteRotcl(1);
+                ExecuteDiv1(0, 2);
+            }
+
+            ExecuteRotcl(1);
+            State.R[0] = State.R[1];
+            State.R[2] = memory.ReadUInt32(savedR2StackAddress);
+
+            State.R[2] = State.R[14];
+            memory.WriteUInt32(State.R[4], State.R[0]);
+            State.R[2] += 36;
+            State.R[4] += 4;
+            State.T = State.R[4] >= State.R[2];
+        }
+
+        State.Pc = 0x8C11_C7EA;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2UnrolledWordCopyReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3432,6 +3523,40 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001
         && memory.ReadInstructionUInt16(0x8C10_7878) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_787A) == 0x6043;
+
+    private bool IsDoa2TableDivideSetupLoop() =>
+        memory.ReadInstructionUInt16(0x8C11_C7B0) == 0x8928
+        && memory.ReadInstructionUInt16(0x8C11_C7B2) == 0x9079
+        && memory.ReadInstructionUInt16(0x8C11_C7B4) == 0x64E3
+        && memory.ReadInstructionUInt16(0x8C11_C7B6) == 0x7404
+        && memory.ReadInstructionUInt16(0x8C11_C7B8) == 0x05DE
+        && memory.ReadInstructionUInt16(0x8C11_C7BA) == 0xE664
+        && memory.ReadInstructionUInt16(0x8C11_C7BC) == 0xE707
+        && memory.ReadInstructionUInt16(0x8C11_C7BE) == 0x75FF
+        && memory.ReadInstructionUInt16(0x8C11_C7C0) == 0x9373
+        && memory.ReadInstructionUInt16(0x8C11_C7C2) == 0x2579
+        && memory.ReadInstructionUInt16(0x8C11_C7C4) == 0x6153
+        && memory.ReadInstructionUInt16(0x8C11_C7C6) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C11_C7C8) == 0x33DC
+        && memory.ReadInstructionUInt16(0x8C11_C7CA) == 0x313C
+        && memory.ReadInstructionUInt16(0x8C11_C7CC) == 0xD33D
+        && memory.ReadInstructionUInt16(0x8C11_C7CE) == 0x6112
+        && memory.ReadInstructionUInt16(0x8C11_C7D0) == 0x75FF
+        && memory.ReadInstructionUInt16(0x8C11_C7D2) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C11_C7D4) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C11_C7D6) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C11_C7D8) == 0x4100
+        && memory.ReadInstructionUInt16(0x8C11_C7DA) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C11_C7DC) == 0x6063
+        && memory.ReadInstructionUInt16(0x8C11_C7DE) == 0x62E3
+        && memory.ReadInstructionUInt16(0x8C11_C7E0) == 0x2402
+        && memory.ReadInstructionUInt16(0x8C11_C7E2) == 0x7224
+        && memory.ReadInstructionUInt16(0x8C11_C7E4) == 0x7404
+        && memory.ReadInstructionUInt16(0x8C11_C7E6) == 0x3422
+        && memory.ReadInstructionUInt16(0x8C11_C7E8) == 0x8BEA
+        && memory.ReadInstructionUInt16(0x8C11_C8A8) == 0x0938
+        && memory.ReadInstructionUInt16(0x8C11_C8AA) == 0x0914
+        && memory.ReadUInt32(0x8C11_C8C4) == 0x8C10_7424;
 
     private bool IsDoa2UnrolledWordCopyReturn() =>
         memory.ReadInstructionUInt16(0x8C10_E60A) == 0x5326

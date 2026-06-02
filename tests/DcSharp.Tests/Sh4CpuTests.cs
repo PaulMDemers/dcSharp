@@ -1096,6 +1096,93 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TableDivideSetupLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TableDivideSetupLoop(normalMemory);
+        WriteDoa2TableDivideSetupData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TableDivideSetupLoop(fastMemory);
+        WriteDoa2TableDivideSetupData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C11_C7B0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C11_C7B0);
+        InitializeDoa2TableDivideSetupState(normal);
+        InitializeDoa2TableDivideSetupState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TableDivideSetupLoop(fastStart, 759, out var skippedInstructions));
+        Assert.Equal(759UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_2FFC), fastMemory.ReadUInt32(0x8C20_2FFC));
+        for (var offset = 4u; offset <= 32; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C20_1000 + offset), fastMemory.ReadUInt32(0x8C20_1000 + offset));
+        }
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TableDivideSetupLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TableDivideSetupLoop(memory);
+        WriteDoa2TableDivideSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_C7B0);
+        InitializeDoa2TableDivideSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TableDivideSetupLoop(start, 758, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C11_C7B2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TableDivideSetupLoopWhenDestinationIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TableDivideSetupLoop(memory);
+        WriteDoa2TableDivideSetupData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_C7B0);
+        InitializeDoa2TableDivideSetupState(cpu);
+        cpu.State.R[14] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TableDivideSetupLoop(start, 759, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TableDivideSetupLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TableDivideSetupLoop(memory);
+        WriteDoa2TableDivideSetupData(memory);
+        memory.WriteUInt32(0x8C11_C8C4, 0x8C10_751C);
+        var cpu = new Sh4Cpu(memory, 0x8C11_C7B0);
+        InitializeDoa2TableDivideSetupState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TableDivideSetupLoop(start, 759, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2UnrolledWordCopyReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -5590,6 +5677,76 @@ public class Sh4CpuTests
         cpu.State.R[6] = byteCount;
         cpu.State.R[7] = 0xFFFF_FFFF;
         cpu.State.Pr = 0x8C01_206A;
+        cpu.State.T = false;
+    }
+
+    private static void WriteDoa2TableDivideSetupLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_C7B0, 0x8928);
+        WriteInstruction(memory, 0x8C11_C7B2, 0x9079);
+        WriteInstruction(memory, 0x8C11_C7B4, 0x64E3);
+        WriteInstruction(memory, 0x8C11_C7B6, 0x7404);
+        WriteInstruction(memory, 0x8C11_C7B8, 0x05DE);
+        WriteInstruction(memory, 0x8C11_C7BA, 0xE664);
+        WriteInstruction(memory, 0x8C11_C7BC, 0xE707);
+        WriteInstruction(memory, 0x8C11_C7BE, 0x75FF);
+        WriteInstruction(memory, 0x8C11_C7C0, 0x9373);
+        WriteInstruction(memory, 0x8C11_C7C2, 0x2579);
+        WriteInstruction(memory, 0x8C11_C7C4, 0x6153);
+        WriteInstruction(memory, 0x8C11_C7C6, 0x4108);
+        WriteInstruction(memory, 0x8C11_C7C8, 0x33DC);
+        WriteInstruction(memory, 0x8C11_C7CA, 0x313C);
+        WriteInstruction(memory, 0x8C11_C7CC, 0xD33D);
+        WriteInstruction(memory, 0x8C11_C7CE, 0x6112);
+        WriteInstruction(memory, 0x8C11_C7D0, 0x75FF);
+        WriteInstruction(memory, 0x8C11_C7D2, 0x4108);
+        WriteInstruction(memory, 0x8C11_C7D4, 0x4108);
+        WriteInstruction(memory, 0x8C11_C7D6, 0x4108);
+        WriteInstruction(memory, 0x8C11_C7D8, 0x4100);
+        WriteInstruction(memory, 0x8C11_C7DA, 0x430B);
+        WriteInstruction(memory, 0x8C11_C7DC, 0x6063);
+        WriteInstruction(memory, 0x8C11_C7DE, 0x62E3);
+        WriteInstruction(memory, 0x8C11_C7E0, 0x2402);
+        WriteInstruction(memory, 0x8C11_C7E2, 0x7224);
+        WriteInstruction(memory, 0x8C11_C7E4, 0x7404);
+        WriteInstruction(memory, 0x8C11_C7E6, 0x3422);
+        WriteInstruction(memory, 0x8C11_C7E8, 0x8BEA);
+        WriteInstruction(memory, 0x8C11_C8A8, 0x0938);
+        WriteInstruction(memory, 0x8C11_C8AA, 0x0914);
+        memory.WriteUInt32(0x8C11_C8C4, 0x8C10_7424);
+        WriteDoa2UnsignedDivideHelper(memory);
+    }
+
+    private static void WriteDoa2TableDivideSetupData(DreamcastMemory memory)
+    {
+        for (var index = 0u; index < 8; index++)
+        {
+            memory.WriteUInt32(0x8C20_4914 + (index * 4), 0x100 + (index * 37));
+        }
+
+        memory.WriteUInt32(0x8C20_4938, 0);
+        for (var offset = 4u; offset <= 32; offset += 4)
+        {
+            memory.WriteUInt32(0x8C20_1000 + offset, 0xDEAD_BEEF);
+        }
+    }
+
+    private static void InitializeDoa2TableDivideSetupState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 0xCAFE_BABE;
+        cpu.State.R[1] = 0x1111_2222;
+        cpu.State.R[2] = 0x3333_4444;
+        cpu.State.R[3] = 0x5555_6666;
+        cpu.State.R[4] = 0x7777_8888;
+        cpu.State.R[5] = 0x9999_AAAA;
+        cpu.State.R[6] = 0xBBBB_CCCC;
+        cpu.State.R[7] = 0xDDDD_EEEE;
+        cpu.State.R[13] = 0x8C20_4000;
+        cpu.State.R[14] = 0x8C20_1000;
+        cpu.State.R[15] = 0x8C20_3000;
+        cpu.State.Pr = 0x8C01_2904;
+        cpu.State.M = true;
+        cpu.State.Q = true;
         cpu.State.T = false;
     }
 
