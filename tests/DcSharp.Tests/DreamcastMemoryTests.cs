@@ -137,6 +137,28 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CapturesWatchedMemoryWritesByProgramCounterRange()
+    {
+        var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(
+            StartAddress: 0x8C01_0000,
+            EndAddress: 0x8C01_000F,
+            StartPc: 0x8C10_0800,
+            EndPc: 0x8C10_0810));
+
+        memory.CurrentInstructionPc = 0x8C10_07FE;
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.CurrentInstructionPc = 0x8C10_080A;
+        memory.WriteUInt32(0x8C01_0004, 2);
+        memory.CurrentInstructionPc = null;
+        memory.WriteUInt32(0x8C01_0008, 3);
+
+        var access = Assert.Single(memory.WatchedWrites);
+        Assert.Equal(0x8C01_0004u, access.Address);
+        Assert.Equal(2u, access.Value);
+        Assert.Equal(0x8C10_080Au, access.Pc);
+    }
+
+    [Fact]
     public void CapturesWatchedMemoryReadsByAddressRange()
     {
         var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(0x8C01_0002, 0x8C01_0005));
@@ -191,6 +213,34 @@ public class DreamcastMemoryTests
         var access = Assert.Single(memory.WatchedReads);
         Assert.Equal(0x8C01_0000u, access.Address);
         Assert.Equal(1u, access.Value);
+    }
+
+    [Fact]
+    public void CapturesWatchedMemoryReadsByProgramCounterRanges()
+    {
+        var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(
+            StartAddress: 0x8C01_0000,
+            EndAddress: 0x8C01_000F,
+            PcRanges:
+            [
+                new DreamcastMemoryAddressRange(0x8C10_0800, 0x8C10_0810),
+                new DreamcastMemoryAddressRange(0x8C10_0840, 0x8C10_0850)
+            ]));
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0004, 2);
+        memory.WriteUInt32(0x8C01_0008, 3);
+
+        memory.CurrentInstructionPc = 0x8C10_07FE;
+        Assert.Equal(1u, memory.ReadUInt32(0x8C01_0000));
+        memory.CurrentInstructionPc = 0x8C10_080A;
+        Assert.Equal(2u, memory.ReadUInt32(0x8C01_0004));
+        memory.CurrentInstructionPc = 0x8C10_084C;
+        Assert.Equal(3u, memory.ReadUInt32(0x8C01_0008));
+
+        Assert.Collection(
+            memory.WatchedReads,
+            first => Assert.Equal(0x8C01_0004u, first.Address),
+            second => Assert.Equal(0x8C01_0008u, second.Address));
     }
 
     [Fact]

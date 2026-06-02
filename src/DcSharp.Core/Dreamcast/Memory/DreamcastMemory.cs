@@ -1912,7 +1912,7 @@ public sealed class DreamcastMemory
 
     private void RecordWatchedWrite(uint address, ReadOnlySpan<byte> data)
     {
-        if (writeWatch is null || !writeWatch.ShouldRecord(address, data.Length) || watchedWrites.Count >= writeWatch.Limit)
+        if (writeWatch is null || !writeWatch.ShouldRecord(address, data.Length, CurrentInstructionPc) || watchedWrites.Count >= writeWatch.Limit)
         {
             return;
         }
@@ -1922,7 +1922,7 @@ public sealed class DreamcastMemory
 
     private void RecordWatchedRead(uint address, int size, uint value)
     {
-        if (readWatch is null || !readWatch.ShouldRecord(address, size) || watchedReads.Count >= readWatch.Limit)
+        if (readWatch is null || !readWatch.ShouldRecord(address, size, CurrentInstructionPc) || watchedReads.Count >= readWatch.Limit)
         {
             return;
         }
@@ -2554,11 +2554,19 @@ public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
     int Limit = 4096,
-    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null)
+    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null,
+    uint? StartPc = null,
+    uint? EndPc = null,
+    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null)
 {
-    public bool ShouldRecord(uint address, int length)
+    public bool ShouldRecord(uint address, int length, uint? pc)
     {
         if (Limit <= 0 || length <= 0)
+        {
+            return false;
+        }
+
+        if (!DreamcastMemoryWatchFilters.MatchesPc(pc, StartPc, EndPc, PcRanges))
         {
             return false;
         }
@@ -2576,11 +2584,19 @@ public sealed record DreamcastMemoryReadWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
     int Limit = 4096,
-    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null)
+    IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null,
+    uint? StartPc = null,
+    uint? EndPc = null,
+    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null)
 {
-    public bool ShouldRecord(uint address, int length)
+    public bool ShouldRecord(uint address, int length, uint? pc)
     {
         if (Limit <= 0 || length <= 0)
+        {
+            return false;
+        }
+
+        if (!DreamcastMemoryWatchFilters.MatchesPc(pc, StartPc, EndPc, PcRanges))
         {
             return false;
         }
@@ -2594,8 +2610,38 @@ public sealed record DreamcastMemoryReadWatch(
     }
 }
 
+internal static class DreamcastMemoryWatchFilters
+{
+    public static bool MatchesPc(uint? pc, uint? startPc, uint? endPc, IReadOnlyList<DreamcastMemoryAddressRange>? pcRanges)
+    {
+        if (pcRanges is { Count: > 0 })
+        {
+            return pc is { } value && pcRanges.Any(range => range.Contains(value));
+        }
+
+        if (startPc is null && endPc is null)
+        {
+            return true;
+        }
+
+        if (pc is null)
+        {
+            return false;
+        }
+
+        return new DreamcastMemoryAddressRange(startPc ?? 0, endPc ?? startPc ?? uint.MaxValue).Contains(pc.Value);
+    }
+}
+
 public sealed record DreamcastMemoryAddressRange(uint StartAddress, uint EndAddress)
 {
+    public bool Contains(uint address)
+    {
+        var start = Math.Min(StartAddress, EndAddress);
+        var end = Math.Max(StartAddress, EndAddress);
+        return address >= start && address <= end;
+    }
+
     public bool Overlaps(uint address, int length)
     {
         if (length <= 0)
