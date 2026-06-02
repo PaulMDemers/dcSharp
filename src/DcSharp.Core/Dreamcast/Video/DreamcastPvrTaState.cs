@@ -142,7 +142,7 @@ public sealed class DreamcastPvrTaState
 
     private DreamcastPvrTaRenderCommand? AcceptSpritePayload(DreamcastPvrTaCommandWrite write)
     {
-        if (!spritePacketDecoder.AcceptPayload(write.Value, out var sprite))
+        if (!spritePacketDecoder.AcceptPayload(write, out var sprite))
         {
             return null;
         }
@@ -378,9 +378,17 @@ public sealed record DreamcastPvrTaSprite(
     string? ListTypeName,
     uint HeaderValue,
     string HeaderValueHex,
+    uint? HeaderInstructionPc,
+    string? HeaderInstructionPcHex,
     DreamcastPvrTaSpriteHeaderPayload HeaderPayload,
     uint ControlValue,
     string ControlValueHex,
+    uint? ControlInstructionPc,
+    string? ControlInstructionPcHex,
+    uint? FirstPayloadInstructionPc,
+    string? FirstPayloadInstructionPcHex,
+    uint? LastPayloadInstructionPc,
+    string? LastPayloadInstructionPcHex,
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,

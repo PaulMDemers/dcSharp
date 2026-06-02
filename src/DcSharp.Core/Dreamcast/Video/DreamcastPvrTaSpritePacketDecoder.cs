@@ -13,7 +13,7 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
         bool endOfStrip) =>
         pending = new PendingSpritePacket(header, headerPayload, control, endOfStrip);
 
-    public bool AcceptPayload(uint value, out DreamcastPvrTaSprite? sprite)
+    public bool AcceptPayload(DreamcastPvrTaCommandWrite write, out DreamcastPvrTaSprite? sprite)
     {
         sprite = null;
         if (pending is null)
@@ -21,7 +21,7 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
             return false;
         }
 
-        pending = pending.AcceptPayload(value);
+        pending = pending.AcceptPayload(write);
         if (!pending.IsComplete)
         {
             return false;
@@ -54,7 +54,11 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
         uint? Dummy0 = null,
         uint? Dummy1 = null,
         uint? Dummy2 = null,
-        uint? Dummy3 = null)
+        uint? Dummy3 = null,
+        uint? FirstPayloadInstructionPc = null,
+        string? FirstPayloadInstructionPcHex = null,
+        uint? LastPayloadInstructionPc = null,
+        string? LastPayloadInstructionPcHex = null)
     {
         public bool IsComplete =>
             AxValue is not null
@@ -73,79 +77,124 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
             && Dummy2 is not null
             && Dummy3 is not null;
 
-        public PendingSpritePacket AcceptPayload(uint value)
+        public PendingSpritePacket AcceptPayload(DreamcastPvrTaCommandWrite write)
         {
+            var value = write.Value;
+            var firstPayloadPc = FirstPayloadInstructionPc ?? write.InstructionPc;
+            var firstPayloadPcHex = FirstPayloadInstructionPcHex ?? write.InstructionPcHex;
             if (AxValue is null)
             {
-                return this with { AxValue = value };
+                return this with
+                {
+                    AxValue = value,
+                    FirstPayloadInstructionPc = firstPayloadPc,
+                    FirstPayloadInstructionPcHex = firstPayloadPcHex,
+                    LastPayloadInstructionPc = write.InstructionPc,
+                    LastPayloadInstructionPcHex = write.InstructionPcHex
+                };
             }
 
             if (AyValue is null)
             {
-                return this with { AyValue = value };
+                return WithPayload(Y: value);
             }
 
             if (AzValue is null)
             {
-                return this with { AzValue = value };
+                return WithPayload(Z: value);
             }
 
             if (BxValue is null)
             {
-                return this with { BxValue = value };
+                return WithPayload(Bx: value);
             }
 
             if (ByValue is null)
             {
-                return this with { ByValue = value };
+                return WithPayload(By: value);
             }
 
             if (BzValue is null)
             {
-                return this with { BzValue = value };
+                return WithPayload(Bz: value);
             }
 
             if (CxValue is null)
             {
-                return this with { CxValue = value };
+                return WithPayload(Cx: value);
             }
 
             if (CyValue is null)
             {
-                return this with { CyValue = value };
+                return WithPayload(Cy: value);
             }
 
             if (CzValue is null)
             {
-                return this with { CzValue = value };
+                return WithPayload(Cz: value);
             }
 
             if (DxValue is null)
             {
-                return this with { DxValue = value };
+                return WithPayload(Dx: value);
             }
 
             if (DyValue is null)
             {
-                return this with { DyValue = value };
+                return WithPayload(Dy: value);
             }
 
             if (Dummy0 is null)
             {
-                return this with { Dummy0 = value };
+                return WithPayload(Dummy0Value: value);
             }
 
             if (Dummy1 is null)
             {
-                return this with { Dummy1 = value };
+                return WithPayload(Dummy1Value: value);
             }
 
             if (Dummy2 is null)
             {
-                return this with { Dummy2 = value };
+                return WithPayload(Dummy2Value: value);
             }
 
-            return this with { Dummy3 = value };
+            return WithPayload(Dummy3Value: value);
+
+            PendingSpritePacket WithPayload(
+                uint? Y = null,
+                uint? Z = null,
+                uint? Bx = null,
+                uint? By = null,
+                uint? Bz = null,
+                uint? Cx = null,
+                uint? Cy = null,
+                uint? Cz = null,
+                uint? Dx = null,
+                uint? Dy = null,
+                uint? Dummy0Value = null,
+                uint? Dummy1Value = null,
+                uint? Dummy2Value = null,
+                uint? Dummy3Value = null) =>
+                this with
+                {
+                    AyValue = Y ?? AyValue,
+                    AzValue = Z ?? AzValue,
+                    BxValue = Bx ?? BxValue,
+                    ByValue = By ?? ByValue,
+                    BzValue = Bz ?? BzValue,
+                    CxValue = Cx ?? CxValue,
+                    CyValue = Cy ?? CyValue,
+                    CzValue = Cz ?? CzValue,
+                    DxValue = Dx ?? DxValue,
+                    DyValue = Dy ?? DyValue,
+                    Dummy0 = Dummy0Value ?? Dummy0,
+                    Dummy1 = Dummy1Value ?? Dummy1,
+                    Dummy2 = Dummy2Value ?? Dummy2,
+                    Dummy3 = Dummy3Value ?? Dummy3,
+                    LastPayloadInstructionPc = write.InstructionPc,
+                    LastPayloadInstructionPcHex = write.InstructionPcHex
+                };
         }
 
         public DreamcastPvrTaSprite ToSprite()
@@ -164,9 +213,17 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
                 Header.ListTypeName,
                 Header.Value,
                 Header.ValueHex,
+                Header.InstructionPc,
+                Header.InstructionPcHex,
                 HeaderPayload,
                 Control.Value,
                 Control.ValueHex,
+                Control.InstructionPc,
+                Control.InstructionPcHex,
+                FirstPayloadInstructionPc,
+                FirstPayloadInstructionPcHex,
+                LastPayloadInstructionPc,
+                LastPayloadInstructionPcHex,
                 EndOfStrip,
                 rgb565,
                 $"0x{rgb565:X4}",

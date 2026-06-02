@@ -799,7 +799,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
-        WritePvrSpritePacket(memory);
+        WritePvrSpritePacket(memory, instructionPcBase: 0x8C10_07D6);
 
         var snapshot = memory.CreateVideoSnapshot();
 
@@ -816,6 +816,14 @@ public class DreamcastMemoryTests
         Assert.Equal(4, sprite.Vertices.Count);
         Assert.Equal(3, sprite.Vertices[3].X);
         Assert.Equal(3, sprite.Vertices[3].Y);
+        Assert.Equal(0x8C10_07D6u, sprite.HeaderInstructionPc);
+        Assert.Equal("0x8C1007D6", sprite.HeaderInstructionPcHex);
+        Assert.Equal(0x8C10_07E6u, sprite.ControlInstructionPc);
+        Assert.Equal("0x8C1007E6", sprite.ControlInstructionPcHex);
+        Assert.Equal(0x8C10_07E8u, sprite.FirstPayloadInstructionPc);
+        Assert.Equal("0x8C1007E8", sprite.FirstPayloadInstructionPcHex);
+        Assert.Equal(0x8C10_0804u, sprite.LastPayloadInstructionPc);
+        Assert.Equal("0x8C100804", sprite.LastPayloadInstructionPcHex);
     }
 
     private static void WritePvrVertexPacket(DreamcastMemory memory, bool endOfStrip, int x, int y, ushort color)
@@ -826,7 +834,7 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0x1000_0000, color);
     }
 
-    private static void WritePvrSpritePacket(DreamcastMemory memory)
+    private static void WritePvrSpritePacket(DreamcastMemory memory, uint? instructionPcBase = null)
     {
         uint[] words =
         [
@@ -856,10 +864,13 @@ public class DreamcastMemoryTests
             0x0000_0000
         ];
 
-        foreach (var word in words)
+        for (var index = 0; index < words.Length; index++)
         {
-            memory.WriteUInt32(0x1000_0000, word);
+            memory.CurrentInstructionPc = instructionPcBase + (uint)(index * 2);
+            memory.WriteUInt32(0x1000_0000, words[index]);
         }
+
+        memory.CurrentInstructionPc = null;
     }
 
     [Fact]
