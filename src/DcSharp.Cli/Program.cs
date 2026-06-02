@@ -519,7 +519,7 @@ static void PrintRuntimeScheduling(DreamcastRunSummary summary)
 static void PrintVideoActivity(DreamcastVideoSummary video)
 {
     Console.WriteLine($"Video VRAM: nonzero={video.NonZeroBytes}, checksum={video.Fnv1A32Hex}, first={video.FirstNonZeroOffsetHex ?? "none"}");
-    Console.WriteLine($"PVR: registers={video.PvrRegisterAccessCount}, taWrites={video.PvrTaCommandWriteCount}, taStrips={video.PvrTaStrips.Count}, taSprites={video.PvrTaSprites.Count}");
+    Console.WriteLine($"PVR: registers={video.PvrRegisterAccessCount}, taWrites={video.PvrTaCommandWriteCount}, taStrips={video.PvrTaStrips.Count}, taSprites={video.PvrTaSprites.Count}{FormatPvrTaSpriteCounts(video)}");
     if (video.PvrTaLists.Count > 0)
     {
         Console.WriteLine($"PVR TA lists: {FormatPvrTaLists(video.PvrTaLists)}");
@@ -887,9 +887,9 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"Controller B: {FormatController(controllerB)}");
     }
 
-    Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
-    Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}");
     var videoSummary = DreamcastVideoSummary.FromSnapshot(result.Video);
+    Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
+    Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}, taStrips={videoSummary.PvrTaStrips.Count}, taSprites={videoSummary.PvrTaSprites.Count}{FormatPvrTaSpriteCounts(videoSummary)}");
     var pvrTaLists = videoSummary.PvrTaLists;
     if (pvrTaLists.Count > 0)
     {
@@ -1169,7 +1169,7 @@ static int RunFixtures(string manifestPath, string[] args)
             if (result.Summary is not null)
             {
                 var scheduler = result.Summary.Scheduler;
-                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, taSprites={result.Summary.Video.PvrTaSprites.Count}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, timerPending={result.Summary.Timer.PendingEventCodeHex ?? "none"}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
+                Console.WriteLine($"  stop={result.Summary.StopReason}, instructions={result.Summary.InstructionsExecuted}, serial={result.Summary.SerialBytes}, videoNonZero={result.Summary.Video.NonZeroBytes}, pvrRegs={result.Summary.Video.PvrRegisterAccessCount}, taWrites={result.Summary.Video.PvrTaCommandWriteCount}, taStrips={result.Summary.Video.PvrTaStrips.Count}, taSprites={result.Summary.Video.PvrTaSprites.Count}{FormatPvrTaSpriteCounts(result.Summary.Video)}, aicaRegs={result.Summary.Audio.RegisterAccessCount}, mapleTransfers={result.Summary.Maple.TransferCount}, mapleDmaBatches={result.Summary.Maple.DmaBatchCount}, mapleDescriptorLimitHits={result.Summary.Maple.DescriptorLimitHitCount}, gdromStatuses={result.Summary.Gdrom.StatusCommandCount}, gdromSectorModes={result.Summary.Gdrom.SectorModeCommandCount}, gdromTocs={result.Summary.Gdrom.TocCommandCount}, gdromReads={result.Summary.Gdrom.ReadCommandCount}, gdromBytes={result.Summary.Gdrom.BytesRead}, timerPending={result.Summary.Timer.PendingEventCodeHex ?? "none"}, asicPending={result.Summary.Asic.PendingEventCodeHex ?? "none"}, vblanks={scheduler.VBlankEventsRaised}, schedulerTicks={scheduler.HardwareAdvanceTicks}, schedulerBatches={scheduler.HardwareAdvanceBatches}, maxSchedulerBatch={scheduler.MaxHardwareAdvanceBatch}, idleTicks={scheduler.IdleAdvanceTicks}, idleBatches={scheduler.IdleAdvanceBatches}, maxIdleBatch={scheduler.MaxIdleAdvanceBatch}, idleWakes=timer:{scheduler.IdleTimerWakeCount}/vblank:{scheduler.IdleVBlankWakeCount}/input:{scheduler.IdleInputWakeCount}, cpuFastForward={scheduler.CpuFastForwardInstructions}, cpuFastForwardBatches={scheduler.CpuFastForwardBatches}, maxCpuFastForward={scheduler.MaxCpuFastForwardBatch}, inputChanges={scheduler.ControllerScriptChanges}");
                 if (result.Summary.Video.PvrTaLists.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaLists={FormatPvrTaLists(result.Summary.Video.PvrTaLists)}");
@@ -2115,6 +2115,11 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
 
 static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
     string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} preview={FormatPvrTaSpritePreviewStatus(sprite)} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}"))}"));
+
+static string FormatPvrTaSpriteCounts(DreamcastVideoSummary video) =>
+    video.PvrTaSprites.Count == 0
+        ? string.Empty
+        : $", taSpritePreview=renderable:{video.PvrTaRenderableSpriteCount}/degenerate:{video.PvrTaDegenerateSpriteCount}/nonfinite:{video.PvrTaNonfiniteSpriteCount}";
 
 static string FormatPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
     sprite.HasRenderablePreviewArea

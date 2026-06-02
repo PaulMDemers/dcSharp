@@ -712,6 +712,24 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("missing AICA channel: 1", failures);
     }
 
+    [Fact]
+    public void VideoSummaryReportsSpritePreviewAggregateCounts()
+    {
+        var summary = CreateVideoSummary(
+            null,
+            null,
+            null,
+            [
+                CreatePvrTaSpriteSummary(hasFinitePreviewCoordinates: true, hasRenderablePreviewArea: true),
+                CreatePvrTaSpriteSummary(hasFinitePreviewCoordinates: true, hasRenderablePreviewArea: false),
+                CreatePvrTaSpriteSummary(hasFinitePreviewCoordinates: false, hasRenderablePreviewArea: false)
+            ]);
+
+        Assert.Equal(1, summary.PvrTaRenderableSpriteCount);
+        Assert.Equal(1, summary.PvrTaDegenerateSpriteCount);
+        Assert.Equal(1, summary.PvrTaNonfiniteSpriteCount);
+    }
+
     private static DreamcastRunSummary CreateSummary(
         ulong vblankEvents,
         ulong hardwareTicks,
@@ -853,7 +871,8 @@ public class DreamcastFixtureRunnerTests
     private static DreamcastVideoSummary CreateVideoSummary(
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters,
         IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites,
-        IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips)
+        IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips,
+        IReadOnlyList<DreamcastPvrTaSpriteSummary>? pvrTaSprites = null)
     {
         var taWrites = pvrTaCommandWrites ?? [];
         return new DreamcastVideoSummary(
@@ -881,12 +900,45 @@ public class DreamcastFixtureRunnerTests
             taWrites.Select(DreamcastPvrTaParameterHeaderSummary.FromWriteSummary).ToArray(),
             CreatePvrTaLists(taWrites),
             pvrTaStrips ?? [],
-            [],
+            pvrTaSprites ?? [],
             taWrites
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
                 .ToArray());
+    }
+
+    private static DreamcastPvrTaSpriteSummary CreatePvrTaSpriteSummary(bool hasFinitePreviewCoordinates, bool hasRenderablePreviewArea)
+    {
+        var header = new DreamcastPvrTaCommandWrite(
+            0x1000_0000,
+            "0x10000000",
+            "TA_INPUT",
+            "SpriteHeader",
+            2,
+            "TranslucentPolygon",
+            false,
+            4,
+            0xA200_0009,
+            "0xA2000009");
+        var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [0, 0, 0, 0, 0, 0, 0]);
+
+        return new DreamcastPvrTaSpriteSummary(
+            "TA_INPUT",
+            2,
+            "TranslucentPolygon",
+            header.Value,
+            header.ValueHex,
+            DreamcastPvrTaSpriteHeaderPayloadSummary.FromPayload(payload),
+            0xF000_0000,
+            "0xF0000000",
+            true,
+            0,
+            "0x0000",
+            hasFinitePreviewCoordinates,
+            hasRenderablePreviewArea,
+            0,
+            []);
     }
 
     private static DreamcastPvrTaCommandWrite ToCommandWrite(DreamcastPvrTaCommandWriteSummary write) =>

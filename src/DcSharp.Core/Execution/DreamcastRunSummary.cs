@@ -451,6 +451,12 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrTaSpriteSummary> PvrTaSprites,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds)
 {
+    public int PvrTaRenderableSpriteCount => PvrTaSprites.Count(sprite => sprite.HasRenderablePreviewArea);
+
+    public int PvrTaDegenerateSpriteCount => PvrTaSprites.Count(sprite => sprite.HasFinitePreviewCoordinates && !sprite.HasRenderablePreviewArea);
+
+    public int PvrTaNonfiniteSpriteCount => PvrTaSprites.Count(sprite => !sprite.HasFinitePreviewCoordinates);
+
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
         new(
             snapshot.VramBytes,
