@@ -2930,6 +2930,104 @@ public class Sh4CpuTests
         Assert.Equal(0x8C10_751Eu, cpu.State.Pc);
     }
 
+    [Theory]
+    [InlineData(0u, 100u)]
+    [InlineData(12345u, 100u)]
+    [InlineData(0xFFFF_FFFFu, 100u)]
+    [InlineData(0x8000_0000u, 3u)]
+    public void FastForwardsDoa2UnsignedDivideHelper(uint dividend, uint divisor)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_7424);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_7424);
+        InitializeDoa2UnsignedDivideState(normal, dividend, divisor);
+        InitializeDoa2UnsignedDivideState(fast, dividend, divisor);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2UnsignedDivideHelper(fastStart, 72, out var skippedInstructions));
+        Assert.Equal(72UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2UnsignedDivideHelperWhenDivisorIsZero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7424);
+        InitializeDoa2UnsignedDivideState(cpu, 12345, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2UnsignedDivideHelper(start, 72, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7426u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2UnsignedDivideHelperWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7424);
+        InitializeDoa2UnsignedDivideState(cpu, 12345, 100);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2UnsignedDivideHelper(start, 71, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7426u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2UnsignedDivideHelperWhenStackIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7424);
+        InitializeDoa2UnsignedDivideState(cpu, 12345, 100);
+        cpu.State.R[15] = 0xA500_0000;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2UnsignedDivideHelper(start, 72, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7426u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2UnsignedDivideHelperWhenOpcodeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2UnsignedDivideHelper(memory);
+        WriteInstruction(memory, 0x8C10_74AE, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C10_7424);
+        InitializeDoa2UnsignedDivideState(cpu, 12345, 100);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2UnsignedDivideHelper(start, 72, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_7426u, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsDoa2ListEntryAllocatorPair()
     {
@@ -6614,6 +6712,37 @@ public class Sh4CpuTests
         cpu.State.R[4] = 0x8C20_4000;
         cpu.State.R[15] = 0x8C20_7000;
         cpu.State.Pr = 0x8C11_753E;
+        cpu.State.T = true;
+        cpu.State.M = true;
+        cpu.State.Q = true;
+    }
+
+    private static void WriteDoa2UnsignedDivideHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_7424, 0x2008);
+        WriteInstruction(memory, 0x8C10_7426, 0x2F26);
+        WriteInstruction(memory, 0x8C10_7428, 0x8945);
+        WriteInstruction(memory, 0x8C10_742A, 0xE200);
+        WriteInstruction(memory, 0x8C10_742C, 0x0019);
+        for (var address = 0x8C10_742Eu; address <= 0x8C10_74AC; address += 4)
+        {
+            WriteInstruction(memory, address, 0x4124);
+            WriteInstruction(memory, address + 2, 0x3204);
+        }
+
+        WriteInstruction(memory, 0x8C10_74AE, 0x4124);
+        WriteInstruction(memory, 0x8C10_74B0, 0x6013);
+        WriteInstruction(memory, 0x8C10_74B2, 0x000B);
+        WriteInstruction(memory, 0x8C10_74B4, 0x62F6);
+    }
+
+    private static void InitializeDoa2UnsignedDivideState(Sh4Cpu cpu, uint dividend, uint divisor)
+    {
+        cpu.State.R[0] = divisor;
+        cpu.State.R[1] = dividend;
+        cpu.State.R[2] = 0x8C20_3000;
+        cpu.State.R[15] = 0x8C20_7000;
+        cpu.State.Pr = 0x8C11_C7DE;
         cpu.State.T = true;
         cpu.State.M = true;
         cpu.State.Q = true;

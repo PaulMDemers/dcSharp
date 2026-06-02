@@ -2627,6 +2627,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2UnsignedDivideHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_7424
+            || step.Opcode != 0x2008
+            || State.Pc != 0x8C10_7426
+            || State.T
+            || State.R[0] == 0)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 72;
+        if (!IsDoa2UnsignedDivideHelper()
+            || maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 4
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[2]);
+        State.R[2] = 0;
+        State.M = false;
+        State.Q = false;
+        State.T = false;
+        for (var index = 0; index < 32; index++)
+        {
+            ExecuteRotcl(1);
+            ExecuteDiv1(0, 2);
+        }
+
+        ExecuteRotcl(1);
+        State.R[0] = State.R[1];
+        State.R[2] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ZeroByteClassifier(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -4136,6 +4181,32 @@ public sealed class Sh4Cpu
             && memory.ReadInstructionUInt16(0x8C10_75C8) == 0x63F6
             && memory.ReadInstructionUInt16(0x8C10_75CA) == 0x000B
             && memory.ReadInstructionUInt16(0x8C10_75CC) == 0x62F6;
+    }
+
+    private bool IsDoa2UnsignedDivideHelper()
+    {
+        if (memory.ReadInstructionUInt16(0x8C10_7424) != 0x2008
+            || memory.ReadInstructionUInt16(0x8C10_7426) != 0x2F26
+            || memory.ReadInstructionUInt16(0x8C10_7428) != 0x8945
+            || memory.ReadInstructionUInt16(0x8C10_742A) != 0xE200
+            || memory.ReadInstructionUInt16(0x8C10_742C) != 0x0019)
+        {
+            return false;
+        }
+
+        for (var address = 0x8C10_742Eu; address <= 0x8C10_74AC; address += 4)
+        {
+            if (memory.ReadInstructionUInt16(address) != 0x4124
+                || memory.ReadInstructionUInt16(address + 2) != 0x3204)
+            {
+                return false;
+            }
+        }
+
+        return memory.ReadInstructionUInt16(0x8C10_74AE) == 0x4124
+            && memory.ReadInstructionUInt16(0x8C10_74B0) == 0x6013
+            && memory.ReadInstructionUInt16(0x8C10_74B2) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C10_74B4) == 0x62F6;
     }
 
     private bool IsDoa2ZeroByteClassifier() =>
