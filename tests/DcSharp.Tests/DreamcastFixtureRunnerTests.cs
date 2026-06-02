@@ -216,6 +216,17 @@ public class DreamcastFixtureRunnerTests
                     ]
                 }
             ],
+            PvrTaSpriteSourceGroups =
+            [
+                new DreamcastFixturePvrTaSpriteSourceGroupExpectation
+                {
+                    PreviewStatus = "nonfinite",
+                    HeaderInstructionPc = "0x8C1007FA",
+                    ControlInstructionPc = "0x8C10084C",
+                    PayloadInstructionPcRange = "0x8C10084C-0x8C100850",
+                    MinCount = 2
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F"
@@ -372,6 +383,23 @@ public class DreamcastFixtureRunnerTests
                         CreatePvrTaVertexSummary(2, 1),
                         CreatePvrTaVertexSummary(1, 2, endOfStrip: true)
                     ])
+            ],
+            pvrTaSprites:
+            [
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: false,
+                    hasRenderablePreviewArea: false,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850),
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: false,
+                    hasRenderablePreviewArea: false,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850)
             ],
             aicaRegisters: [new DreamcastAicaRegisterValueSummary(0x2800, "0x2800", "AICA_MASTER_VOLUME", null, 0x0000000F, "0x0000000F")],
             aicaChannels: [CreateAudioChannel()]);
@@ -550,6 +578,17 @@ public class DreamcastFixtureRunnerTests
                     ]
                 }
             ],
+            PvrTaSpriteSourceGroups =
+            [
+                new DreamcastFixturePvrTaSpriteSourceGroupExpectation
+                {
+                    PreviewStatus = "nonfinite",
+                    HeaderInstructionPc = "0x8C1007FA",
+                    ControlInstructionPc = "0x8C10084C",
+                    PayloadInstructionPcRange = "0x8C10084C-0x8C100850",
+                    MinCount = 1
+                }
+            ],
             AicaRegisters =
             {
                 ["AICA_MASTER_VOLUME"] = "0x0000000F",
@@ -692,6 +731,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Contains("expected PVR TA list region=TA_INPUT list=OpaquePolygon to have at least 1 vertices, got 0", failures);
         Assert.Contains("missing PVR TA list region=TA_INPUT list=TranslucentPolygon", failures);
         Assert.Contains("expected at least 1 PVR TA strip region=TA_INPUT list=OpaquePolygon rgb565=0xF800 minVertices=3 vertices=1,1/2,1/1,2 matches, got 0", failures);
+        Assert.Contains("expected at least 1 PVR TA sprite source group preview=nonfinite headerPc=0x8C1007FA controlPc=0x8C10084C payloadPc=0x8C10084C-0x8C100850 sprites, got 0", failures);
         Assert.Contains("AICA register AICA_MASTER_VOLUME expected 0x0000000F, got 0x0000000E", failures);
         Assert.Contains("missing AICA register: AICA_MONITOR_CHANNEL", failures);
         Assert.Contains("AICA channel 0 pitch expected 0x00001AC0, got 0x00001ABF", failures);
@@ -805,6 +845,7 @@ public class DreamcastFixtureRunnerTests
         IReadOnlyList<DreamcastPvrRegisterValueSummary>? pvrRegisters = null,
         IReadOnlyList<DreamcastPvrTaCommandWriteSummary>? pvrTaCommandWrites = null,
         IReadOnlyList<DreamcastPvrTaStripSummary>? pvrTaStrips = null,
+        IReadOnlyList<DreamcastPvrTaSpriteSummary>? pvrTaSprites = null,
         IReadOnlyList<DreamcastAicaRegisterValueSummary>? aicaRegisters = null,
         IReadOnlyList<DreamcastAicaChannelSummary>? aicaChannels = null,
         DreamcastTimerSummary? timer = null,
@@ -834,7 +875,7 @@ public class DreamcastFixtureRunnerTests
             [],
             new DreamcastControllerSummary(DreamcastControllerButtons.None, "None", 0, 0, 0, 0, 0, 0),
             asic ?? new DreamcastAsicSummary([], null, null, null, null),
-            CreateVideoSummary(pvrRegisters, pvrTaCommandWrites, pvrTaStrips),
+            CreateVideoSummary(pvrRegisters, pvrTaCommandWrites, pvrTaStrips, pvrTaSprites),
             new DreamcastAudioSummary(0, 0, 0, "0x00000000", aicaRegisters ?? [], 0, [], aicaChannels ?? [], aicaChannels?.Count(channel => channel.Active) ?? 0),
             new DreamcastMapleSummary(
                 mapleTransfers,

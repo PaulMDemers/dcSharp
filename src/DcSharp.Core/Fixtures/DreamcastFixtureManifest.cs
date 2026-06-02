@@ -94,6 +94,7 @@ public sealed class DreamcastFixtureDefinition
     public List<DreamcastFixturePvrTaListExpectation> PvrTaLists { get; set; } = [];
     public List<DreamcastFixturePvrTaStripExpectation> PvrTaStrips { get; set; } = [];
     public List<DreamcastFixturePvrTaSpriteExpectation> PvrTaSprites { get; set; } = [];
+    public List<DreamcastFixturePvrTaSpriteSourceGroupExpectation> PvrTaSpriteSourceGroups { get; set; } = [];
     public List<DreamcastFixtureVideoSampleExpectation> VideoSamples { get; set; } = [];
     public List<DreamcastFixtureGdromTocExpectation> GdromTocs { get; set; } = [];
     public List<DreamcastFixtureGdromStatusExpectation> GdromStatuses { get; set; } = [];
@@ -359,6 +360,17 @@ public sealed class DreamcastFixturePvrTaSpriteExpectation
     public string? Rgb565 { get; set; }
     public int? MinVertices { get; set; }
     public List<DreamcastFixturePvrTaVertexExpectation> Vertices { get; set; } = [];
+    public int MinCount { get; set; } = 1;
+}
+
+public sealed class DreamcastFixturePvrTaSpriteSourceGroupExpectation
+{
+    public string? PreviewStatus { get; set; }
+    public string? HeaderInstructionPc { get; set; }
+    public string? ControlInstructionPc { get; set; }
+    public string? FirstPayloadInstructionPc { get; set; }
+    public string? LastPayloadInstructionPc { get; set; }
+    public string? PayloadInstructionPcRange { get; set; }
     public int MinCount { get; set; } = 1;
 }
 

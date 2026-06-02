@@ -358,6 +358,11 @@ public static class DreamcastFixtureRunner
             ValidatePvrTaSprite(failures, summary, expected);
         }
 
+        foreach (var expected in fixture.PvrTaSpriteSourceGroups)
+        {
+            ValidatePvrTaSpriteSourceGroup(failures, summary, expected);
+        }
+
         foreach (var (registerName, expectedValueText) in fixture.PvrRegisters)
         {
             var register = summary.Video.PvrRegisters.SingleOrDefault(register => string.Equals(register.Name, registerName, StringComparison.Ordinal));
@@ -1349,6 +1354,42 @@ public static class DreamcastFixtureRunner
             details.Add($"vertices={string.Join("/", expected.Vertices.Select(DescribePvrTaVertexExpectation))}");
         }
 
+        return details.Count == 0 ? "<any>" : string.Join(" ", details);
+    }
+
+    private static void ValidatePvrTaSpriteSourceGroup(
+        List<string> failures,
+        DreamcastRunSummary summary,
+        DreamcastFixturePvrTaSpriteSourceGroupExpectation expected)
+    {
+        uint? expectedHeaderPc = expected.HeaderInstructionPc is null ? null : ParseHex32(expected.HeaderInstructionPc, "PVR TA sprite source header PC");
+        uint? expectedControlPc = expected.ControlInstructionPc is null ? null : ParseHex32(expected.ControlInstructionPc, "PVR TA sprite source control PC");
+        uint? expectedFirstPayloadPc = expected.FirstPayloadInstructionPc is null ? null : ParseHex32(expected.FirstPayloadInstructionPc, "PVR TA sprite source first payload PC");
+        uint? expectedLastPayloadPc = expected.LastPayloadInstructionPc is null ? null : ParseHex32(expected.LastPayloadInstructionPc, "PVR TA sprite source last payload PC");
+        var count = summary.Video.PvrTaSpriteSourceGroups
+            .Where(group =>
+                (expected.PreviewStatus is null || string.Equals(group.PreviewStatus, expected.PreviewStatus, StringComparison.OrdinalIgnoreCase))
+                && (expectedHeaderPc is null || group.HeaderInstructionPc == expectedHeaderPc)
+                && (expectedControlPc is null || group.ControlInstructionPc == expectedControlPc)
+                && (expectedFirstPayloadPc is null || group.FirstPayloadInstructionPc == expectedFirstPayloadPc)
+                && (expectedLastPayloadPc is null || group.LastPayloadInstructionPc == expectedLastPayloadPc)
+                && (expected.PayloadInstructionPcRange is null || string.Equals(group.PayloadInstructionPcRangeHex, expected.PayloadInstructionPcRange, StringComparison.OrdinalIgnoreCase)))
+            .Sum(group => group.Count);
+        if (count < expected.MinCount)
+        {
+            failures.Add($"expected at least {expected.MinCount} PVR TA sprite source group {DescribePvrTaSpriteSourceGroupExpectation(expected)} sprites, got {count}");
+        }
+    }
+
+    private static string DescribePvrTaSpriteSourceGroupExpectation(DreamcastFixturePvrTaSpriteSourceGroupExpectation expected)
+    {
+        var details = new List<string>();
+        AddOptionalDetail(details, "preview", expected.PreviewStatus);
+        AddOptionalDetail(details, "headerPc", expected.HeaderInstructionPc);
+        AddOptionalDetail(details, "controlPc", expected.ControlInstructionPc);
+        AddOptionalDetail(details, "firstPayloadPc", expected.FirstPayloadInstructionPc);
+        AddOptionalDetail(details, "lastPayloadPc", expected.LastPayloadInstructionPc);
+        AddOptionalDetail(details, "payloadPc", expected.PayloadInstructionPcRange);
         return details.Count == 0 ? "<any>" : string.Join(" ", details);
     }
 
