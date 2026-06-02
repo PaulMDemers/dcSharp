@@ -5446,7 +5446,7 @@ public class Sh4CpuTests
 
         var step = cpu.Step();
 
-        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[3])));
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[3]);
         Assert.Contains("fipr fv8,fv0 ; fr3=0x", step.Trace, StringComparison.Ordinal);
         Assert.Contains("fv0=[0x7FC00000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
         Assert.Contains("fv8=[0x3F800000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
@@ -5461,7 +5461,7 @@ public class Sh4CpuTests
 
         var step = cpu.Step();
 
-        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[4])));
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[4]);
         Assert.Contains("fdiv fr5,fr4 ; fr4=0x", step.Trace, StringComparison.Ordinal);
         Assert.Contains("nonfinite fr4old=0x00000000,fr5=0x00000000", step.Trace, StringComparison.Ordinal);
     }
@@ -5534,7 +5534,7 @@ public class Sh4CpuTests
 
         cpu.Step();
 
-        Assert.True(float.IsNaN(BitConverter.UInt32BitsToSingle(cpu.State.Fr[4])));
+        Assert.Equal(Sh4State.DefaultSingleQNaN, cpu.State.Fr[4]);
         Assert.Equal(Sh4State.FpscrCauseInvalidBit, cpu.State.Fpscr & Sh4State.FpscrCauseMask);
         Assert.Equal(Sh4State.FpscrFlagInvalidBit, cpu.State.Fpscr & Sh4State.FpscrFlagMask);
     }
