@@ -1031,6 +1031,58 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2ByteFillWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_7864
+            || step.Opcode != 0xE700
+            || State.Pc != 0x8C10_7866
+            || State.R[7] != 0)
+        {
+            return false;
+        }
+
+        var byteCount = State.R[6];
+        if (!IsDoa2ByteFillLoop()
+            || byteCount > int.MaxValue)
+        {
+            return false;
+        }
+
+        skippedInstructions = 6 + ((ulong)byteCount * 5);
+        if (skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        if (byteCount != 0)
+        {
+            if (State.R[4] > uint.MaxValue - (byteCount - 1)
+                || !memory.TryGetSystemRamOffset(State.R[4], checked((int)byteCount), out _))
+            {
+                skippedInstructions = 0;
+                return false;
+            }
+
+            var value = (byte)State.R[5];
+            for (var index = 0u; index < byteCount; index++)
+            {
+                memory.Write(State.R[4] + index, [value]);
+            }
+        }
+
+        State.R[0] = State.R[4];
+        State.R[3] = 0;
+        State.R[7] = byteCount;
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2UnrolledWordCopyReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -3377,7 +3429,9 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_7870) == 0x2050
         && memory.ReadInstructionUInt16(0x8C10_7872) == 0x3762
         && memory.ReadInstructionUInt16(0x8C10_7874) == 0x8FFB
-        && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001;
+        && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001
+        && memory.ReadInstructionUInt16(0x8C10_7878) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_787A) == 0x6043;
 
     private bool IsDoa2UnrolledWordCopyReturn() =>
         memory.ReadInstructionUInt16(0x8C10_E60A) == 0x5326

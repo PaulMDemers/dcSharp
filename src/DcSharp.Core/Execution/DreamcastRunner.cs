@@ -206,6 +206,11 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2ColorBytePackSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_7864, 0x8C10_787C)
+                        && cpu.TryFastForwardDoa2ByteFillWrapper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2ByteFillWrapperSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2ByteFillWrapperSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_786E, 0x8C10_7878)
                         && cpu.TryFastForwardDoa2ByteFillLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2ByteFillSkippedInstructions))
                     {
