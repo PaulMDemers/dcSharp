@@ -2114,7 +2114,7 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
 static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
-    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} preview={FormatPvrTaSpritePreviewStatus(sprite)}{FormatPvrTaSpriteSource(sprite)} points={string.Join("/", sprite.Vertices.Select(vertex => $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}"))}"));
+    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} preview={FormatPvrTaSpritePreviewStatus(sprite)}{FormatPvrTaSpriteSource(sprite)} points={string.Join("/", sprite.Vertices.Select(FormatPvrTaSpriteVertex))}"));
 
 static string FormatPvrTaSpriteCounts(DreamcastVideoSummary video) =>
     video.PvrTaSprites.Count == 0
@@ -2138,6 +2138,14 @@ static string FormatPvrTaSpritePayloadPcRange(DreamcastPvrTaSpriteSummary sprite
     sprite.FirstPayloadInstructionPcHex == sprite.LastPayloadInstructionPcHex
         ? sprite.FirstPayloadInstructionPcHex ?? "-"
         : $"{sprite.FirstPayloadInstructionPcHex ?? "-"}-{sprite.LastPayloadInstructionPcHex ?? "-"}";
+
+static string FormatPvrTaSpriteVertex(DreamcastPvrTaSpriteVertexSummary vertex)
+{
+    var formatted = $"{vertex.Name}:{vertex.X},{vertex.Y}:{FormatFloat(vertex.U)},{FormatFloat(vertex.V)}";
+    return vertex.HasFinitePosition
+        ? formatted
+        : $"{formatted}[raw={vertex.XValueHex},{vertex.YValueHex},z={vertex.ZValueHex}]";
+}
 
 static string FormatPvrTaStripMode(DreamcastPvrTaPolygonHeaderPayloadSummary? payload) =>
     payload is null
