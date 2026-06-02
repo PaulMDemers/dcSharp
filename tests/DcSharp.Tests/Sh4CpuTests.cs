@@ -1786,6 +1786,143 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2EmptyTaskHelperCallerLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(normalMemory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(fastMemory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_07D6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(normal, normalMemory, index: 0);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(fast, fastMemory, index: 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyTaskHelperCallerLoop(fastStart, 520, out var skippedInstructions));
+        Assert.Equal(520UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_7008), fastMemory.ReadUInt32(0x8C20_7008));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FFC), fastMemory.ReadUInt32(0x8C20_6FFC));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF8), fastMemory.ReadUInt32(0x8C20_6FF8));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF4), fastMemory.ReadUInt32(0x8C20_6FF4));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_6FF0), fastMemory.ReadUInt32(0x8C20_6FF0));
+        for (var offset = 0u; offset < 20; offset += 4)
+        {
+            Assert.Equal(normalMemory.ReadUInt32(0x8C2F_6864 + offset), fastMemory.ReadUInt32(0x8C2F_6864 + offset));
+            Assert.Equal(normalMemory.ReadUInt32(0x8C2F_6904 + offset), fastMemory.ReadUInt32(0x8C2F_6904 + offset));
+        }
+    }
+
+    [Fact]
+    public void FastForwardsDoa2EmptyTaskHelperCallerLoopFromFinalEntry()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(normalMemory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(fastMemory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_07D6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(normal, normalMemory, index: 4);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(fast, fastMemory, index: 4);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2EmptyTaskHelperCallerLoop(fastStart, 104, out var skippedInstructions));
+        Assert.Equal(104UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperCallerLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(memory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(cpu, memory, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperCallerLoop(start, 519, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_07D8u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperCallerLoopWhenSourceEntryIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(memory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(memory);
+        memory.WriteUInt32(0x8C20_2010, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(cpu, memory, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperCallerLoop(start, 520, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperCallerLoopWhenLoopCounterDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(memory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(cpu, memory, index: 0);
+        memory.WriteUInt32(0x8C20_7008, 4);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperCallerLoop(start, 520, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2EmptyTaskHelperCallerLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2EmptyTaskHelperCallerLoop(memory);
+        WriteDoa2EmptyTaskHelperCallerLoopData(memory);
+        WriteInstruction(memory, 0x8C13_0818, 0xBF41);
+        var cpu = new Sh4Cpu(memory, 0x8C13_07D6);
+        InitializeDoa2EmptyTaskHelperCallerLoopState(cpu, memory, index: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2EmptyTaskHelperCallerLoop(start, 520, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2UnrolledWordCopyReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -6638,6 +6775,104 @@ public class Sh4CpuTests
         cpu.State.R[14] = 0x8C2F_6820;
         cpu.State.R[15] = 0x8C20_7000;
         cpu.State.T = false;
+    }
+
+    private static void WriteDoa2EmptyTaskHelperCallerLoop(DreamcastMemory memory)
+    {
+        WriteDoa2EmptyTaskHelperReturn(memory);
+        WriteInstruction(memory, 0x8C13_07D6, 0x9053);
+        WriteInstruction(memory, 0x8C13_07D8, 0x69D3);
+        WriteInstruction(memory, 0x8C13_07DA, 0x4908);
+        WriteInstruction(memory, 0x8C13_07DC, 0x62E3);
+        WriteInstruction(memory, 0x8C13_07DE, 0x30EC);
+        WriteInstruction(memory, 0x8C13_07E0, 0x308C);
+        WriteInstruction(memory, 0x8C13_07E2, 0x309C);
+        WriteInstruction(memory, 0x8C13_07E4, 0x2F06);
+        WriteInstruction(memory, 0x8C13_07E6, 0x7244);
+        WriteInstruction(memory, 0x8C13_07E8, 0x51C2);
+        WriteInstruction(memory, 0x8C13_07EA, 0x328C);
+        WriteInstruction(memory, 0x8C13_07EC, 0x60C2);
+        WriteInstruction(memory, 0x8C13_07EE, 0x329C);
+        WriteInstruction(memory, 0x8C13_07F0, 0x5113);
+        WriteInstruction(memory, 0x8C13_07F2, 0x039E);
+        WriteInstruction(memory, 0x8C13_07F4, 0x50C3);
+        WriteInstruction(memory, 0x8C13_07F6, 0x4108);
+        WriteInstruction(memory, 0x8C13_07F8, 0x001E);
+        WriteInstruction(memory, 0x8C13_07FA, 0x308C);
+        WriteInstruction(memory, 0x8C13_07FC, 0x019E);
+        WriteInstruction(memory, 0x8C13_07FE, 0x2212);
+        WriteInstruction(memory, 0x8C13_0800, 0x3318);
+        WriteInstruction(memory, 0x8C13_0802, 0x62F6);
+        WriteInstruction(memory, 0x8C13_0804, 0x2232);
+        WriteInstruction(memory, 0x8C13_0806, 0xD221);
+        WriteInstruction(memory, 0x8C13_0808, 0x6122);
+        WriteInstruction(memory, 0x8C13_080A, 0x2118);
+        WriteInstruction(memory, 0x8C13_080C, 0x8901);
+        WriteInstruction(memory, 0x8C13_0812, 0x65E3);
+        WriteInstruction(memory, 0x8C13_0814, 0x66B3);
+        WriteInstruction(memory, 0x8C13_0816, 0x67D3);
+        WriteInstruction(memory, 0x8C13_0818, 0xBF42);
+        WriteInstruction(memory, 0x8C13_081A, 0x64C3);
+        WriteInstruction(memory, 0x8C13_081C, 0x9030);
+        WriteInstruction(memory, 0x8C13_081E, 0x30EC);
+        WriteInstruction(memory, 0x8C13_0820, 0x308C);
+        WriteInstruction(memory, 0x8C13_0822, 0x039E);
+        WriteInstruction(memory, 0x8C13_0824, 0x2338);
+        WriteInstruction(memory, 0x8C13_0826, 0x8B01);
+        WriteInstruction(memory, 0x8C13_0828, 0xA0BA);
+        WriteInstruction(memory, 0x8C13_082A, 0x0009);
+        WriteInstruction(memory, 0x8C13_0880, 0x00E4);
+        memory.WriteUInt32(0x8C13_088C, 0x8C2F_7640);
+        WriteInstruction(memory, 0x8C13_09A0, 0xE305);
+        WriteInstruction(memory, 0x8C13_09A2, 0x7D01);
+        WriteInstruction(memory, 0x8C13_09A4, 0x3D32);
+        WriteInstruction(memory, 0x8C13_09A6, 0x8B00);
+        WriteInstruction(memory, 0x8C13_09A8, 0xED00);
+        WriteInstruction(memory, 0x8C13_09AA, 0x53F2);
+        WriteInstruction(memory, 0x8C13_09AC, 0x73FF);
+        WriteInstruction(memory, 0x8C13_09AE, 0x2338);
+        WriteInstruction(memory, 0x8C13_09B0, 0x8D02);
+        WriteInstruction(memory, 0x8C13_09B2, 0x1F32);
+        WriteInstruction(memory, 0x8C13_09B4, 0xAF0F);
+        WriteInstruction(memory, 0x8C13_09B6, 0x0009);
+        WriteInstruction(memory, 0x8C13_09B8, 0xE000);
+        WriteInstruction(memory, 0x8C13_09BA, 0x7F0C);
+    }
+
+    private static void WriteDoa2EmptyTaskHelperCallerLoopData(DreamcastMemory memory)
+    {
+        WriteDoa2EmptyTaskHelperReturnData(memory);
+        memory.WriteUInt32(0x8C2F_7640, 0);
+        memory.WriteUInt32(0x8C20_1000, 0x8C20_2000);
+        memory.WriteUInt32(0x8C20_1008, 0);
+        memory.WriteUInt32(0x8C20_100C, 0);
+        memory.WriteUInt32(0x0000_000C, 0);
+        for (var offset = 0u; offset < 20; offset += 4)
+        {
+            memory.WriteUInt32(0x8C20_2000 + offset, 0);
+            memory.WriteUInt32(0x8C2F_6864 + offset, 0xDEAD_BEEF);
+            memory.WriteUInt32(0x8C2F_6904 + offset, 0);
+        }
+    }
+
+    private static void InitializeDoa2EmptyTaskHelperCallerLoopState(Sh4Cpu cpu, DreamcastMemory memory, uint index)
+    {
+        cpu.State.Pr = 0x8C11_B5B6;
+        cpu.State.R[8] = 0;
+        cpu.State.R[11] = 0;
+        cpu.State.R[12] = 0x8C20_1000;
+        cpu.State.R[13] = index;
+        cpu.State.R[14] = 0x8C2F_6820;
+        cpu.State.R[15] = 0x8C20_7000;
+        cpu.State.T = false;
+        cpu.State.R[0] = 0x1234_5678;
+        cpu.State.R[9] = 0xCAFE_BABE;
+        cpu.State.R[5] = 0x5555_5555;
+        cpu.State.R[6] = 0x6666_6666;
+        cpu.State.R[7] = 0x7777_7777;
+        cpu.State.R[4] = 0x4444_4444;
+        cpu.State.R[10] = 0xAAAA_AAAA;
+        memory.WriteUInt32(0x8C20_7008, 5 - index);
     }
 
     private static void WriteDoa2UnrolledWordCopyReturn(DreamcastMemory memory)
