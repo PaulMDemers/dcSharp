@@ -263,6 +263,15 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2WordCopySkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (options.MemoryReadWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_4D4C, 0x8C10_4D58)
+                        && cpu.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(
+                            step,
+                            scheduler.ClampFastForwardToExternalWake(options.InstructionLimit - cpu.State.InstructionsExecuted),
+                            out var doa2AicaZeroMailboxTimeoutSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2AicaZeroMailboxTimeoutSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardFpuRecurrence(options)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_3AF0, 0x8C10_3B0E)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_E5D8, 0x8C10_E5E6)

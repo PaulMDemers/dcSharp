@@ -1654,6 +1654,60 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_4D56
+            || step.Opcode != 0x8BF9
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C10_4D4C)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C10_4D4C) != 0x6362
+            || memory.ReadInstructionUInt16(0x8C10_4D4E) != 0x2338
+            || memory.ReadInstructionUInt16(0x8C10_4D50) != 0x8B06
+            || memory.ReadInstructionUInt16(0x8C10_4D52) != 0x7401
+            || memory.ReadInstructionUInt16(0x8C10_4D54) != 0x3452
+            || memory.ReadInstructionUInt16(0x8C10_4D56) != 0x8BF9
+            || memory.ReadUInt32(0x8C10_4E10) != 0xA080_005C
+            || memory.ReadUInt32(0x8C10_4E14) != 0x0040_0000)
+        {
+            return false;
+        }
+
+        if (State.R[5] != 0x0040_0000
+            || State.R[6] != 0xA080_005C
+            || State.R[3] != 0
+            || State.R[4] >= State.R[5]
+            || State.T
+            || memory.ReadUInt32(State.R[6]) != 0)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[5] - State.R[4];
+        const ulong instructionsPerIteration = 6;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        var completed = iterationsToSkip == remainingIterations;
+        State.R[3] = 0;
+        State.R[4] += (uint)iterationsToSkip;
+        State.T = completed;
+        State.Pc = completed ? 0x8C10_4D58 : 0x8C10_4D4C;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ScratchVectorCopyWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

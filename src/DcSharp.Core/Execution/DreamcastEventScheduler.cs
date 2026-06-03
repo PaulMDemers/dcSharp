@@ -132,6 +132,28 @@ public sealed class DreamcastEventScheduler
         bool IsNotBeforeFastForwardEnd(ulong? ticks) => ticks is null || ticks.Value >= skippedInstructions;
     }
 
+    public ulong ClampFastForwardToExternalWake(ulong requestedInstructions)
+    {
+        if (requestedInstructions == 0)
+        {
+            return 0;
+        }
+
+        var limit = requestedInstructions;
+        Clamp(memory.TicksUntilNextTimerInterrupt());
+        Clamp(vblankInterval == 0 || !memory.IsVBlankBeginInterruptEnabled() ? null : TicksUntilNextVBlank());
+        Clamp(TicksUntilNextInputScriptChange());
+        return limit;
+
+        void Clamp(ulong? ticks)
+        {
+            if (ticks is not null && ticks.Value < limit)
+            {
+                limit = ticks.Value;
+            }
+        }
+    }
+
     private void RecordIdleAdvance(ulong ticks, ulong? nextTimerInterrupt, ulong? nextVblank, ulong? nextInputChange)
     {
         idleAdvanceTicks += ticks;

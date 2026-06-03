@@ -1990,6 +1990,107 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2AicaZeroMailboxTimeoutLoopPartially()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_4D4C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_4D4C);
+        InitializeDoa2AicaZeroMailboxTimeoutState(normal, 0);
+        InitializeDoa2AicaZeroMailboxTimeoutState(fast, 0);
+
+        var normalStart = StepMany(normal, 6);
+        var fastStart = StepMany(fast, 6);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(fastStart, 12, out var skippedInstructions));
+        Assert.Equal(12UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsDoa2AicaZeroMailboxTimeoutLoopToEnd()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_4D4C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_4D4C);
+        InitializeDoa2AicaZeroMailboxTimeoutState(normal, 0x003F_FFFE);
+        InitializeDoa2AicaZeroMailboxTimeoutState(fast, 0x003F_FFFE);
+
+        var normalStart = StepMany(normal, 6);
+        var fastStart = StepMany(fast, 6);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(fastStart, 6, out var skippedInstructions));
+        Assert.Equal(6UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(0x8C10_4D58u, fast.State.Pc);
+        Assert.Equal(0x0040_0000u, fast.State.R[4]);
+        Assert.True(fast.State.T);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2AicaZeroMailboxTimeoutLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_4D4C);
+        InitializeDoa2AicaZeroMailboxTimeoutState(cpu, 0);
+
+        var start = StepMany(cpu, 6);
+
+        Assert.False(cpu.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(start, 5, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_4D4Cu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2AicaZeroMailboxTimeoutLoopWhenMailboxIsNonzero()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(memory);
+        memory.WriteUInt32(0xA080_005C, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C10_4D4C);
+        InitializeDoa2AicaZeroMailboxTimeoutState(cpu, 1);
+        cpu.State.R[3] = 0;
+        cpu.State.Pc = 0x8C10_4D4C;
+        cpu.State.T = false;
+        var step = new Sh4StepResult(0x8C10_4D56, 0x8BF9, "bf 0x8C104D4C ; taken", 1);
+
+        Assert.False(cpu.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(step, 6, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2AicaZeroMailboxTimeoutLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2AicaZeroMailboxTimeoutLoop(memory);
+        memory.WriteUInt32(0x8C10_4E10, 0xA080_0060);
+        var cpu = new Sh4Cpu(memory, 0x8C10_4D4C);
+        InitializeDoa2AicaZeroMailboxTimeoutState(cpu, 0);
+
+        var start = StepMany(cpu, 6);
+
+        Assert.False(cpu.TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(start, 6, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2ScratchVectorCopyWrapper()
     {
         var normalMemory = new DreamcastMemory();
@@ -6548,6 +6649,17 @@ public class Sh4CpuTests
         memory.Write(address, [(byte)opcode, (byte)(opcode >> 8)]);
     }
 
+    private static Sh4StepResult StepMany(Sh4Cpu cpu, ulong count)
+    {
+        Sh4StepResult step = new(cpu.State.Pc, 0, string.Empty, cpu.State.InstructionsExecuted);
+        for (var index = 0ul; index < count; index++)
+        {
+            step = cpu.Step();
+        }
+
+        return step;
+    }
+
     private static void WriteDoa2StringScanLoop(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C10_EDAA, 0x62F2);
@@ -7142,6 +7254,26 @@ public class Sh4CpuTests
         cpu.State.R[2] = 0x8C20_1000;
         cpu.State.R[15] = 0x8C20_3000;
         cpu.State.Pr = 0x8C10_0A52;
+    }
+
+    private static void WriteDoa2AicaZeroMailboxTimeoutLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_4D4C, 0x6362);
+        WriteInstruction(memory, 0x8C10_4D4E, 0x2338);
+        WriteInstruction(memory, 0x8C10_4D50, 0x8B06);
+        WriteInstruction(memory, 0x8C10_4D52, 0x7401);
+        WriteInstruction(memory, 0x8C10_4D54, 0x3452);
+        WriteInstruction(memory, 0x8C10_4D56, 0x8BF9);
+        memory.WriteUInt32(0x8C10_4E10, 0xA080_005C);
+        memory.WriteUInt32(0x8C10_4E14, 0x0040_0000);
+    }
+
+    private static void InitializeDoa2AicaZeroMailboxTimeoutState(Sh4Cpu cpu, uint counter)
+    {
+        cpu.State.R[4] = counter;
+        cpu.State.R[5] = 0x0040_0000;
+        cpu.State.R[6] = 0xA080_005C;
+        cpu.State.T = false;
     }
 
     private static void WriteDoa2ScratchVectorCopyWrapper(DreamcastMemory memory)
