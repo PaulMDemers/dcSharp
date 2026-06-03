@@ -134,6 +134,16 @@ public sealed class DreamcastEventScheduler
 
     public ulong ClampFastForwardToExternalWake(ulong requestedInstructions)
     {
+        return ClampFastForward(requestedInstructions, includeVBlankEvent: false);
+    }
+
+    public ulong ClampFastForwardToExternalEvent(ulong requestedInstructions)
+    {
+        return ClampFastForward(requestedInstructions, includeVBlankEvent: true);
+    }
+
+    private ulong ClampFastForward(ulong requestedInstructions, bool includeVBlankEvent)
+    {
         if (requestedInstructions == 0)
         {
             return 0;
@@ -141,7 +151,7 @@ public sealed class DreamcastEventScheduler
 
         var limit = requestedInstructions;
         Clamp(memory.TicksUntilNextTimerInterrupt());
-        Clamp(vblankInterval == 0 || !memory.IsVBlankBeginInterruptEnabled() ? null : TicksUntilNextVBlank());
+        Clamp(vblankInterval == 0 || (!includeVBlankEvent && !memory.IsVBlankBeginInterruptEnabled()) ? null : TicksUntilNextVBlank());
         Clamp(TicksUntilNextInputScriptChange());
         return limit;
 

@@ -325,6 +325,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinAsicEventWaitLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_90A0
+            || step.Opcode != 0x89FB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C00_909A)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C00_909A) != 0xD313
+            || memory.ReadInstructionUInt16(0x8C00_909C) != 0x6032
+            || memory.ReadInstructionUInt16(0x8C00_909E) != 0xC808
+            || memory.ReadInstructionUInt16(0x8C00_90A0) != 0x89FB
+            || memory.ReadUInt32(0x8C00_90E8) != 0xA05F_6900)
+        {
+            return false;
+        }
+
+        var asicEvent = memory.ReadUInt32(0xA05F_6900);
+        if (State.R[3] != 0xA05F_6900
+            || State.R[0] != asicEvent
+            || (asicEvent & 0x08) != 0
+            || !State.T)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        var iterationsToSkip = maxInstructionsToSkip / instructionsPerIteration;
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[3] = 0xA05F_6900;
+        State.R[0] = asicEvent;
+        State.T = true;
+        State.Pc = 0x8C00_909A;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2VramClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

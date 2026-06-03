@@ -277,6 +277,74 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsIpBinAsicEventWaitLoopPartially()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinAsicEventWaitLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinAsicEventWaitLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_909A);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_909A);
+
+        var normalStart = StepMany(normal, 4);
+        var fastStart = StepMany(fast, 4);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinAsicEventWaitLoop(fastStart, 8, out var skippedInstructions));
+        Assert.Equal(8UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C00_909Au, fast.State.Pc);
+        Assert.True(fast.State.T);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinAsicEventWaitLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinAsicEventWaitLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_909A);
+
+        var start = StepMany(cpu, 4);
+
+        Assert.False(cpu.TryFastForwardIpBinAsicEventWaitLoop(start, 3, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_909Au, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinAsicEventWaitLoopWhenEventArrives()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinAsicEventWaitLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_909A);
+
+        var start = StepMany(cpu, 4);
+        memory.RaiseAsicEventForDiagnostics(0x0003);
+
+        Assert.False(cpu.TryFastForwardIpBinAsicEventWaitLoop(start, 4, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinAsicEventWaitLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinAsicEventWaitLoop(memory);
+        memory.WriteUInt32(0x8C00_90E8, 0xA05F_6904);
+        var cpu = new Sh4Cpu(memory, 0x8C00_909A);
+
+        var start = StepMany(cpu, 4);
+
+        Assert.False(cpu.TryFastForwardIpBinAsicEventWaitLoop(start, 4, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2VramClearLoop()
     {
         var memory = new DreamcastMemory();
@@ -6856,6 +6924,15 @@ public class Sh4CpuTests
         }
 
         return step;
+    }
+
+    private static void WriteIpBinAsicEventWaitLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_909A, 0xD313);
+        WriteInstruction(memory, 0x8C00_909C, 0x6032);
+        WriteInstruction(memory, 0x8C00_909E, 0xC808);
+        WriteInstruction(memory, 0x8C00_90A0, 0x89FB);
+        memory.WriteUInt32(0x8C00_90E8, 0xA05F_6900);
     }
 
     private static void WriteDoa2StringScanLoop(DreamcastMemory memory)

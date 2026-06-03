@@ -134,6 +134,15 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(shortDelaySkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (options.MemoryReadWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_909A, 0x8C00_90A2)
+                        && cpu.TryFastForwardIpBinAsicEventWaitLoop(
+                            step,
+                            scheduler.ClampFastForwardToExternalEvent(options.InstructionLimit - cpu.State.InstructionsExecuted),
+                            out var ipBinAsicEventWaitSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(ipBinAsicEventWaitSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_ED90, 0x8C12_EDA0)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_9E20, 0x8C12_9E50)
                         && cpu.TryFastForwardDoa2VramClearLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2VramClearSkippedInstructions))
