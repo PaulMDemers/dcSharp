@@ -1708,6 +1708,99 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2HighRamZeroFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_3344
+            || step.Opcode != 0x8BFA
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C11_333C)
+        {
+            return false;
+        }
+
+        if (!IsDoa2HighRamZeroFillLoop()
+            || State.R[4] != 0
+            || State.R[6] != 0x8C14_D4E0
+            || State.R[2] != memory.ReadUInt32(State.R[6])
+            || State.R[5] < memory.ReadUInt32(0x8C14_D4D4)
+            || State.R[5] >= State.R[2]
+            || State.T)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[2] - State.R[5];
+        const ulong instructionsPerIteration = 5;
+        var iterationsToSkip = Math.Min((ulong)remainingIterations, maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0 || iterationsToSkip > int.MaxValue)
+        {
+            return false;
+        }
+
+        if (!memory.TryGetSystemRamOffset(State.R[5], checked((int)iterationsToSkip), out _))
+        {
+            return false;
+        }
+
+        var destination = State.R[5];
+        for (var index = 0u; index < (uint)iterationsToSkip; index++)
+        {
+            memory.Write(destination + index, [0]);
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[5] += (uint)iterationsToSkip;
+        var completed = State.R[5] == State.R[2];
+        State.T = completed;
+        State.Pc = completed ? 0x8C11_3346 : 0x8C11_333C;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2CacheBlockPurgeLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_1EDE
+            || step.Opcode != 0x8BFB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C11_1ED8)
+        {
+            return false;
+        }
+
+        if (!IsDoa2CacheBlockPurgeLoop()
+            || State.R[5] == 0
+            || State.T)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        var iterationsToSkip = Math.Min((ulong)State.R[5], maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0
+            || iterationsToSkip > uint.MaxValue / 32
+            || State.R[0] > uint.MaxValue - ((uint)iterationsToSkip * 32))
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[5] -= (uint)iterationsToSkip;
+        State.R[0] += (uint)iterationsToSkip * 32;
+        var completed = State.R[5] == 0;
+        State.T = completed;
+        State.Pc = completed ? 0x8C11_1EE0 : 0x8C11_1ED8;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2ScratchVectorCopyWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -4182,6 +4275,21 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001
         && memory.ReadInstructionUInt16(0x8C10_7878) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_787A) == 0x6043;
+
+    private bool IsDoa2HighRamZeroFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C11_333C) == 0x2540
+        && memory.ReadInstructionUInt16(0x8C11_333E) == 0x7501
+        && memory.ReadInstructionUInt16(0x8C11_3340) == 0x6262
+        && memory.ReadInstructionUInt16(0x8C11_3342) == 0x3522
+        && memory.ReadInstructionUInt16(0x8C11_3344) == 0x8BFA
+        && memory.ReadUInt32(0x8C11_343C) == 0x8C14_D4E0
+        && memory.ReadUInt32(0x8C11_3440) == 0x8C14_D4D4;
+
+    private bool IsDoa2CacheBlockPurgeLoop() =>
+        memory.ReadInstructionUInt16(0x8C11_1ED8) == 0x00A3
+        && memory.ReadInstructionUInt16(0x8C11_1EDA) == 0x4510
+        && memory.ReadInstructionUInt16(0x8C11_1EDC) == 0x7020
+        && memory.ReadInstructionUInt16(0x8C11_1EDE) == 0x8BFB;
 
     private bool IsDoa2TableDivideSetupLoop() =>
         memory.ReadInstructionUInt16(0x8C11_C7B0) == 0x8928

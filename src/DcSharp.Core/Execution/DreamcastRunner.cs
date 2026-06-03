@@ -383,6 +383,24 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2UnsignedDivideSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_333C, 0x8C11_3346)
+                        && cpu.TryFastForwardDoa2HighRamZeroFillLoop(
+                            step,
+                            scheduler.ClampFastForwardToExternalWake(options.InstructionLimit - cpu.State.InstructionsExecuted),
+                            out var doa2HighRamZeroFillSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2HighRamZeroFillSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_1ED8, 0x8C11_1EE0)
+                        && cpu.TryFastForwardDoa2CacheBlockPurgeLoop(
+                            step,
+                            scheduler.ClampFastForwardToExternalWake(options.InstructionLimit - cpu.State.InstructionsExecuted),
+                            out var doa2CacheBlockPurgeSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2CacheBlockPurgeSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_7482, 0x8C11_74AE)
                         && cpu.TryFastForwardDoa2ZeroByteClassifier(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2ZeroByteClassifierSkippedInstructions))
                     {
