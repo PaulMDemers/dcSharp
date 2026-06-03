@@ -3349,7 +3349,7 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        const ulong maxSkippedInstructionCount = 135;
+        const ulong maxSkippedInstructionCount = 117;
         if (!IsDoa2RendererInterpolationSetupToLoopExit()
             || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
             || maxInstructionsToSkip < maxSkippedInstructionCount
@@ -4013,12 +4013,12 @@ public sealed class Sh4Cpu
         ExecuteFpuMove(0xF34C, 3, 4, 0xC);
         ExecuteFpuMove(0xF353, 3, 5, 0x3);
         ExecuteFpuMove(0xF300, 3, 0, 0x0);
-        State.Fpul = (uint)(int)BitConverter.UInt32BitsToSingle(State.Fr[3]);
+        State.Fpul = ConvertSingleToFpul(State.Fr[3]);
         State.R[6] = State.Fpul;
         State.Fpul = State.R[6];
         State.Fr[3] = BitConverter.SingleToUInt32Bits(unchecked((int)State.Fpul));
         ExecuteFpuMove(0xF352, 3, 5, 0x2);
-        ExecuteFpuMove(0xF69D, 6, 9, 0xD);
+        ExecuteFpuMove(0xF58D, 5, 8, 0xD);
         ExecuteFpuMove(0xF431, 4, 3, 0x1);
         ExecuteFpuMove(0xF64C, 6, 4, 0xC);
         ExecuteFpuMove(0xF642, 6, 4, 0x2);
@@ -4038,7 +4038,7 @@ public sealed class Sh4Cpu
             }
         }
 
-        ExecuteFpuMove(0xF58D, 5, 8, 0xD);
+        ExecuteFpuMove(0xF69D, 6, 9, 0xD);
         State.R[3] = 1;
         ExecuteFpuMove(0xF36C, 3, 6, 0xC);
         ExecuteFpuMove(0xF351, 3, 5, 0x1);
@@ -7010,31 +7010,54 @@ public sealed class Sh4Cpu
 
             case 0xD:
             {
-                var destinationBase = n & 0xC;
-                var sourceBase = m & 0xC;
-                Span<uint> destinationOperands = stackalloc uint[4];
-                Span<uint> sourceOperands = stackalloc uint[4];
-                var sum = 0.0f;
-                for (var index = 0; index < 4; index++)
+                if ((opcode & 0xF0FF) == 0xF00D)
                 {
-                    destinationOperands[index] = State.Fr[destinationBase + index];
-                    sourceOperands[index] = State.Fr[sourceBase + index];
-                    sum += BitConverter.UInt32BitsToSingle(destinationOperands[index])
-                        * BitConverter.UInt32BitsToSingle(sourceOperands[index]);
+                    State.Fr[n] = State.Fpul;
+                    return $"fsts fpul,fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
                 }
 
-                var rounded = ApplySingleResultRounding(sum, AllFiniteSingleOperands(destinationOperands, sourceOperands));
-                State.Fr[destinationBase + 3] = SingleResultToBits(rounded);
-                RecordFpuSingleResult(destinationOperands, sourceOperands, sum, forceInexact: true);
-                var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
-                if (float.IsFinite(rounded))
+                if ((opcode & 0xF0FF) == 0xF01D)
                 {
-                    return float.IsInfinity(sum) ? $"{trace} ; overflow-rounded" : trace;
+                    State.Fpul = State.Fr[n];
+                    return $"flds fr{n},fpul ; fpul=0x{State.Fpul:X8}";
                 }
 
-                return float.IsFinite(sum)
-                    ? trace
-                    : $"{trace} ; fv{destinationBase}={FormatFpuVector(destinationOperands)}, fv{sourceBase}={FormatFpuVector(sourceOperands)}";
+                if ((opcode & 0xF0FF) == 0xF04D)
+                {
+                    State.Fr[n] ^= 0x8000_0000;
+                    return $"fneg fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+                }
+
+                if ((opcode & 0xF0FF) == 0xF06D)
+                {
+                    var operandBits = State.Fr[n];
+                    var operand = BitConverter.UInt32BitsToSingle(operandBits);
+                    var result = MathF.Sqrt(operand);
+                    State.Fr[n] = SingleResultToBits(result);
+                    RecordFpuSingleResult([operandBits], result);
+                    return float.IsFinite(result)
+                        ? $"fsqrt fr{n} ; fr{n}=0x{State.Fr[n]:X8}"
+                        : $"fsqrt fr{n} ; fr{n}=0x{State.Fr[n]:X8} ; nonfinite fr{n}old=0x{operandBits:X8}";
+                }
+
+                if ((opcode & 0xF0FF) == 0xF08D)
+                {
+                    State.Fr[n] = 0;
+                    return $"fldi0 fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+                }
+
+                if ((opcode & 0xF0FF) == 0xF09D)
+                {
+                    State.Fr[n] = BitConverter.SingleToUInt32Bits(1.0f);
+                    return $"fldi1 fr{n} ; fr{n}=0x{State.Fr[n]:X8}";
+                }
+
+                if ((opcode & 0xF0FF) == 0xF0ED)
+                {
+                    return ExecuteFipr(opcode);
+                }
+
+                throw new UnsupportedInstructionException(State.Pc, opcode);
             }
 
             case 0xE:
@@ -7058,6 +7081,35 @@ public sealed class Sh4Cpu
             default:
                 throw new UnsupportedInstructionException(State.Pc, opcode);
         }
+    }
+
+    private string ExecuteFipr(ushort opcode)
+    {
+        var destinationBase = ((opcode >> 8) & 0xC);
+        var sourceBase = ((opcode >> 6) & 0xC);
+        Span<uint> destinationOperands = stackalloc uint[4];
+        Span<uint> sourceOperands = stackalloc uint[4];
+        var sum = 0.0f;
+        for (var index = 0; index < 4; index++)
+        {
+            destinationOperands[index] = State.Fr[destinationBase + index];
+            sourceOperands[index] = State.Fr[sourceBase + index];
+            sum += BitConverter.UInt32BitsToSingle(destinationOperands[index])
+                * BitConverter.UInt32BitsToSingle(sourceOperands[index]);
+        }
+
+        var rounded = ApplySingleResultRounding(sum, AllFiniteSingleOperands(destinationOperands, sourceOperands));
+        State.Fr[destinationBase + 3] = SingleResultToBits(rounded);
+        RecordFpuSingleResult(destinationOperands, sourceOperands, sum, forceInexact: true);
+        var trace = $"fipr fv{sourceBase},fv{destinationBase} ; fr{destinationBase + 3}=0x{State.Fr[destinationBase + 3]:X8}";
+        if (float.IsFinite(rounded))
+        {
+            return float.IsInfinity(sum) ? $"{trace} ; overflow-rounded" : trace;
+        }
+
+        return float.IsFinite(sum)
+            ? trace
+            : $"{trace} ; fv{destinationBase}={FormatFpuVector(destinationOperands)}, fv{sourceBase}={FormatFpuVector(sourceOperands)}";
     }
 
     private string ExecuteFpuArithmetic(

@@ -174,15 +174,24 @@ if ($Doa2SpriteProbe) {
             throw "Dead or Alive 2 sprite source probe stopped with $($doaSpriteReport.summary.stopReason), expected InstructionLimit"
         }
 
-        if ($doaSpriteReport.summary.pcHex -ne "0x8C10076E") {
-            throw "Dead or Alive 2 sprite source probe reached $($doaSpriteReport.summary.pcHex), expected 0x8C10076E"
+        if ($doaSpriteReport.summary.pcHex -ne "0x8C1007EE") {
+            throw "Dead or Alive 2 sprite source probe reached $($doaSpriteReport.summary.pcHex), expected 0x8C1007EE"
         }
 
         Assert-PvrTaSpriteSourceGroup `
             "Dead or Alive 2 sprite source probe" `
             $doaSpriteReport `
-            "nonfinite" `
-            32397 `
+            "renderable" `
+            1470 `
+            "0x8C1007FA" `
+            "0x8C10084C" `
+            "0x8C10084C-0x8C100850"
+
+        Assert-PvrTaSpriteSourceGroup `
+            "Dead or Alive 2 sprite source probe" `
+            $doaSpriteReport `
+            "degenerate" `
+            31431 `
             "0x8C1007FA" `
             "0x8C10084C" `
             "0x8C10084C-0x8C100850"

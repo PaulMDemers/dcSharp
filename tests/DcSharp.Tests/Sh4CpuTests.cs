@@ -4083,8 +4083,8 @@ public class Sh4CpuTests
         var fastStart = fast.Step();
         Assert.Equal(normalStart.Trace, fastStart.Trace);
 
-        Assert.True(fast.TryFastForwardDoa2RendererInterpolationSetupToLoopExit(fastStart, 135, out var skippedInstructions));
-        Assert.Equal(135UL, skippedInstructions);
+        Assert.True(fast.TryFastForwardDoa2RendererInterpolationSetupToLoopExit(fastStart, 117, out var skippedInstructions));
+        Assert.Equal(117UL, skippedInstructions);
         for (var index = 0ul; index < skippedInstructions; index++)
         {
             normal.Step();
@@ -4118,7 +4118,7 @@ public class Sh4CpuTests
 
         var start = cpu.Step();
 
-        Assert.False(cpu.TryFastForwardDoa2RendererInterpolationSetupToLoopExit(start, 134, out var skippedInstructions));
+        Assert.False(cpu.TryFastForwardDoa2RendererInterpolationSetupToLoopExit(start, 116, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C10_0A54u, cpu.State.Pc);
     }
@@ -5860,7 +5860,7 @@ public class Sh4CpuTests
     public void ExecutesFloatingPointVectorInnerProduct()
     {
         var memory = new DreamcastMemory();
-        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        WriteInstruction(memory, 0x8C01_0000, 0xF2ED);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(1.0f);
         cpu.State.Fr[1] = BitConverter.SingleToUInt32Bits(2.0f);
@@ -5881,7 +5881,7 @@ public class Sh4CpuTests
     public void FloatingPointVectorInnerProductTraceIncludesOperandsForNonFiniteResult()
     {
         var memory = new DreamcastMemory();
-        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        WriteInstruction(memory, 0x8C01_0000, 0xF2ED);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Fr[0] = 0x7FC0_0000;
         cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(1.0f);
@@ -5892,6 +5892,25 @@ public class Sh4CpuTests
         Assert.Contains("fipr fv8,fv0 ; fr3=0x", step.Trace, StringComparison.Ordinal);
         Assert.Contains("fv0=[0x7FC00000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
         Assert.Contains("fv8=[0x3F800000,0x00000000,0x00000000,0x00000000]", step.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExecutesFloatingPointImmediateZeroAndOneLoads()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF58D);
+        WriteInstruction(memory, 0x8C01_0002, 0xF79D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[5] = BitConverter.SingleToUInt32Bits(123.0f);
+        cpu.State.Fr[7] = BitConverter.SingleToUInt32Bits(456.0f);
+
+        var zero = cpu.Step();
+        var one = cpu.Step();
+
+        Assert.Equal(0u, cpu.State.Fr[5]);
+        Assert.Equal(BitConverter.SingleToUInt32Bits(1.0f), cpu.State.Fr[7]);
+        Assert.Equal("fldi0 fr5 ; fr5=0x00000000", zero.Trace);
+        Assert.Equal("fldi1 fr7 ; fr7=0x3F800000", one.Trace);
     }
 
     [Fact]
@@ -6049,7 +6068,7 @@ public class Sh4CpuTests
     public void FloatingPointVectorInnerProductOverflowRoundToZeroSaturatesAndSetsFpscrBits()
     {
         var memory = new DreamcastMemory();
-        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        WriteInstruction(memory, 0x8C01_0000, 0xF2ED);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(float.MaxValue);
         cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(2.0f);
@@ -6069,7 +6088,7 @@ public class Sh4CpuTests
     public void FloatingPointVectorInnerProductAlwaysSetsInexactCauseAndStickyFlagBits()
     {
         var memory = new DreamcastMemory();
-        WriteInstruction(memory, 0x8C01_0000, 0xF08D);
+        WriteInstruction(memory, 0x8C01_0000, 0xF2ED);
         var cpu = new Sh4Cpu(memory, 0x8C01_0000);
         cpu.State.Fr[0] = BitConverter.SingleToUInt32Bits(2.0f);
         cpu.State.Fr[8] = BitConverter.SingleToUInt32Bits(3.0f);
