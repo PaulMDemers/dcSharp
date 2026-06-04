@@ -386,6 +386,16 @@ public sealed class DreamcastRunner
                     else if (CanFastForwardFpuRecurrence(options)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0A30, 0x8C10_0A50)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_E5CC, 0x8C10_E5D6)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_E60A, 0x8C10_E62C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0A52, 0x8C10_0AB6)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0AB6, 0x8C10_0ABC)
+                        && cpu.TryFastForwardDoa2RendererInterpolationAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererInterpolationAggregateSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererInterpolationAggregateSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0A30, 0x8C10_0A50)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_E5CC, 0x8C10_E5D6)
                         && cpu.TryFastForwardDoa2RendererInterpolationPrologueToCopyTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererInterpolationPrologueSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2RendererInterpolationPrologueSkippedInstructions, cpu.State.InstructionsExecuted);

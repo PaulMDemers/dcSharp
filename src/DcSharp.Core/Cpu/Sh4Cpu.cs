@@ -1677,6 +1677,18 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        ExecuteDoa2UnrolledWordCopyReturnBody();
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private void ExecuteDoa2UnrolledWordCopyReturnBody()
+    {
         memory.WriteUInt32(State.R[1] + 28, State.R[0]);
         State.R[0] = memory.ReadUInt32(State.R[2] + 20);
         memory.WriteUInt32(State.R[1] + 24, State.R[3]);
@@ -1693,13 +1705,6 @@ public sealed class Sh4Cpu
         memory.WriteUInt32(State.R[1], State.R[3]);
         State.R[3] = memory.ReadUInt32(State.R[15]);
         State.R[15] += 4;
-
-        skippedInstructions = skippedInstructionCount;
-        State.Pc = State.Pr;
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
     }
 
     internal bool TryFastForwardDoa2AicaZeroMailboxTimeoutLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -3397,6 +3402,109 @@ public sealed class Sh4Cpu
         }
 
         var copyTailAddress = memory.ReadUInt32(jumpTableAddress + 32);
+        ExecuteDoa2RendererInterpolationPrologueToCopyTailBody(sourceTableAddress, copyHelperAddress, jumpTableAddress, copyTailAddress);
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2RendererInterpolationAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_0A30
+            || step.Opcode != 0xFFEB
+            || State.Pc != 0x8C10_0A32)
+        {
+            return false;
+        }
+
+        const ulong prologueSkippedInstructionCount = 22;
+        const ulong copySkippedInstructionCount = 17;
+        const ulong maxSetupSkippedInstructionCount = 136;
+        const ulong epilogueSkippedInstructionCount = 4;
+        const ulong maxSkippedInstructionCount = prologueSkippedInstructionCount
+            + copySkippedInstructionCount
+            + maxSetupSkippedInstructionCount
+            + epilogueSkippedInstructionCount;
+        var sourceTableAddress = memory.ReadUInt32(0x8C10_0B68);
+        var copyHelperAddress = memory.ReadUInt32(0x8C10_0B6C);
+        var jumpTableAddress = memory.ReadUInt32(0x8C10_E5E4);
+        if (!IsDoa2RendererInterpolationPrologueToCopyTail()
+            || !IsDoa2UnrolledWordCopyReturn()
+            || !IsDoa2RendererInterpolationSetupToLoopExit()
+            || !IsDoa2RendererInterpolationEpilogueReturn()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || copyHelperAddress != 0x8C10_E5CC
+            || jumpTableAddress != 0x8C10_E62C
+            || State.R[15] < 44
+            || sourceTableAddress > uint.MaxValue - 31
+            || !memory.TryGetSystemRamOffset(State.R[15] - 44, 76, out _)
+            || !memory.TryGetSystemRamOffset(sourceTableAddress, 32, out _)
+            || State.R[4] > uint.MaxValue - 52
+            || State.R[5] > uint.MaxValue - 15
+            || State.R[6] > uint.MaxValue - 15
+            || !memory.TryGetSystemRamOffset(State.R[4] + 4, 8, out _)
+            || !memory.TryGetSystemRamOffset(State.R[4] + 52, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[5], 16, out _)
+            || !memory.TryGetSystemRamOffset(State.R[6], 16, out _))
+        {
+            return false;
+        }
+
+        var copyTailAddress = memory.ReadUInt32(jumpTableAddress + 32);
+        if (copyTailAddress != 0x8C10_E60A)
+        {
+            return false;
+        }
+
+        ExecuteDoa2RendererInterpolationPrologueToCopyTailBody(sourceTableAddress, copyHelperAddress, jumpTableAddress, copyTailAddress);
+        State.R[3] = memory.ReadUInt32(State.R[2] + 24);
+        ExecuteDoa2UnrolledWordCopyReturnBody();
+        State.Pc = State.Pr;
+
+        if (State.Pr != 0x8C10_0A52 || State.Pc != 0x8C10_0A52)
+        {
+            return false;
+        }
+
+        State.R[0] = memory.ReadUInt32(State.R[4] + 52);
+        var setupSkippedInstructionCount = 1 + ExecuteDoa2RendererInterpolationSetupToLoopExitBody(ulong.MaxValue);
+        if (State.Pc != 0x8C10_0AB6)
+        {
+            return false;
+        }
+
+        State.R[15] += 36;
+        var returnAddress = memory.ReadUInt32(State.R[15]);
+        if (returnAddress != 0x8C10_055C)
+        {
+            return false;
+        }
+
+        ExecuteDoa2RendererInterpolationEpilogueReturnBody(returnAddress);
+
+        skippedInstructions = prologueSkippedInstructionCount
+            + copySkippedInstructionCount
+            + setupSkippedInstructionCount
+            + epilogueSkippedInstructionCount;
+        State.Pc = returnAddress;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private void ExecuteDoa2RendererInterpolationPrologueToCopyTailBody(
+        uint sourceTableAddress,
+        uint copyHelperAddress,
+        uint jumpTableAddress,
+        uint copyTailAddress)
+    {
         State.R[15] -= 4;
         memory.WriteUInt32(State.R[15], State.Pr);
         State.R[15] += unchecked((uint)-36);
@@ -3421,13 +3529,6 @@ public sealed class Sh4Cpu
         State.R[3] = copyTailAddress;
         State.R[0] += unchecked((uint)-4);
         State.R[0] = memory.ReadUInt32(State.R[2] + State.R[0]);
-
-        skippedInstructions = skippedInstructionCount;
-        State.Pc = State.R[3];
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
     }
 
     internal bool TryFastForwardDoa2RendererInterpolationSetupToLoopExit(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -3459,13 +3560,27 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.T = (State.R[0] & 0x0F) == 0;
-        if (State.T)
+        skippedInstructions = ExecuteDoa2RendererInterpolationSetupToLoopExitBody(maxSkippedInstructionCount);
+        if (skippedInstructions == 0)
         {
             return false;
         }
 
-        skippedInstructions += 2;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private ulong ExecuteDoa2RendererInterpolationSetupToLoopExitBody(ulong maxSkippedInstructionCount)
+    {
+        State.T = (State.R[0] & 0x0F) == 0;
+        if (State.T)
+        {
+            return 0;
+        }
+
+        ulong skippedInstructions = 2;
         memory.WriteUInt32(State.R[15], State.R[0]);
         State.R[0] &= 0x03;
         State.Fpul = State.R[0];
@@ -3540,10 +3655,7 @@ public sealed class Sh4Cpu
             }
         }
 
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
+        return skippedInstructions <= maxSkippedInstructionCount ? skippedInstructions : 0;
     }
 
     internal bool TryFastForwardDoa2RendererInterpolationEpilogueReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -3572,9 +3684,7 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.Pr = returnAddress;
-        State.R[15] += 4;
-        ExecuteFpuMove(0xFEF9, 14, 15, 0x9);
+        ExecuteDoa2RendererInterpolationEpilogueReturnBody(returnAddress);
 
         skippedInstructions = skippedInstructionCount;
         State.Pc = returnAddress;
@@ -3582,6 +3692,13 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    private void ExecuteDoa2RendererInterpolationEpilogueReturnBody(uint returnAddress)
+    {
+        State.Pr = returnAddress;
+        State.R[15] += 4;
+        ExecuteFpuMove(0xFEF9, 14, 15, 0x9);
     }
 
     internal bool TryFastForwardDoa2SignedRemainderHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
