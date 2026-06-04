@@ -3992,6 +3992,82 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        ExecuteDoa2TrigSetupAndRecurrenceLoopBody();
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = 0x8C0F_B216;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2TrigSetupAndPostReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_B1C0
+            || step.Opcode != 0x644D
+            || State.Pc != 0x8C0F_B1C2)
+        {
+            return false;
+        }
+
+        const ulong trigSkippedInstructionCount = 74;
+        const ulong tstSkippedInstructionCount = 1;
+        const ulong maxPostSkippedInstructionCount = 12;
+        const ulong maxSkippedInstructionCount = trigSkippedInstructionCount + tstSkippedInstructionCount + maxPostSkippedInstructionCount;
+        if (!IsDoa2TrigSetupAndRecurrenceLoop()
+            || !IsDoa2PostTrigHelperReturn()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || !memory.TryGetSystemRamOffset(0x8C0F_B23C, 16, out _))
+        {
+            return false;
+        }
+
+        ExecuteDoa2TrigSetupAndRecurrenceLoopBody();
+        State.T = (State.R[3] & State.R[6]) == 0;
+        var postSkippedInstructionCount = ExecuteDoa2PostTrigHelperReturnBodyAfterTst();
+
+        skippedInstructions = trigSkippedInstructionCount + tstSkippedInstructionCount + postSkippedInstructionCount;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2PostTrigHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_B216
+            || step.Opcode != 0x2638
+            || State.Pc != 0x8C0F_B218)
+        {
+            return false;
+        }
+
+        var branchTaken = !State.T;
+        var skippedInstructionCount = branchTaken ? 12ul : 10ul;
+        if (!IsDoa2PostTrigHelperReturn()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        ExecuteDoa2PostTrigHelperReturnBodyAfterTst();
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private void ExecuteDoa2TrigSetupAndRecurrenceLoopBody()
+    {
         ExecuteFpuMove(0xF79D, 7, 9, 0xD);
         State.Fpul = State.R[4];
         State.R[0] = 0x8C0F_B23C;
@@ -4042,34 +4118,11 @@ public sealed class Sh4Cpu
         State.R[3] = 1;
         ExecuteFpuMove(0xF36C, 3, 6, 0xC);
         ExecuteFpuMove(0xF351, 3, 5, 0x1);
-
-        skippedInstructions = skippedInstructionCount;
-        State.Pc = 0x8C0F_B216;
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
     }
 
-    internal bool TryFastForwardDoa2PostTrigHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    private ulong ExecuteDoa2PostTrigHelperReturnBodyAfterTst()
     {
-        skippedInstructions = 0;
-        if (step.Pc != 0x8C0F_B216
-            || step.Opcode != 0x2638
-            || State.Pc != 0x8C0F_B218)
-        {
-            return false;
-        }
-
         var branchTaken = !State.T;
-        var skippedInstructionCount = branchTaken ? 12ul : 10ul;
-        if (!IsDoa2PostTrigHelperReturn()
-            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
-            || maxInstructionsToSkip < skippedInstructionCount)
-        {
-            return false;
-        }
-
         ExecuteFpuMove(0xF433, 4, 3, 0x3);
         ExecuteFpuMove(0xF24C, 2, 4, 0xC);
         ExecuteFpuMove(0xF272, 2, 7, 0x2);
@@ -4077,22 +4130,13 @@ public sealed class Sh4Cpu
         ExecuteFpuMove(0xF64E, 6, 4, 0xE);
         ExecuteFpuMove(0xF42C, 4, 2, 0xC);
         ExecuteFpuMove(0xF463, 4, 6, 0x3);
+        ExecuteFpuMove(0xF04C, 0, 4, 0xC);
         if (branchTaken)
         {
-            ExecuteFpuMove(0xF04C, 0, 4, 0xC);
             ExecuteFpuMove(0xF04D, 0, 4, 0xD);
         }
-        else
-        {
-            ExecuteFpuMove(0xF04C, 0, 4, 0xC);
-        }
 
-        skippedInstructions = skippedInstructionCount;
-        State.Pc = State.Pr;
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
+        return branchTaken ? 12ul : 10ul;
     }
 
     internal bool TryFastForwardDoa2VectorScaleLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)

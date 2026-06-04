@@ -5202,6 +5202,80 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2TrigSetupAndPostReturn()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(normalMemory);
+        WriteDoa2PostTrigHelperReturn(normalMemory);
+        WriteDoa2TrigSetupConstants(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(fastMemory);
+        WriteDoa2PostTrigHelperReturn(fastMemory);
+        WriteDoa2TrigSetupConstants(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B1C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(normal);
+        InitializeDoa2TrigSetupState(fast);
+        normal.State.Pr = 0x8C10_0536;
+        fast.State.Pr = 0x8C10_0536;
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2TrigSetupAndPostReturn(fastStart, 100, out var skippedInstructions));
+        Assert.True(skippedInstructions is 85UL or 87UL);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_0536u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TrigSetupAndPostReturnWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(memory);
+        WriteDoa2PostTrigHelperReturn(memory);
+        WriteDoa2TrigSetupConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(cpu);
+
+        var setupStart = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TrigSetupAndPostReturn(setupStart, 86, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2TrigSetupAndPostReturnWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2TrigSetupAndRecurrenceLoop(memory);
+        WriteDoa2PostTrigHelperReturn(memory);
+        WriteDoa2TrigSetupConstants(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2TrigSetupState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrPrBit;
+
+        var setupStart = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2TrigSetupAndPostReturn(setupStart, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2PostTrigHelperReturn()
     {
         var normalMemory = new DreamcastMemory();
