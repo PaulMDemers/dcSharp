@@ -107,24 +107,44 @@ public static class DreamcastPvrPreviewRenderer
         var centerY = (minY + maxY) * 0.5f;
         var sourceU = vertices.Average(vertex => vertex.U);
         var sourceV = vertices.Average(vertex => vertex.V);
-        if (maxX - minX < maxY - minY)
+        var width = maxX - minX;
+        var height = maxY - minY;
+        if (width < height)
         {
-            var x = Math.Clamp((int)MathF.Floor(centerX), 0, previewWidth - 1);
+            var startX = Math.Clamp((int)MathF.Floor(minX), 0, previewWidth - 1);
+            var endX = Math.Clamp((int)MathF.Floor(maxX), 0, previewWidth - 1);
+            if (endX < startX)
+            {
+                startX = endX = Math.Clamp((int)MathF.Floor(centerX), 0, previewWidth - 1);
+            }
+
             var startY = Math.Max((int)MathF.Floor(minY), 0);
             var endY = Math.Max((int)MathF.Ceiling(maxY), 0);
-            for (var y = startY; y <= endY; y++)
+            for (var x = startX; x <= endX; x++)
             {
-                WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                for (var y = startY; y <= endY; y++)
+                {
+                    WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                }
             }
         }
         else
         {
-            var y = Math.Max((int)MathF.Floor(centerY), 0);
+            var startY = Math.Max((int)MathF.Floor(minY), 0);
+            var endY = Math.Max((int)MathF.Floor(maxY), 0);
+            if (endY < startY)
+            {
+                startY = endY = Math.Max((int)MathF.Floor(centerY), 0);
+            }
+
             var startX = Math.Clamp((int)MathF.Floor(minX), 0, previewWidth - 1);
             var endX = Math.Clamp((int)MathF.Ceiling(maxX), 0, previewWidth - 1);
-            for (var x = startX; x <= endX; x++)
+            for (var y = startY; y <= endY; y++)
             {
-                WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                for (var x = startX; x <= endX; x++)
+                {
+                    WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                }
             }
         }
     }

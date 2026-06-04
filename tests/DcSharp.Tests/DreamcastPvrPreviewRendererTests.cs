@@ -316,6 +316,33 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void RendersThinSpriteFootprintAcrossSpannedColumns()
+    {
+        const int previewWidth = 640;
+        var vram = new byte[previewWidth * 8 * 2];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(251, 2, 0.0f, 0.0f), (251, 2, 0.0f, 0.0f), (251, 4, 0.0f, 0.0f), (251, 4, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00,
+                xValues:
+                [
+                    SingleToUInt32Bits(250.75f),
+                    SingleToUInt32Bits(251.25f),
+                    SingleToUInt32Bits(251.25f),
+                    SingleToUInt32Bits(250.75f)
+                ]),
+            vram,
+            previewWidth,
+            useScreenCoordinates: true);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 250, 3, previewWidth));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 251, 3, previewWidth));
+        Assert.Equal(0x0000, ReadRgb565(vram, 252, 3, previewWidth));
+    }
+
+    [Fact]
     public void LaterStripOverwritesSpritePreviewPixels()
     {
         var vram = new byte[4096];
