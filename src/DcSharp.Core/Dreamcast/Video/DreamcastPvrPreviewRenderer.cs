@@ -7,10 +7,16 @@ public static class DreamcastPvrPreviewRenderer
     public const int Width = 320;
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram) =>
-        RenderStrip(strip, vram, [], useDepth: false);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates: false);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, bool useScreenCoordinates) =>
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true);
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates: false);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useScreenCoordinates) =>
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates);
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram) =>
         RenderSprite(sprite, vram, useScreenCoordinates: false);
@@ -183,34 +189,39 @@ public static class DreamcastPvrPreviewRenderer
             : ApplyTextureShading(sprite.Rgb565, textureSample, sprite.HeaderPayload.Mode2Fields.TextureShadingName);
     }
 
-    private static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useDepth)
+    private static void RenderStrip(
+        DreamcastPvrTaStrip strip,
+        Span<byte> vram,
+        Span<float> depthBuffer,
+        bool useDepth,
+        bool useScreenCoordinates)
     {
         if (strip.Vertices.Count < 3)
         {
             return;
         }
 
-        var minX = strip.Vertices.Min(vertex => vertex.X);
-        var minY = strip.Vertices.Min(vertex => vertex.Y);
+        var originX = useScreenCoordinates ? 0 : strip.Vertices.Min(vertex => vertex.X);
+        var originY = useScreenCoordinates ? 0 : strip.Vertices.Min(vertex => vertex.Y);
         for (var index = 0; index <= strip.Vertices.Count - 3; index++)
         {
             var vertices = strip.Vertices.Skip(index).Take(3).ToArray();
-            RenderTriangle(strip, vertices, minX, minY, vram, depthBuffer, useDepth);
+            RenderTriangle(strip, vertices, originX, originY, vram, depthBuffer, useDepth);
         }
     }
 
     private static void RenderTriangle(
         DreamcastPvrTaStrip strip,
         IReadOnlyList<DreamcastPvrTaVertex> vertices,
-        int minX,
-        int minY,
+        int originX,
+        int originY,
         Span<byte> vram,
         Span<float> depthBuffer,
         bool useDepth)
     {
-        var a = new Vector2(vertices[0].X - minX, vertices[0].Y - minY);
-        var b = new Vector2(vertices[1].X - minX, vertices[1].Y - minY);
-        var c = new Vector2(vertices[2].X - minX, vertices[2].Y - minY);
+        var a = new Vector2(vertices[0].X - originX, vertices[0].Y - originY);
+        var b = new Vector2(vertices[1].X - originX, vertices[1].Y - originY);
+        var c = new Vector2(vertices[2].X - originX, vertices[2].Y - originY);
         if (IsCulled(strip, a, b, c))
         {
             return;

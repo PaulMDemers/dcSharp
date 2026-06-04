@@ -742,10 +742,13 @@ public class DreamcastMemoryTests
         var snapshot = memory.CreateVideoSnapshot();
 
         Assert.True(snapshot.NonZeroBytes >= 3);
-        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
-        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
-        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
-        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0xF800, ReadPreviewRgb565(snapshot.Vram, 1, 1));
+        Assert.Equal(0xF800, ReadPreviewRgb565(snapshot.Vram, 2, 1));
+        Assert.Equal(0xF800, ReadPreviewRgb565(snapshot.Vram, 1, 2));
+        Assert.Equal(0xF800, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
         var strip = Assert.Single(snapshot.PvrTaStrips);
         Assert.Equal("OpaquePolygon", strip.ListTypeName);
         Assert.Equal(3, strip.Vertices.Count);
@@ -784,11 +787,15 @@ public class DreamcastMemoryTests
 
         var snapshot = memory.CreateVideoSnapshot();
 
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
-        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0x07E0, ReadPreviewRgb565(snapshot.Vram, 1, 1));
+        Assert.Equal(0x07E0, ReadPreviewRgb565(snapshot.Vram, 2, 1));
+        Assert.Equal(0x07E0, ReadPreviewRgb565(snapshot.Vram, 3, 1));
+        Assert.Equal(0x07E0, ReadPreviewRgb565(snapshot.Vram, 1, 2));
+        Assert.Equal(0x0000, ReadPreviewRgb565(snapshot.Vram, 2, 2));
         var strip = Assert.Single(snapshot.PvrTaStrips);
         Assert.Equal(0x07E0, strip.Rgb565);
         Assert.Equal(3, strip.Vertices[1].X);
@@ -1791,5 +1798,11 @@ public class DreamcastMemoryTests
         }
 
         return data;
+    }
+
+    private static ushort ReadPreviewRgb565(byte[] vram, int x, int y)
+    {
+        var offset = ((y * 320) + x) * 2;
+        return (ushort)(vram[offset] | (vram[offset + 1] << 8));
     }
 }

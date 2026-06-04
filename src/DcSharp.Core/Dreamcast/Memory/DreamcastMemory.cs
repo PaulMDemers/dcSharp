@@ -1983,7 +1983,7 @@ public sealed class DreamcastMemory
         {
             if (renderCommand.Strip is { } strip)
             {
-                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth);
+                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth, useScreenCoordinates: true);
             }
             else if (renderCommand.Sprite is { } sprite)
             {

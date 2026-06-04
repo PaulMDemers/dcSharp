@@ -34,6 +34,20 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void CanRenderStripPreviewInScreenCoordinates()
+    {
+        var vram = new byte[4096];
+        var strip = CreateStrip(0x07E0, [(4, 3), (5, 3), (4, 4)]);
+
+        DreamcastPvrPreviewRenderer.RenderStrip(strip, vram, useScreenCoordinates: true);
+
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 4, 3));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 5, 3));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 4, 4));
+    }
+
+    [Fact]
     public void RendersContinuationTrianglesAfterFirstThreeVertices()
     {
         var vram = new byte[DreamcastPvrPreviewRenderer.Width * 8];
