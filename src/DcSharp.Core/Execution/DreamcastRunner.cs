@@ -205,6 +205,7 @@ public sealed class DreamcastRunner
                     }
                     else if (CanFastForwardFpuRecurrence(options)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B216, 0x8C0F_B22C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B250, 0x8C0F_B258)
                         && cpu.TryFastForwardDoa2PostTrigHelperReturn(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2PostTrigSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2PostTrigSkippedInstructions, cpu.State.InstructionsExecuted);

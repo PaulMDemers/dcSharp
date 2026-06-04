@@ -4056,13 +4056,13 @@ public sealed class Sh4Cpu
         skippedInstructions = 0;
         if (step.Pc != 0x8C0F_B216
             || step.Opcode != 0x2638
-            || !State.T
             || State.Pc != 0x8C0F_B218)
         {
             return false;
         }
 
-        const ulong skippedInstructionCount = 10;
+        var branchTaken = !State.T;
+        var skippedInstructionCount = branchTaken ? 12ul : 10ul;
         if (!IsDoa2PostTrigHelperReturn()
             || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
             || maxInstructionsToSkip < skippedInstructionCount)
@@ -4077,7 +4077,15 @@ public sealed class Sh4Cpu
         ExecuteFpuMove(0xF64E, 6, 4, 0xE);
         ExecuteFpuMove(0xF42C, 4, 2, 0xC);
         ExecuteFpuMove(0xF463, 4, 6, 0x3);
-        ExecuteFpuMove(0xF04C, 0, 4, 0xC);
+        if (branchTaken)
+        {
+            ExecuteFpuMove(0xF04C, 0, 4, 0xC);
+            ExecuteFpuMove(0xF04D, 0, 4, 0xD);
+        }
+        else
+        {
+            ExecuteFpuMove(0xF04C, 0, 4, 0xC);
+        }
 
         skippedInstructions = skippedInstructionCount;
         State.Pc = State.Pr;
@@ -5583,7 +5591,11 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C0F_B224) == 0x8F14
         && memory.ReadInstructionUInt16(0x8C0F_B226) == 0xF463
         && memory.ReadInstructionUInt16(0x8C0F_B228) == 0x000B
-        && memory.ReadInstructionUInt16(0x8C0F_B22A) == 0xF04C;
+        && memory.ReadInstructionUInt16(0x8C0F_B22A) == 0xF04C
+        && memory.ReadInstructionUInt16(0x8C0F_B250) == 0xF04C
+        && memory.ReadInstructionUInt16(0x8C0F_B252) == 0xF04D
+        && memory.ReadInstructionUInt16(0x8C0F_B254) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C0F_B256) == 0x0009;
 
     private bool IsDoa2VectorScaleLoop() =>
         memory.ReadInstructionUInt16(0x8C10_05A0) == 0x6043

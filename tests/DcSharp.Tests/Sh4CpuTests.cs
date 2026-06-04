@@ -5250,7 +5250,47 @@ public class Sh4CpuTests
     }
 
     [Fact]
-    public void DoesNotFastForwardDoa2PostTrigHelperReturnWhenBranchPathIsTaken()
+    public void FastForwardsDoa2PostTrigHelperTakenReturn()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2PostTrigHelperReturn(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B216);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B216);
+        InitializeDoa2PostTrigHelperReturnState(normal);
+        InitializeDoa2PostTrigHelperReturnState(fast);
+        normal.State.Pr = 0x8C10_0540;
+        normal.State.R[3] = 1;
+        normal.State.R[6] = 1;
+        fast.State.Pr = 0x8C10_0540;
+        fast.State.R[3] = 1;
+        fast.State.R[6] = 1;
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2PostTrigHelperReturn(fastStart, 100, out var skippedInstructions));
+        Assert.Equal(12UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_0540u, fast.State.Pc);
+        Assert.False(fast.State.T);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2PostTrigHelperTakenReturnWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
         WriteDoa2PostTrigHelperReturn(memory);
@@ -5261,7 +5301,7 @@ public class Sh4CpuTests
 
         var start = cpu.Step();
 
-        Assert.False(cpu.TryFastForwardDoa2PostTrigHelperReturn(start, 100, out var skippedInstructions));
+        Assert.False(cpu.TryFastForwardDoa2PostTrigHelperReturn(start, 11, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C0F_B218u, cpu.State.Pc);
         Assert.False(cpu.State.T);
@@ -9254,6 +9294,10 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C0F_B226, 0xF463);
         WriteInstruction(memory, 0x8C0F_B228, 0x000B);
         WriteInstruction(memory, 0x8C0F_B22A, 0xF04C);
+        WriteInstruction(memory, 0x8C0F_B250, 0xF04C);
+        WriteInstruction(memory, 0x8C0F_B252, 0xF04D);
+        WriteInstruction(memory, 0x8C0F_B254, 0x000B);
+        WriteInstruction(memory, 0x8C0F_B256, 0x0009);
     }
 
     private static void InitializeDoa2PostTrigHelperReturnState(Sh4Cpu cpu)
