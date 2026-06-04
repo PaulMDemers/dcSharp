@@ -270,6 +270,27 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void CanRenderSpritePreviewWithWideStride()
+    {
+        const int previewWidth = 640;
+        var vram = new byte[previewWidth * 8 * 2];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(500, 3, 0.0f, 0.0f), (501, 3, 0.0f, 0.0f), (501, 4, 0.0f, 0.0f), (500, 4, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram,
+            previewWidth,
+            useScreenCoordinates: true);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 500, 3, previewWidth));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 501, 3, previewWidth));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 500, 4, previewWidth));
+        Assert.Equal(0x0000, ReadRgb565(vram, 319, 3, previewWidth));
+    }
+
+    [Fact]
     public void LaterStripOverwritesSpritePreviewPixels()
     {
         var vram = new byte[4096];
@@ -1263,8 +1284,11 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     private static ushort ReadRgb565(byte[] vram, int x, int y)
+        => ReadRgb565(vram, x, y, DreamcastPvrPreviewRenderer.Width);
+
+    private static ushort ReadRgb565(byte[] vram, int x, int y, int previewWidth)
     {
-        var offset = ((y * DreamcastPvrPreviewRenderer.Width) + x) * 2;
+        var offset = ((y * previewWidth) + x) * 2;
         return (ushort)(vram[offset] | (vram[offset + 1] << 8));
     }
 }

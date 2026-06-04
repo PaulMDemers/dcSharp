@@ -7,21 +7,30 @@ public static class DreamcastPvrPreviewRenderer
     public const int Width = 320;
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram) =>
-        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates: false);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates: false, Width);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, Width);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, int previewWidth, bool useScreenCoordinates) =>
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, previewWidth);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates: false);
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates: false, Width);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates);
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, Width);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, int previewWidth, bool useScreenCoordinates) =>
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, previewWidth);
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram) =>
         RenderSprite(sprite, vram, useScreenCoordinates: false);
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, bool useScreenCoordinates)
+        => RenderSprite(sprite, vram, Width, useScreenCoordinates);
+
+    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
     {
         if (sprite.Rgb565 == 0 || !sprite.HasFinitePreviewCoordinates)
         {
@@ -30,7 +39,7 @@ public static class DreamcastPvrPreviewRenderer
 
         if (!sprite.HasRenderablePreviewArea)
         {
-            RenderDegenerateSprite(sprite, vram, useScreenCoordinates);
+            RenderDegenerateSprite(sprite, vram, previewWidth, useScreenCoordinates);
             return;
         }
 
@@ -45,9 +54,9 @@ public static class DreamcastPvrPreviewRenderer
         var ordered = vertices
             .OrderBy(vertex => MathF.Atan2(vertex.Y - centerY, vertex.X - centerX))
             .ToArray();
-        var minPreviewX = Math.Clamp((int)MathF.Floor(ordered.Min(vertex => vertex.X)), 0, Width - 1);
+        var minPreviewX = Math.Clamp((int)MathF.Floor(ordered.Min(vertex => vertex.X)), 0, previewWidth - 1);
         var minPreviewY = Math.Max((int)MathF.Floor(ordered.Min(vertex => vertex.Y)), 0);
-        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(ordered.Max(vertex => vertex.X)), 0, Width - 1);
+        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(ordered.Max(vertex => vertex.X)), 0, previewWidth - 1);
         var maxPreviewY = Math.Max((int)MathF.Ceiling(ordered.Max(vertex => vertex.Y)), 0);
 
         for (var y = minPreviewY; y <= maxPreviewY; y++)
@@ -61,13 +70,13 @@ public static class DreamcastPvrPreviewRenderer
                     continue;
                 }
 
-                var pixelIndex = PreviewPixelIndex(x, y);
+                var pixelIndex = PreviewPixelIndex(x, y, previewWidth);
                 WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
             }
         }
     }
 
-    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, bool useScreenCoordinates)
+    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
     {
         var originX = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.X);
         var originY = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.Y);
@@ -78,7 +87,7 @@ public static class DreamcastPvrPreviewRenderer
 
         for (var index = 0; index < vertices.Length; index++)
         {
-            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram);
+            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram, previewWidth);
         }
     }
 
@@ -86,7 +95,8 @@ public static class DreamcastPvrPreviewRenderer
         DreamcastPvrTaSprite sprite,
         DreamcastPvrPreviewSpriteVertex a,
         DreamcastPvrPreviewSpriteVertex b,
-        Span<byte> vram)
+        Span<byte> vram,
+        int previewWidth)
     {
         var x0 = (int)MathF.Round(a.X);
         var y0 = (int)MathF.Round(a.Y);
@@ -99,14 +109,14 @@ public static class DreamcastPvrPreviewRenderer
             var weight = steps == 0 ? 0.0f : step / (float)steps;
             var x = (int)MathF.Round(Lerp(x0, x1, weight));
             var y = (int)MathF.Round(Lerp(y0, y1, weight));
-            if (x < 0 || x >= Width || y < 0)
+            if (x < 0 || x >= previewWidth || y < 0)
             {
                 continue;
             }
 
             var u = Lerp(a.U, b.U, weight);
             var v = Lerp(a.V, b.V, weight);
-            WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y), u, v);
+            WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), u, v);
         }
     }
 
@@ -194,7 +204,8 @@ public static class DreamcastPvrPreviewRenderer
         Span<byte> vram,
         Span<float> depthBuffer,
         bool useDepth,
-        bool useScreenCoordinates)
+        bool useScreenCoordinates,
+        int previewWidth)
     {
         if (strip.Vertices.Count < 3)
         {
@@ -206,7 +217,7 @@ public static class DreamcastPvrPreviewRenderer
         for (var index = 0; index <= strip.Vertices.Count - 3; index++)
         {
             var vertices = strip.Vertices.Skip(index).Take(3).ToArray();
-            RenderTriangle(strip, vertices, originX, originY, vram, depthBuffer, useDepth);
+            RenderTriangle(strip, vertices, originX, originY, vram, depthBuffer, useDepth, previewWidth);
         }
     }
 
@@ -217,7 +228,8 @@ public static class DreamcastPvrPreviewRenderer
         int originY,
         Span<byte> vram,
         Span<float> depthBuffer,
-        bool useDepth)
+        bool useDepth,
+        int previewWidth)
     {
         var a = new Vector2(vertices[0].X - originX, vertices[0].Y - originY);
         var b = new Vector2(vertices[1].X - originX, vertices[1].Y - originY);
@@ -227,9 +239,9 @@ public static class DreamcastPvrPreviewRenderer
             return;
         }
 
-        var minPreviewX = Math.Clamp((int)MathF.Floor(MathF.Min(a.X, MathF.Min(b.X, c.X))), 0, Width - 1);
+        var minPreviewX = Math.Clamp((int)MathF.Floor(MathF.Min(a.X, MathF.Min(b.X, c.X))), 0, previewWidth - 1);
         var minPreviewY = Math.Max((int)MathF.Floor(MathF.Min(a.Y, MathF.Min(b.Y, c.Y))), 0);
-        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(MathF.Max(a.X, MathF.Max(b.X, c.X))), 0, Width - 1);
+        var maxPreviewX = Math.Clamp((int)MathF.Ceiling(MathF.Max(a.X, MathF.Max(b.X, c.X))), 0, previewWidth - 1);
         var maxPreviewY = Math.Max((int)MathF.Ceiling(MathF.Max(a.Y, MathF.Max(b.Y, c.Y))), 0);
 
         for (var y = minPreviewY; y <= maxPreviewY; y++)
@@ -239,7 +251,7 @@ public static class DreamcastPvrPreviewRenderer
                 var point = new Vector2(x, y);
                 if (IsInsideTriangle(point, a, b, c))
                 {
-                    var pixelIndex = PreviewPixelIndex(x, y);
+                    var pixelIndex = PreviewPixelIndex(x, y, previewWidth);
                     if (!PassesDepth(strip, vertices, pixelIndex, depthBuffer, useDepth))
                     {
                         continue;
@@ -345,8 +357,8 @@ public static class DreamcastPvrPreviewRenderer
     private static float EdgeFunction(Vector2 a, Vector2 b, Vector2 point) =>
         ((point.X - a.X) * (b.Y - a.Y)) - ((point.Y - a.Y) * (b.X - a.X));
 
-    private static int PreviewPixelIndex(int x, int y) =>
-        (y * Width) + x;
+    private static int PreviewPixelIndex(int x, int y, int previewWidth) =>
+        (y * previewWidth) + x;
 
     private static bool WritePreviewPixel(
         DreamcastPvrTaStrip strip,

@@ -838,7 +838,7 @@ public class DreamcastFixtureRunnerTests
                     3,
                     [
                         CreatePvrTaVertexSummary(-1, 1),
-                        CreatePvrTaVertexSummary(321, 1),
+                        CreatePvrTaVertexSummary(641, 1),
                         CreatePvrTaVertexSummary(1, 4, endOfStrip: true)
                     ])
             ],
@@ -857,14 +857,14 @@ public class DreamcastFixtureRunnerTests
 
         var diagnostics = summary.PvrTaDiagnostics;
 
-        Assert.Equal(320, diagnostics.PreviewWidth);
+        Assert.Equal(640, diagnostics.PreviewWidth);
         Assert.Equal(1, diagnostics.StripCount);
         Assert.Equal(1, diagnostics.StripTriangleCount);
         Assert.Equal(1, diagnostics.SpriteCount);
         Assert.Equal(1, diagnostics.DegenerateSpriteCount);
         Assert.Equal(-1, diagnostics.CombinedBounds.MinX);
         Assert.Equal(1, diagnostics.CombinedBounds.MinY);
-        Assert.Equal(321, diagnostics.CombinedBounds.MaxX);
+        Assert.Equal(641, diagnostics.CombinedBounds.MaxX);
         Assert.Equal(9, diagnostics.CombinedBounds.MaxY);
         Assert.Equal(1, diagnostics.CombinedBounds.NegativeXCount);
         Assert.Equal(1, diagnostics.CombinedBounds.RightClippedCount);

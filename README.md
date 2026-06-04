@@ -124,7 +124,7 @@ The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank
 Dump the current RGB565 framebuffer snapshot to PNG:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 320x240
+dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_framebuffer.elf --instructions 70000000 --dump-framebuffer artifacts/video/framebuffer.png --framebuffer-size 640x480
 ```
 
 Capture narrow trace/device logs while keeping the normal run summary readable:

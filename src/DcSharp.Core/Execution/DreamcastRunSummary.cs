@@ -539,7 +539,7 @@ public sealed record DreamcastPvrTaDiagnosticsSummary(
 {
     public static DreamcastPvrTaDiagnosticsSummary FromVideo(DreamcastVideoSummary video)
     {
-        const int previewWidth = 320;
+        const int previewWidth = 640;
         var stripBounds = DreamcastPvrTaBoundsSummary.FromGroups(
             video.PvrTaStrips.Select(strip => strip.Vertices.Select(vertex => (vertex.X, vertex.Y))));
         var spriteBounds = DreamcastPvrTaBoundsSummary.FromGroups(
@@ -583,7 +583,7 @@ public sealed record DreamcastPvrTaBoundsSummary(
 
     public static DreamcastPvrTaBoundsSummary FromGroups(IEnumerable<IEnumerable<(int X, int Y)>> groups)
     {
-        const int previewWidth = 320;
+        const int previewWidth = 640;
         var sourceCount = 0;
         int? minX = null;
         int? minY = null;

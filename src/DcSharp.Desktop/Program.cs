@@ -22,8 +22,8 @@ internal static class Program
 
 internal sealed class MainForm : Form
 {
-    private const int DefaultFramebufferWidth = 320;
-    private const int DefaultFramebufferHeight = 240;
+    private const int DefaultFramebufferWidth = 640;
+    private const int DefaultFramebufferHeight = 480;
     private const int MaxFramebufferWidth = 1024;
     private const int MaxFramebufferHeight = 768;
     private const ulong DefaultInstructionLimit = 70_000_000;

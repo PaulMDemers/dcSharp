@@ -44,6 +44,7 @@ public sealed class DreamcastMemory
     private const uint PvrTaInputLimit = 0x1080_0000;
     private const uint PvrTaYuvBase = 0x1080_0000;
     private const uint PvrTaYuvLimit = 0x1100_0000;
+    private const int PvrPreviewWidth = 640;
     private const uint AicaRegisterBase = 0x0070_0000;
     private const uint AicaRegisterLimit = 0x0071_0000;
     private const uint AicaRamBase = 0x0080_0000;
@@ -1983,11 +1984,11 @@ public sealed class DreamcastMemory
         {
             if (renderCommand.Strip is { } strip)
             {
-                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth, useScreenCoordinates: true);
+                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth, PvrPreviewWidth, useScreenCoordinates: true);
             }
             else if (renderCommand.Sprite is { } sprite)
             {
-                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, useScreenCoordinates: true);
+                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, PvrPreviewWidth, useScreenCoordinates: true);
             }
         }
 
