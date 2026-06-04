@@ -820,6 +820,75 @@ public class DreamcastFixtureRunnerTests
     }
 
     [Fact]
+    public void VideoSummaryGroupsSpriteShapesByColorTextureSizeAndInstructionPcs()
+    {
+        var summary = CreateVideoSummary(
+            null,
+            null,
+            null,
+            [
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: true,
+                    hasRenderablePreviewArea: true,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850,
+                    vertices:
+                    [
+                        CreatePvrTaSpriteVertexSummary(5, 7),
+                        CreatePvrTaSpriteVertexSummary(5, 7),
+                        CreatePvrTaSpriteVertexSummary(5, 9),
+                        CreatePvrTaSpriteVertexSummary(5, 9)
+                    ]),
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: true,
+                    hasRenderablePreviewArea: true,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850,
+                    vertices:
+                    [
+                        CreatePvrTaSpriteVertexSummary(12, 7),
+                        CreatePvrTaSpriteVertexSummary(12, 7),
+                        CreatePvrTaSpriteVertexSummary(12, 9),
+                        CreatePvrTaSpriteVertexSummary(12, 9)
+                    ]),
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: true,
+                    hasRenderablePreviewArea: true,
+                    headerPc: 0x8C10_07FA,
+                    controlPc: 0x8C10_084C,
+                    firstPayloadPc: 0x8C10_084C,
+                    lastPayloadPc: 0x8C10_0850,
+                    vertices:
+                    [
+                        CreatePvrTaSpriteVertexSummary(20, 7),
+                        CreatePvrTaSpriteVertexSummary(25, 7),
+                        CreatePvrTaSpriteVertexSummary(25, 9),
+                        CreatePvrTaSpriteVertexSummary(20, 9)
+                    ])
+            ]);
+
+        Assert.Collection(
+            summary.PvrTaSpriteShapeGroups,
+            group =>
+            {
+                Assert.Equal(2, group.Count);
+                Assert.Equal("0", group.WidthBucket);
+                Assert.Equal("2-4", group.HeightBucket);
+                Assert.Equal("0x8C10084C-0x8C100850", group.PayloadInstructionPcRangeHex);
+            },
+            group =>
+            {
+                Assert.Equal(1, group.Count);
+                Assert.Equal("4-8", group.WidthBucket);
+                Assert.Equal("2-4", group.HeightBucket);
+            });
+    }
+
+    [Fact]
     public void VideoSummaryReportsPvrTaDiagnostics()
     {
         var summary = CreateVideoSummary(

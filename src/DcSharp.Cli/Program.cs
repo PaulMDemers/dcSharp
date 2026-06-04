@@ -539,6 +539,7 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
     if (video.PvrTaSprites.Count > 0)
     {
         Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(video.PvrTaSpriteSourceGroups)}");
+        Console.WriteLine($"PVR TA sprite shapes: {FormatPvrTaSpriteShapeGroups(video.PvrTaSpriteShapeGroups)}");
         Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(video.PvrTaSprites.TakeLast(8).ToArray())}");
     }
 }
@@ -919,6 +920,7 @@ static void RunElf(string path, string[] args)
     if (pvrTaSprites.Count > 0)
     {
         Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(videoSummary.PvrTaSpriteSourceGroups)}");
+        Console.WriteLine($"PVR TA sprite shapes: {FormatPvrTaSpriteShapeGroups(videoSummary.PvrTaSpriteShapeGroups)}");
         Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(pvrTaSprites)}");
     }
 
@@ -1198,6 +1200,7 @@ static int RunFixtures(string manifestPath, string[] args)
                 if (result.Summary.Video.PvrTaSprites.Count > 0)
                 {
                     Console.WriteLine($"  pvrTaSpriteSources={FormatPvrTaSpriteSourceGroups(result.Summary.Video.PvrTaSpriteSourceGroups)}");
+                    Console.WriteLine($"  pvrTaSpriteShapes={FormatPvrTaSpriteShapeGroups(result.Summary.Video.PvrTaSpriteShapeGroups)}");
                     Console.WriteLine($"  pvrTaSprites={FormatPvrTaSprites(result.Summary.Video.PvrTaSprites)}");
                 }
 
@@ -2189,6 +2192,11 @@ static string FormatPvrTaSpriteSourceGroups(IReadOnlyList<DreamcastPvrTaSpriteSo
     string.Join(", ", groups
         .Take(8)
         .Select(group => $"{group.PreviewStatus}:{group.Count} pc=h:{group.HeaderInstructionPcHex ?? "-"}/c:{group.ControlInstructionPcHex ?? "-"}/p:{group.PayloadInstructionPcRangeHex}"));
+
+static string FormatPvrTaSpriteShapeGroups(IReadOnlyList<DreamcastPvrTaSpriteShapeGroupSummary> groups) =>
+    string.Join(", ", groups
+        .Take(8)
+        .Select(group => $"{group.PreviewStatus}:{group.Count} list={group.ListTypeName ?? "none"} color={group.Rgb565Hex}/argb={group.ArgbHex} tex={group.TextureEnabled} size={group.WidthBucket}x{group.HeightBucket} pc=h:{group.HeaderInstructionPcHex ?? "-"}/c:{group.ControlInstructionPcHex ?? "-"}/p:{group.PayloadInstructionPcRangeHex}"));
 
 static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostics)
 {

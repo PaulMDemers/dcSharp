@@ -461,6 +461,9 @@ public sealed record DreamcastVideoSummary(
     public IReadOnlyList<DreamcastPvrTaSpriteSourceGroupSummary> PvrTaSpriteSourceGroups =>
         DreamcastPvrTaSpriteSourceGroupSummary.FromSprites(PvrTaSprites);
 
+    public IReadOnlyList<DreamcastPvrTaSpriteShapeGroupSummary> PvrTaSpriteShapeGroups =>
+        DreamcastPvrTaSpriteShapeGroupSummary.FromSprites(PvrTaSprites);
+
     public DreamcastPvrTaDiagnosticsSummary PvrTaDiagnostics =>
         DreamcastPvrTaDiagnosticsSummary.FromVideo(this);
 
@@ -791,6 +794,119 @@ public sealed record DreamcastPvrTaSpriteSourceGroupSummary(
                 group.Key.LastPayloadInstructionPcHex,
                 FormatPayloadPcRange(group.Key.FirstPayloadInstructionPcHex, group.Key.LastPayloadInstructionPcHex)))
             .ToArray();
+
+    private static string FormatPayloadPcRange(string? firstPayloadInstructionPcHex, string? lastPayloadInstructionPcHex) =>
+        firstPayloadInstructionPcHex == lastPayloadInstructionPcHex
+            ? firstPayloadInstructionPcHex ?? "-"
+            : $"{firstPayloadInstructionPcHex ?? "-"}-{lastPayloadInstructionPcHex ?? "-"}";
+}
+
+public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
+    string PreviewStatus,
+    string? ListTypeName,
+    string Rgb565Hex,
+    string ArgbHex,
+    bool TextureEnabled,
+    string WidthBucket,
+    string HeightBucket,
+    int Count,
+    uint? HeaderInstructionPc,
+    string? HeaderInstructionPcHex,
+    uint? ControlInstructionPc,
+    string? ControlInstructionPcHex,
+    uint? FirstPayloadInstructionPc,
+    string? FirstPayloadInstructionPcHex,
+    uint? LastPayloadInstructionPc,
+    string? LastPayloadInstructionPcHex,
+    string PayloadInstructionPcRangeHex)
+{
+    public static IReadOnlyList<DreamcastPvrTaSpriteShapeGroupSummary> FromSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
+        sprites
+            .GroupBy(sprite => new PvrTaSpriteShapeGroupKey(
+                DreamcastVideoSummary.GetPvrTaSpritePreviewStatus(sprite),
+                sprite.ListTypeName,
+                sprite.Rgb565Hex,
+                sprite.HeaderPayload.ArgbHex,
+                sprite.HeaderPayload.Mode1Fields.TextureEnabled,
+                SizeBucket(SpriteWidth(sprite)),
+                SizeBucket(SpriteHeight(sprite)),
+                sprite.HeaderInstructionPc,
+                sprite.HeaderInstructionPcHex,
+                sprite.ControlInstructionPc,
+                sprite.ControlInstructionPcHex,
+                sprite.FirstPayloadInstructionPc,
+                sprite.FirstPayloadInstructionPcHex,
+                sprite.LastPayloadInstructionPc,
+                sprite.LastPayloadInstructionPcHex))
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key.PreviewStatus, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.ListTypeName ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.WidthBucket, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.HeightBucket, StringComparer.Ordinal)
+            .Select(group => new DreamcastPvrTaSpriteShapeGroupSummary(
+                group.Key.PreviewStatus,
+                group.Key.ListTypeName,
+                group.Key.Rgb565Hex,
+                group.Key.ArgbHex,
+                group.Key.TextureEnabled,
+                group.Key.WidthBucket,
+                group.Key.HeightBucket,
+                group.Count(),
+                group.Key.HeaderInstructionPc,
+                group.Key.HeaderInstructionPcHex,
+                group.Key.ControlInstructionPc,
+                group.Key.ControlInstructionPcHex,
+                group.Key.FirstPayloadInstructionPc,
+                group.Key.FirstPayloadInstructionPcHex,
+                group.Key.LastPayloadInstructionPc,
+                group.Key.LastPayloadInstructionPcHex,
+                FormatPayloadPcRange(group.Key.FirstPayloadInstructionPcHex, group.Key.LastPayloadInstructionPcHex)))
+            .ToArray();
+
+    private static float SpriteWidth(DreamcastPvrTaSpriteSummary sprite) =>
+        SpriteExtent(sprite, vertex => vertex.RawX);
+
+    private static float SpriteHeight(DreamcastPvrTaSpriteSummary sprite) =>
+        SpriteExtent(sprite, vertex => vertex.RawY);
+
+    private static float SpriteExtent(DreamcastPvrTaSpriteSummary sprite, Func<DreamcastPvrTaSpriteVertexSummary, float> selector)
+    {
+        var vertices = sprite.Vertices.Take(4).ToArray();
+        if (vertices.Length == 0 || vertices.Any(vertex => !vertex.HasFinitePosition))
+        {
+            return float.NaN;
+        }
+
+        return vertices.Max(selector) - vertices.Min(selector);
+    }
+
+    private static string SizeBucket(float value)
+    {
+        if (!float.IsFinite(value))
+        {
+            return "nonfinite";
+        }
+
+        if (value <= 0.0f)
+        {
+            return "0";
+        }
+
+        if (value < 1.0f)
+        {
+            return "<1";
+        }
+
+        var lower = 1;
+        var upper = 2;
+        while (value >= upper && upper < 1024)
+        {
+            lower = upper;
+            upper *= 2;
+        }
+
+        return upper >= 1024 && value >= upper ? ">=1024" : $"{lower}-{upper}";
+    }
 
     private static string FormatPayloadPcRange(string? firstPayloadInstructionPcHex, string? lastPayloadInstructionPcHex) =>
         firstPayloadInstructionPcHex == lastPayloadInstructionPcHex
@@ -1318,6 +1434,23 @@ internal sealed record PvrTaListKey(string Region, int? ListType, string? ListTy
 
 internal sealed record PvrTaSpriteSourceGroupKey(
     string PreviewStatus,
+    uint? HeaderInstructionPc,
+    string? HeaderInstructionPcHex,
+    uint? ControlInstructionPc,
+    string? ControlInstructionPcHex,
+    uint? FirstPayloadInstructionPc,
+    string? FirstPayloadInstructionPcHex,
+    uint? LastPayloadInstructionPc,
+    string? LastPayloadInstructionPcHex);
+
+internal sealed record PvrTaSpriteShapeGroupKey(
+    string PreviewStatus,
+    string? ListTypeName,
+    string Rgb565Hex,
+    string ArgbHex,
+    bool TextureEnabled,
+    string WidthBucket,
+    string HeightBucket,
     uint? HeaderInstructionPc,
     string? HeaderInstructionPcHex,
     uint? ControlInstructionPc,
