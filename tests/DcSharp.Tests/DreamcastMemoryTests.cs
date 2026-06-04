@@ -804,11 +804,12 @@ public class DreamcastMemoryTests
         var snapshot = memory.CreateVideoSnapshot();
 
         Assert.True(snapshot.NonZeroBytes >= 9);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
-        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "origin").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_1_0").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_2_0").Rgb565);
+        Assert.Equal(0x0000, snapshot.Samples.Single(sample => sample.Name == "pixel_0_1_320x240").Rgb565);
         Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_1_1_320x240").Rgb565);
+        Assert.Equal(0x07E0, snapshot.Samples.Single(sample => sample.Name == "pixel_2_2_320x240").Rgb565);
         var sprite = Assert.Single(snapshot.PvrTaSprites);
         Assert.Equal("OpaquePolygon", sprite.ListTypeName);
         Assert.Equal("0xFF00FF00", sprite.HeaderPayload.ArgbHex);

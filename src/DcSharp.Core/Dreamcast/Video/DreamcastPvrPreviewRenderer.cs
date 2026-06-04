@@ -12,18 +12,27 @@ public static class DreamcastPvrPreviewRenderer
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
         RenderStrip(strip, vram, depthBuffer, useDepth: true);
 
-    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram)
+    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram) =>
+        RenderSprite(sprite, vram, useScreenCoordinates: false);
+
+    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, bool useScreenCoordinates)
     {
-        if (!sprite.HasRenderablePreviewArea)
+        if (sprite.Rgb565 == 0 || !sprite.HasFinitePreviewCoordinates)
         {
             return;
         }
 
-        var minX = sprite.Vertices.Take(4).Min(vertex => vertex.X);
-        var minY = sprite.Vertices.Take(4).Min(vertex => vertex.Y);
+        if (!sprite.HasRenderablePreviewArea)
+        {
+            RenderDegenerateSprite(sprite, vram, useScreenCoordinates);
+            return;
+        }
+
+        var originX = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.X);
+        var originY = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.Y);
         var vertices = sprite.Vertices
             .Take(4)
-            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - minX, vertex.Y - minY, vertex.U, vertex.V))
+            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - originX, vertex.Y - originY, vertex.U, vertex.V))
             .ToArray();
         var centerX = vertices.Average(vertex => vertex.X);
         var centerY = vertices.Average(vertex => vertex.Y);
@@ -47,29 +56,83 @@ public static class DreamcastPvrPreviewRenderer
                 }
 
                 var pixelIndex = PreviewPixelIndex(x, y);
-                var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
-                if (IsPunchThrough(sprite)
-                    && SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex) < 128)
-                {
-                    continue;
-                }
-
-                if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
-                {
-                    source = source with
-                    {
-                        Rgb565 = BlendRgb565(
-                            source.Rgb565,
-                            ReadRgb565Pixel(vram, pixelIndex),
-                            SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex),
-                            sprite.HeaderPayload.Mode2Fields.BlendSrcName,
-                            sprite.HeaderPayload.Mode2Fields.BlendDstName)
-                    };
-                }
-
-                WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
+                WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
             }
         }
+    }
+
+    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, bool useScreenCoordinates)
+    {
+        var originX = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.X);
+        var originY = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.Y);
+        var vertices = sprite.Vertices
+            .Take(4)
+            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - originX, vertex.Y - originY, vertex.U, vertex.V))
+            .ToArray();
+
+        for (var index = 0; index < vertices.Length; index++)
+        {
+            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram);
+        }
+    }
+
+    private static void DrawSpritePreviewLine(
+        DreamcastPvrTaSprite sprite,
+        DreamcastPvrPreviewSpriteVertex a,
+        DreamcastPvrPreviewSpriteVertex b,
+        Span<byte> vram)
+    {
+        var x0 = (int)MathF.Round(a.X);
+        var y0 = (int)MathF.Round(a.Y);
+        var x1 = (int)MathF.Round(b.X);
+        var y1 = (int)MathF.Round(b.Y);
+        var steps = Math.Max(Math.Abs(x1 - x0), Math.Abs(y1 - y0));
+
+        for (var step = 0; step <= steps; step++)
+        {
+            var weight = steps == 0 ? 0.0f : step / (float)steps;
+            var x = (int)MathF.Round(Lerp(x0, x1, weight));
+            var y = (int)MathF.Round(Lerp(y0, y1, weight));
+            if (x < 0 || x >= Width || y < 0)
+            {
+                continue;
+            }
+
+            var u = Lerp(a.U, b.U, weight);
+            var v = Lerp(a.V, b.V, weight);
+            WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y), u, v);
+        }
+    }
+
+    private static bool WriteSpritePreviewPixel(
+        DreamcastPvrTaSprite sprite,
+        Span<byte> vram,
+        int pixelIndex,
+        float sourceU,
+        float sourceV)
+    {
+        var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
+        if (IsPunchThrough(sprite)
+            && SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex) < 128)
+        {
+            return false;
+        }
+
+        if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
+        {
+            source = source with
+            {
+                Rgb565 = BlendRgb565(
+                    source.Rgb565,
+                    ReadRgb565Pixel(vram, pixelIndex),
+                    SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex),
+                    sprite.HeaderPayload.Mode2Fields.BlendSrcName,
+                    sprite.HeaderPayload.Mode2Fields.BlendDstName)
+            };
+        }
+
+        WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
+        return true;
     }
 
     private static bool TryInterpolateSpriteUv(

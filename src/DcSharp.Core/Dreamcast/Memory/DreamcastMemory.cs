@@ -1987,7 +1987,7 @@ public sealed class DreamcastMemory
             }
             else if (renderCommand.Sprite is { } sprite)
             {
-                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram);
+                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, useScreenCoordinates: true);
             }
         }
 

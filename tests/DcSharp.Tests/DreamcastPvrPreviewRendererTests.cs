@@ -197,6 +197,65 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void RendersFiniteDegenerateSpriteAsVerticalPreviewLine()
+    {
+        var vram = new byte[4096];
+        var sprite = CreateSprite(
+            0x07E0,
+            [(4, 4, 0.0f, 0.0f), (4, 4, 0.0f, 0.0f), (4, 6, 0.0f, 1.0f), (4, 6, 0.0f, 1.0f)],
+            argb: 0xFF00_FF00);
+
+        Assert.True(sprite.HasFinitePreviewCoordinates);
+        Assert.False(sprite.HasRenderablePreviewArea);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(sprite, vram);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 1));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 2));
+        Assert.Equal(0x0000, ReadRgb565(vram, 1, 0));
+    }
+
+    [Fact]
+    public void RendersFiniteDegenerateSpriteAsHorizontalPreviewLine()
+    {
+        var vram = new byte[4096];
+        var sprite = CreateSprite(
+            0x001F,
+            [(5, 7, 0.0f, 0.0f), (7, 7, 1.0f, 0.0f), (7, 7, 1.0f, 0.0f), (5, 7, 0.0f, 0.0f)],
+            argb: 0xFF00_00FF);
+
+        Assert.True(sprite.HasFinitePreviewCoordinates);
+        Assert.False(sprite.HasRenderablePreviewArea);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(sprite, vram);
+
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
+    public void CanRenderSpritePreviewInScreenCoordinates()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(4, 3, 0.0f, 0.0f), (5, 3, 0.0f, 0.0f), (5, 4, 0.0f, 0.0f), (4, 4, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram,
+            useScreenCoordinates: true);
+
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 4, 3));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 5, 3));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 4, 4));
+    }
+
+    [Fact]
     public void LaterStripOverwritesSpritePreviewPixels()
     {
         var vram = new byte[4096];
