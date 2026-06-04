@@ -186,6 +186,17 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B1C0, 0x8C0F_B216)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B216, 0x8C0F_B22C)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B250, 0x8C0F_B258)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0536, 0x8C10_053E)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_AC40, 0x8C0F_AC56)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C10_0540, 0x8C10_055C)
+                        && cpu.TryFastForwardDoa2RendererTrigPairToInterpolation(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2RendererTrigPairSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(doa2RendererTrigPairSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardFpuRecurrence(options)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B1C0, 0x8C0F_B216)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B216, 0x8C0F_B22C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C0F_B250, 0x8C0F_B258)
                         && cpu.TryFastForwardDoa2TrigSetupAndPostReturn(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2TrigSetupAndPostReturnSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2TrigSetupAndPostReturnSkippedInstructions, cpu.State.InstructionsExecuted);

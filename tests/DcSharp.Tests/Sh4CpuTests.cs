@@ -5276,6 +5276,76 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2RendererTrigPairToInterpolation()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2RendererTrigPairToInterpolation(normalMemory);
+        WriteRendererTrigPairToInterpolationData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2RendererTrigPairToInterpolation(fastMemory);
+        WriteRendererTrigPairToInterpolationData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0F_B1C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0F_B1C0);
+        InitializeDoa2RendererTrigPairState(normal);
+        InitializeDoa2RendererTrigPairState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2RendererTrigPairToInterpolation(fastStart, 220, out var skippedInstructions));
+        Assert.InRange(skippedInstructions, 199UL, 203UL);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpul, fast.State.Fpul);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_2FFC), fastMemory.ReadUInt32(0x8C20_2FFC));
+        Assert.Equal(0x8C10_0A30u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererTrigPairToInterpolationWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererTrigPairToInterpolation(memory);
+        WriteRendererTrigPairToInterpolationData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2RendererTrigPairState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererTrigPairToInterpolation(start, 202, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2RendererTrigPairToInterpolationWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2RendererTrigPairToInterpolation(memory);
+        WriteRendererTrigPairToInterpolationData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C0F_B1C0);
+        InitializeDoa2RendererTrigPairState(cpu);
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardDoa2RendererTrigPairToInterpolation(start, 220, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C0F_B1C2u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2PostTrigHelperReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -9385,6 +9455,32 @@ public class Sh4CpuTests
         cpu.State.Fr[4] = BitConverter.SingleToUInt32Bits(8.0f);
         cpu.State.Fr[6] = BitConverter.SingleToUInt32Bits(5.0f);
         cpu.State.Fr[7] = BitConverter.SingleToUInt32Bits(3.0f);
+    }
+
+    private static void WriteDoa2RendererTrigPairToInterpolation(DreamcastMemory memory)
+    {
+        WriteDoa2TrigSetupAndRecurrenceLoop(memory);
+        WriteDoa2PostTrigHelperReturn(memory);
+        WriteDoa2RendererSecondTrigCallBridge(memory);
+        WriteDoa2Fac40TrigArgumentWrapper(memory);
+        WriteDoa2RendererPostSecondTrigBridge(memory);
+    }
+
+    private static void WriteRendererTrigPairToInterpolationData(DreamcastMemory memory)
+    {
+        WriteDoa2TrigSetupConstants(memory);
+        WriteRendererSecondTrigCallData(memory);
+        WriteRendererPostSecondTrigData(memory);
+    }
+
+    private static void InitializeDoa2RendererTrigPairState(Sh4Cpu cpu)
+    {
+        InitializeDoa2TrigSetupState(cpu);
+        cpu.State.Pr = 0x8C10_0536;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[14] = 0xCAFE_BABE;
+        cpu.State.R[15] = 0x8C20_3000;
+        cpu.State.Fr[12] = BitConverter.SingleToUInt32Bits(0.125f);
     }
 
     private static void WriteDoa2VectorScaleLoop(DreamcastMemory memory)

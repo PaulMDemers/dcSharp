@@ -2633,13 +2633,7 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.R[15] -= 4;
-        memory.WriteUInt32(State.R[15], State.R[14]);
-        State.R[14] = argument;
-        State.T = unchecked((int)State.R[14]) > unchecked((int)State.R[3]);
-        State.R[4] = (uint)(0x4000 - State.R[14]);
-        State.R[14] = memory.ReadUInt32(State.R[15]);
-        State.R[15] += 4;
+        ExecuteDoa2Fac40TrigArgumentWrapperBody(argument);
 
         skippedInstructions = skippedInstructionCount;
         State.Pc = 0x8C0F_B1C0;
@@ -2647,6 +2641,17 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    private void ExecuteDoa2Fac40TrigArgumentWrapperBody(uint argument)
+    {
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[14]);
+        State.R[14] = argument;
+        State.T = unchecked((int)State.R[14]) > unchecked((int)State.R[3]);
+        State.R[4] = (uint)(0x4000 - State.R[14]);
+        State.R[14] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
     }
 
     internal bool TryFastForwardDoa2RendererPrologueCommonPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -3042,13 +3047,86 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.R[0] = 8;
-        ExecuteFpuMove(0xFF07, 15, 0, 0x7);
-        State.Pr = 0x8C10_0540;
-        State.R[4] = memory.ReadUInt32(State.R[13] + 40);
+        ExecuteDoa2RendererSecondTrigCallBridgeBody();
 
         skippedInstructions = skippedInstructionCount;
         State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardDoa2RendererTrigPairToInterpolation(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0F_B1C0
+            || step.Opcode != 0x644D
+            || State.Pc != 0x8C0F_B1C2
+            || State.Pr != 0x8C10_0536)
+        {
+            return false;
+        }
+
+        const ulong maxSkippedInstructionCount = 203;
+        if (State.R[15] < 4
+            || State.R[15] > uint.MaxValue - 47
+            || State.R[13] > uint.MaxValue - 43
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15] + 4, 8, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15] + 8, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[13] + 40, 4, out _))
+        {
+            return false;
+        }
+
+        var secondTrigCallTarget = memory.ReadUInt32(0x8C10_0588);
+        var fac40Limit = memory.ReadUInt32(0x8C0F_AD24);
+        var secondArgument = memory.ReadUInt32(State.R[13] + 40) & 0xFFFF;
+        if (!IsDoa2TrigSetupAndRecurrenceLoop()
+            || !IsDoa2PostTrigHelperReturn()
+            || !IsDoa2RendererSecondTrigCallBridge()
+            || !IsDoa2Fac40TrigArgumentWrapper()
+            || !IsDoa2RendererPostSecondTrigBridge()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || secondTrigCallTarget != 0x8C0F_AC40
+            || unchecked((int)secondArgument) > unchecked((int)fac40Limit)
+            || !memory.TryGetSystemRamOffset(0x8C0F_B23C, 16, out _))
+        {
+            return false;
+        }
+
+        ExecuteDoa2TrigSetupAndRecurrenceLoopBody();
+        State.T = (State.R[3] & State.R[6]) == 0;
+        var firstPostSkippedInstructionCount = ExecuteDoa2PostTrigHelperReturnBodyAfterTst();
+
+        State.R[3] = secondTrigCallTarget;
+        ExecuteDoa2RendererSecondTrigCallBridgeBody();
+
+        State.R[3] = fac40Limit;
+        var argument = State.R[4] & 0xFFFF;
+        ExecuteDoa2Fac40TrigArgumentWrapperBody(argument);
+
+        State.R[4] &= 0xFFFF;
+        ExecuteDoa2TrigSetupAndRecurrenceLoopBody();
+        State.T = (State.R[3] & State.R[6]) == 0;
+        var secondPostSkippedInstructionCount = ExecuteDoa2PostTrigHelperReturnBodyAfterTst();
+
+        State.R[0] = 8;
+        ExecuteDoa2RendererPostSecondTrigBridgeBody();
+
+        skippedInstructions = 74
+            + 1
+            + firstPostSkippedInstructionCount
+            + 5
+            + 9
+            + 1
+            + 74
+            + 1
+            + secondPostSkippedInstructionCount
+            + 14;
+        State.Pc = 0x8C10_0A30;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
@@ -3075,6 +3153,26 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        ExecuteDoa2RendererPostSecondTrigBridgeBody();
+
+        skippedInstructions = skippedInstructionCount;
+        State.Pc = 0x8C10_0A30;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private void ExecuteDoa2RendererSecondTrigCallBridgeBody()
+    {
+        State.R[0] = 8;
+        ExecuteFpuMove(0xFF07, 15, 0, 0x7);
+        State.Pr = 0x8C10_0540;
+        State.R[4] = memory.ReadUInt32(State.R[13] + 40);
+    }
+
+    private void ExecuteDoa2RendererPostSecondTrigBridgeBody()
+    {
         State.R[10] = State.R[15];
         ExecuteFpuMove(0xF6F6, 6, 15, 0x6);
         State.R[0] = 4;
@@ -3088,13 +3186,6 @@ public sealed class Sh4Cpu
         ExecuteFpuMove(0xF4CC, 4, 12, 0xC);
         State.Pr = 0x8C10_055C;
         State.R[4] = State.R[13];
-
-        skippedInstructions = skippedInstructionCount;
-        State.Pc = 0x8C10_0A30;
-        State.InstructionsExecuted += skippedInstructions;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
     }
 
     internal bool TryFastForwardDoa2RendererPostCallScaleSetup(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
