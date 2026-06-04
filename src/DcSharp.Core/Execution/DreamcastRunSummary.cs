@@ -460,6 +460,9 @@ public sealed record DreamcastVideoSummary(
     public IReadOnlyList<DreamcastPvrTaSpriteSourceGroupSummary> PvrTaSpriteSourceGroups =>
         DreamcastPvrTaSpriteSourceGroupSummary.FromSprites(PvrTaSprites);
 
+    public DreamcastPvrTaDiagnosticsSummary PvrTaDiagnostics =>
+        DreamcastPvrTaDiagnosticsSummary.FromVideo(this);
+
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
         new(
             snapshot.VramBytes,
@@ -516,6 +519,215 @@ public sealed record DreamcastVideoSummary(
         sprite.HasRenderablePreviewArea
             ? "renderable"
             : sprite.HasFinitePreviewCoordinates ? "degenerate" : "nonfinite";
+}
+
+public sealed record DreamcastPvrTaDiagnosticsSummary(
+    int PreviewWidth,
+    ulong FramebufferNonZeroBytes,
+    string FramebufferChecksumHex,
+    string? FirstNonZeroOffsetHex,
+    int StripCount,
+    int StripTriangleCount,
+    int SpriteCount,
+    int RenderableSpriteCount,
+    int DegenerateSpriteCount,
+    int NonfiniteSpriteCount,
+    DreamcastPvrTaBoundsSummary StripBounds,
+    DreamcastPvrTaBoundsSummary SpriteBounds,
+    DreamcastPvrTaBoundsSummary CombinedBounds,
+    IReadOnlyList<DreamcastPvrTaTextureModeGroupSummary> TextureModes)
+{
+    public static DreamcastPvrTaDiagnosticsSummary FromVideo(DreamcastVideoSummary video)
+    {
+        const int previewWidth = 320;
+        var stripBounds = DreamcastPvrTaBoundsSummary.FromGroups(
+            video.PvrTaStrips.Select(strip => strip.Vertices.Select(vertex => (vertex.X, vertex.Y))));
+        var spriteBounds = DreamcastPvrTaBoundsSummary.FromGroups(
+            video.PvrTaSprites
+                .Where(sprite => sprite.HasFinitePreviewCoordinates)
+                .Select(sprite => sprite.Vertices.Take(4).Select(vertex => (vertex.X, vertex.Y))));
+        var combinedBounds = DreamcastPvrTaBoundsSummary.Combine(stripBounds, spriteBounds);
+
+        return new(
+            previewWidth,
+            video.NonZeroBytes,
+            video.Fnv1A32Hex,
+            video.FirstNonZeroOffsetHex,
+            video.PvrTaStrips.Count,
+            video.PvrTaStrips.Sum(strip => Math.Max(0, strip.VertexCount - 2)),
+            video.PvrTaSprites.Count,
+            video.PvrTaRenderableSpriteCount,
+            video.PvrTaDegenerateSpriteCount,
+            video.PvrTaNonfiniteSpriteCount,
+            stripBounds,
+            spriteBounds,
+            combinedBounds,
+            DreamcastPvrTaTextureModeGroupSummary.FromVideo(video));
+    }
+}
+
+public sealed record DreamcastPvrTaBoundsSummary(
+    bool HasBounds,
+    int SourceCount,
+    int? MinX,
+    int? MinY,
+    int? MaxX,
+    int? MaxY,
+    int NegativeXCount,
+    int RightClippedCount,
+    int NegativeYCount,
+    int ZeroWidthCount,
+    int ZeroHeightCount)
+{
+    public static DreamcastPvrTaBoundsSummary Empty { get; } = new(false, 0, null, null, null, null, 0, 0, 0, 0, 0);
+
+    public static DreamcastPvrTaBoundsSummary FromGroups(IEnumerable<IEnumerable<(int X, int Y)>> groups)
+    {
+        const int previewWidth = 320;
+        var sourceCount = 0;
+        int? minX = null;
+        int? minY = null;
+        int? maxX = null;
+        int? maxY = null;
+        var negativeXCount = 0;
+        var rightClippedCount = 0;
+        var negativeYCount = 0;
+        var zeroWidthCount = 0;
+        var zeroHeightCount = 0;
+
+        foreach (var group in groups)
+        {
+            var points = group.ToArray();
+            if (points.Length == 0)
+            {
+                continue;
+            }
+
+            sourceCount++;
+            var groupMinX = points.Min(point => point.X);
+            var groupMinY = points.Min(point => point.Y);
+            var groupMaxX = points.Max(point => point.X);
+            var groupMaxY = points.Max(point => point.Y);
+
+            minX = minX is null ? groupMinX : Math.Min(minX.Value, groupMinX);
+            minY = minY is null ? groupMinY : Math.Min(minY.Value, groupMinY);
+            maxX = maxX is null ? groupMaxX : Math.Max(maxX.Value, groupMaxX);
+            maxY = maxY is null ? groupMaxY : Math.Max(maxY.Value, groupMaxY);
+
+            if (groupMinX < 0)
+            {
+                negativeXCount++;
+            }
+
+            if (groupMaxX >= previewWidth)
+            {
+                rightClippedCount++;
+            }
+
+            if (groupMinY < 0)
+            {
+                negativeYCount++;
+            }
+
+            if (groupMinX == groupMaxX)
+            {
+                zeroWidthCount++;
+            }
+
+            if (groupMinY == groupMaxY)
+            {
+                zeroHeightCount++;
+            }
+        }
+
+        return sourceCount == 0
+            ? Empty
+            : new(true, sourceCount, minX, minY, maxX, maxY, negativeXCount, rightClippedCount, negativeYCount, zeroWidthCount, zeroHeightCount);
+    }
+
+    public static DreamcastPvrTaBoundsSummary Combine(params DreamcastPvrTaBoundsSummary[] bounds)
+    {
+        var populated = bounds.Where(bound => bound.HasBounds).ToArray();
+        if (populated.Length == 0)
+        {
+            return Empty;
+        }
+
+        return new(
+            true,
+            populated.Sum(bound => bound.SourceCount),
+            populated.Min(bound => bound.MinX),
+            populated.Min(bound => bound.MinY),
+            populated.Max(bound => bound.MaxX),
+            populated.Max(bound => bound.MaxY),
+            populated.Sum(bound => bound.NegativeXCount),
+            populated.Sum(bound => bound.RightClippedCount),
+            populated.Sum(bound => bound.NegativeYCount),
+            populated.Sum(bound => bound.ZeroWidthCount),
+            populated.Sum(bound => bound.ZeroHeightCount));
+    }
+}
+
+public sealed record DreamcastPvrTaTextureModeGroupSummary(
+    string PrimitiveKind,
+    string? ListTypeName,
+    bool TextureEnabled,
+    bool VqEnabled,
+    bool MipMapEnabled,
+    bool NonTwiddled,
+    string PixelFormatName,
+    int Count)
+{
+    public static IReadOnlyList<DreamcastPvrTaTextureModeGroupSummary> FromVideo(DreamcastVideoSummary video) =>
+        video.PvrTaStrips
+            .Select(strip => FromStrip(strip))
+            .Concat(video.PvrTaSprites.Select(FromSprite))
+            .GroupBy(mode => new
+            {
+                mode.PrimitiveKind,
+                mode.ListTypeName,
+                mode.TextureEnabled,
+                mode.VqEnabled,
+                mode.MipMapEnabled,
+                mode.NonTwiddled,
+                mode.PixelFormatName
+            })
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key.PrimitiveKind, StringComparer.Ordinal)
+            .ThenBy(group => group.Key.ListTypeName ?? string.Empty, StringComparer.Ordinal)
+            .Select(group => new DreamcastPvrTaTextureModeGroupSummary(
+                group.Key.PrimitiveKind,
+                group.Key.ListTypeName,
+                group.Key.TextureEnabled,
+                group.Key.VqEnabled,
+                group.Key.MipMapEnabled,
+                group.Key.NonTwiddled,
+                group.Key.PixelFormatName,
+                group.Count()))
+            .ToArray();
+
+    private static DreamcastPvrTaTextureModeGroupSummary FromStrip(DreamcastPvrTaStripSummary strip) =>
+        strip.HeaderPayload is { } payload
+            ? FromPayload("strip", strip.ListTypeName, payload.Mode1Fields.TextureEnabled, payload.Mode3Fields)
+            : new("strip", strip.ListTypeName, false, false, false, false, "none", 1);
+
+    private static DreamcastPvrTaTextureModeGroupSummary FromSprite(DreamcastPvrTaSpriteSummary sprite) =>
+        FromPayload("sprite", sprite.ListTypeName, sprite.HeaderPayload.Mode1Fields.TextureEnabled, sprite.HeaderPayload.Mode3Fields);
+
+    private static DreamcastPvrTaTextureModeGroupSummary FromPayload(
+        string primitiveKind,
+        string? listTypeName,
+        bool textureEnabled,
+        DreamcastPvrTaPolygonHeaderMode3 mode3) =>
+        new(
+            primitiveKind,
+            listTypeName,
+            textureEnabled,
+            mode3.VqEnabled,
+            mode3.MipMapEnabled,
+            mode3.NonTwiddled,
+            mode3.PixelFormatName,
+            1);
 }
 
 public sealed record DreamcastPvrTaSpriteSourceGroupSummary(

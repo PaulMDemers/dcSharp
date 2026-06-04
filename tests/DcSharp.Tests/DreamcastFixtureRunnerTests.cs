@@ -819,6 +819,61 @@ public class DreamcastFixtureRunnerTests
             });
     }
 
+    [Fact]
+    public void VideoSummaryReportsPvrTaDiagnostics()
+    {
+        var summary = CreateVideoSummary(
+            null,
+            null,
+            [
+                new DreamcastPvrTaStripSummary(
+                    "TA_INPUT",
+                    0,
+                    "OpaquePolygon",
+                    0x8084_0000,
+                    "0x80840000",
+                    null,
+                    0xF800,
+                    "0xF800",
+                    3,
+                    [
+                        CreatePvrTaVertexSummary(-1, 1),
+                        CreatePvrTaVertexSummary(321, 1),
+                        CreatePvrTaVertexSummary(1, 4, endOfStrip: true)
+                    ])
+            ],
+            [
+                CreatePvrTaSpriteSummary(
+                    hasFinitePreviewCoordinates: true,
+                    hasRenderablePreviewArea: false,
+                    vertices:
+                    [
+                        CreatePvrTaSpriteVertexSummary(5, 7),
+                        CreatePvrTaSpriteVertexSummary(5, 7),
+                        CreatePvrTaSpriteVertexSummary(5, 9),
+                        CreatePvrTaSpriteVertexSummary(5, 9)
+                    ])
+            ]);
+
+        var diagnostics = summary.PvrTaDiagnostics;
+
+        Assert.Equal(320, diagnostics.PreviewWidth);
+        Assert.Equal(1, diagnostics.StripCount);
+        Assert.Equal(1, diagnostics.StripTriangleCount);
+        Assert.Equal(1, diagnostics.SpriteCount);
+        Assert.Equal(1, diagnostics.DegenerateSpriteCount);
+        Assert.Equal(-1, diagnostics.CombinedBounds.MinX);
+        Assert.Equal(1, diagnostics.CombinedBounds.MinY);
+        Assert.Equal(321, diagnostics.CombinedBounds.MaxX);
+        Assert.Equal(9, diagnostics.CombinedBounds.MaxY);
+        Assert.Equal(1, diagnostics.CombinedBounds.NegativeXCount);
+        Assert.Equal(1, diagnostics.CombinedBounds.RightClippedCount);
+        Assert.Equal(1, diagnostics.CombinedBounds.ZeroWidthCount);
+        Assert.Equal(2, diagnostics.TextureModes.Count);
+        Assert.Contains(diagnostics.TextureModes, mode => mode.PrimitiveKind == "strip" && mode.Count == 1 && !mode.TextureEnabled);
+        Assert.Contains(diagnostics.TextureModes, mode => mode.PrimitiveKind == "sprite" && mode.Count == 1 && !mode.TextureEnabled);
+    }
+
     private static DreamcastRunSummary CreateSummary(
         ulong vblankEvents,
         ulong hardwareTicks,
@@ -1004,7 +1059,8 @@ public class DreamcastFixtureRunnerTests
         uint? headerPc = null,
         uint? controlPc = null,
         uint? firstPayloadPc = null,
-        uint? lastPayloadPc = null)
+        uint? lastPayloadPc = null,
+        IReadOnlyList<DreamcastPvrTaSpriteVertexSummary>? vertices = null)
     {
         var header = new DreamcastPvrTaCommandWrite(
             0x1000_0000,
@@ -1041,8 +1097,8 @@ public class DreamcastFixtureRunnerTests
             "0x0000",
             hasFinitePreviewCoordinates,
             hasRenderablePreviewArea,
-            0,
-            []);
+            vertices?.Count ?? 0,
+            vertices ?? []);
     }
 
     private static DreamcastPvrTaCommandWrite ToCommandWrite(DreamcastPvrTaCommandWriteSummary write) =>
@@ -1086,6 +1142,28 @@ public class DreamcastFixtureRunnerTests
             $"0x{yValue:X8}",
             0x0000_F800,
             "0x0000F800");
+    }
+
+    private static DreamcastPvrTaSpriteVertexSummary CreatePvrTaSpriteVertexSummary(int x, int y)
+    {
+        var xValue = BitConverter.SingleToUInt32Bits(x);
+        var yValue = BitConverter.SingleToUInt32Bits(y);
+        return new DreamcastPvrTaSpriteVertexSummary(
+            "A",
+            x,
+            y,
+            1.0f,
+            0x3F80_0000,
+            "0x3F800000",
+            xValue,
+            $"0x{xValue:X8}",
+            yValue,
+            $"0x{yValue:X8}",
+            0.0f,
+            0.0f,
+            0,
+            "0x00000000",
+            true);
     }
 
     private static IReadOnlyList<DreamcastPvrTaListSummary> CreatePvrTaLists(IReadOnlyList<DreamcastPvrTaCommandWriteSummary> taWrites) =>
