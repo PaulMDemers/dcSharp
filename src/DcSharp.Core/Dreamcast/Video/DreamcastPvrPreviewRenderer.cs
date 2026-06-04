@@ -58,6 +58,7 @@ public static class DreamcastPvrPreviewRenderer
         var minPreviewY = Math.Max((int)MathF.Floor(ordered.Min(vertex => vertex.Y)), 0);
         var maxPreviewX = Math.Clamp((int)MathF.Ceiling(ordered.Max(vertex => vertex.X)), 0, previewWidth - 1);
         var maxPreviewY = Math.Max((int)MathF.Ceiling(ordered.Max(vertex => vertex.Y)), 0);
+        var wrotePixel = false;
 
         for (var y = minPreviewY; y <= maxPreviewY; y++)
         {
@@ -71,7 +72,59 @@ public static class DreamcastPvrPreviewRenderer
                 }
 
                 var pixelIndex = PreviewPixelIndex(x, y, previewWidth);
-                WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
+                wrotePixel |= WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
+            }
+        }
+
+        if (!wrotePixel)
+        {
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth);
+        }
+        else if (IsThinSprite(ordered))
+        {
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth);
+        }
+    }
+
+    private static bool IsThinSprite(IReadOnlyList<DreamcastPvrPreviewSpriteVertex> vertices)
+    {
+        var width = vertices.Max(vertex => vertex.X) - vertices.Min(vertex => vertex.X);
+        var height = vertices.Max(vertex => vertex.Y) - vertices.Min(vertex => vertex.Y);
+        return (width > 0.0f && width < 1.0f) || (height > 0.0f && height < 1.0f);
+    }
+
+    private static void RenderSubpixelSpriteFootprint(
+        DreamcastPvrTaSprite sprite,
+        IReadOnlyList<DreamcastPvrPreviewSpriteVertex> vertices,
+        Span<byte> vram,
+        int previewWidth)
+    {
+        var minX = vertices.Min(vertex => vertex.X);
+        var minY = vertices.Min(vertex => vertex.Y);
+        var maxX = vertices.Max(vertex => vertex.X);
+        var maxY = vertices.Max(vertex => vertex.Y);
+        var centerX = (minX + maxX) * 0.5f;
+        var centerY = (minY + maxY) * 0.5f;
+        var sourceU = vertices.Average(vertex => vertex.U);
+        var sourceV = vertices.Average(vertex => vertex.V);
+        if (maxX - minX < maxY - minY)
+        {
+            var x = Math.Clamp((int)MathF.Floor(centerX), 0, previewWidth - 1);
+            var startY = Math.Max((int)MathF.Floor(minY), 0);
+            var endY = Math.Max((int)MathF.Ceiling(maxY), 0);
+            for (var y = startY; y <= endY; y++)
+            {
+                WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+            }
+        }
+        else
+        {
+            var y = Math.Max((int)MathF.Floor(centerY), 0);
+            var startX = Math.Clamp((int)MathF.Floor(minX), 0, previewWidth - 1);
+            var endX = Math.Clamp((int)MathF.Ceiling(maxX), 0, previewWidth - 1);
+            for (var x = startX; x <= endX; x++)
+            {
+                WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
             }
         }
     }

@@ -291,6 +291,31 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void RendersSubpixelSpriteFootprintForThinRenderableQuad()
+    {
+        const int previewWidth = 640;
+        var vram = new byte[previewWidth * 8 * 2];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(250, 2, 0.0f, 0.0f), (250, 2, 0.0f, 0.0f), (250, 4, 0.0f, 0.0f), (250, 4, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00,
+                xValues:
+                [
+                    0x437A_0000,
+                    0x437A_3800,
+                    0x437A_3800,
+                    0x437A_0000
+                ]),
+            vram,
+            previewWidth,
+            useScreenCoordinates: true);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 250, 3, previewWidth));
+    }
+
+    [Fact]
     public void LaterStripOverwritesSpritePreviewPixels()
     {
         var vram = new byte[4096];
@@ -1041,7 +1066,8 @@ public class DreamcastPvrPreviewRendererTests
         bool vFlip = false,
         string textureShading = "Replace",
         uint pixelFormat = 1,
-        uint textureBase = 0)
+        uint textureBase = 0,
+        IReadOnlyList<uint>? xValues = null)
     {
         var mode1 = textureEnabled ? 0x0200_0000u : 0;
         var mode2 = (BlendBits(blendSrc) << 29)
@@ -1086,21 +1112,25 @@ public class DreamcastPvrPreviewRendererTests
             color,
             $"0x{color:X4}",
             [],
-            points.Select((point, index) => new DreamcastPvrTaSpriteVertex(
-                ((char)('A' + index)).ToString(),
-                point.X,
-                point.Y,
-                1.0f,
-                SingleToUInt32Bits(1.0f),
-                "0x3F800000",
-                SingleToUInt32Bits((float)point.X),
-                $"0x{SingleToUInt32Bits((float)point.X):X8}",
-                SingleToUInt32Bits((float)point.Y),
-                $"0x{SingleToUInt32Bits((float)point.Y):X8}",
-                point.U,
-                point.V,
-                0,
-                "0x00000000")).ToArray());
+            points.Select((point, index) =>
+            {
+                var xValue = xValues?[index] ?? SingleToUInt32Bits((float)point.X);
+                return new DreamcastPvrTaSpriteVertex(
+                    ((char)('A' + index)).ToString(),
+                    point.X,
+                    point.Y,
+                    1.0f,
+                    SingleToUInt32Bits(1.0f),
+                    "0x3F800000",
+                    xValue,
+                    $"0x{xValue:X8}",
+                    SingleToUInt32Bits((float)point.Y),
+                    $"0x{SingleToUInt32Bits((float)point.Y):X8}",
+                    point.U,
+                    point.V,
+                    0,
+                    "0x00000000");
+            }).ToArray());
     }
 
     private static DreamcastPvrTaPolygonHeaderPayload? CreateHeaderPayload(

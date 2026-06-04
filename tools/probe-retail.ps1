@@ -182,16 +182,7 @@ if ($Doa2SpriteProbe) {
             "Dead or Alive 2 sprite source probe" `
             $doaSpriteReport `
             "renderable" `
-            1470 `
-            "0x8C1007FA" `
-            "0x8C10084C" `
-            "0x8C10084C-0x8C100850"
-
-        Assert-PvrTaSpriteSourceGroup `
-            "Dead or Alive 2 sprite source probe" `
-            $doaSpriteReport `
-            "degenerate" `
-            31431 `
+            32901 `
             "0x8C1007FA" `
             "0x8C10084C" `
             "0x8C10084C-0x8C100850"
