@@ -19,9 +19,14 @@ public sealed class DreamcastPvrTaState
     private readonly List<DreamcastPvrTaVertex> currentVertices = [];
     private readonly List<DreamcastPvrTaStrip> completedStrips = [];
     private readonly List<DreamcastPvrTaSprite> completedSprites = [];
+    private int droppedShortStripCount;
+    private int droppedZeroColorPrimitiveCount;
+    private int droppedMixedFlatColorStripCount;
 
     public IReadOnlyList<DreamcastPvrTaStrip> CompletedStrips => completedStrips;
     public IReadOnlyList<DreamcastPvrTaSprite> CompletedSprites => completedSprites;
+    public DreamcastPvrTaAssemblyDiagnostics AssemblyDiagnostics =>
+        new(droppedShortStripCount, droppedZeroColorPrimitiveCount, droppedMixedFlatColorStripCount);
 
     public DreamcastPvrTaRenderCommand? Accept(DreamcastPvrTaCommandWrite write)
     {
@@ -173,6 +178,7 @@ public sealed class DreamcastPvrTaState
     {
         if (vertex is null || vertex.Rgb565 == 0)
         {
+            droppedZeroColorPrimitiveCount++;
             ResetStrip();
             return null;
         }
@@ -180,6 +186,7 @@ public sealed class DreamcastPvrTaState
         var color = vertex.Rgb565;
         if (!IsGouraudHeader(currentHeaderValue) && currentVertices.Count > 0 && currentVertices[0].Rgb565 != color)
         {
+            droppedMixedFlatColorStripCount++;
             ResetStrip();
             return null;
         }
@@ -191,6 +198,11 @@ public sealed class DreamcastPvrTaState
         }
 
         var canRender = currentVertices.Count >= 3;
+        if (!canRender)
+        {
+            droppedShortStripCount++;
+        }
+
         var stripColor = currentVertices[0].Rgb565;
         var strip = canRender
             ? new DreamcastPvrTaStrip(
@@ -259,6 +271,11 @@ public sealed class DreamcastPvrTaState
         currentVertices.Clear();
     }
 }
+
+public sealed record DreamcastPvrTaAssemblyDiagnostics(
+    int DroppedShortStripCount,
+    int DroppedZeroColorPrimitiveCount,
+    int DroppedMixedFlatColorStripCount);
 
 public sealed record DreamcastPvrTaSpriteHeaderPayload(
     string Region,

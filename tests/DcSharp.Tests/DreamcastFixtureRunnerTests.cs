@@ -1050,7 +1050,8 @@ public class DreamcastFixtureRunnerTests
                 .GroupBy(write => write.Kind, StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
-                .ToArray());
+                .ToArray(),
+            new DreamcastPvrTaAssemblyDiagnosticsSummary(0, 0, 0));
     }
 
     private static DreamcastPvrTaSpriteSummary CreatePvrTaSpriteSummary(

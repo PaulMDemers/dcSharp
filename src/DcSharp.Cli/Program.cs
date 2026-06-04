@@ -2198,6 +2198,7 @@ static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostic
     return
         $"previewW={diagnostics.PreviewWidth} fbNonZero={diagnostics.FramebufferNonZeroBytes} first={diagnostics.FirstNonZeroOffsetHex ?? "none"} checksum={diagnostics.FramebufferChecksumHex} " +
         $"prims=strips:{diagnostics.StripCount}/tris:{diagnostics.StripTriangleCount}/sprites:{diagnostics.SpriteCount} " +
+        $"stripDrops=short:{diagnostics.DroppedShortStripCount}/zero:{diagnostics.DroppedZeroColorPrimitiveCount}/mixed:{diagnostics.DroppedMixedFlatColorStripCount} " +
         $"sprites=renderable:{diagnostics.RenderableSpriteCount}/degenerate:{diagnostics.DegenerateSpriteCount}/nonfinite:{diagnostics.NonfiniteSpriteCount} " +
         $"bounds=all:{FormatPvrTaBounds(diagnostics.CombinedBounds)} strips:{FormatPvrTaBounds(diagnostics.StripBounds)} sprites:{FormatPvrTaBounds(diagnostics.SpriteBounds)} " +
         $"clipRisk=x<0:{diagnostics.CombinedBounds.NegativeXCount}/x>=w:{diagnostics.CombinedBounds.RightClippedCount}/y<0:{diagnostics.CombinedBounds.NegativeYCount} " +

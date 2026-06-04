@@ -916,6 +916,7 @@ public sealed class DreamcastMemory
             pvrTaCommandWrites.ToArray(),
             pvrTaState.CompletedStrips.ToArray(),
             pvrTaState.CompletedSprites.ToArray(),
+            pvrTaState.AssemblyDiagnostics,
             (byte[])pvrVram.Clone());
     }
 

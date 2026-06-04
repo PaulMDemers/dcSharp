@@ -235,6 +235,22 @@ public class DreamcastPvrTaStateTests
 
         Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0000)));
         Assert.Null(AcceptVertexPacket(state, "VertexEndOfStrip", 1, 1, 0xF800));
+
+        Assert.Empty(state.CompletedStrips);
+        Assert.Equal(1, state.AssemblyDiagnostics.DroppedMixedFlatColorStripCount);
+        Assert.Equal(1, state.AssemblyDiagnostics.DroppedShortStripCount);
+    }
+
+    [Fact]
+    public void CountsZeroColorPrimitiveDrops()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("PolygonHeader", 0x8084_0000)));
+        Assert.Null(AcceptVertexPacket(state, "VertexEndOfStrip", 1, 1, 0x0000));
+
+        Assert.Empty(state.CompletedStrips);
+        Assert.Equal(1, state.AssemblyDiagnostics.DroppedZeroColorPrimitiveCount);
     }
 
     [Fact]
