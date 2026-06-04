@@ -385,6 +385,32 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void TranslucentSpriteListBlendsArgbAlphaWhenAlphaModeIsDisabled()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 0.0f, 0.0f), (3, 3, 0.0f, 0.0f), (1, 3, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram);
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0xF800,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 0.0f, 0.0f), (3, 3, 0.0f, 0.0f), (1, 3, 0.0f, 0.0f)],
+                argb: 0x80FF_0000,
+                listType: 2,
+                listTypeName: "TranslucentPolygon",
+                headerValue: 0xA200_0001),
+            vram);
+
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 1, 0));
+        Assert.Equal(0x83E0, ReadRgb565(vram, 0, 1));
+    }
+
+    [Fact]
     public void PunchThroughListDiscardsLowAlphaPreviewPixels()
     {
         var vram = new byte[4096];
@@ -1094,6 +1120,9 @@ public class DreamcastPvrPreviewRendererTests
         string textureShading = "Replace",
         uint pixelFormat = 1,
         uint textureBase = 0,
+        int listType = 0,
+        string listTypeName = "OpaquePolygon",
+        uint headerValue = 0xA084_0001,
         IReadOnlyList<uint>? xValues = null)
     {
         var mode1 = textureEnabled ? 0x0200_0000u : 0;
@@ -1111,19 +1140,19 @@ public class DreamcastPvrPreviewRendererTests
             "0x10000000",
             "TA_INPUT",
             "SpriteHeader",
-            0,
-            "OpaquePolygon",
+            listType,
+            listTypeName,
             false,
             4,
-            0xA084_0001,
-            "0xA0840001");
+            headerValue,
+            $"0x{headerValue:X8}");
         var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [mode1, mode2, mode3, argb, 0, 0, 0]);
         return new DreamcastPvrTaSprite(
             "TA_INPUT",
-            0,
-            "OpaquePolygon",
-            0xA084_0001,
-            "0xA0840001",
+            listType,
+            listTypeName,
+            headerValue,
+            $"0x{headerValue:X8}",
             null,
             null,
             payload,

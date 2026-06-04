@@ -207,6 +207,7 @@ public static class DreamcastPvrPreviewRenderer
             return false;
         }
 
+        var sourceAlpha = SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex);
         if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
         {
             source = source with
@@ -214,9 +215,21 @@ public static class DreamcastPvrPreviewRenderer
                 Rgb565 = BlendRgb565(
                     source.Rgb565,
                     ReadRgb565Pixel(vram, pixelIndex),
-                    SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex),
+                    sourceAlpha,
                     sprite.HeaderPayload.Mode2Fields.BlendSrcName,
                     sprite.HeaderPayload.Mode2Fields.BlendDstName)
+            };
+        }
+        else if (IsTranslucent(sprite) && sourceAlpha < byte.MaxValue)
+        {
+            source = source with
+            {
+                Rgb565 = BlendRgb565(
+                    source.Rgb565,
+                    ReadRgb565Pixel(vram, pixelIndex),
+                    sourceAlpha,
+                    "SrcAlpha",
+                    "InverseSrcAlpha")
             };
         }
 
@@ -472,6 +485,9 @@ public static class DreamcastPvrPreviewRenderer
 
     private static bool IsPunchThrough(DreamcastPvrTaSprite sprite) =>
         string.Equals(sprite.ListTypeName, "PunchThroughPolygon", StringComparison.Ordinal);
+
+    private static bool IsTranslucent(DreamcastPvrTaSprite sprite) =>
+        string.Equals(sprite.ListTypeName, "TranslucentPolygon", StringComparison.Ordinal);
 
     private static DreamcastPvrPreviewSourceSample SourceSample(
         DreamcastPvrTaStrip strip,
