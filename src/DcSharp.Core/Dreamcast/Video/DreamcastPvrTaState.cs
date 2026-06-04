@@ -372,6 +372,11 @@ public sealed record DreamcastPvrTaSpriteVertex(
     public bool HasFinitePosition => float.IsFinite(RawX) && float.IsFinite(RawY) && float.IsFinite(Z);
 }
 
+public sealed record DreamcastPvrTaSpritePayloadWord(
+    string Name,
+    uint Value,
+    string ValueHex);
+
 public sealed record DreamcastPvrTaSprite(
     string Region,
     int? ListType,
@@ -392,6 +397,7 @@ public sealed record DreamcastPvrTaSprite(
     bool EndOfStrip,
     ushort Rgb565,
     string Rgb565Hex,
+    IReadOnlyList<DreamcastPvrTaSpritePayloadWord> PayloadWords,
     IReadOnlyList<DreamcastPvrTaSpriteVertex> Vertices)
 {
     public bool HasFinitePreviewCoordinates =>

@@ -1226,6 +1226,15 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
             vertex.HasFinitePosition);
 }
 
+public sealed record DreamcastPvrTaSpritePayloadWordSummary(
+    string Name,
+    uint Value,
+    string ValueHex)
+{
+    public static DreamcastPvrTaSpritePayloadWordSummary FromWord(DreamcastPvrTaSpritePayloadWord word) =>
+        new(word.Name, word.Value, word.ValueHex);
+}
+
 public sealed record DreamcastPvrTaSpriteSummary(
     string Region,
     int? ListType,
@@ -1249,6 +1258,7 @@ public sealed record DreamcastPvrTaSpriteSummary(
     bool HasFinitePreviewCoordinates,
     bool HasRenderablePreviewArea,
     int VertexCount,
+    IReadOnlyList<DreamcastPvrTaSpritePayloadWordSummary> PayloadWords,
     IReadOnlyList<DreamcastPvrTaSpriteVertexSummary> Vertices)
 {
     public static DreamcastPvrTaSpriteSummary FromSprite(DreamcastPvrTaSprite sprite) =>
@@ -1275,6 +1285,7 @@ public sealed record DreamcastPvrTaSpriteSummary(
             sprite.HasFinitePreviewCoordinates,
             sprite.HasRenderablePreviewArea,
             sprite.Vertices.Count,
+            sprite.PayloadWords.Select(DreamcastPvrTaSpritePayloadWordSummary.FromWord).ToArray(),
             sprite.Vertices.Select(DreamcastPvrTaSpriteVertexSummary.FromVertex).ToArray());
 }
 

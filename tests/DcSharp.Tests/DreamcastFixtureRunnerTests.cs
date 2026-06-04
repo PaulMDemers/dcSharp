@@ -1098,6 +1098,7 @@ public class DreamcastFixtureRunnerTests
             hasFinitePreviewCoordinates,
             hasRenderablePreviewArea,
             vertices?.Count ?? 0,
+            [],
             vertices ?? []);
     }
 

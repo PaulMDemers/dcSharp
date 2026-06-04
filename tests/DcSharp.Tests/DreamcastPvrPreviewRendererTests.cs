@@ -1085,6 +1085,7 @@ public class DreamcastPvrPreviewRendererTests
             true,
             color,
             $"0x{color:X4}",
+            [],
             points.Select((point, index) => new DreamcastPvrTaSpriteVertex(
                 ((char)('A' + index)).ToString(),
                 point.X,

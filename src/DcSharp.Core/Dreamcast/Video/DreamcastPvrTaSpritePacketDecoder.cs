@@ -227,12 +227,38 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
                 EndOfStrip,
                 rgb565,
                 $"0x{rgb565:X4}",
+                PayloadWords(),
                 [
                     CreateVertex(AxValue ?? 0, AyValue ?? 0, AzValue ?? 0, "A", aUv.U, aUv.V, aUv.Value),
                     CreateVertex(BxValue ?? 0, ByValue ?? 0, BzValue ?? 0, "B", bUv.U, bUv.V, bUv.Value),
                     CreateVertex(CxValue ?? 0, CyValue ?? 0, CzValue ?? 0, "C", cUv.U, cUv.V, cUv.Value),
                     CreateVertex(DxValue ?? 0, DyValue ?? 0, InterpolateDz(AzValue ?? 0, BzValue ?? 0, CzValue ?? 0), "D", dUv.U, dUv.V, dUv.Value)
                 ]);
+        }
+
+        private IReadOnlyList<DreamcastPvrTaSpritePayloadWord> PayloadWords() =>
+        [
+            PayloadWord("Ax", AxValue),
+            PayloadWord("Ay", AyValue),
+            PayloadWord("Az", AzValue),
+            PayloadWord("Bx", BxValue),
+            PayloadWord("By", ByValue),
+            PayloadWord("Bz", BzValue),
+            PayloadWord("Cx", CxValue),
+            PayloadWord("Cy", CyValue),
+            PayloadWord("Cz", CzValue),
+            PayloadWord("Dx", DxValue),
+            PayloadWord("Dy", DyValue),
+            PayloadWord("Dummy0", Dummy0),
+            PayloadWord("Dummy1", Dummy1),
+            PayloadWord("Dummy2", Dummy2),
+            PayloadWord("Dummy3", Dummy3)
+        ];
+
+        private static DreamcastPvrTaSpritePayloadWord PayloadWord(string name, uint? value)
+        {
+            var raw = value ?? 0;
+            return new(name, raw, $"0x{raw:X8}");
         }
 
         private static DreamcastPvrTaSpriteVertex CreateVertex(uint xValue, uint yValue, uint zValue, string name, float u, float v, uint uvValue) =>

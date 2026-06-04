@@ -260,6 +260,31 @@ public class DreamcastPvrTaStateTests
         Assert.Equal("0xF0000000", sprite.ControlValueHex);
         Assert.True(sprite.EndOfStrip);
         Assert.Collection(
+            sprite.PayloadWords,
+            word =>
+            {
+                Assert.Equal("Ax", word.Name);
+                Assert.Equal("0x3F800000", word.ValueHex);
+            },
+            word =>
+            {
+                Assert.Equal("Ay", word.Name);
+                Assert.Equal("0x3F800000", word.ValueHex);
+            },
+            word => Assert.Equal("Az", word.Name),
+            word => Assert.Equal("Bx", word.Name),
+            word => Assert.Equal("By", word.Name),
+            word => Assert.Equal("Bz", word.Name),
+            word => Assert.Equal("Cx", word.Name),
+            word => Assert.Equal("Cy", word.Name),
+            word => Assert.Equal("Cz", word.Name),
+            word => Assert.Equal("Dx", word.Name),
+            word => Assert.Equal("Dy", word.Name),
+            word => Assert.Equal("Dummy0", word.Name),
+            word => Assert.Equal("Dummy1", word.Name),
+            word => Assert.Equal("Dummy2", word.Name),
+            word => Assert.Equal("Dummy3", word.Name));
+        Assert.Collection(
             sprite.Vertices,
             vertex =>
             {
