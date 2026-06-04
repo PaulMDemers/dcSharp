@@ -370,6 +370,8 @@ public sealed record DreamcastPvrTaSpriteVertex(
     public float RawX => BitConverter.UInt32BitsToSingle(XValue);
     public float RawY => BitConverter.UInt32BitsToSingle(YValue);
     public bool HasFinitePosition => float.IsFinite(RawX) && float.IsFinite(RawY) && float.IsFinite(Z);
+    public float PreviewX => RawX;
+    public float PreviewY => RawY;
 }
 
 public sealed record DreamcastPvrTaSpritePayloadWord(
@@ -410,10 +412,10 @@ public sealed record DreamcastPvrTaSprite(
 
     private static IReadOnlyList<DreamcastPvrTaSpriteVertex> OrderPreviewVertices(IReadOnlyList<DreamcastPvrTaSpriteVertex> vertices)
     {
-        var centerX = (float)vertices.Average(vertex => vertex.X);
-        var centerY = (float)vertices.Average(vertex => vertex.Y);
+        var centerX = (float)vertices.Average(vertex => vertex.PreviewX);
+        var centerY = (float)vertices.Average(vertex => vertex.PreviewY);
         return vertices
-            .OrderBy(vertex => MathF.Atan2(vertex.Y - centerY, vertex.X - centerX))
+            .OrderBy(vertex => MathF.Atan2(vertex.PreviewY - centerY, vertex.PreviewX - centerX))
             .ToArray();
     }
 
@@ -424,7 +426,7 @@ public sealed record DreamcastPvrTaSprite(
         {
             var current = vertices[index];
             var next = vertices[(index + 1) % vertices.Count];
-            area += (current.X * next.Y) - (next.X * current.Y);
+            area += (current.PreviewX * next.PreviewY) - (next.PreviewX * current.PreviewY);
         }
 
         return area * 0.5f;

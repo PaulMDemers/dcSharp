@@ -43,11 +43,11 @@ public static class DreamcastPvrPreviewRenderer
             return;
         }
 
-        var originX = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.X);
-        var originY = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.Y);
+        var originX = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewX);
+        var originY = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewY);
         var vertices = sprite.Vertices
             .Take(4)
-            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - originX, vertex.Y - originY, vertex.U, vertex.V))
+            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.PreviewX - originX, vertex.PreviewY - originY, vertex.U, vertex.V))
             .ToArray();
         var centerX = vertices.Average(vertex => vertex.X);
         var centerY = vertices.Average(vertex => vertex.Y);
@@ -78,11 +78,11 @@ public static class DreamcastPvrPreviewRenderer
 
     private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
     {
-        var originX = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.X);
-        var originY = useScreenCoordinates ? 0 : sprite.Vertices.Take(4).Min(vertex => vertex.Y);
+        var originX = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewX);
+        var originY = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewY);
         var vertices = sprite.Vertices
             .Take(4)
-            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.X - originX, vertex.Y - originY, vertex.U, vertex.V))
+            .Select(vertex => new DreamcastPvrPreviewSpriteVertex(vertex.PreviewX - originX, vertex.PreviewY - originY, vertex.U, vertex.V))
             .ToArray();
 
         for (var index = 0; index < vertices.Length; index++)

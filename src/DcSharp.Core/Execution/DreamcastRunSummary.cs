@@ -541,11 +541,11 @@ public sealed record DreamcastPvrTaDiagnosticsSummary(
     {
         const int previewWidth = 640;
         var stripBounds = DreamcastPvrTaBoundsSummary.FromGroups(
-            video.PvrTaStrips.Select(strip => strip.Vertices.Select(vertex => (vertex.X, vertex.Y))));
+            video.PvrTaStrips.Select(strip => strip.Vertices.Select(vertex => ((float)vertex.X, (float)vertex.Y))));
         var spriteBounds = DreamcastPvrTaBoundsSummary.FromGroups(
             video.PvrTaSprites
                 .Where(sprite => sprite.HasFinitePreviewCoordinates)
-                .Select(sprite => sprite.Vertices.Take(4).Select(vertex => (vertex.X, vertex.Y))));
+                .Select(sprite => sprite.Vertices.Take(4).Select(vertex => (vertex.RawX, vertex.RawY))));
         var combinedBounds = DreamcastPvrTaBoundsSummary.Combine(stripBounds, spriteBounds);
 
         return new(
@@ -569,10 +569,10 @@ public sealed record DreamcastPvrTaDiagnosticsSummary(
 public sealed record DreamcastPvrTaBoundsSummary(
     bool HasBounds,
     int SourceCount,
-    int? MinX,
-    int? MinY,
-    int? MaxX,
-    int? MaxY,
+    float? MinX,
+    float? MinY,
+    float? MaxX,
+    float? MaxY,
     int NegativeXCount,
     int RightClippedCount,
     int NegativeYCount,
@@ -581,14 +581,14 @@ public sealed record DreamcastPvrTaBoundsSummary(
 {
     public static DreamcastPvrTaBoundsSummary Empty { get; } = new(false, 0, null, null, null, null, 0, 0, 0, 0, 0);
 
-    public static DreamcastPvrTaBoundsSummary FromGroups(IEnumerable<IEnumerable<(int X, int Y)>> groups)
+    public static DreamcastPvrTaBoundsSummary FromGroups(IEnumerable<IEnumerable<(float X, float Y)>> groups)
     {
         const int previewWidth = 640;
         var sourceCount = 0;
-        int? minX = null;
-        int? minY = null;
-        int? maxX = null;
-        int? maxY = null;
+        float? minX = null;
+        float? minY = null;
+        float? maxX = null;
+        float? maxY = null;
         var negativeXCount = 0;
         var rightClippedCount = 0;
         var negativeYCount = 0;
@@ -1207,6 +1207,9 @@ public sealed record DreamcastPvrTaSpriteVertexSummary(
     string UvValueHex,
     bool HasFinitePosition)
 {
+    public float RawX => BitConverter.UInt32BitsToSingle(XValue);
+    public float RawY => BitConverter.UInt32BitsToSingle(YValue);
+
     public static DreamcastPvrTaSpriteVertexSummary FromVertex(DreamcastPvrTaSpriteVertex vertex) =>
         new(
             vertex.Name,

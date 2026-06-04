@@ -2207,8 +2207,11 @@ static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostic
 
 static string FormatPvrTaBounds(DreamcastPvrTaBoundsSummary bounds) =>
     bounds.HasBounds
-        ? $"{bounds.MinX},{bounds.MinY}-{bounds.MaxX},{bounds.MaxY}({bounds.SourceCount})"
+        ? $"{FormatNullableFloat(bounds.MinX)},{FormatNullableFloat(bounds.MinY)}-{FormatNullableFloat(bounds.MaxX)},{FormatNullableFloat(bounds.MaxY)}({bounds.SourceCount})"
         : "none";
+
+static string FormatNullableFloat(float? value) =>
+    value is { } concreteValue ? FormatFloat(concreteValue) : "-";
 
 static string FormatPvrTaTextureMode(DreamcastPvrTaTextureModeGroupSummary mode) =>
     $"{mode.PrimitiveKind}:{mode.ListTypeName ?? "none"}:{(mode.TextureEnabled ? "tex" : "flat")}:vq={mode.VqEnabled}:mip={mode.MipMapEnabled}:twid={!mode.NonTwiddled}:pix={mode.PixelFormatName}x{mode.Count}";
