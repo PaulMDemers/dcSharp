@@ -65,6 +65,25 @@ public class DreamcastPvrTaSpriteLogWriterTests
     }
 
     [Fact]
+    public void WritesSpriteTextureSamplesFromVram()
+    {
+        var sprite = CreateSpriteSummary();
+        var vram = new byte[0x2000];
+        vram[0x1234] = 0x01;
+        vram[0x1235] = 0x80;
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaSpriteTextureSampleTraceWriter.WriteText(writer, [sprite], vram, limit: null, previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("# sprites=1 matched=1 skipped=0 limit=all status=all vramBytes=8192", text);
+        Assert.Contains("#0 sample=fallbackAvg status=renderable region=TA_INPUT list=OpaquePolygon", text);
+        Assert.Contains("effectiveTexture=True mode1=0x80000000 mode2=0x941004C0 mode3=0x00001234", text);
+        Assert.Contains("texBase=0x00001234 texSize=8x8 texFormat=Argb1555 texLayout=twiddled texFilter=Nearest texShading=ModulateAlpha", text);
+        Assert.Contains("uv=0,0 adjustedUv=0,0 texel=0,0 texelIndex=0 byteOffset=0x00001234 rawTexel=0x8001 rgb565=0x0001 sampleAlpha=255 inBounds=True sampleable=True", text);
+    }
+
+    [Fact]
     public void FiltersByPreviewStatusAndPreservesOriginalIndexes()
     {
         var renderable = CreateSpriteSummary();
@@ -85,6 +104,7 @@ public class DreamcastPvrTaSpriteLogWriterTests
         using var writer = new StringWriter();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteLogWriter.WriteText(writer, [], limit: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteTextureSampleTraceWriter.WriteText(writer, [], [], limit: -1));
     }
 
     private static DreamcastPvrTaSpriteSummary CreateSpriteSummary(bool hasRenderablePreviewArea = true)

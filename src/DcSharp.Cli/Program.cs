@@ -402,6 +402,11 @@ static void BootSmoke(string path, string[] args)
         DumpPvrTaSpriteLog(result, options);
     }
 
+    if (options.PvrTaSpriteTextureSampleLogPath is not null)
+    {
+        DumpPvrTaSpriteTextureSampleLog(result, options);
+    }
+
     if (options.PvrTaSpriteSourceLogPath is not null)
     {
         DumpPvrTaSpriteSourceLog(result, options);
@@ -821,6 +826,11 @@ static void RunElf(string path, string[] args)
     if (options.PvrTaSpriteLogPath is not null)
     {
         DumpPvrTaSpriteLog(result, options);
+    }
+
+    if (options.PvrTaSpriteTextureSampleLogPath is not null)
+    {
+        DumpPvrTaSpriteTextureSampleLog(result, options);
     }
 
     if (options.PvrTaSpriteSourceLogPath is not null)
@@ -1388,6 +1398,18 @@ static void DumpPvrTaSpriteLog(DreamcastRunResult result, CliRunOptions options)
         options.PvrTaSpriteStatus);
 }
 
+static void DumpPvrTaSpriteTextureSampleLog(DreamcastRunResult result, CliRunOptions options)
+{
+    using var writer = CreateTextLog(options.PvrTaSpriteTextureSampleLogPath!);
+    var videoSummary = DreamcastVideoSummary.FromSnapshot(result.Video);
+    DreamcastPvrTaSpriteTextureSampleTraceWriter.WriteText(
+        writer,
+        videoSummary.PvrTaSprites,
+        result.Video.Vram,
+        options.PvrTaSpriteTextureSampleLogLimit,
+        options.PvrTaSpriteStatus);
+}
+
 static void DumpPvrTaSpriteSourceLog(DreamcastRunResult result, CliRunOptions options)
 {
     using var writer = CreateTextLog(options.PvrTaSpriteSourceLogPath!);
@@ -1600,6 +1622,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     var pvrTaLogLimit = 4096;
     string? pvrTaSpriteLogPath = null;
     var pvrTaSpriteLogLimit = 4096;
+    string? pvrTaSpriteTextureSampleLogPath = null;
+    var pvrTaSpriteTextureSampleLogLimit = 256;
     string? pvrTaSpriteSourceLogPath = null;
     var pvrTaSpriteSourceLogLimit = 256;
     string? pvrTaSpriteSqLogPath = null;
@@ -1747,6 +1771,14 @@ static CliRunOptions ParseRunOptions(string[] args)
                 break;
             case "--pvr-ta-sprite-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedPvrTaSpriteLogLimit):
                 pvrTaSpriteLogLimit = parsedPvrTaSpriteLogLimit;
+                index++;
+                break;
+            case "--pvr-ta-sprite-texture-sample-log" when index + 1 < args.Length:
+                pvrTaSpriteTextureSampleLogPath = args[index + 1];
+                index++;
+                break;
+            case "--pvr-ta-sprite-texture-sample-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedPvrTaSpriteTextureSampleLogLimit):
+                pvrTaSpriteTextureSampleLogLimit = parsedPvrTaSpriteTextureSampleLogLimit;
                 index++;
                 break;
             case "--pvr-ta-sprite-source-log" when index + 1 < args.Length:
@@ -1994,6 +2026,11 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--pvr-ta-sprite-log-limit must be zero or greater.");
     }
 
+    if (pvrTaSpriteTextureSampleLogLimit < 0)
+    {
+        throw new InvalidDataException("--pvr-ta-sprite-texture-sample-log-limit must be zero or greater.");
+    }
+
     if (pvrTaSpriteSourceLogLimit < 0)
     {
         throw new InvalidDataException("--pvr-ta-sprite-source-log-limit must be zero or greater.");
@@ -2152,6 +2189,8 @@ static CliRunOptions ParseRunOptions(string[] args)
         pvrTaLogLimit,
         pvrTaSpriteLogPath,
         pvrTaSpriteLogLimit,
+        pvrTaSpriteTextureSampleLogPath,
+        pvrTaSpriteTextureSampleLogLimit,
         pvrTaSpriteSourceLogPath,
         pvrTaSpriteSourceLogLimit,
         pvrTaSpriteSqLogPath,
@@ -2500,7 +2539,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --fpu-memory-address, --fpu-memory-pc, --memory-write-address, --memory-write-pc, --memory-read-address, and --memory-read-pc may be repeated for multiple ranges. --fpu-write-register and --fpu-memory-register may be repeated for multiple registers. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, --fpu-memory-instruction, and --pc-profile-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -2545,6 +2584,8 @@ internal sealed record CliRunOptions(
     int PvrTaLogLimit,
     string? PvrTaSpriteLogPath,
     int PvrTaSpriteLogLimit,
+    string? PvrTaSpriteTextureSampleLogPath,
+    int PvrTaSpriteTextureSampleLogLimit,
     string? PvrTaSpriteSourceLogPath,
     int PvrTaSpriteSourceLogLimit,
     string? PvrTaSpriteSqLogPath,
