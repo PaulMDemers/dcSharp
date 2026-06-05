@@ -640,6 +640,7 @@ public sealed class DreamcastRunner
     {
         if (!TryDecodeFpuMemoryTransfer(step, state, memory, out var transfer)
             || !ShouldCaptureRegister(transfer.Register, options.Register, options.Registers)
+            || !options.ContainsPc(transfer.Pc)
             || !options.ContainsAddress(transfer.Address))
         {
             return;
@@ -669,6 +670,7 @@ public sealed class DreamcastRunner
         var direction = string.Empty;
         var register = 0;
         var address = 0u;
+        var isStore = false;
 
         switch (lowNibble)
         {
@@ -681,6 +683,7 @@ public sealed class DreamcastRunner
                 direction = "store";
                 register = m;
                 address = state.R[0] + state.R[n];
+                isStore = true;
                 break;
             case 0x8:
                 direction = "load";
@@ -696,16 +699,22 @@ public sealed class DreamcastRunner
                 direction = "store";
                 register = m;
                 address = state.R[n];
+                isStore = true;
                 break;
             case 0xB:
                 direction = "store";
                 register = m;
                 address = state.R[n];
+                isStore = true;
                 break;
             default:
                 return false;
         }
 
+        var value = isStore ? state.Fr[register] : memory.ReadUInt32(address);
+        var valueHigh = doubleSize
+            ? (isStore ? state.Fr[(register + 1) & 0xF] : memory.ReadUInt32(address + 4))
+            : (uint?)null;
         transfer = new Sh4FpuMemoryTransfer(
             step.Instruction,
             step.Pc,
@@ -714,8 +723,8 @@ public sealed class DreamcastRunner
             direction,
             doubleSize ? $"dr{register & ~1}" : $"fr{register}",
             address,
-            memory.ReadUInt32(address),
-            doubleSize ? memory.ReadUInt32(address + 4) : null,
+            value,
+            valueHigh,
             byteSize,
             state.Fpscr);
         return true;
@@ -1166,8 +1175,12 @@ public sealed record DreamcastFpuMemoryWatchOptions(
     ulong? StartInstruction = null,
     ulong? EndInstruction = null,
     IReadOnlyList<DreamcastMemoryAddressRange>? AddressRanges = null,
-    IReadOnlyList<string>? Registers = null)
+    IReadOnlyList<string>? Registers = null,
+    IReadOnlyList<DreamcastTracePcRange>? PcRanges = null)
 {
+    public bool ContainsPc(uint pc) =>
+        PcRanges is not { Count: > 0 } || PcRanges.Any(range => range.Contains(pc));
+
     public bool ContainsAddress(uint address) =>
         AddressRanges is not { Count: > 0 } || AddressRanges.Any(range => range.Overlaps(address, 1));
 }

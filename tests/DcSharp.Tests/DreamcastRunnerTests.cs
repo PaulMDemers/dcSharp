@@ -345,13 +345,15 @@ public class DreamcastRunnerTests
     public void CapturesFpuMemoryTransferLogForSelectedRegister()
     {
         var raw = new byte[4];
-        raw[0] = 0x5B;
-        raw[1] = 0xFF;
+        raw[0] = 0x9D; // fldi1 fr5
+        raw[1] = 0xF5;
+        raw[2] = 0x5B; // fmov.s fr5,@-r15
+        raw[3] = 0xFF;
 
         var result = new DreamcastRunner().RunRawBinary(
             raw,
             new DreamcastRunOptions(
-                InstructionLimit: 1,
+                InstructionLimit: 2,
                 TraceTailLength: 0,
                 InitialStackPointer: 0x8C01_0100,
                 FpuMemoryWatch: new DreamcastFpuMemoryWatchOptions(
@@ -360,12 +362,13 @@ public class DreamcastRunnerTests
                     AddressRanges: [new DreamcastMemoryAddressRange(0x8C01_00F0, 0x8C01_0100)])));
 
         var transfer = Assert.Single(result.FpuMemoryTransfers);
-        Assert.Equal(1UL, transfer.Instruction);
-        Assert.Equal(0x8C01_0000u, transfer.Pc);
+        Assert.Equal(2UL, transfer.Instruction);
+        Assert.Equal(0x8C01_0002u, transfer.Pc);
         Assert.Equal(0xFF5B, transfer.Opcode);
         Assert.Equal("store", transfer.Direction);
         Assert.Equal("fr5", transfer.Register);
         Assert.Equal(0x8C01_00FCu, transfer.Address);
+        Assert.Equal(0x3F80_0000u, transfer.Value);
         Assert.Equal(4, transfer.Size);
         Assert.Contains("fmov.s fr5,@-r15", transfer.Trace, StringComparison.Ordinal);
     }
@@ -403,6 +406,32 @@ public class DreamcastRunnerTests
                 Assert.Equal("fr5", transfer.Register);
                 Assert.Equal(0x8C01_00F8u, transfer.Address);
             });
+    }
+
+    [Fact]
+    public void CapturesFpuMemoryTransferLogForSelectedPcRange()
+    {
+        var raw = new byte[4];
+        raw[0] = 0x4B; // fmov.s fr4,@-r15
+        raw[1] = 0xFF;
+        raw[2] = 0x5B; // fmov.s fr5,@-r15
+        raw[3] = 0xFF;
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 2,
+                TraceTailLength: 0,
+                InitialStackPointer: 0x8C01_0100,
+                FpuMemoryWatch: new DreamcastFpuMemoryWatchOptions(
+                    Limit: 4,
+                    PcRanges: [new DreamcastTracePcRange(0x8C01_0002, 0x8C01_0002)])));
+
+        var transfer = Assert.Single(result.FpuMemoryTransfers);
+        Assert.Equal(2UL, transfer.Instruction);
+        Assert.Equal(0x8C01_0002u, transfer.Pc);
+        Assert.Equal("fr5", transfer.Register);
+        Assert.Equal(0x8C01_00F8u, transfer.Address);
     }
 
     [Fact]
