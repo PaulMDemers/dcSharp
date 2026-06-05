@@ -159,6 +159,22 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void FormatsWatchedMemoryWriteProducerSource()
+    {
+        var access = new MemoryAccess(
+            MemoryAccessKind.Write,
+            0xE000_0024,
+            4,
+            0x4296_0000,
+            0x8C10_080A,
+            0x1E21);
+
+        Assert.Equal(
+            "op=0x1E21 source=r2 trace=\"mov.l r2,@(4,r14)\"",
+            DreamcastMemoryAccessProducerFormatter.Format(access));
+    }
+
+    [Fact]
     public void CapturesWatchedMemoryReadsByAddressRange()
     {
         var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(0x8C01_0002, 0x8C01_0005));
@@ -241,6 +257,23 @@ public class DreamcastMemoryTests
             memory.WatchedReads,
             first => Assert.Equal(0x8C01_0004u, first.Address),
             second => Assert.Equal(0x8C01_0008u, second.Address));
+    }
+
+    [Theory]
+    [InlineData(0x6252, "op=0x6252 target=r2 trace=\"mov.l @r5,r2\"")]
+    [InlineData(0x5351, "op=0x5351 target=r3 trace=\"mov.l @(4,r5),r3\"")]
+    [InlineData(0xD34A, "op=0xD34A target=r3 trace=\"mov.l @(296,pc),r3\"")]
+    public void FormatsWatchedMemoryReadTargets(ushort opcode, string expected)
+    {
+        var access = new MemoryAccess(
+            MemoryAccessKind.Read,
+            0x8C2B_6BC0,
+            4,
+            0x4280_0000,
+            0x8C10_0808,
+            opcode);
+
+        Assert.Equal(expected, DreamcastMemoryAccessProducerFormatter.Format(access));
     }
 
     [Fact]
