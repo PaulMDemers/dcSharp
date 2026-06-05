@@ -22,6 +22,7 @@ public sealed class Sh4Cpu
     {
         var pc = State.Pc;
         memory.CurrentInstructionPc = pc;
+        memory.CurrentInstructionOpcode = null;
         if (delayedBranchTarget is null && TryAcceptExternalInterrupt(pc, out var interruptTrace))
         {
             State.InstructionsExecuted++;
@@ -35,6 +36,7 @@ public sealed class Sh4Cpu
         }
 
         var opcode = memory.ReadInstructionUInt16(pc);
+        memory.CurrentInstructionOpcode = opcode;
         var trace = Execute(pc, opcode);
         State.InstructionsExecuted++;
 
@@ -2487,12 +2489,14 @@ public sealed class Sh4Cpu
         void WriteUInt32WithPc(uint address, uint value, uint pc)
         {
             memory.CurrentInstructionPc = pc;
+            memory.CurrentInstructionOpcode = memory.ReadInstructionUInt16(pc);
             memory.WriteUInt32(address, value);
         }
 
         void PrefetchWithPc(uint address, uint pc)
         {
             memory.CurrentInstructionPc = pc;
+            memory.CurrentInstructionOpcode = memory.ReadInstructionUInt16(pc);
             memory.Prefetch(address);
         }
 

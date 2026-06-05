@@ -179,6 +179,7 @@ public sealed class DreamcastMemory
     public IReadOnlyList<MemoryAccess> WatchedWrites => watchedWrites;
     public IReadOnlyList<byte> SerialOutput => serialOutput;
     public uint? CurrentInstructionPc { get; set; }
+    public ushort? CurrentInstructionOpcode { get; set; }
 
     public void ResetSystemRamWriteCounters()
     {
@@ -1922,7 +1923,7 @@ public sealed class DreamcastMemory
             return;
         }
 
-        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc));
+        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc, CurrentInstructionOpcode));
     }
 
     private void RecordWatchedRead(uint address, int size, uint value)
@@ -1932,7 +1933,7 @@ public sealed class DreamcastMemory
             return;
         }
 
-        watchedReads.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, value, CurrentInstructionPc));
+        watchedReads.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, value, CurrentInstructionPc, CurrentInstructionOpcode));
     }
 
     private void RecordSystemRamWrite(uint address, int length)
@@ -2578,7 +2579,10 @@ internal sealed class DreamcastMemoryRegionWriteCounter(string name, uint start,
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 
-public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value, uint? Pc = null);
+public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value, uint? Pc = null, ushort? Opcode = null)
+{
+    public string? OpcodeHex => Opcode is { } opcode ? $"0x{opcode:X4}" : null;
+}
 
 public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,

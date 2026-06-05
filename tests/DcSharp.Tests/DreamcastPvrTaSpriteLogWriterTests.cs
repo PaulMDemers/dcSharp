@@ -58,8 +58,9 @@ public class DreamcastPvrTaSpriteLogWriterTests
         Assert.Contains("# sprites=1 sqWrites=16 sqPackets=1 matched=1 skipped=0 limit=all status=all", text);
         Assert.Contains("#0 status=renderable region=TA_INPUT list=OpaquePolygon headerPc=0x8C1007FA controlFlushPc=0x8C10084C payloadFlushPcRange=0x8C10084C-0x8C100850", text);
         Assert.Contains("sqBase=0xE0000020 producerPcRange=0x8C100804-0x8C10084A", text);
-        Assert.Contains("controlProducer=Control@0xE0000020=0xF0000000,pc=0x8C100804", text);
-        Assert.Contains("payloadProducers=Ax@0xE0000024=0x3F800000,pc=0x8C10080A/Ay@0xE0000028=0x3F800000,pc=0x8C10080E", text);
+        Assert.Contains("controlProducer=Control@0xE0000020=0xF0000000,pc=0x8C100804,op=0x2E32 source=r3 trace=\"mov.l r3,@r14\"", text);
+        Assert.Contains("payloadProducers=Ax@0xE0000024=0x3F800000,pc=0x8C10080A,op=0x1E21 source=r2 trace=\"mov.l r2,@(4,r14)\"", text);
+        Assert.Contains("Az@0xE000002C=0x3F800000,pc=0x8C100810,op=0xFED7 source=fr13 trace=\"fmov.s fr13,@(r0,r14)\"", text);
         Assert.Contains("payloadWords=Ax=0x3F800000/Ay=0x3F800000/Az=0x3F800000/Bx=0x40400000", text);
     }
 
@@ -179,6 +180,25 @@ public class DreamcastPvrTaSpriteLogWriterTests
             0x8C10_0842,
             0x8C10_084A
         ];
+        ushort[] opcodes =
+        [
+            0x2E32,
+            0x1E21,
+            0x1E30,
+            0xFED7,
+            0x1E34,
+            0x1E25,
+            0xFED7,
+            0x1E37,
+            0x1E28,
+            0xFED7,
+            0x1E3A,
+            0x1E2B,
+            0x1E8C,
+            0x1E2D,
+            0x1E9E,
+            0x1E1F
+        ];
 
         return values
             .Select((value, index) => new MemoryAccess(
@@ -186,7 +206,8 @@ public class DreamcastPvrTaSpriteLogWriterTests
                 0xE000_0020u + (uint)(index * 4),
                 4,
                 value,
-                pcs[index]))
+                pcs[index],
+                opcodes[index]))
             .ToArray();
     }
 

@@ -79,7 +79,8 @@ public static class DreamcastPvrTaSpriteStoreQueueTraceWriter
                     wordIndex,
                     write.Address,
                     write.Value,
-                    write.Pc);
+                    write.Pc,
+                    write.Opcode);
             }
 
             if (complete)
@@ -179,7 +180,7 @@ public static class DreamcastPvrTaSpriteStoreQueueTraceWriter
     }
 
     private static string FormatProducer(StoreQueueProducerWord word, string name) =>
-        $"{name}@0x{word.Address:X8}=0x{word.Value:X8},pc={FormatPc(word.Pc)}";
+        $"{name}@0x{word.Address:X8}=0x{word.Value:X8},pc={FormatPc(word.Pc)},{DreamcastMemoryAccessProducerFormatter.Format(new MemoryAccess(MemoryAccessKind.Write, word.Address, 4, word.Value, word.Pc, word.Opcode))}";
 
     private static string FormatPayloadProducers(DreamcastPvrTaSpriteSummary sprite, StoreQueuePacket packet) =>
         sprite.PayloadWords.Count == 0
@@ -264,7 +265,7 @@ public static class DreamcastPvrTaSpriteStoreQueueTraceWriter
         public const int PayloadWordCount = WordCount - 1;
     }
 
-    private sealed record StoreQueueProducerWord(int Index, uint Address, uint Value, uint? Pc);
+    private sealed record StoreQueueProducerWord(int Index, uint Address, uint Value, uint? Pc, ushort? Opcode);
 
     private sealed record SpriteStoreQueueMatch(
         int SpriteIndex,

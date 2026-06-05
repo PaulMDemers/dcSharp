@@ -493,6 +493,7 @@ public class DreamcastRunnerTests
         Assert.Equal(4, access.Size);
         Assert.Equal(0u, access.Value);
         Assert.Equal(0x8C01_0002u, access.Pc);
+        Assert.Equal((ushort)0x2102, access.Opcode);
     }
 
     [Fact]
