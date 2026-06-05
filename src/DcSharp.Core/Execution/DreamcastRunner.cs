@@ -152,6 +152,22 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(ipBinAsicEventWaitSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (options.MemoryReadWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C02_DB34, 0x8C02_DB58)
+                        && cpu.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var segaRally2TimerDeltaSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(segaRally2TimerDeltaSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C01_79D8, 0x8C01_7A8A)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C01_23C2, 0x8C01_23C6)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C01_246E, 0x8C01_2480)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C01_20FC, 0x8C01_20FE)
+                        && cpu.TryFastForwardSegaRally2WinceSchedulerReturnToDispatch(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var segaRally2SchedulerReturnSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(segaRally2SchedulerReturnSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_ED90, 0x8C12_EDA0)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_9E20, 0x8C12_9E50)
                         && cpu.TryFastForwardDoa2VramClearLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var doa2VramClearSkippedInstructions))

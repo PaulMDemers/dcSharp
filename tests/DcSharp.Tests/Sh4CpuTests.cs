@@ -345,6 +345,150 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSegaRally2WinceTimerDeltaHelperReturn()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSegaRally2WinceTimerDeltaHelper(normalMemory);
+        WriteSegaRally2WinceTimerDeltaHelperData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSegaRally2WinceTimerDeltaHelper(fastMemory);
+        WriteSegaRally2WinceTimerDeltaHelperData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C02_DB24);
+        var fast = new Sh4Cpu(fastMemory, 0x8C02_DB24);
+        normal.State.Pr = 0x8C01_79D6;
+        fast.State.Pr = normal.State.Pr;
+
+        var normalStart = StepMany(normal, 8);
+        var fastStart = StepMany(fast, 8);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(fastStart, 14, out var skippedInstructions));
+        Assert.Equal(14UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSegaRally2WinceTimerDeltaHelperReturnWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSegaRally2WinceTimerDeltaHelper(memory);
+        WriteSegaRally2WinceTimerDeltaHelperData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C02_DB24);
+        cpu.State.Pr = 0x8C01_79D6;
+
+        var start = StepMany(cpu, 8);
+
+        Assert.False(cpu.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(start, 13, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C02_DB34u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSegaRally2WinceTimerDeltaHelperReturnWhenAccumulatorChanges()
+    {
+        var memory = new DreamcastMemory();
+        WriteSegaRally2WinceTimerDeltaHelper(memory);
+        WriteSegaRally2WinceTimerDeltaHelperData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C02_DB24);
+        cpu.State.Pr = 0x8C01_79D6;
+
+        var start = StepMany(cpu, 8);
+        memory.WriteUInt32(0x8C13_1888, 1);
+
+        Assert.False(cpu.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(start, 14, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSegaRally2WinceTimerDeltaHelperReturnWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSegaRally2WinceTimerDeltaHelper(memory);
+        WriteSegaRally2WinceTimerDeltaHelperData(memory);
+        memory.WriteUInt32(0x8C02_DB60, 0x8C13_8B88);
+        var cpu = new Sh4Cpu(memory, 0x8C02_DB24);
+        cpu.State.Pr = 0x8C01_79D6;
+
+        var start = StepMany(cpu, 8);
+
+        Assert.False(cpu.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(start, 14, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void FastForwardsSegaRally2WinceSchedulerReturnToDispatch()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSegaRally2WinceSchedulerReturnTail(normalMemory);
+        WriteSegaRally2WinceSchedulerReturnData(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSegaRally2WinceSchedulerReturnTail(fastMemory);
+        WriteSegaRally2WinceSchedulerReturnData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C01_79D6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C01_79D6);
+        InitializeSegaRally2WinceSchedulerReturnState(normal);
+        InitializeSegaRally2WinceSchedulerReturnState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSegaRally2WinceSchedulerReturnToDispatch(fastStart, 40, out var skippedInstructions));
+        Assert.Equal(40UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C13_6664), fastMemory.ReadUInt32(0x8C13_6664));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C13_64FC), fastMemory.ReadUInt32(0x8C13_64FC));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C13_6524), fastMemory.ReadUInt32(0x8C13_6524));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSegaRally2WinceSchedulerReturnToDispatchWhenFlagIsZero()
+    {
+        var memory = new DreamcastMemory();
+        WriteSegaRally2WinceSchedulerReturnTail(memory);
+        WriteSegaRally2WinceSchedulerReturnData(memory);
+        memory.WriteUInt32(0x8C13_64FC, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C01_79D6);
+        InitializeSegaRally2WinceSchedulerReturnState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSegaRally2WinceSchedulerReturnToDispatch(start, 40, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C01_79D8u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSegaRally2WinceSchedulerReturnToDispatchWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSegaRally2WinceSchedulerReturnTail(memory);
+        WriteSegaRally2WinceSchedulerReturnData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C01_79D6);
+        InitializeSegaRally2WinceSchedulerReturnState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSegaRally2WinceSchedulerReturnToDispatch(start, 39, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C01_79D8u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsDoa2VramClearLoop()
     {
         var memory = new DreamcastMemory();
@@ -7356,6 +7500,117 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C00_909E, 0xC808);
         WriteInstruction(memory, 0x8C00_90A0, 0x89FB);
         memory.WriteUInt32(0x8C00_90E8, 0xA05F_6900);
+    }
+
+    private static void WriteSegaRally2WinceTimerDeltaHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C02_DB24, 0xD50D);
+        WriteInstruction(memory, 0x8C02_DB26, 0xD40F);
+        WriteInstruction(memory, 0x8C02_DB28, 0x6752);
+        WriteInstruction(memory, 0x8C02_DB2A, 0xE0D8);
+        WriteInstruction(memory, 0x8C02_DB2C, 0x6642);
+        WriteInstruction(memory, 0x8C02_DB2E, 0x4028);
+        WriteInstruction(memory, 0x8C02_DB30, 0xE10C);
+        WriteInstruction(memory, 0x8C02_DB32, 0x051E);
+        WriteInstruction(memory, 0x8C02_DB34, 0x3570);
+        WriteInstruction(memory, 0x8C02_DB36, 0x8B04);
+        WriteInstruction(memory, 0x8C02_DB42, 0x6342);
+        WriteInstruction(memory, 0x8C02_DB44, 0x3630);
+        WriteInstruction(memory, 0x8C02_DB46, 0x8BF0);
+        WriteInstruction(memory, 0x8C02_DB48, 0xD205);
+        WriteInstruction(memory, 0x8C02_DB4A, 0x3758);
+        WriteInstruction(memory, 0x8C02_DB4C, 0x6222);
+        WriteInstruction(memory, 0x8C02_DB4E, 0x0277);
+        WriteInstruction(memory, 0x8C02_DB50, 0x031A);
+        WriteInstruction(memory, 0x8C02_DB52, 0x4329);
+        WriteInstruction(memory, 0x8C02_DB54, 0x363C);
+        WriteInstruction(memory, 0x8C02_DB56, 0x000B);
+        WriteInstruction(memory, 0x8C02_DB58, 0x6063);
+        memory.WriteUInt32(0x8C02_DB5C, 0x8C13_8B80);
+        memory.WriteUInt32(0x8C02_DB60, 0x8C13_8B84);
+        memory.WriteUInt32(0x8C02_DB64, 0x8C13_1888);
+    }
+
+    private static void WriteSegaRally2WinceTimerDeltaHelperData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C13_8B80, 0x0004_C4B4);
+        memory.WriteUInt32(0x8C13_1888, 0);
+        memory.WriteUInt32(0x8C13_8B84, 5);
+        memory.WriteUInt32(0xFFD8_000C, 0x0004_4871);
+    }
+
+    private static void WriteSegaRally2WinceSchedulerReturnTail(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C01_79D6, 0xD134);
+        WriteInstruction(memory, 0x8C01_79D8, 0x6112);
+        WriteInstruction(memory, 0x8C01_79DA, 0x2118);
+        WriteInstruction(memory, 0x8C01_79DC, 0x8F0C);
+        WriteInstruction(memory, 0x8C01_79DE, 0x6503);
+        WriteInstruction(memory, 0x8C01_79F8, 0xD12D);
+        WriteInstruction(memory, 0x8C01_79FA, 0x2888);
+        WriteInstruction(memory, 0x8C01_79FC, 0x2152);
+        WriteInstruction(memory, 0x8C01_79FE, 0x0229);
+        WriteInstruction(memory, 0x8C01_7A00, 0xD129);
+        WriteInstruction(memory, 0x8C01_7A02, 0x2888);
+        WriteInstruction(memory, 0x8C01_7A04, 0x2122);
+        WriteInstruction(memory, 0x8C01_7A06, 0xE200);
+        WriteInstruction(memory, 0x8C01_7A08, 0xD123);
+        WriteInstruction(memory, 0x8C01_7A0A, 0x8D2D);
+        WriteInstruction(memory, 0x8C01_7A0C, 0x2122);
+        WriteInstruction(memory, 0x8C01_7A68, 0xD10A);
+        WriteInstruction(memory, 0x8C01_7A6A, 0x6112);
+        WriteInstruction(memory, 0x8C01_7A6C, 0x2118);
+        WriteInstruction(memory, 0x8C01_7A6E, 0x8907);
+        WriteInstruction(memory, 0x8C01_7A80, 0x6083);
+        WriteInstruction(memory, 0x8C01_7A82, 0x7F10);
+        WriteInstruction(memory, 0x8C01_7A84, 0x4F26);
+        WriteInstruction(memory, 0x8C01_7A86, 0x69F6);
+        WriteInstruction(memory, 0x8C01_7A88, 0x000B);
+        WriteInstruction(memory, 0x8C01_7A8A, 0x68F6);
+        WriteInstruction(memory, 0x8C01_23C2, 0x5595);
+        WriteInstruction(memory, 0x8C01_23C4, 0x8800);
+        WriteInstruction(memory, 0x8C01_23C6, 0x8952);
+        WriteInstruction(memory, 0x8C01_246E, 0xD117);
+        WriteInstruction(memory, 0x8C01_2470, 0xD817);
+        WriteInstruction(memory, 0x8C01_2472, 0x410E);
+        WriteInstruction(memory, 0x8C01_2474, 0x6090);
+        WriteInstruction(memory, 0x8C01_2476, 0x2008);
+        WriteInstruction(memory, 0x8C01_2478, 0x8B99);
+        WriteInstruction(memory, 0x8C01_247A, 0x480B);
+        WriteInstruction(memory, 0x8C01_247C, 0x0009);
+        WriteInstruction(memory, 0x8C01_20FC, 0x000B);
+        WriteInstruction(memory, 0x8C01_20FE, 0x0009);
+        WriteInstruction(memory, 0x8C01_247E, 0xAF96);
+        WriteInstruction(memory, 0x8C01_2480, 0x0009);
+        memory.WriteUInt32(0x8C01_7AA8, 0x8C13_64FC);
+        memory.WriteUInt32(0x8C01_7AB0, 0x8C13_6664);
+        memory.WriteUInt32(0x8C01_7A98, 0x8C13_6524);
+        memory.WriteUInt32(0x8C01_7A94, 0x8C13_659C);
+        memory.WriteUInt32(0x8C01_24CC, 0x5000_8000);
+        memory.WriteUInt32(0x8C01_24D0, 0x8C01_20FC);
+    }
+
+    private static void WriteSegaRally2WinceSchedulerReturnData(DreamcastMemory memory)
+    {
+        memory.WriteUInt32(0x8C13_64FC, 1);
+        memory.WriteUInt32(0x8C13_6664, 0);
+        memory.WriteUInt32(0x8C13_6524, 1);
+        memory.WriteUInt32(0x8C13_659C, 0);
+        memory.WriteUInt32(0x8C13_1898, 0);
+        memory.WriteUInt32(0x8C20_0010, 0x8C01_23C2);
+        memory.WriteUInt32(0x8C20_0014, 0x8C13_1884);
+        memory.WriteUInt32(0x8C20_0018, 0x8C01_78EC);
+    }
+
+    private static void InitializeSegaRally2WinceSchedulerReturnState(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 2;
+        cpu.State.R[8] = 0;
+        cpu.State.R[9] = 0x8C13_6544;
+        cpu.State.R[15] = 0x8C20_0000;
+        cpu.State.Pr = 0x8C01_79D6;
+        cpu.State.Sr = 0x4000_8001;
+        cpu.State.T = true;
     }
 
     private static void WriteDoa2StringScanLoop(DreamcastMemory memory)

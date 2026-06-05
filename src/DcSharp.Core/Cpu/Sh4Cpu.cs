@@ -392,6 +392,126 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong helperTailInstructions = 14;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C02_DB32
+            || step.Opcode != 0x051E
+            || State.Pc != 0x8C02_DB34
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < helperTailInstructions)
+        {
+            return false;
+        }
+
+        if (!IsSegaRally2WinceTimerDeltaHelperTail())
+        {
+            return false;
+        }
+
+        var baseline = State.R[7];
+        var currentTimer = State.R[5];
+        if (baseline == currentTimer)
+        {
+            return false;
+        }
+
+        var accumulatorAddress = State.R[4];
+        var accumulator = memory.ReadUInt32(accumulatorAddress);
+        if (accumulator != State.R[6])
+        {
+            return false;
+        }
+
+        var multiplierAddress = memory.ReadUInt32(0x8C02_DB60);
+        var multiplier = memory.ReadUInt32(multiplierAddress);
+        var delta = unchecked(baseline - currentTimer);
+        var product = unchecked((uint)(unchecked((int)delta) * unchecked((int)multiplier)));
+        var increment = product >> 16;
+        var result = unchecked(accumulator + increment);
+
+        State.R[2] = multiplier;
+        State.R[3] = increment;
+        State.R[6] = result;
+        State.R[7] = delta;
+        State.R[0] = result;
+        State.Macl = product;
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += helperTailInstructions;
+        skippedInstructions = helperTailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSegaRally2WinceSchedulerReturnToDispatch(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong schedulerTailInstructions = 40;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C01_79D6
+            || step.Opcode != 0xD134
+            || State.Pc != 0x8C01_79D8
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < schedulerTailInstructions)
+        {
+            return false;
+        }
+
+        if (!IsSegaRally2WinceSchedulerReturnTail())
+        {
+            return false;
+        }
+
+        var flagAddress = State.R[1];
+        if (flagAddress != 0x8C13_64FC || memory.ReadUInt32(flagAddress) == 0 || State.R[8] != 0)
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        var restoredPr = memory.ReadUInt32(stack + 16);
+        var restoredR9 = memory.ReadUInt32(stack + 20);
+        var restoredR8 = memory.ReadUInt32(stack + 24);
+        if (restoredPr != 0x8C01_23C2 || restoredR9 != 0x8C13_1884 || restoredR8 != 0x8C01_78EC)
+        {
+            return false;
+        }
+
+        if (memory.ReadUInt32(0x8C13_659C) != 0 || memory.ReadByte(restoredR9) != 0)
+        {
+            return false;
+        }
+
+        var result = State.R[0];
+        var wrapperStatus = memory.ReadUInt32(restoredR9 + 20);
+        WriteUInt32AsInstruction(0x8C01_79FC, 0x8C13_6664, result);
+        WriteUInt32AsInstruction(0x8C01_7A04, 0x8C13_64FC, 1);
+        WriteUInt32AsInstruction(0x8C01_7A0C, 0x8C13_6524, 0);
+
+        State.R[0] = 0;
+        State.R[1] = 0x5000_8000;
+        State.R[2] = 0;
+        State.R[5] = wrapperStatus;
+        State.R[8] = 0x8C01_20FC;
+        State.R[9] = restoredR9;
+        State.R[15] = stack + 28;
+        State.Pr = 0x8C01_247E;
+        State.Sr = 0x5000_8000;
+        State.T = true;
+        State.Pc = 0x8C01_23AE;
+        State.InstructionsExecuted += schedulerTailInstructions;
+        skippedInstructions = schedulerTailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2VramClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -4595,6 +4715,71 @@ public sealed class Sh4Cpu
         immediateBranchTarget = null;
         return true;
     }
+
+    private bool IsSegaRally2WinceTimerDeltaHelperTail() =>
+        memory.ReadInstructionUInt16(0x8C02_DB34) == 0x3570
+        && memory.ReadInstructionUInt16(0x8C02_DB36) == 0x8B04
+        && memory.ReadInstructionUInt16(0x8C02_DB42) == 0x6342
+        && memory.ReadInstructionUInt16(0x8C02_DB44) == 0x3630
+        && memory.ReadInstructionUInt16(0x8C02_DB46) == 0x8BF0
+        && memory.ReadInstructionUInt16(0x8C02_DB48) == 0xD205
+        && memory.ReadInstructionUInt16(0x8C02_DB4A) == 0x3758
+        && memory.ReadInstructionUInt16(0x8C02_DB4C) == 0x6222
+        && memory.ReadInstructionUInt16(0x8C02_DB4E) == 0x0277
+        && memory.ReadInstructionUInt16(0x8C02_DB50) == 0x031A
+        && memory.ReadInstructionUInt16(0x8C02_DB52) == 0x4329
+        && memory.ReadInstructionUInt16(0x8C02_DB54) == 0x363C
+        && memory.ReadInstructionUInt16(0x8C02_DB56) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C02_DB58) == 0x6063
+        && memory.ReadUInt32(0x8C02_DB60) == 0x8C13_8B84;
+
+    private bool IsSegaRally2WinceSchedulerReturnTail() =>
+        memory.ReadInstructionUInt16(0x8C01_79D8) == 0x6112
+        && memory.ReadInstructionUInt16(0x8C01_79DA) == 0x2118
+        && memory.ReadInstructionUInt16(0x8C01_79DC) == 0x8F0C
+        && memory.ReadInstructionUInt16(0x8C01_79DE) == 0x6503
+        && memory.ReadInstructionUInt16(0x8C01_79F8) == 0xD12D
+        && memory.ReadInstructionUInt16(0x8C01_79FA) == 0x2888
+        && memory.ReadInstructionUInt16(0x8C01_79FC) == 0x2152
+        && memory.ReadInstructionUInt16(0x8C01_79FE) == 0x0229
+        && memory.ReadInstructionUInt16(0x8C01_7A00) == 0xD129
+        && memory.ReadInstructionUInt16(0x8C01_7A02) == 0x2888
+        && memory.ReadInstructionUInt16(0x8C01_7A04) == 0x2122
+        && memory.ReadInstructionUInt16(0x8C01_7A06) == 0xE200
+        && memory.ReadInstructionUInt16(0x8C01_7A08) == 0xD123
+        && memory.ReadInstructionUInt16(0x8C01_7A0A) == 0x8D2D
+        && memory.ReadInstructionUInt16(0x8C01_7A0C) == 0x2122
+        && memory.ReadInstructionUInt16(0x8C01_7A68) == 0xD10A
+        && memory.ReadInstructionUInt16(0x8C01_7A6A) == 0x6112
+        && memory.ReadInstructionUInt16(0x8C01_7A6C) == 0x2118
+        && memory.ReadInstructionUInt16(0x8C01_7A6E) == 0x8907
+        && memory.ReadInstructionUInt16(0x8C01_7A80) == 0x6083
+        && memory.ReadInstructionUInt16(0x8C01_7A82) == 0x7F10
+        && memory.ReadInstructionUInt16(0x8C01_7A84) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C01_7A86) == 0x69F6
+        && memory.ReadInstructionUInt16(0x8C01_7A88) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C01_7A8A) == 0x68F6
+        && memory.ReadInstructionUInt16(0x8C01_23C2) == 0x5595
+        && memory.ReadInstructionUInt16(0x8C01_23C4) == 0x8800
+        && memory.ReadInstructionUInt16(0x8C01_23C6) == 0x8952
+        && memory.ReadInstructionUInt16(0x8C01_246E) == 0xD117
+        && memory.ReadInstructionUInt16(0x8C01_2470) == 0xD817
+        && memory.ReadInstructionUInt16(0x8C01_2472) == 0x410E
+        && memory.ReadInstructionUInt16(0x8C01_2474) == 0x6090
+        && memory.ReadInstructionUInt16(0x8C01_2476) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C01_2478) == 0x8B99
+        && memory.ReadInstructionUInt16(0x8C01_247A) == 0x480B
+        && memory.ReadInstructionUInt16(0x8C01_247C) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C01_20FC) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C01_20FE) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C01_247E) == 0xAF96
+        && memory.ReadInstructionUInt16(0x8C01_2480) == 0x0009
+        && memory.ReadUInt32(0x8C01_7AA8) == 0x8C13_64FC
+        && memory.ReadUInt32(0x8C01_7AB0) == 0x8C13_6664
+        && memory.ReadUInt32(0x8C01_7A98) == 0x8C13_6524
+        && memory.ReadUInt32(0x8C01_7A94) == 0x8C13_659C
+        && memory.ReadUInt32(0x8C01_24CC) == 0x5000_8000
+        && memory.ReadUInt32(0x8C01_24D0) == 0x8C01_20FC;
 
     private static bool TryComputeSkippedInstructions(uint remainingIterations, uint bodyInstructionCount, out ulong skippedInstructions)
     {
