@@ -320,7 +320,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
 
-        Assert.False(memory.TryPeekUInt32(0x3304_41F0, out var value));
+        Assert.False(memory.TryPeekUInt32(0x1804_41F0, out var value));
 
         Assert.Equal(0u, value);
         Assert.Empty(memory.DeviceAccesses);
@@ -497,6 +497,22 @@ public class DreamcastMemoryTests
 
         Assert.Equal(0xF800, memory.ReadUInt16(0x0500_0000));
         Assert.Equal(0x07E0, memory.ReadUInt16(0xA500_0002));
+    }
+
+    [Fact]
+    public void MapsPvrVramThroughTaTextureApertures()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt16(0x1100_0000, 0xF800);
+        memory.WriteUInt16(0x1300_0002, 0x07E0);
+
+        Assert.Equal(0xF800, memory.ReadUInt16(0x0400_0000));
+        Assert.Equal(0x07E0, memory.ReadUInt16(0x0500_0002));
+        Assert.True(memory.TryGetPvrVramOffset(0x1100_0000, 2, out var texture64Offset));
+        Assert.True(memory.TryGetPvrVramOffset(0x1300_0002, 2, out var texture32Offset));
+        Assert.Equal(0, texture64Offset);
+        Assert.Equal(2, texture32Offset);
     }
 
     [Fact]

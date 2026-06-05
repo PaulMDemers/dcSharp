@@ -7,6 +7,8 @@ public class DreamcastDeviceDomainClassifierTests
     [Theory]
     [InlineData(0xA05F_8044u, MemoryAccessKind.Write, "pvr")]
     [InlineData(0x1000_0000u, MemoryAccessKind.Write, "pvr")]
+    [InlineData(0x1100_0000u, MemoryAccessKind.Write, "pvr")]
+    [InlineData(0x1300_0000u, MemoryAccessKind.Write, "pvr")]
     [InlineData(0xA070_0000u, MemoryAccessKind.Write, "aica")]
     [InlineData(0xA080_0000u, MemoryAccessKind.Write, "aica")]
     [InlineData(0xA05F_6C18u, MemoryAccessKind.Write, "maple")]

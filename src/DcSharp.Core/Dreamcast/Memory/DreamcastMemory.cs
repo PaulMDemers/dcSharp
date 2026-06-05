@@ -27,6 +27,8 @@ public sealed class DreamcastMemory
     private const uint SystemRamMirrorBytes = 32 * 1024 * 1024;
     private const uint PvrVram64PhysicalBase = 0x0400_0000;
     private const uint PvrVram32PhysicalBase = 0x0500_0000;
+    private const uint PvrTaTexture64PhysicalBase = 0x1100_0000;
+    private const uint PvrTaTexture32PhysicalBase = 0x1300_0000;
     private const int PvrVramByteCount = 8 * 1024 * 1024;
     private const uint P4Base = 0xE000_0000;
     private const uint ExternalRegisterBase = 0x005F_0000;
@@ -305,6 +307,14 @@ public sealed class DreamcastMemory
         else if (physical >= PvrVram64PhysicalBase && physical < PvrVram64PhysicalBase + PvrVramByteCount)
         {
             offset = (int)(physical - PvrVram64PhysicalBase);
+        }
+        else if (physical >= PvrTaTexture64PhysicalBase && physical < PvrTaTexture64PhysicalBase + PvrVramByteCount)
+        {
+            offset = (int)(physical - PvrTaTexture64PhysicalBase);
+        }
+        else if (physical >= PvrTaTexture32PhysicalBase && physical < PvrTaTexture32PhysicalBase + PvrVramByteCount)
+        {
+            offset = (int)(physical - PvrTaTexture32PhysicalBase);
         }
         else
         {

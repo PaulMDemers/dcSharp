@@ -48,7 +48,7 @@ public static class DreamcastDeviceDomainClassifier
             return Sh4;
         }
 
-        if (physical is >= 0x1000_0000 and < 0x1100_0000)
+        if (physical is >= 0x1000_0000 and < 0x1400_0000)
         {
             return Pvr;
         }
