@@ -842,6 +842,15 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
     bool Uv16Bit,
     string WidthBucket,
     string HeightBucket,
+    float MinWidth,
+    float AverageWidth,
+    float MaxWidth,
+    float MinHeight,
+    float AverageHeight,
+    float MaxHeight,
+    int MinFallbackPixels,
+    float AverageFallbackPixels,
+    int MaxFallbackPixels,
     int Count,
     uint? HeaderInstructionPc,
     string? HeaderInstructionPcHex,
@@ -878,26 +887,41 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
             .ThenBy(group => group.Key.ListTypeName ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(group => group.Key.WidthBucket, StringComparer.Ordinal)
             .ThenBy(group => group.Key.HeightBucket, StringComparer.Ordinal)
-            .Select(group => new DreamcastPvrTaSpriteShapeGroupSummary(
-                group.Key.PreviewStatus,
-                group.Key.ListTypeName,
-                group.Key.Rgb565Hex,
-                group.Key.ArgbHex,
-                group.Key.TextureEnabled,
-                group.Key.TexturePayload,
-                group.Key.Uv16Bit,
-                group.Key.WidthBucket,
-                group.Key.HeightBucket,
-                group.Count(),
-                group.Key.HeaderInstructionPc,
-                group.Key.HeaderInstructionPcHex,
-                group.Key.ControlInstructionPc,
-                group.Key.ControlInstructionPcHex,
-                group.Key.FirstPayloadInstructionPc,
-                group.Key.FirstPayloadInstructionPcHex,
-                group.Key.LastPayloadInstructionPc,
-                group.Key.LastPayloadInstructionPcHex,
-                FormatPayloadPcRange(group.Key.FirstPayloadInstructionPcHex, group.Key.LastPayloadInstructionPcHex)))
+            .Select(group =>
+            {
+                var widths = group.Select(SpriteWidth).Where(float.IsFinite).ToArray();
+                var heights = group.Select(SpriteHeight).Where(float.IsFinite).ToArray();
+                var fallbackPixels = group.Select(EstimatedFallbackPixelCount).ToArray();
+                return new DreamcastPvrTaSpriteShapeGroupSummary(
+                    group.Key.PreviewStatus,
+                    group.Key.ListTypeName,
+                    group.Key.Rgb565Hex,
+                    group.Key.ArgbHex,
+                    group.Key.TextureEnabled,
+                    group.Key.TexturePayload,
+                    group.Key.Uv16Bit,
+                    group.Key.WidthBucket,
+                    group.Key.HeightBucket,
+                    MinOrNaN(widths),
+                    AverageOrNaN(widths),
+                    MaxOrNaN(widths),
+                    MinOrNaN(heights),
+                    AverageOrNaN(heights),
+                    MaxOrNaN(heights),
+                    fallbackPixels.Length == 0 ? 0 : fallbackPixels.Min(),
+                    fallbackPixels.Length == 0 ? 0.0f : (float)fallbackPixels.Average(),
+                    fallbackPixels.Length == 0 ? 0 : fallbackPixels.Max(),
+                    group.Count(),
+                    group.Key.HeaderInstructionPc,
+                    group.Key.HeaderInstructionPcHex,
+                    group.Key.ControlInstructionPc,
+                    group.Key.ControlInstructionPcHex,
+                    group.Key.FirstPayloadInstructionPc,
+                    group.Key.FirstPayloadInstructionPcHex,
+                    group.Key.LastPayloadInstructionPc,
+                    group.Key.LastPayloadInstructionPcHex,
+                    FormatPayloadPcRange(group.Key.FirstPayloadInstructionPcHex, group.Key.LastPayloadInstructionPcHex));
+            })
             .ToArray();
 
     private static float SpriteWidth(DreamcastPvrTaSpriteSummary sprite) =>
@@ -944,6 +968,51 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
 
         return upper >= 1024 && value >= upper ? ">=1024" : $"{lower}-{upper}";
     }
+
+    private static int EstimatedFallbackPixelCount(DreamcastPvrTaSpriteSummary sprite)
+    {
+        const int previewWidth = 640;
+        var vertices = sprite.Vertices.Take(4).ToArray();
+        if (vertices.Length == 0 || vertices.Any(vertex => !vertex.HasFinitePosition))
+        {
+            return 0;
+        }
+
+        var minX = vertices.Min(vertex => vertex.RawX);
+        var minY = vertices.Min(vertex => vertex.RawY);
+        var maxX = vertices.Max(vertex => vertex.RawX);
+        var maxY = vertices.Max(vertex => vertex.RawY);
+        var width = maxX - minX;
+        var height = maxY - minY;
+        if (!float.IsFinite(width) || !float.IsFinite(height))
+        {
+            return 0;
+        }
+
+        if (width < height)
+        {
+            var startX = Math.Clamp((int)MathF.Floor(minX), 0, previewWidth - 1);
+            var endX = Math.Clamp((int)MathF.Floor(maxX), 0, previewWidth - 1);
+            var startY = Math.Max((int)MathF.Floor(minY), 0);
+            var endY = Math.Max((int)MathF.Ceiling(maxY), 0);
+            return Math.Max(0, endX - startX + 1) * Math.Max(0, endY - startY + 1);
+        }
+
+        var fallbackStartY = Math.Max((int)MathF.Floor(minY), 0);
+        var fallbackEndY = Math.Max((int)MathF.Floor(maxY), 0);
+        var fallbackStartX = Math.Clamp((int)MathF.Floor(minX), 0, previewWidth - 1);
+        var fallbackEndX = Math.Clamp((int)MathF.Ceiling(maxX), 0, previewWidth - 1);
+        return Math.Max(0, fallbackEndX - fallbackStartX + 1) * Math.Max(0, fallbackEndY - fallbackStartY + 1);
+    }
+
+    private static float MinOrNaN(IReadOnlyList<float> values) =>
+        values.Count == 0 ? float.NaN : values.Min();
+
+    private static float AverageOrNaN(IReadOnlyList<float> values) =>
+        values.Count == 0 ? float.NaN : (float)values.Average();
+
+    private static float MaxOrNaN(IReadOnlyList<float> values) =>
+        values.Count == 0 ? float.NaN : values.Max();
 
     private static string FormatPayloadPcRange(string? firstPayloadInstructionPcHex, string? lastPayloadInstructionPcHex) =>
         firstPayloadInstructionPcHex == lastPayloadInstructionPcHex

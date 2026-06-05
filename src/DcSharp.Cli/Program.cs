@@ -2232,7 +2232,7 @@ static string FormatPvrTaSpriteSourceGroups(IReadOnlyList<DreamcastPvrTaSpriteSo
 static string FormatPvrTaSpriteShapeGroups(IReadOnlyList<DreamcastPvrTaSpriteShapeGroupSummary> groups) =>
     string.Join(", ", groups
         .Take(8)
-        .Select(group => $"{group.PreviewStatus}:{group.Count} list={group.ListTypeName ?? "none"} color={group.Rgb565Hex}/argb={group.ArgbHex} tex={group.TextureEnabled} cmdTex={group.TexturePayload} uv16={group.Uv16Bit} size={group.WidthBucket}x{group.HeightBucket} pc=h:{group.HeaderInstructionPcHex ?? "-"}/c:{group.ControlInstructionPcHex ?? "-"}/p:{group.PayloadInstructionPcRangeHex}"));
+        .Select(group => $"{group.PreviewStatus}:{group.Count} list={group.ListTypeName ?? "none"} color={group.Rgb565Hex}/argb={group.ArgbHex} tex={group.TextureEnabled} cmdTex={group.TexturePayload} uv16={group.Uv16Bit} size={group.WidthBucket}x{group.HeightBucket} rawW={FormatFloat(group.MinWidth)}/{FormatFloat(group.AverageWidth)}/{FormatFloat(group.MaxWidth)} rawH={FormatFloat(group.MinHeight)}/{FormatFloat(group.AverageHeight)}/{FormatFloat(group.MaxHeight)} fallbackPx={group.MinFallbackPixels}/{FormatFloat(group.AverageFallbackPixels)}/{group.MaxFallbackPixels} pc=h:{group.HeaderInstructionPcHex ?? "-"}/c:{group.ControlInstructionPcHex ?? "-"}/p:{group.PayloadInstructionPcRangeHex}"));
 
 static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostics)
 {
