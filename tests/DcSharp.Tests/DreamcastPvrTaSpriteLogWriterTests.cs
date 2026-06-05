@@ -25,6 +25,22 @@ public class DreamcastPvrTaSpriteLogWriterTests
     }
 
     [Fact]
+    public void WritesGroupedSpriteSourceTrace()
+    {
+        var sprite = CreateSpriteSummary();
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaSpriteSourceTraceWriter.WriteText(writer, [sprite], limit: null, previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("# sprites=1 groups=1 skipped=0 limit=all status=all", text);
+        Assert.Contains("#0 status=renderable count=1 region=TA_INPUT list=OpaquePolygon headerPc=0x8C1007FA controlPc=0x8C10084C payloadPcRange=0x8C10084C-0x8C100850", text);
+        Assert.Contains("rawW=2/2/2 rawH=2/2/2 fallbackPx=9/9/9", text);
+        Assert.Contains("xRanges=A:1/1/1/B:3/3/3/C:1/1/1/D:3/3/3", text);
+        Assert.Contains("firstPayload=Ax=0x3F800000/Ay=0x3F800000/Az=0x3F800000/Bx=0x40400000", text);
+    }
+
+    [Fact]
     public void FiltersByPreviewStatusAndPreservesOriginalIndexes()
     {
         var renderable = CreateSpriteSummary();
