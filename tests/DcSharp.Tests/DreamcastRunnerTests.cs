@@ -365,6 +365,32 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesCpuSnapshotBeforeMatchingInstructionExecutes()
+    {
+        var raw = new byte[]
+        {
+            0x01, 0xE1, // mov #1,r1
+            0x01, 0x71  // add #1,r1
+        };
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 2,
+                TraceTailLength: 0,
+                CpuSnapshotCapture: new DreamcastCpuSnapshotCaptureOptions(
+                    Limit: 4,
+                    Ranges: [new DreamcastTracePcRange(0x8C01_0002, 0x8C01_0002)])));
+
+        var snapshot = Assert.Single(result.CpuSnapshots);
+        Assert.Equal(2UL, snapshot.Instruction);
+        Assert.Equal(0x8C01_0002u, snapshot.Pc);
+        Assert.Equal(0x7101, snapshot.Opcode);
+        Assert.Equal(1u, snapshot.State.R[1]);
+        Assert.Contains("add #1,r1", snapshot.Trace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CapturesFpuMemoryTransferLogForSelectedRegister()
     {
         var raw = new byte[4];

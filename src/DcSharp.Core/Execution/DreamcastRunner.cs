@@ -55,6 +55,7 @@ public sealed class DreamcastRunner
         var fpscrEvents = new List<Sh4FpscrEvent>();
         var fpuSnapshots = new List<Sh4FpuSnapshot>();
         var fpuMemoryTransfers = new List<Sh4FpuMemoryTransfer>();
+        var cpuSnapshots = new List<Sh4CpuSnapshot>();
         var pcProfile = options.PcProfile is null ? null : new Dictionary<uint, ulong>();
         var shouldSnapshotFpu = options.FpuAnomalyCapture is not null || options.FpuRegisterWatch is not null;
         var frBefore = shouldSnapshotFpu ? new uint[16] : null;
@@ -72,6 +73,9 @@ public sealed class DreamcastRunner
                 var shouldCaptureFpuWrites = ShouldCaptureFpuRegisterWrites(options.FpuRegisterWatch, fpuRegisterWrites, nextInstruction);
                 var shouldCaptureFpscr = ShouldCaptureFpscrEvents(options.FpscrWatch, fpscrEvents, nextInstruction);
                 var shouldCaptureFpuMemory = ShouldCaptureFpuMemoryTransfers(options.FpuMemoryWatch, fpuMemoryTransfers, nextInstruction);
+                var pendingCpuSnapshot = ShouldCaptureCpuSnapshot(options.CpuSnapshotCapture, cpuSnapshots, nextInstruction, cpu.State.Pc)
+                    ? CreateCpuSnapshot(nextInstruction, cpu.State, memory)
+                    : null;
                 var pendingFpuSnapshot = ShouldCaptureFpuSnapshot(options.FpuSnapshotCapture, fpuSnapshots, nextInstruction, cpu.State.Pc)
                     ? CreateFpuSnapshot(nextInstruction, cpu.State, memory)
                     : null;
@@ -104,6 +108,11 @@ public sealed class DreamcastRunner
                 if (pendingFpuSnapshot is not null)
                 {
                     fpuSnapshots.Add(pendingFpuSnapshot with { Trace = step.Trace });
+                }
+
+                if (pendingCpuSnapshot is not null)
+                {
+                    cpuSnapshots.Add(pendingCpuSnapshot with { Trace = step.Trace });
                 }
 
                 if (shouldCaptureFpuMemory)
@@ -546,12 +555,12 @@ public sealed class DreamcastRunner
 
                 if (ShouldStopOnDeviceAccess(options, memory.DeviceAccesses, deviceAccessCountBeforeStep, out var stopAccess, out var stopDetail))
                 {
-                    return DreamcastRunResult.DeviceAccessStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), stopAccess, stopDetail, CaptureFinalMemorySnapshot(options, memory))
+                    return DreamcastRunResult.DeviceAccessStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), stopAccess, stopDetail, CaptureFinalMemorySnapshot(options, memory))
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
             }
 
-            return DreamcastRunResult.InstructionLimit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), CaptureFinalMemorySnapshot(options, memory))
+            return DreamcastRunResult.InstructionLimit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), CaptureFinalMemorySnapshot(options, memory))
                 with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
         }
         catch (UnsupportedInstructionException ex)
@@ -559,21 +568,21 @@ public sealed class DreamcastRunner
             var serialOutput = memory.SerialOutput.ToArray();
             if (HasKosExitBanner(serialOutput) && !IsInExecutableSegment(load, ex.Pc))
             {
-                return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), serialOutput, memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message, CaptureFinalMemorySnapshot(options, memory))
+                return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), serialOutput, memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message, CaptureFinalMemorySnapshot(options, memory))
                     with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
             }
 
-            return DreamcastRunResult.UnsupportedInstruction(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message, CaptureFinalMemorySnapshot(options, memory))
+            return DreamcastRunResult.UnsupportedInstruction(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Pc, ex.Opcode, ex.Message, CaptureFinalMemorySnapshot(options, memory))
                 with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
         }
         catch (MemoryMapException ex)
         {
-            return DreamcastRunResult.MemoryFault(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message, CaptureFinalMemorySnapshot(options, memory))
+            return DreamcastRunResult.MemoryFault(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message, CaptureFinalMemorySnapshot(options, memory))
                 with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
         }
         catch (DreamcastFirmwareExitException ex)
         {
-            return DreamcastRunResult.FirmwareExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message, CaptureFinalMemorySnapshot(options, memory))
+            return DreamcastRunResult.FirmwareExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), ex.Message, CaptureFinalMemorySnapshot(options, memory))
                 with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
         }
     }
@@ -747,6 +756,27 @@ public sealed class DreamcastRunner
 
         return options.Ranges is not { Count: > 0 } || options.Ranges.Any(range => range.Contains(pc));
     }
+
+    private static bool ShouldCaptureCpuSnapshot(DreamcastCpuSnapshotCaptureOptions? options, List<Sh4CpuSnapshot> snapshots, ulong nextInstruction, uint pc)
+    {
+        if (options is null
+            || snapshots.Count >= options.Limit
+            || (options.StartInstruction is { } startInstruction && nextInstruction < startInstruction)
+            || (options.EndInstruction is { } endInstruction && nextInstruction > endInstruction))
+        {
+            return false;
+        }
+
+        return options.Ranges is not { Count: > 0 } || options.Ranges.Any(range => range.Contains(pc));
+    }
+
+    private static Sh4CpuSnapshot CreateCpuSnapshot(ulong instruction, Sh4State state, DreamcastMemory memory) =>
+        new(
+            instruction,
+            state.Pc,
+            memory.ReadInstructionUInt16(state.Pc),
+            string.Empty,
+            Sh4StateSnapshot.From(state, memory));
 
     private static Sh4FpuSnapshot CreateFpuSnapshot(ulong instruction, Sh4State state, DreamcastMemory memory) =>
         new(
@@ -1134,7 +1164,8 @@ public sealed record DreamcastRunOptions(
     DreamcastFpuSnapshotCaptureOptions? FpuSnapshotCapture = null,
     DreamcastFpuMemoryWatchOptions? FpuMemoryWatch = null,
     DreamcastPcProfileOptions? PcProfile = null,
-    DreamcastFinalMemorySnapshotOptions? FinalMemorySnapshot = null);
+    DreamcastFinalMemorySnapshotOptions? FinalMemorySnapshot = null,
+    DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null);
 
 public sealed record DreamcastFinalMemorySnapshotOptions(
     IReadOnlyList<DreamcastMemoryAddressRange> Ranges,
@@ -1174,6 +1205,12 @@ public sealed record DreamcastFpscrWatchOptions(
     bool IncludeReads = true);
 
 public sealed record DreamcastFpuSnapshotCaptureOptions(
+    int Limit = 4096,
+    IReadOnlyList<DreamcastTracePcRange>? Ranges = null,
+    ulong? StartInstruction = null,
+    ulong? EndInstruction = null);
+
+public sealed record DreamcastCpuSnapshotCaptureOptions(
     int Limit = 4096,
     IReadOnlyList<DreamcastTracePcRange>? Ranges = null,
     ulong? StartInstruction = null,
@@ -1319,6 +1356,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1335,6 +1373,7 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
@@ -1349,6 +1388,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1368,6 +1408,7 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
@@ -1382,6 +1423,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1401,6 +1443,7 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
@@ -1415,6 +1458,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1432,6 +1476,7 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
@@ -1446,6 +1491,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1463,6 +1509,7 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
@@ -1477,6 +1524,7 @@ public sealed record DreamcastRunResult(
         IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
         IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
         IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
         IReadOnlyList<MemoryAccess> deviceAccesses,
         IReadOnlyList<MemoryAccess> watchedMemoryWrites,
         IReadOnlyList<MemoryAccess> watchedMemoryReads,
@@ -1495,11 +1543,13 @@ public sealed record DreamcastRunResult(
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
     public IReadOnlyList<Sh4FpuSnapshot> FpuSnapshots { get; init; } = [];
     public IReadOnlyList<Sh4FpuMemoryTransfer> FpuMemoryTransfers { get; init; } = [];
+    public IReadOnlyList<Sh4CpuSnapshot> CpuSnapshots { get; init; } = [];
     public IReadOnlyList<DreamcastPcProfileEntry> PcProfile { get; init; } = [];
 }
 
@@ -1576,6 +1626,17 @@ public sealed record Sh4FpuSnapshot(
     public string FpulHex => $"0x{Fpul:X8}";
     public string PrHex => $"0x{Pr:X8}";
     public string R15Hex => $"0x{R15:X8}";
+}
+
+public sealed record Sh4CpuSnapshot(
+    ulong Instruction,
+    uint Pc,
+    ushort Opcode,
+    string Trace,
+    Sh4StateSnapshot State)
+{
+    public string PcHex => $"0x{Pc:X8}";
+    public string OpcodeHex => $"0x{Opcode:X4}";
 }
 
 public sealed record Sh4FpuMemoryTransfer(
