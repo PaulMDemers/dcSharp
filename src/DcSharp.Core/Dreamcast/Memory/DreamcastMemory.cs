@@ -39,6 +39,9 @@ public sealed class DreamcastMemory
     private const uint PvrIdValue = 0x17FD_11DB;
     private const uint PvrRevision = 0x005F_8004;
     private const uint PvrRevisionValue = 0x0000_0011;
+    private const uint PvrDmaState = 0x005F_6800;
+    private const uint PvrDmaLength = 0x005F_6804;
+    private const uint PvrDmaStart = 0x005F_6808;
     private const uint PvrSyncStatus = 0x005F_810C;
     private const uint PvrSyncStatusVBlank = 0x0000_0001;
     private const ulong PvrVBlankStatusTicks = 128;
@@ -63,6 +66,8 @@ public sealed class DreamcastMemory
     private const uint Sh4Intevt = 0xFF00_0028;
     private const uint Sh4Qacr0 = 0xFF00_0038;
     private const uint Sh4Qacr1 = 0xFF00_003C;
+    private const uint Sh4DmaChannel2Source = 0xFFA0_0020;
+    private const uint Sh4DmaChannel2TransferCount = 0xFFA0_0028;
     private const uint StoreQueueBase = 0xE000_0000;
     private const uint StoreQueueLimit = 0xE400_0000;
     private const uint StoreQueueAddressMask = 0x03FF_FFE0;
@@ -100,6 +105,7 @@ public sealed class DreamcastMemory
     private const uint MapleStandardControllerCapabilities = 0xFE06_0F00;
     private const int MapleDmaDescriptorLimit = 64;
     private const ushort AsicEventPvrVBlankBegin = 0x0003;
+    private const ushort AsicEventPvrDma = 0x0013;
     private const ushort AsicEventMapleDma = 0x000C;
     private const ushort AsicEventGdromCommand = 0x0100;
     private const ushort AsicEventGdromDma = 0x000E;
@@ -120,6 +126,7 @@ public sealed class DreamcastMemory
     private readonly List<MemoryAccess> watchedReads = [];
     private readonly List<MemoryAccess> watchedWrites = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
+    private readonly List<DreamcastPvrDmaTransfer> pvrDmaTransfers = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly DreamcastPvrTaState pvrTaState = new();
     private DreamcastPvrPreviewRenderStats pvrPreviewRenderStats = DreamcastPvrPreviewRenderStats.Empty;
@@ -926,6 +933,7 @@ public sealed class DreamcastMemory
             CreateVideoSamples(),
             CreatePvrRegisterValues(),
             pvrRegisterAccesses.ToArray(),
+            pvrDmaTransfers.ToArray(),
             pvrTaCommandWrites.ToArray(),
             pvrTaState.CompletedStrips.ToArray(),
             pvrTaState.CompletedSprites.ToArray(),
@@ -1440,6 +1448,11 @@ public sealed class DreamcastMemory
         {
             CompleteMapleDma();
         }
+
+        if (aligned == PvrDmaStart && data.Length == 4 && (value & 1) != 0)
+        {
+            CompletePvrDma();
+        }
     }
 
     private void RaiseAsicEvent(ushort code)
@@ -1473,6 +1486,88 @@ public sealed class DreamcastMemory
 
         externalRegisters[MapleState] = 0;
         RaiseAsicEvent(AsicEventMapleDma);
+    }
+
+    private void CompletePvrDma()
+    {
+        var source = p4Registers.GetValueOrDefault(Sh4DmaChannel2Source);
+        var destination = externalRegisters.GetValueOrDefault(PvrDmaState);
+        var byteCount = externalRegisters.GetValueOrDefault(PvrDmaLength);
+        if (byteCount == 0)
+        {
+            byteCount = p4Registers.GetValueOrDefault(Sh4DmaChannel2TransferCount) * 32;
+        }
+
+        var completed = TryCopyPvrDma(source, destination, byteCount, out var status);
+        pvrDmaTransfers.Add(new DreamcastPvrDmaTransfer(
+            source,
+            $"0x{source:X8}",
+            destination,
+            $"0x{destination:X8}",
+            byteCount,
+            completed,
+            status));
+
+        externalRegisters[PvrDmaStart] = 0;
+        if (completed)
+        {
+            p4Registers[Sh4DmaChannel2TransferCount] = 0;
+            RaiseAsicEvent(AsicEventPvrDma);
+        }
+    }
+
+    private bool TryCopyPvrDma(uint source, uint destination, uint byteCount, out string status)
+    {
+        if (byteCount == 0)
+        {
+            status = "zero length";
+            return true;
+        }
+
+        if (byteCount > int.MaxValue)
+        {
+            status = "length too large";
+            return false;
+        }
+
+        var length = (int)byteCount;
+        if (!TryGetSystemRamOffset(source, length, out var sourceOffset))
+        {
+            status = "source outside system RAM";
+            return false;
+        }
+
+        var sourceBytes = systemRam.AsSpan(sourceOffset, length);
+        if (TryGetPvrVramOffset(destination, length, out var vramOffset))
+        {
+            sourceBytes.CopyTo(pvrVram.AsSpan(vramOffset, length));
+            status = "copied to PVR VRAM";
+            return true;
+        }
+
+        var physicalDestination = TranslateAddress(destination);
+        if (physicalDestination >= PvrTaInputBase && physicalDestination < PvrTaYuvLimit)
+        {
+            for (var offset = 0; offset < length; offset += 4)
+            {
+                var remaining = Math.Min(4, length - offset);
+                if (remaining == 3)
+                {
+                    Write(destination + (uint)offset, sourceBytes.Slice(offset, 2));
+                    Write(destination + (uint)offset + 2, sourceBytes.Slice(offset + 2, 1));
+                }
+                else
+                {
+                    Write(destination + (uint)offset, sourceBytes.Slice(offset, remaining));
+                }
+            }
+
+            status = physicalDestination < PvrTaYuvBase ? "copied to TA input" : "copied to TA YUV converter";
+            return true;
+        }
+
+        status = "destination outside PVR DMA apertures";
+        return false;
     }
 
     private DreamcastMapleDmaBatch WriteMapleResponses(uint dmaAddress)

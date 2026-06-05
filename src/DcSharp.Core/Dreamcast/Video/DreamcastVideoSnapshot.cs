@@ -12,6 +12,7 @@ public sealed record DreamcastVideoSnapshot(
     IReadOnlyList<DreamcastVideoSample> Samples,
     IReadOnlyList<DreamcastPvrRegisterValue> PvrRegisters,
     IReadOnlyList<DreamcastPvrRegisterAccess> PvrRegisterAccesses,
+    IReadOnlyList<DreamcastPvrDmaTransfer> PvrDmaTransfers,
     IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStrip> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaSprite> PvrTaSprites,
@@ -43,6 +44,15 @@ public sealed record DreamcastPvrRegisterAccess(
     int Size,
     uint Value,
     string ValueHex);
+
+public sealed record DreamcastPvrDmaTransfer(
+    uint SourceAddress,
+    string SourceAddressHex,
+    uint DestinationAddress,
+    string DestinationAddressHex,
+    uint ByteCount,
+    bool Completed,
+    string Status);
 
 public sealed record DreamcastPvrTaCommandWrite(
     uint Address,

@@ -440,6 +440,8 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrRegisterValueSummary> PvrRegisters,
     int PvrRegisterAccessCount,
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
+    int PvrDmaTransferCount,
+    IReadOnlyList<DreamcastPvrDmaTransferSummary> RecentPvrDmaTransfers,
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary> RecentPvrTaStreamWrites,
@@ -488,6 +490,8 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisters.Select(DreamcastPvrRegisterValueSummary.FromRegister).ToArray(),
             snapshot.PvrRegisterAccesses.Count,
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
+            snapshot.PvrDmaTransfers.Count,
+            snapshot.PvrDmaTransfers.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrDmaTransferSummary.FromTransfer).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
             DreamcastPvrTaStreamDecoder.Decode(snapshot.PvrTaCommandWrites)
@@ -1131,6 +1135,26 @@ public sealed record DreamcastPvrRegisterAccessSummary(
 {
     public static DreamcastPvrRegisterAccessSummary FromAccess(DreamcastPvrRegisterAccess access) =>
         new(access.Kind, access.Address, access.AddressHex, access.Offset, access.OffsetHex, access.Name, access.Size, access.Value, access.ValueHex);
+}
+
+public sealed record DreamcastPvrDmaTransferSummary(
+    uint SourceAddress,
+    string SourceAddressHex,
+    uint DestinationAddress,
+    string DestinationAddressHex,
+    uint ByteCount,
+    bool Completed,
+    string Status)
+{
+    public static DreamcastPvrDmaTransferSummary FromTransfer(DreamcastPvrDmaTransfer transfer) =>
+        new(
+            transfer.SourceAddress,
+            transfer.SourceAddressHex,
+            transfer.DestinationAddress,
+            transfer.DestinationAddressHex,
+            transfer.ByteCount,
+            transfer.Completed,
+            transfer.Status);
 }
 
 public sealed record DreamcastPvrTaCommandWriteSummary(

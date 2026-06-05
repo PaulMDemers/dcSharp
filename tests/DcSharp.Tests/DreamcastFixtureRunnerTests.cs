@@ -1100,6 +1100,8 @@ public class DreamcastFixtureRunnerTests
             pvrRegisters ?? [],
             0,
             [],
+            0,
+            [],
             taWrites.Count,
             taWrites,
             DreamcastPvrTaStreamDecoder.Decode(taWrites.Select(ToCommandWrite).ToArray())

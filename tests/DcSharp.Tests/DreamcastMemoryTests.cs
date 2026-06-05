@@ -516,6 +516,54 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void PvrDmaCopiesSystemRamToTextureMemoryAndRaisesEvent()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C01_0000, 0x1122_3344);
+        memory.WriteUInt32(0x8C01_0004, 0x5566_7788);
+        memory.WriteUInt32(0xFFA0_0020, 0x0C01_0000);
+        memory.WriteUInt32(0xFFA0_0028, 1);
+        memory.WriteUInt32(0xA05F_6800, 0x1100_0040);
+        memory.WriteUInt32(0xA05F_6804, 8);
+        memory.WriteUInt32(0xA05F_6930, 1u << 19);
+
+        memory.WriteUInt32(0xA05F_6808, 1);
+
+        Assert.Equal(0x1122_3344u, memory.ReadUInt32(0x0400_0040));
+        Assert.Equal(0x5566_7788u, memory.ReadUInt32(0x0400_0044));
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_6808));
+        Assert.Equal(0u, memory.ReadUInt32(0xFFA0_0028));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0320u, eventCode);
+        Assert.Equal(9, level);
+
+        var transfer = Assert.Single(memory.CreateVideoSnapshot().PvrDmaTransfers);
+        Assert.True(transfer.Completed);
+        Assert.Equal("copied to PVR VRAM", transfer.Status);
+        Assert.Equal("0x0C010000", transfer.SourceAddressHex);
+        Assert.Equal("0x11000040", transfer.DestinationAddressHex);
+        Assert.Equal(8u, transfer.ByteCount);
+    }
+
+    [Fact]
+    public void PvrDmaRecordsFailedTransfersWithoutRaisingEvent()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xFFA0_0020, 0x1800_0000);
+        memory.WriteUInt32(0xA05F_6800, 0x1100_0040);
+        memory.WriteUInt32(0xA05F_6804, 4);
+        memory.WriteUInt32(0xA05F_6930, 1u << 19);
+
+        memory.WriteUInt32(0xA05F_6808, 1);
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_6808));
+        Assert.False(memory.TryGetPendingExternalInterrupt(out _, out _));
+        var transfer = Assert.Single(memory.CreateVideoSnapshot().PvrDmaTransfers);
+        Assert.False(transfer.Completed);
+        Assert.Equal("source outside system RAM", transfer.Status);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();
