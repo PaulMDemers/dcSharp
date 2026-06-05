@@ -1642,8 +1642,9 @@ static void DumpMemoryWriteLog(DreamcastRunResult result, string path)
     foreach (var access in result.WatchedMemoryWrites)
     {
         var pc = access.Pc is { } watchedPc ? $", pc=0x{watchedPc:X8}" : string.Empty;
+        var previous = access.PreviousValue is { } previousValue ? $", previous=0x{previousValue:X8}" : string.Empty;
         var producer = access.Opcode is null ? string.Empty : $", {DreamcastMemoryAccessProducerFormatter.Format(access)}";
-        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}{pc}{producer}");
+        writer.WriteLine($"{access.Kind}: addr=0x{access.Address:X8}, size={access.Size}, value=0x{access.Value:X8}{previous}{pc}{producer}");
     }
 }
 

@@ -137,6 +137,21 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CapturesWatchedMemoryWritePreviousValue()
+    {
+        var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(0x8C01_0000, 0x8C01_0003));
+        memory.WriteUInt32(0x8C01_0000, 0x1234_5678);
+        memory.ResetWatchedWrites();
+
+        memory.WriteUInt16(0x8C01_0000, 0xABCD);
+
+        var access = Assert.Single(memory.WatchedWrites);
+        Assert.Equal(2, access.Size);
+        Assert.Equal(0xABCDu, access.Value);
+        Assert.Equal(0x5678u, access.PreviousValue);
+    }
+
+    [Fact]
     public void CapturesWatchedMemoryWritesByProgramCounterRange()
     {
         var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(

@@ -18,6 +18,23 @@ public sealed class Sh4Cpu
 
     public Sh4State State { get; } = new();
 
+    private void WriteUInt32AsInstruction(uint pc, uint address, uint value)
+    {
+        var previousPc = memory.CurrentInstructionPc;
+        var previousOpcode = memory.CurrentInstructionOpcode;
+        try
+        {
+            memory.CurrentInstructionPc = pc;
+            memory.CurrentInstructionOpcode = memory.ReadInstructionUInt16(pc);
+            memory.WriteUInt32(address, value);
+        }
+        finally
+        {
+            memory.CurrentInstructionPc = previousPc;
+            memory.CurrentInstructionOpcode = previousOpcode;
+        }
+    }
+
     public Sh4StepResult Step()
     {
         var pc = State.Pc;
@@ -3328,15 +3345,15 @@ public sealed class Sh4Cpu
         State.R[3] = memory.ReadUInt32(0x8C10_067C);
         State.R[2] &= State.R[3];
         State.R[3] = (uint)(short)memory.ReadUInt16(0x8C10_0674);
-        memory.WriteUInt32(State.R[12], State.R[2]);
+        WriteUInt32AsInstruction(0x8C10_05BC, State.R[12], State.R[2]);
         State.R[1] = memory.ReadUInt32(State.R[12] + 4);
         State.R[2] = memory.ReadUInt32(0x8C10_0680);
         State.R[1] &= State.R[2];
-        memory.WriteUInt32(State.R[12] + 4, State.R[1]);
+        WriteUInt32AsInstruction(0x8C10_05C4, State.R[12] + 4, State.R[1]);
         State.R[0] = memory.ReadUInt32(State.R[12] + 8);
         State.R[1] = memory.ReadUInt32(0x8C10_0684);
         State.R[0] &= State.R[1];
-        memory.WriteUInt32(State.R[12] + 8, State.R[0]);
+        WriteUInt32AsInstruction(0x8C10_05CC, State.R[12] + 8, State.R[0]);
         State.R[0] = modeFlags;
         State.T = (State.R[0] & State.R[3]) == 0;
 
@@ -3359,7 +3376,7 @@ public sealed class Sh4Cpu
         State.R[4] <<= 29;
         State.T = (State.R[14] & State.R[14]) == 0;
         State.R[2] |= State.R[4];
-        memory.WriteUInt32(State.R[12] + 4, State.R[2]);
+        WriteUInt32AsInstruction(0x8C10_0616, State.R[12] + 4, State.R[2]);
         State.R[0] = mode;
         State.T = State.R[0] == 4;
 
@@ -3372,11 +3389,11 @@ public sealed class Sh4Cpu
         State.R[0] <<= 8;
         State.R[0] |= State.R[1];
         State.R[3] |= State.R[0];
-        memory.WriteUInt32(State.R[12] + 8, State.R[3]);
+        WriteUInt32AsInstruction(0x8C10_0658, State.R[12] + 8, State.R[3]);
         State.R[0] = memory.ReadUInt32(State.R[12]);
         State.R[3] = memory.ReadUInt32(0x8C10_06A0);
         State.R[0] |= State.R[3];
-        memory.WriteUInt32(State.R[12], State.R[0]);
+        WriteUInt32AsInstruction(0x8C10_05B4, State.R[12], State.R[0]);
 
         State.R[3] = modeFlags;
         State.T = (State.R[5] & State.R[3]) == 0;

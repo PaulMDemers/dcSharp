@@ -2130,6 +2130,24 @@ public sealed class DreamcastMemory
         return value;
     }
 
+    private bool TryPeekValue(uint address, int size, out uint value)
+    {
+        value = 0;
+        var count = Math.Min(size, 4);
+        for (var index = 0; index < count; index++)
+        {
+            if (!TryPeekByte(address + (uint)index, out var byteValue))
+            {
+                value = 0;
+                return false;
+            }
+
+            value |= (uint)byteValue << (index * 8);
+        }
+
+        return true;
+    }
+
     private void RecordWatchedWrite(uint address, ReadOnlySpan<byte> data)
     {
         if (writeWatch is null || !writeWatch.ShouldRecord(address, data.Length, CurrentInstructionPc) || watchedWrites.Count >= writeWatch.Limit)
@@ -2137,7 +2155,10 @@ public sealed class DreamcastMemory
             return;
         }
 
-        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc, CurrentInstructionOpcode));
+        var previousValue = TryPeekValue(address, data.Length, out var peekedValue)
+            ? peekedValue
+            : (uint?)null;
+        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc, CurrentInstructionOpcode, previousValue));
     }
 
     private void RecordWatchedRead(uint address, int size, uint value)
@@ -2793,7 +2814,7 @@ internal sealed class DreamcastMemoryRegionWriteCounter(string name, uint start,
 
 public sealed class MemoryMapException(string message) : InvalidOperationException(message);
 
-public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value, uint? Pc = null, ushort? Opcode = null)
+public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size, uint Value, uint? Pc = null, ushort? Opcode = null, uint? PreviousValue = null)
 {
     public string? OpcodeHex => Opcode is { } opcode ? $"0x{opcode:X4}" : null;
 }
