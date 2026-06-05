@@ -1,4 +1,5 @@
 using DcSharp.Core.Dreamcast.Video;
+using DcSharp.Core.Dreamcast.Memory;
 using DcSharp.Core.Execution;
 
 namespace DcSharp.Tests;
@@ -38,6 +39,28 @@ public class DreamcastPvrTaSpriteLogWriterTests
         Assert.Contains("rawW=2/2/2 rawH=2/2/2 fallbackPx=9/9/9", text);
         Assert.Contains("xRanges=A:1/1/1/B:3/3/3/C:1/1/1/D:3/3/3", text);
         Assert.Contains("firstPayload=Ax=0x3F800000/Ay=0x3F800000/Az=0x3F800000/Bx=0x40400000", text);
+    }
+
+    [Fact]
+    public void WritesSpriteStoreQueueProducerTrace()
+    {
+        var sprite = CreateSpriteSummary();
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaSpriteStoreQueueTraceWriter.WriteText(
+            writer,
+            [sprite],
+            CreateSpriteStoreQueueWrites(),
+            limit: null,
+            previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("# sprites=1 sqWrites=16 sqPackets=1 matched=1 skipped=0 limit=all status=all", text);
+        Assert.Contains("#0 status=renderable region=TA_INPUT list=OpaquePolygon headerPc=0x8C1007FA controlFlushPc=0x8C10084C payloadFlushPcRange=0x8C10084C-0x8C100850", text);
+        Assert.Contains("sqBase=0xE0000020 producerPcRange=0x8C100804-0x8C10084A", text);
+        Assert.Contains("controlProducer=Control@0xE0000020=0xF0000000,pc=0x8C100804", text);
+        Assert.Contains("payloadProducers=Ax@0xE0000024=0x3F800000,pc=0x8C10080A/Ay@0xE0000028=0x3F800000,pc=0x8C10080E", text);
+        Assert.Contains("payloadWords=Ax=0x3F800000/Ay=0x3F800000/Az=0x3F800000/Bx=0x40400000", text);
     }
 
     [Fact]
@@ -114,6 +137,57 @@ public class DreamcastPvrTaSpriteLogWriterTests
         return hasRenderablePreviewArea
             ? summary
             : summary with { HasRenderablePreviewArea = false };
+    }
+
+    private static IReadOnlyList<MemoryAccess> CreateSpriteStoreQueueWrites()
+    {
+        uint[] values =
+        [
+            0xF000_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x3F80_0000,
+            0x4040_0000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ];
+        uint[] pcs =
+        [
+            0x8C10_0804,
+            0x8C10_080A,
+            0x8C10_080E,
+            0x8C10_0810,
+            0x8C10_0816,
+            0x8C10_081A,
+            0x8C10_081C,
+            0x8C10_0822,
+            0x8C10_0826,
+            0x8C10_0828,
+            0x8C10_082C,
+            0x8C10_0832,
+            0x8C10_0836,
+            0x8C10_083C,
+            0x8C10_0842,
+            0x8C10_084A
+        ];
+
+        return values
+            .Select((value, index) => new MemoryAccess(
+                MemoryAccessKind.Write,
+                0xE000_0020u + (uint)(index * 4),
+                4,
+                value,
+                pcs[index]))
+            .ToArray();
     }
 
     private static DreamcastPvrTaSpriteVertex CreateVertex(string name, int x, int y) =>
