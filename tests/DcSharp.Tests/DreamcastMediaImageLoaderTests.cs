@@ -401,6 +401,43 @@ public class DreamcastMediaImageLoaderTests
     }
 
     [Fact]
+    public void ExtractBootFilePrefersHighDensityGdiVolumeWhenLowVolumeLacksBootFile()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempRoot);
+        var lowTrackPath = Path.Combine(tempRoot, "track01.bin");
+        var highTrackPath = Path.Combine(tempRoot, "track03.bin");
+        var gdiPath = Path.Combine(tempRoot, "game.gdi");
+
+        try
+        {
+            var lowIso = CreateBootableIsoImage("OTHER.BIN", "LOW"u8.ToArray(), advertisedBootFile: "1ST_READ.BIN");
+            var highIso = CreateBootableIsoImage("1ST_READ.BIN", "HIGH BOOT"u8.ToArray(), extentBias: 45_000);
+
+            File.WriteAllBytes(lowTrackPath, ToCdSectors(lowIso));
+            File.WriteAllBytes(highTrackPath, ToCdSectors(highIso));
+            File.WriteAllText(
+                gdiPath,
+                $$"""
+                2
+                1     0 4 2352 "{{Path.GetFileName(lowTrackPath)}}" 0
+                3 45000 4 2352 "{{Path.GetFileName(highTrackPath)}}" 0
+                """);
+
+            var result = DreamcastBootExtractor.ExtractBootFile(gdiPath);
+
+            Assert.Equal(gdiPath, result.SourcePath);
+            Assert.Equal("1ST_READ.BIN", result.BootSector.BootFile);
+            Assert.Equal(45_021u, result.File.ExtentSector);
+            Assert.Equal("HIGH BOOT"u8.ToArray(), result.Data);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ExtractBootFileContinuesAfterUnreadableAdjacentCandidate()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -779,10 +816,10 @@ public class DreamcastMediaImageLoaderTests
         return sector;
     }
 
-    private static byte[] CreateBootableIsoImage(string bootFile, byte[] bootData, uint extentBias = 0, uint fileExtent = 21)
+    private static byte[] CreateBootableIsoImage(string bootFile, byte[] bootData, uint extentBias = 0, uint fileExtent = 21, string? advertisedBootFile = null)
     {
         var image = new byte[2048 * 24];
-        Array.Copy(CreateBootSector(bootFile, "ISO BOOT TEST"), image, 2048);
+        Array.Copy(CreateBootSector(advertisedBootFile ?? bootFile, "ISO BOOT TEST"), image, 2048);
 
         var pvd = image.AsSpan(16 * 2048, 2048);
         pvd[0] = 1;

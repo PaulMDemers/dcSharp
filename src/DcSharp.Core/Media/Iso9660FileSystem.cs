@@ -201,8 +201,8 @@ public sealed class Iso9660FileSystem
 
         return mappings
             .Distinct()
-            .OrderBy(mapping => mapping.VolumeStartSector)
-            .ThenBy(mapping => mapping.ExtentBias)
+            .OrderByDescending(mapping => mapping.VolumeStartSector)
+            .ThenByDescending(mapping => mapping.ExtentBias)
             .ToArray();
     }
 
