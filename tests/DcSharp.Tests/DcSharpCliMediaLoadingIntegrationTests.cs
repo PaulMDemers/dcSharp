@@ -323,6 +323,45 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandWritesWindowsCeSyscallLog()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "wince.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateWindowsCeSleepThunkBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "4",
+                "--trace-tail",
+                "0",
+                "--wince-syscall-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("0xFFFFFD5D", log);
+            Assert.Contains("firmware wince hle WIN32.Sleep", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandSeedsIpBinForCueInput()
     {
         var repoRoot = FindRepoRoot();
@@ -503,16 +542,16 @@ public class DcSharpCliMediaLoadingIntegrationTests
 
     private static string FindCliAssembly(string repoRoot)
     {
-        var debugAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", "Debug", "net10.0", "DcSharp.Cli.dll");
-        if (File.Exists(debugAssembly))
-        {
-            return debugAssembly;
-        }
-
         var releaseAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", "Release", "net10.0", "DcSharp.Cli.dll");
         if (File.Exists(releaseAssembly))
         {
             return releaseAssembly;
+        }
+
+        var debugAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", "Debug", "net10.0", "DcSharp.Cli.dll");
+        if (File.Exists(debugAssembly))
+        {
+            return debugAssembly;
         }
 
         throw new FileNotFoundException("Could not find built CLI assembly.", "DcSharp.Cli.dll");
@@ -638,6 +677,17 @@ public class DcSharpCliMediaLoadingIntegrationTests
 
         return data;
     }
+
+    private static byte[] CreateWindowsCeSleepThunkBootBinary() =>
+    [
+        0x01, 0xD0, // mov.l @(0x01,pc),r0
+        0x0B, 0x40, // jsr @r0
+        0x09, 0x00, // nop
+        0x09, 0x00, // nop
+        0x5D, 0xFD, 0xFF, 0xFF, // 0xFFFFFD5D
+        0x09, 0x00,
+        0x09, 0x00
+    ];
 
     private static byte[] CreateUnmappedReadBootBinary() =>
     [

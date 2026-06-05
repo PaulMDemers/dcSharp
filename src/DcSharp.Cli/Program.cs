@@ -491,6 +491,11 @@ static void BootSmoke(string path, string[] args)
         DumpPcProfileLog(result, options.PcProfileLogPath);
     }
 
+    if (options.WindowsCeSyscallLogPath is not null)
+    {
+        DumpWindowsCeSyscallLog(result, options.WindowsCeSyscallLogPath);
+    }
+
     if (options.DeviceLogPath is not null)
     {
         DumpDeviceLog(result, options);
@@ -943,6 +948,11 @@ static void RunElf(string path, string[] args)
     if (options.PcProfileLogPath is not null)
     {
         DumpPcProfileLog(result, options.PcProfileLogPath);
+    }
+
+    if (options.WindowsCeSyscallLogPath is not null)
+    {
+        DumpWindowsCeSyscallLog(result, options.WindowsCeSyscallLogPath);
     }
 
     if (options.DeviceLogPath is not null)
@@ -1665,6 +1675,17 @@ static void DumpPcProfileLog(DreamcastRunResult result, string path)
     }
 }
 
+static void DumpWindowsCeSyscallLog(DreamcastRunResult result, string path)
+{
+    using var writer = CreateTextLog(path);
+    foreach (var step in result.TraceLog.Where(step => (step.Pc & 1) != 0 && (step.Pc & 0xFFFF_0000) == 0xFFFF_0000))
+    {
+        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
+        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
+        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+    }
+}
+
 static void DumpDeviceLog(DreamcastRunResult result, CliRunOptions options)
 {
     using var writer = CreateTextLog(options.DeviceLogPath!);
@@ -1819,6 +1840,8 @@ static CliRunOptions ParseRunOptions(string[] args)
     var pcProfileLimit = 256;
     ulong? pcProfileStartInstruction = null;
     ulong? pcProfileEndInstruction = null;
+    string? windowsCeSyscallLogPath = null;
+    var windowsCeSyscallLogLimit = 256;
     string? deviceLogPath = null;
     MemoryAccessKind? deviceKind = null;
     AddressRange? deviceAddressRange = null;
@@ -2116,6 +2139,14 @@ static CliRunOptions ParseRunOptions(string[] args)
                 (pcProfileStartInstruction, pcProfileEndInstruction) = ParseInstructionRange(args[index + 1]);
                 index++;
                 break;
+            case "--wince-syscall-log" when index + 1 < args.Length:
+                windowsCeSyscallLogPath = args[index + 1];
+                index++;
+                break;
+            case "--wince-syscall-log-limit" when index + 1 < args.Length && int.TryParse(args[index + 1], out var parsedWindowsCeSyscallLogLimit):
+                windowsCeSyscallLogLimit = parsedWindowsCeSyscallLogLimit;
+                index++;
+                break;
             case "--device-log" when index + 1 < args.Length:
                 deviceLogPath = args[index + 1];
                 index++;
@@ -2300,6 +2331,11 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--pc-profile-limit must be zero or greater.");
     }
 
+    if (windowsCeSyscallLogLimit < 0)
+    {
+        throw new InvalidDataException("--wince-syscall-log-limit must be zero or greater.");
+    }
+
     if (memoryWriteLimit < 0)
     {
         throw new InvalidDataException("--memory-write-limit must be zero or greater.");
@@ -2320,12 +2356,24 @@ static CliRunOptions ParseRunOptions(string[] args)
         throw new InvalidDataException("--memory-snapshot-log requires at least one --memory-snapshot-address range.");
     }
 
-    var traceCapture = traceLogPath is null
+    var needsTraceCapture = traceLogPath is not null || windowsCeSyscallLogPath is not null;
+    var effectiveTraceLogLimit = windowsCeSyscallLogPath is null
+        ? traceLogLimit
+        : traceLogPath is null
+            ? windowsCeSyscallLogLimit
+            : Math.Max(traceLogLimit, windowsCeSyscallLogLimit);
+    if (windowsCeSyscallLogPath is not null
+        && (traceLogPath is null || traceStartPc is not null || traceEndPc is not null || tracePcRanges.Count > 0))
+    {
+        tracePcRanges.Add(new AddressRange(0xFFFF_0000u, 0xFFFF_FFFFu));
+    }
+
+    var traceCapture = !needsTraceCapture
         ? null
         : new DreamcastTraceCaptureOptions(
             traceStartPc,
             traceEndPc,
-            traceLogLimit,
+            effectiveTraceLogLimit,
             tracePcRanges.Count == 0
                 ? null
                 : tracePcRanges.Select(range => new DreamcastTracePcRange(range.Start, range.End)).ToArray(),
@@ -2461,6 +2509,7 @@ static CliRunOptions ParseRunOptions(string[] args)
         cpuSnapshotLogPath,
         fpuMemoryLogPath,
         pcProfileLogPath,
+        windowsCeSyscallLogPath,
         deviceLogPath,
         deviceKind,
         deviceAddressRange,
@@ -2801,7 +2850,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--wince-syscall-log path] [--wince-syscall-log-limit count] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --cpu-snapshot-pc, --fpu-memory-address, --fpu-memory-pc, --memory-write-address, --memory-write-pc, --memory-read-address, --memory-read-pc, and --memory-snapshot-address may be repeated for multiple ranges. --fpu-write-register and --fpu-memory-register may be repeated for multiple registers. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, --cpu-snapshot-instruction, --fpu-memory-instruction, and --pc-profile-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -2866,6 +2915,7 @@ internal sealed record CliRunOptions(
     string? CpuSnapshotLogPath,
     string? FpuMemoryLogPath,
     string? PcProfileLogPath,
+    string? WindowsCeSyscallLogPath,
     string? DeviceLogPath,
     MemoryAccessKind? DeviceKind,
     AddressRange? DeviceAddressRange,

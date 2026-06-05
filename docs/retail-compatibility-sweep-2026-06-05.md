@@ -99,6 +99,8 @@ With the corrected file-offset mapping, target `0x8C0120E0` corresponds to file 
 
 The first odd negative thunk is `0xFFFFFD1F`, which decodes as `WIN32.PerformCallBack`. The observed `CALLBACKINFO` block at `0x8C137538` contains `hProc=0x0CEEEFE2`, `pfn=0x8C021FA0`, and `pvArg0=0x8C0116E0`. A narrow WinCE HLE path now transfers control to that callback with `pvArg0` as the first argument and leaves `PR` pointing back to the original caller. With that in place, Sega Rally reaches the generic 50M instruction budget. The current profile is a repeating WinCE scheduler/list-management path around `0x8C0176A8-0x8C017A00` plus low virtual helper calls such as `0x00005BC0`.
 
+Use `--wince-syscall-log` on longer probes to capture odd negative WinCE API thunks without a broad trace. A 12M Sega Rally check currently logs only the initial `WIN32.PerformCallBack`, confirming the 50M hot loop is guest scheduler/list code plus TMU reads rather than repeated syscall HLE.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
