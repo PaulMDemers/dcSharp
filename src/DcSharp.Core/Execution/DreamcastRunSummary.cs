@@ -442,6 +442,8 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrRegisterAccessSummary> RecentPvrRegisterAccesses,
     int PvrDmaTransferCount,
     IReadOnlyList<DreamcastPvrDmaTransferSummary> RecentPvrDmaTransfers,
+    int StoreQueueFlushCount,
+    IReadOnlyList<DreamcastStoreQueueFlushSummary> RecentStoreQueueFlushes,
     int PvrTaCommandWriteCount,
     IReadOnlyList<DreamcastPvrTaCommandWriteSummary> RecentPvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStreamWriteSummary> RecentPvrTaStreamWrites,
@@ -492,6 +494,8 @@ public sealed record DreamcastVideoSummary(
             snapshot.PvrRegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.PvrDmaTransfers.Count,
             snapshot.PvrDmaTransfers.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrDmaTransferSummary.FromTransfer).ToArray(),
+            snapshot.StoreQueueFlushes.Count,
+            snapshot.StoreQueueFlushes.TakeLast(Math.Max(0, recentCount)).Select(DreamcastStoreQueueFlushSummary.FromFlush).ToArray(),
             snapshot.PvrTaCommandWrites.Count,
             snapshot.PvrTaCommandWrites.TakeLast(Math.Max(0, recentCount)).Select(DreamcastPvrTaCommandWriteSummary.FromWrite).ToArray(),
             DreamcastPvrTaStreamDecoder.Decode(snapshot.PvrTaCommandWrites)
@@ -1155,6 +1159,38 @@ public sealed record DreamcastPvrDmaTransferSummary(
             transfer.ByteCount,
             transfer.Completed,
             transfer.Status);
+}
+
+public sealed record DreamcastStoreQueueFlushSummary(
+    int QueueIndex,
+    uint SourceAddress,
+    string SourceAddressHex,
+    uint DestinationAddress,
+    string DestinationAddressHex,
+    uint QacrAddress,
+    string QacrAddressHex,
+    uint QacrValue,
+    string QacrValueHex,
+    IReadOnlyList<uint> Words,
+    IReadOnlyList<string> WordHex,
+    uint? InstructionPc = null,
+    string? InstructionPcHex = null)
+{
+    public static DreamcastStoreQueueFlushSummary FromFlush(DreamcastStoreQueueFlush flush) =>
+        new(
+            flush.QueueIndex,
+            flush.SourceAddress,
+            flush.SourceAddressHex,
+            flush.DestinationAddress,
+            flush.DestinationAddressHex,
+            flush.QacrAddress,
+            flush.QacrAddressHex,
+            flush.QacrValue,
+            flush.QacrValueHex,
+            flush.Words,
+            flush.WordHex,
+            flush.InstructionPc,
+            flush.InstructionPcHex);
 }
 
 public sealed record DreamcastPvrTaCommandWriteSummary(

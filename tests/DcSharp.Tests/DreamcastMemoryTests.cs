@@ -739,6 +739,15 @@ public class DreamcastMemoryTests
         Assert.Equal("PolygonHeader", snapshot.PvrTaCommandWrites[0].Kind);
         Assert.Equal("0x10000004", snapshot.PvrTaCommandWrites[1].AddressHex);
         Assert.Equal("0x06000000", snapshot.PvrTaCommandWrites[1].ValueHex);
+
+        var flush = Assert.Single(snapshot.StoreQueueFlushes);
+        Assert.Equal(0, flush.QueueIndex);
+        Assert.Equal("0xE0000000", flush.SourceAddressHex);
+        Assert.Equal("0x10000000", flush.DestinationAddressHex);
+        Assert.Equal("0xFF000038", flush.QacrAddressHex);
+        Assert.Equal("0x00000010", flush.QacrValueHex);
+        Assert.Equal("0x80840000", flush.WordHex[0]);
+        Assert.Equal("0x06000000", flush.WordHex[1]);
     }
 
     [Fact]
@@ -754,6 +763,7 @@ public class DreamcastMemoryTests
         var snapshot = memory.CreateVideoSnapshot();
         Assert.Equal("0x10000020", snapshot.PvrTaCommandWrites[0].AddressHex);
         Assert.Equal("Vertex", snapshot.PvrTaCommandWrites[0].Kind);
+        Assert.Equal("0xFF00003C", Assert.Single(snapshot.StoreQueueFlushes).QacrAddressHex);
     }
 
     [Fact]

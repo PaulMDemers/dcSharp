@@ -127,6 +127,7 @@ public sealed class DreamcastMemory
     private readonly List<MemoryAccess> watchedWrites = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrDmaTransfer> pvrDmaTransfers = [];
+    private readonly List<DreamcastStoreQueueFlush> storeQueueFlushes = [];
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly DreamcastPvrTaState pvrTaState = new();
     private DreamcastPvrPreviewRenderStats pvrPreviewRenderStats = DreamcastPvrPreviewRenderStats.Empty;
@@ -934,6 +935,7 @@ public sealed class DreamcastMemory
             CreatePvrRegisterValues(),
             pvrRegisterAccesses.ToArray(),
             pvrDmaTransfers.ToArray(),
+            storeQueueFlushes.ToArray(),
             pvrTaCommandWrites.ToArray(),
             pvrTaState.CompletedStrips.ToArray(),
             pvrTaState.CompletedSprites.ToArray(),
@@ -1987,21 +1989,42 @@ public sealed class DreamcastMemory
     private void FlushStoreQueue(uint address)
     {
         var queueIndex = StoreQueueIndex(address);
-        var destination = StoreQueueDestinationBase(address, queueIndex);
+        var qacrAddress = StoreQueueQacrAddress(queueIndex);
+        var qacr = p4Registers.GetValueOrDefault(qacrAddress);
+        var destination = StoreQueueDestinationBase(address, qacr);
         var queue = storeQueues.AsSpan(queueIndex * StoreQueueBytes, StoreQueueBytes);
+        var words = new uint[StoreQueueBytes / 4];
         for (var offset = 0; offset < StoreQueueBytes; offset += 4)
         {
-            WriteUInt32(destination + (uint)offset, ToValue(queue.Slice(offset, 4)));
+            var word = ToValue(queue.Slice(offset, 4));
+            words[offset / 4] = word;
+            WriteUInt32(destination + (uint)offset, word);
         }
+
+        storeQueueFlushes.Add(new DreamcastStoreQueueFlush(
+            queueIndex,
+            address,
+            $"0x{address:X8}",
+            destination,
+            $"0x{destination:X8}",
+            qacrAddress,
+            $"0x{qacrAddress:X8}",
+            qacr,
+            $"0x{qacr:X8}",
+            words,
+            words.Select(word => $"0x{word:X8}").ToArray(),
+            CurrentInstructionPc,
+            CurrentInstructionPc is { } instructionPc ? $"0x{instructionPc:X8}" : null));
     }
 
     private int StoreQueueIndex(uint address) =>
         (int)((address >> 5) & 1);
 
-    private uint StoreQueueDestinationBase(uint address, int queueIndex)
+    private static uint StoreQueueQacrAddress(int queueIndex) =>
+        queueIndex == 0 ? Sh4Qacr0 : Sh4Qacr1;
+
+    private static uint StoreQueueDestinationBase(uint address, uint qacr)
     {
-        var qacrAddress = queueIndex == 0 ? Sh4Qacr0 : Sh4Qacr1;
-        var qacr = p4Registers.GetValueOrDefault(qacrAddress);
         var highBits = qacr & 0x1Cu;
         var baseAddress = highBits == 0
             ? PvrTaInputBase

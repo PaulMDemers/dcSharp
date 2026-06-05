@@ -13,6 +13,7 @@ public sealed record DreamcastVideoSnapshot(
     IReadOnlyList<DreamcastPvrRegisterValue> PvrRegisters,
     IReadOnlyList<DreamcastPvrRegisterAccess> PvrRegisterAccesses,
     IReadOnlyList<DreamcastPvrDmaTransfer> PvrDmaTransfers,
+    IReadOnlyList<DreamcastStoreQueueFlush> StoreQueueFlushes,
     IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites,
     IReadOnlyList<DreamcastPvrTaStrip> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaSprite> PvrTaSprites,
@@ -53,6 +54,21 @@ public sealed record DreamcastPvrDmaTransfer(
     uint ByteCount,
     bool Completed,
     string Status);
+
+public sealed record DreamcastStoreQueueFlush(
+    int QueueIndex,
+    uint SourceAddress,
+    string SourceAddressHex,
+    uint DestinationAddress,
+    string DestinationAddressHex,
+    uint QacrAddress,
+    string QacrAddressHex,
+    uint QacrValue,
+    string QacrValueHex,
+    IReadOnlyList<uint> Words,
+    IReadOnlyList<string> WordHex,
+    uint? InstructionPc = null,
+    string? InstructionPcHex = null);
 
 public sealed record DreamcastPvrTaCommandWrite(
     uint Address,
