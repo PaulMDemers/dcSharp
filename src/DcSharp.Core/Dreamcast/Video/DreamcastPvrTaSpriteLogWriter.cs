@@ -32,7 +32,7 @@ public static class DreamcastPvrTaSpriteLogWriter
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"# sprites={sprites.Count} matched={indexed.Length} skipped={skipped} limit={FormatLimit(limit)} status={previewStatus ?? "all"}"));
-        writer.WriteLine("# columns: index status region list headerPc controlPc payloadPcRange header control color argb texture cmdTexture uv16 mode1 mode2 mode3 texBase texSize texFormat texLayout texFilter texShading alpha rawSize intSize fallbackPixels points rawPoints payloadWords");
+        writer.WriteLine("# columns: index status region list headerPc controlPc payloadPcRange header control color argb texture cmdTexture effectiveTexture uv16 mode1 mode2 mode3 texBase texSize texFormat texLayout texFilter texShading alpha rawSize intSize fallbackPixels points rawPoints payloadWords");
 
         for (var index = skipped; index < indexed.Length; index++)
         {
@@ -41,7 +41,7 @@ public static class DreamcastPvrTaSpriteLogWriter
             writer.WriteLine(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"#{entry.Index} status={PreviewStatus(sprite)} region={sprite.Region} list={sprite.ListTypeName ?? "-"} headerPc={sprite.HeaderInstructionPcHex ?? "-"} controlPc={sprite.ControlInstructionPcHex ?? "-"} payloadPcRange={FormatPayloadPcRange(sprite)} header={sprite.HeaderValueHex} control={sprite.ControlValueHex} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} texture={sprite.HeaderPayload.Mode1Fields.TextureEnabled} cmdTexture={HasTexturePayload(sprite.HeaderValue)} uv16={HasPackedUv(sprite.HeaderValue)} mode1={sprite.HeaderPayload.Mode1Hex} mode2={sprite.HeaderPayload.Mode2Hex} mode3={sprite.HeaderPayload.Mode3Hex} texBase={sprite.HeaderPayload.Mode3Fields.TextureBaseHex} texSize={FormatTextureSize(sprite)} texFormat={sprite.HeaderPayload.Mode3Fields.PixelFormatName} texLayout={FormatTextureLayout(sprite)} texFilter={sprite.HeaderPayload.Mode2Fields.FilterModeName} texShading={sprite.HeaderPayload.Mode2Fields.TextureShadingName} alpha={FormatAlpha(sprite)} rawSize={FormatRawSize(sprite)} intSize={FormatIntegerSize(sprite)} fallbackPixels={EstimatedFallbackPixelCount(sprite)} points={FormatPoints(sprite.Vertices)} rawPoints={FormatRawPoints(sprite.Vertices)} payloadWords={FormatPayloadWords(sprite.PayloadWords)}"));
+                    $"#{entry.Index} status={PreviewStatus(sprite)} region={sprite.Region} list={sprite.ListTypeName ?? "-"} headerPc={sprite.HeaderInstructionPcHex ?? "-"} controlPc={sprite.ControlInstructionPcHex ?? "-"} payloadPcRange={FormatPayloadPcRange(sprite)} header={sprite.HeaderValueHex} control={sprite.ControlValueHex} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} texture={sprite.HeaderPayload.Mode1Fields.TextureEnabled} cmdTexture={sprite.HeaderPayload.HasTexturePayload} effectiveTexture={sprite.HeaderPayload.EffectiveTextureEnabled} uv16={HasPackedUv(sprite.HeaderValue)} mode1={sprite.HeaderPayload.Mode1Hex} mode2={sprite.HeaderPayload.Mode2Hex} mode3={sprite.HeaderPayload.Mode3Hex} texBase={sprite.HeaderPayload.Mode3Fields.TextureBaseHex} texSize={FormatTextureSize(sprite)} texFormat={sprite.HeaderPayload.Mode3Fields.PixelFormatName} texLayout={FormatTextureLayout(sprite)} texFilter={sprite.HeaderPayload.Mode2Fields.FilterModeName} texShading={sprite.HeaderPayload.Mode2Fields.TextureShadingName} alpha={FormatAlpha(sprite)} rawSize={FormatRawSize(sprite)} intSize={FormatIntegerSize(sprite)} fallbackPixels={EstimatedFallbackPixelCount(sprite)} points={FormatPoints(sprite.Vertices)} rawPoints={FormatRawPoints(sprite.Vertices)} payloadWords={FormatPayloadWords(sprite.PayloadWords)}"));
         }
     }
 
@@ -139,9 +139,6 @@ public static class DreamcastPvrTaSpriteLogWriter
 
     private static string FormatLimit(int? limit) =>
         limit?.ToString(CultureInfo.InvariantCulture) ?? "all";
-
-    private static bool HasTexturePayload(uint headerValue) =>
-        (headerValue & 0x0000_0008u) != 0;
 
     private static bool HasPackedUv(uint headerValue) =>
         (headerValue & 0x0000_0001u) != 0;

@@ -301,6 +301,10 @@ public sealed record DreamcastPvrTaSpriteHeaderPayload(
     DreamcastPvrTaPolygonHeaderMode2 Mode2Fields,
     DreamcastPvrTaPolygonHeaderMode3 Mode3Fields)
 {
+    public bool HasTexturePayload => (HeaderValue & 0x0000_0008u) != 0;
+
+    public bool EffectiveTextureEnabled => Mode1Fields.TextureEnabled || HasTexturePayload;
+
     public static DreamcastPvrTaSpriteHeaderPayload FromPayload(DreamcastPvrTaCommandWrite header, IReadOnlyList<uint> words)
     {
         var decodedModes = DreamcastPvrTaPolygonHeaderPayloadDecoder.DecodePayload(header, words);

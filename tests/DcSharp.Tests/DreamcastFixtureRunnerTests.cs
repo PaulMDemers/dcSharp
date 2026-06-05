@@ -940,7 +940,7 @@ public class DreamcastFixtureRunnerTests
         Assert.Equal(1, diagnostics.CombinedBounds.ZeroWidthCount);
         Assert.Equal(2, diagnostics.TextureModes.Count);
         Assert.Contains(diagnostics.TextureModes, mode => mode.PrimitiveKind == "strip" && mode.Count == 1 && !mode.TextureEnabled);
-        Assert.Contains(diagnostics.TextureModes, mode => mode.PrimitiveKind == "sprite" && mode.Count == 1 && !mode.TextureEnabled);
+        Assert.Contains(diagnostics.TextureModes, mode => mode.PrimitiveKind == "sprite" && mode.Count == 1 && mode.TextureEnabled);
     }
 
     private static DreamcastRunSummary CreateSummary(

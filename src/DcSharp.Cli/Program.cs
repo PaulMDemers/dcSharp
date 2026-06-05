@@ -2312,7 +2312,7 @@ static string FormatPvrTaStrips(IReadOnlyList<DreamcastPvrTaStripSummary> strips
     string.Join(", ", strips.Select(strip => $"{strip.Region}:{strip.ListTypeName ?? "none"} vertices={strip.VertexCount} color={strip.Rgb565Hex}{FormatPvrTaStripMode(strip.HeaderPayload)} points={string.Join("/", strip.Vertices.Select(vertex => $"{vertex.X},{vertex.Y}"))}"));
 
 static string FormatPvrTaSprites(IReadOnlyList<DreamcastPvrTaSpriteSummary> sprites) =>
-    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} cmdTex={HasPvrTaSpriteTexturePayload(sprite.HeaderValue)} uv16={HasPvrTaSpritePackedUv(sprite.HeaderValue)} preview={FormatPvrTaSpritePreviewStatus(sprite)}{FormatPvrTaSpriteSource(sprite)} points={string.Join("/", sprite.Vertices.Select(FormatPvrTaSpriteVertex))}"));
+    string.Join(", ", sprites.Select(sprite => $"{sprite.Region}:{sprite.ListTypeName ?? "none"} vertices={sprite.VertexCount} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} tex={sprite.HeaderPayload.Mode1Fields.TextureEnabled} cmdTex={sprite.HeaderPayload.HasTexturePayload} effectiveTex={sprite.HeaderPayload.EffectiveTextureEnabled} uv16={HasPvrTaSpritePackedUv(sprite.HeaderValue)} preview={FormatPvrTaSpritePreviewStatus(sprite)}{FormatPvrTaSpriteSource(sprite)} points={string.Join("/", sprite.Vertices.Select(FormatPvrTaSpriteVertex))}"));
 
 static string FormatPvrTaSpriteCounts(DreamcastVideoSummary video) =>
     video.PvrTaSprites.Count == 0
@@ -2347,7 +2347,7 @@ static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostic
 }
 
 static string FormatPvrPreviewRenderStats(DreamcastPvrPreviewRenderStatsSummary stats) =>
-    $"calls:{stats.SpriteCalls}/attempts:{stats.PixelWriteAttempts}/written:{stats.PixelsWritten}/unique:{stats.UniquePixelsWritten}/zero:{stats.ZeroRgbWritePixels}/alpha:{stats.AlphaBlendedPixels}/punchReject:{stats.PunchThroughRejectedPixels}/fallback:{stats.SubpixelFallbacks}/oob:{stats.OutOfBoundsWritePixels}";
+    $"calls:{stats.SpriteCalls}/attempts:{stats.PixelWriteAttempts}/written:{stats.PixelsWritten}/unique:{stats.UniquePixelsWritten}/zero:{stats.ZeroRgbWritePixels}/alpha:{stats.AlphaBlendedPixels}/texSample:{stats.TextureSampledPixels}/texA0:{stats.ZeroAlphaTexturePixels}/punchReject:{stats.PunchThroughRejectedPixels}/fallback:{stats.SubpixelFallbacks}/oob:{stats.OutOfBoundsWritePixels}";
 
 static string FormatPvrTaBounds(DreamcastPvrTaBoundsSummary bounds) =>
     bounds.HasBounds
@@ -2402,9 +2402,6 @@ static string FormatPvrTaSpriteVertex(DreamcastPvrTaSpriteVertexSummary vertex)
         ? formatted
         : $"{formatted}[raw={vertex.XValueHex},{vertex.YValueHex},z={vertex.ZValueHex}]";
 }
-
-static bool HasPvrTaSpriteTexturePayload(uint headerValue) =>
-    (headerValue & 0x0000_0008u) != 0;
 
 static bool HasPvrTaSpritePackedUv(uint headerValue) =>
     (headerValue & 0x0000_0001u) != 0;

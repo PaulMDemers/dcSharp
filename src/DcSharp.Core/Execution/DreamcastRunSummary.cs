@@ -593,7 +593,9 @@ public sealed record DreamcastPvrPreviewRenderStatsSummary(
     int AlphaBlendedPixels,
     int PunchThroughRejectedPixels,
     int SubpixelFallbacks,
-    int OutOfBoundsWritePixels)
+    int OutOfBoundsWritePixels,
+    int TextureSampledPixels = 0,
+    int ZeroAlphaTexturePixels = 0)
 {
     public static DreamcastPvrPreviewRenderStatsSummary FromStats(DreamcastPvrPreviewRenderStats stats) =>
         new(
@@ -605,7 +607,9 @@ public sealed record DreamcastPvrPreviewRenderStatsSummary(
             stats.AlphaBlendedPixels,
             stats.PunchThroughRejectedPixels,
             stats.SubpixelFallbacks,
-            stats.OutOfBoundsWritePixels);
+            stats.OutOfBoundsWritePixels,
+            stats.TextureSampledPixels,
+            stats.ZeroAlphaTexturePixels);
 }
 
 public sealed record DreamcastPvrTaAssemblyDiagnosticsSummary(
@@ -766,7 +770,7 @@ public sealed record DreamcastPvrTaTextureModeGroupSummary(
             : new("strip", strip.ListTypeName, false, false, false, false, "none", 1);
 
     private static DreamcastPvrTaTextureModeGroupSummary FromSprite(DreamcastPvrTaSpriteSummary sprite) =>
-        FromPayload("sprite", sprite.ListTypeName, sprite.HeaderPayload.Mode1Fields.TextureEnabled, sprite.HeaderPayload.Mode3Fields);
+        FromPayload("sprite", sprite.ListTypeName, sprite.HeaderPayload.EffectiveTextureEnabled, sprite.HeaderPayload.Mode3Fields);
 
     private static DreamcastPvrTaTextureModeGroupSummary FromPayload(
         string primitiveKind,
@@ -1483,6 +1487,8 @@ public sealed record DreamcastPvrTaSpriteHeaderPayloadSummary(
     string Dummy0Hex,
     uint Dummy1,
     string Dummy1Hex,
+    bool HasTexturePayload,
+    bool EffectiveTextureEnabled,
     DreamcastPvrTaPolygonHeaderMode1 Mode1Fields,
     DreamcastPvrTaPolygonHeaderMode2 Mode2Fields,
     DreamcastPvrTaPolygonHeaderMode3 Mode3Fields)
@@ -1503,6 +1509,8 @@ public sealed record DreamcastPvrTaSpriteHeaderPayloadSummary(
             payload.Dummy0Hex,
             payload.Dummy1,
             payload.Dummy1Hex,
+            payload.HasTexturePayload,
+            payload.EffectiveTextureEnabled,
             payload.Mode1Fields,
             payload.Mode2Fields,
             payload.Mode3Fields);

@@ -49,7 +49,12 @@ public static class DreamcastPvrPreviewRenderer
     {
         var stats = new DreamcastPvrPreviewRenderStatsBuilder();
         stats.SpriteCalls++;
-        if (sprite.Rgb565 == 0 || !sprite.HasFinitePreviewCoordinates)
+        if (!sprite.HasFinitePreviewCoordinates)
+        {
+            return stats.ToStats();
+        }
+
+        if (sprite.Rgb565 == 0 && !CanSampleSpriteTexture(sprite))
         {
             return stats.ToStats();
         }
@@ -237,6 +242,7 @@ public static class DreamcastPvrPreviewRenderer
     {
         stats.PixelWriteAttempts++;
         var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
+        stats.RecordSourceSample(source.IsTextureSample, source.Alpha);
         if (IsPunchThrough(sprite)
             && SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex) < 128)
         {
@@ -315,9 +321,7 @@ public static class DreamcastPvrPreviewRenderer
 
     private static DreamcastPvrPreviewSourceSample SpriteSourceSample(DreamcastPvrTaSprite sprite, ReadOnlySpan<byte> vram, float sourceU, float sourceV)
     {
-        if (!sprite.HeaderPayload.Mode1Fields.TextureEnabled
-            || sprite.HeaderPayload.Mode3Fields.VqEnabled
-            || sprite.HeaderPayload.Mode3Fields.MipMapEnabled)
+        if (!CanSampleSpriteTexture(sprite))
         {
             return new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null);
         }
@@ -336,6 +340,13 @@ public static class DreamcastPvrPreviewRenderer
             ? new DreamcastPvrPreviewSourceSample(sprite.Rgb565, null)
             : ApplyTextureShading(sprite.Rgb565, textureSample, sprite.HeaderPayload.Mode2Fields.TextureShadingName);
     }
+
+    private static bool CanSampleSpriteTexture(DreamcastPvrTaSprite sprite) =>
+        sprite.HeaderPayload.EffectiveTextureEnabled
+        && !sprite.HeaderPayload.Mode3Fields.VqEnabled
+        && !sprite.HeaderPayload.Mode3Fields.MipMapEnabled
+        && TextureSize(sprite.HeaderPayload.Mode2Fields.TextureUSize) > 0
+        && TextureSize(sprite.HeaderPayload.Mode2Fields.TextureVSize) > 0;
 
     private static void RenderStrip(
         DreamcastPvrTaStrip strip,
@@ -703,9 +714,9 @@ public static class DreamcastPvrPreviewRenderer
         var textureAlphaEnabled = !mode2.TextureAlphaDisabled;
         return mode3.PixelFormatName switch
         {
-            "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null),
-            "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null),
-            "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null),
+            "Rgb565" => new DreamcastPvrPreviewSourceSample(texel, null, IsTextureSample: true),
+            "Argb1555" => new DreamcastPvrPreviewSourceSample(Argb1555ToRgb565(texel), textureAlphaEnabled ? Argb1555Alpha(texel) : null, IsTextureSample: true),
+            "Argb4444" => new DreamcastPvrPreviewSourceSample(Argb4444ToRgb565(texel), textureAlphaEnabled ? Argb4444Alpha(texel) : null, IsTextureSample: true),
             _ => null
         };
     }
@@ -739,7 +750,7 @@ public static class DreamcastPvrPreviewRenderer
                 xWeight,
                 yWeight)
             : (byte?)null;
-        return new DreamcastPvrPreviewSourceSample(Rgb888ToRgb565(red, green, blue), alpha);
+        return new DreamcastPvrPreviewSourceSample(Rgb888ToRgb565(red, green, blue), alpha, IsTextureSample: true);
     }
 
     private static byte InterpolateChannel(
@@ -973,7 +984,8 @@ public static class DreamcastPvrPreviewRenderer
     private sealed record DreamcastPvrPreviewSourceSample(
         ushort Rgb565,
         byte? Alpha,
-        bool AlphaMultipliesVertex = true);
+        bool AlphaMultipliesVertex = true,
+        bool IsTextureSample = false);
 
     private sealed record DreamcastPvrPreviewSpriteVertex(
         float X,
@@ -991,7 +1003,9 @@ public sealed record DreamcastPvrPreviewRenderStats(
     int AlphaBlendedPixels,
     int PunchThroughRejectedPixels,
     int SubpixelFallbacks,
-    int OutOfBoundsWritePixels)
+    int OutOfBoundsWritePixels,
+    int TextureSampledPixels = 0,
+    int ZeroAlphaTexturePixels = 0)
 {
     public static DreamcastPvrPreviewRenderStats Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -1005,7 +1019,9 @@ public sealed record DreamcastPvrPreviewRenderStats(
             AlphaBlendedPixels + other.AlphaBlendedPixels,
             PunchThroughRejectedPixels + other.PunchThroughRejectedPixels,
             SubpixelFallbacks + other.SubpixelFallbacks,
-            OutOfBoundsWritePixels + other.OutOfBoundsWritePixels);
+            OutOfBoundsWritePixels + other.OutOfBoundsWritePixels,
+            TextureSampledPixels + other.TextureSampledPixels,
+            ZeroAlphaTexturePixels + other.ZeroAlphaTexturePixels);
 }
 
 internal sealed class DreamcastPvrPreviewRenderStatsBuilder
@@ -1018,7 +1034,23 @@ internal sealed class DreamcastPvrPreviewRenderStatsBuilder
     public int PunchThroughRejectedPixels { get; set; }
     public int SubpixelFallbacks { get; set; }
     public int OutOfBoundsWritePixels { get; set; }
+    public int TextureSampledPixels { get; set; }
+    public int ZeroAlphaTexturePixels { get; set; }
     private readonly HashSet<int> writtenPixelIndices = [];
+
+    public void RecordSourceSample(bool isTextureSample, byte? alpha)
+    {
+        if (!isTextureSample)
+        {
+            return;
+        }
+
+        TextureSampledPixels++;
+        if (alpha == 0)
+        {
+            ZeroAlphaTexturePixels++;
+        }
+    }
 
     public void RecordWrittenPixel(int pixelIndex)
     {
@@ -1036,5 +1068,7 @@ internal sealed class DreamcastPvrPreviewRenderStatsBuilder
             AlphaBlendedPixels,
             PunchThroughRejectedPixels,
             SubpixelFallbacks,
-            OutOfBoundsWritePixels);
+            OutOfBoundsWritePixels,
+            TextureSampledPixels,
+            ZeroAlphaTexturePixels);
 }

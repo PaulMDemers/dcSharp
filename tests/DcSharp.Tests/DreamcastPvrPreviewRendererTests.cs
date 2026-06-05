@@ -518,18 +518,76 @@ public class DreamcastPvrPreviewRendererTests
         WriteTexturePixel(vram, textureBase, 7, 0, 0x07E0);
         WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
 
-        DreamcastPvrPreviewRenderer.RenderSprite(
+        var stats = DreamcastPvrPreviewRenderer.RenderSprite(
             CreateSprite(
                 0xFFFF,
                 [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
                 textureEnabled: true,
                 nonTwiddled: true,
                 textureBase: textureBase),
-            vram);
+            vram,
+            DreamcastPvrPreviewRenderer.Width,
+            useScreenCoordinates: false,
+            targetPixelOffset: 0);
 
         Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
         Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
         Assert.Equal(0xFFFF, ReadRgb565(vram, 1, 1));
+        Assert.True(stats.TextureSampledPixels > 0);
+        Assert.Equal(0, stats.ZeroAlphaTexturePixels);
+    }
+
+    [Fact]
+    public void SamplesSpriteTextureWhenCommandTextureBitIsSet()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xF800);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x07E0);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0x001F);
+
+        var stats = DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0xFFFF,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                textureEnabled: false,
+                nonTwiddled: true,
+                textureBase: textureBase,
+                headerValue: 0xA084_0009),
+            vram,
+            DreamcastPvrPreviewRenderer.Width,
+            useScreenCoordinates: false,
+            targetPixelOffset: 0);
+
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 1, 1));
+        Assert.True(stats.TextureSampledPixels > 0);
+        Assert.Equal(0, stats.ZeroAlphaTexturePixels);
+    }
+
+    [Fact]
+    public void TexturedSpriteWithZeroFlatColorStillSamplesTexture()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0x07E0);
+
+        var stats = DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x0000,
+                [(1, 1, 0.0f, 0.0f), (2, 1, 0.0f, 0.0f), (2, 2, 0.0f, 0.0f), (1, 2, 0.0f, 0.0f)],
+                textureEnabled: false,
+                nonTwiddled: true,
+                textureBase: textureBase,
+                headerValue: 0xA084_0009),
+            vram,
+            DreamcastPvrPreviewRenderer.Width,
+            useScreenCoordinates: false,
+            targetPixelOffset: 0);
+
+        Assert.Equal(0x07E0, ReadRgb565(vram, 0, 0));
+        Assert.True(stats.TextureSampledPixels > 0);
     }
 
     [Fact]
@@ -784,7 +842,7 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
-    public void DoesNotSampleSpriteTextureWhenOnlyCommandCarriesUvPayload()
+    public void SamplesSpriteTextureWhenOnlyCommandCarriesUvPayload()
     {
         var vram = new byte[4096];
         const uint textureBase = 0x400;
@@ -802,9 +860,9 @@ public class DreamcastPvrPreviewRendererTests
                 headerValue: 0xA084_0009),
             vram);
 
-        Assert.Equal(0x001F, ReadRgb565(vram, 0, 0));
-        Assert.Equal(0x001F, ReadRgb565(vram, 2, 0));
-        Assert.Equal(0x001F, ReadRgb565(vram, 1, 1));
+        Assert.Equal(0xF800, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0xFFFF, ReadRgb565(vram, 1, 1));
     }
 
     [Fact]
