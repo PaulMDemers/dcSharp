@@ -329,6 +329,39 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void DecodesSpriteUvPayloadFromCommandTextureBit()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("SpriteHeader", 0xA084_0009)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFFF_FFFF)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+
+        var render = AcceptSpritePacket(
+            state,
+            dummy1: 0x3F80_3F00,
+            dummy2: 0x4000_3F00,
+            dummy3: 0x4000_4000);
+
+        Assert.NotNull(render);
+        var sprite = Assert.Single(state.CompletedSprites);
+        Assert.False(sprite.HeaderPayload.Mode1Fields.TextureEnabled);
+        Assert.Equal(1.0f, sprite.Vertices[0].U);
+        Assert.Equal(0.5f, sprite.Vertices[0].V);
+        Assert.Equal(2.0f, sprite.Vertices[1].U);
+        Assert.Equal(0.5f, sprite.Vertices[1].V);
+        Assert.Equal(2.0f, sprite.Vertices[2].U);
+        Assert.Equal(2.0f, sprite.Vertices[2].V);
+        Assert.Equal(1.0f, sprite.Vertices[3].U);
+        Assert.Equal(2.0f, sprite.Vertices[3].V);
+    }
+
+    [Fact]
     public void TreatsSubpixelWidthSpriteAsRenderablePreviewArea()
     {
         var state = new DreamcastPvrTaState();
@@ -415,7 +448,11 @@ public class DreamcastPvrTaStateTests
         return state.Accept(CreateWrite("Unknown", 0));
     }
 
-    private static DreamcastPvrTaRenderCommand? AcceptSpritePacket(DreamcastPvrTaState state)
+    private static DreamcastPvrTaRenderCommand? AcceptSpritePacket(
+        DreamcastPvrTaState state,
+        uint dummy1 = 0,
+        uint dummy2 = 0,
+        uint dummy3 = 0)
         => AcceptSpritePacket(
             state,
             ax: 0x3F80_0000,
@@ -425,7 +462,10 @@ public class DreamcastPvrTaStateTests
             cx: 0x3F80_0000,
             cy: 0x4040_0000,
             dx: 0x4040_0000,
-            dy: 0x4040_0000);
+            dy: 0x4040_0000,
+            dummy1: dummy1,
+            dummy2: dummy2,
+            dummy3: dummy3);
 
     private static DreamcastPvrTaRenderCommand? AcceptSpritePacket(
         DreamcastPvrTaState state,
@@ -436,7 +476,10 @@ public class DreamcastPvrTaStateTests
         uint cx,
         uint cy,
         uint dx,
-        uint dy)
+        uint dy,
+        uint dummy1 = 0,
+        uint dummy2 = 0,
+        uint dummy3 = 0)
     {
         Assert.Null(state.Accept(CreateWrite("VertexEndOfStrip", 0xF000_0000)));
         Assert.Null(state.Accept(CreateWrite("Unknown", ax)));
@@ -451,9 +494,9 @@ public class DreamcastPvrTaStateTests
         Assert.Null(state.Accept(CreateWrite("Unknown", dx)));
         Assert.Null(state.Accept(CreateWrite("Unknown", dy)));
         Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
-        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
-        Assert.Null(state.Accept(CreateWrite("Unknown", 0)));
-        return state.Accept(CreateWrite("Unknown", 0));
+        Assert.Null(state.Accept(CreateWrite("Unknown", dummy1)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", dummy2)));
+        return state.Accept(CreateWrite("Unknown", dummy3));
     }
 
     private static DreamcastPvrTaRenderCommand? AcceptNonFiniteSpritePacket(DreamcastPvrTaState state)

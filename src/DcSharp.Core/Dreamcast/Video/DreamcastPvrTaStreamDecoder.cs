@@ -33,7 +33,9 @@ public static class DreamcastPvrTaStreamDecoder
                 {
                     if (string.Equals(payloadControl.Kind, "SpriteHeader", StringComparison.Ordinal))
                     {
-                        pendingSpriteHeader = new PendingSpriteHeader(payloadControl.Region, SpriteHeaderTextureEnabled(payloadControl.PayloadWords));
+                        pendingSpriteHeader = new PendingSpriteHeader(
+                            payloadControl.Region,
+                            SpriteHeaderHasTexturePayload(payloadControl.Value));
                     }
                     else if (string.Equals(payloadControl.Kind, "PolygonHeader", StringComparison.Ordinal))
                     {
@@ -71,7 +73,12 @@ public static class DreamcastPvrTaStreamDecoder
                         null,
                         15,
                         null));
-                    payloadControl = new PayloadControl(write.Region, controlKind, write.Value, write.ValueHex, pendingSpriteHeader.TextureEnabled);
+                    payloadControl = new PayloadControl(
+                        write.Region,
+                        controlKind,
+                        write.Value,
+                        write.ValueHex,
+                        pendingSpriteHeader.HasTexturePayload);
                     payloadWordsRemaining = 15;
                     payloadWordIndex = 0;
                     pendingSpriteHeader = null;
@@ -129,8 +136,8 @@ public static class DreamcastPvrTaStreamDecoder
         string.Equals(region, "TA_INPUT", StringComparison.Ordinal)
         && listTypeName is "OpaquePolygon" or "TranslucentPolygon" or "PunchThroughPolygon";
 
-    private static bool SpriteHeaderTextureEnabled(IReadOnlyList<uint> payloadWords) =>
-        payloadWords.Count > 0 && (payloadWords[0] & 0x0200_0000u) != 0;
+    private static bool SpriteHeaderHasTexturePayload(uint headerValue) =>
+        (headerValue & 0x0000_0008u) != 0;
 
     private static string? PayloadWordName(string controlKind, int payloadWordIndex, bool? spriteTextureEnabled = null) =>
         controlKind switch
@@ -232,7 +239,7 @@ internal sealed record PayloadControl(
     public void AddPayloadWord(uint value) => payloadWords.Add(value);
 }
 
-internal sealed record PendingSpriteHeader(string Region, bool TextureEnabled);
+internal sealed record PendingSpriteHeader(string Region, bool HasTexturePayload);
 
 public sealed record DreamcastPvrTaStreamWrite(
     DreamcastPvrTaCommandWrite Write,

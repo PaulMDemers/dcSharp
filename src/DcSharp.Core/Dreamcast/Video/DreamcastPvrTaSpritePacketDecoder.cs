@@ -200,11 +200,11 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
         public DreamcastPvrTaSprite ToSprite()
         {
             var rgb565 = Argb8888ToRgb565(HeaderPayload.Argb);
-            var textured = HeaderPayload.Mode1Fields.TextureEnabled;
-            (float U, float V, uint Value) aUv = textured ? DecodePackedUv(Dummy1 ?? 0) : (0.0f, 0.0f, 0u);
-            (float U, float V, uint Value) bUv = textured ? DecodePackedUv(Dummy2 ?? 0) : (0.0f, 0.0f, 0u);
-            (float U, float V, uint Value) cUv = textured ? DecodePackedUv(Dummy3 ?? 0) : (0.0f, 0.0f, 0u);
-            (float U, float V, uint Value) dUv = textured
+            var hasTexturePayload = HasTexturePayload(HeaderPayload.HeaderValue);
+            (float U, float V, uint Value) aUv = hasTexturePayload ? DecodePackedUv(Dummy1 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) bUv = hasTexturePayload ? DecodePackedUv(Dummy2 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) cUv = hasTexturePayload ? DecodePackedUv(Dummy3 ?? 0) : (0.0f, 0.0f, 0u);
+            (float U, float V, uint Value) dUv = hasTexturePayload
                 ? (aUv.U + cUv.U - bUv.U, aUv.V + cUv.V - bUv.V, 0u)
                 : (0.0f, 0.0f, 0u);
             return new DreamcastPvrTaSprite(
@@ -284,6 +284,9 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
             var v = BitConverter.UInt32BitsToSingle((value & 0x0000_FFFFu) << 16);
             return (u, v, value);
         }
+
+        private static bool HasTexturePayload(uint headerValue) =>
+            (headerValue & 0x0000_0008u) != 0;
 
         private static uint InterpolateDz(uint azValue, uint bzValue, uint czValue)
         {

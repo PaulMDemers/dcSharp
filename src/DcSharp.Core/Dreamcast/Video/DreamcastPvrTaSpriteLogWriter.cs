@@ -32,7 +32,7 @@ public static class DreamcastPvrTaSpriteLogWriter
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"# sprites={sprites.Count} matched={indexed.Length} skipped={skipped} limit={FormatLimit(limit)} status={previewStatus ?? "all"}"));
-        writer.WriteLine("# columns: index status region list headerPc controlPc payloadPcRange header control color argb texture points rawPoints payloadWords");
+        writer.WriteLine("# columns: index status region list headerPc controlPc payloadPcRange header control color argb texture cmdTexture uv16 points rawPoints payloadWords");
 
         for (var index = skipped; index < indexed.Length; index++)
         {
@@ -41,7 +41,7 @@ public static class DreamcastPvrTaSpriteLogWriter
             writer.WriteLine(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"#{entry.Index} status={PreviewStatus(sprite)} region={sprite.Region} list={sprite.ListTypeName ?? "-"} headerPc={sprite.HeaderInstructionPcHex ?? "-"} controlPc={sprite.ControlInstructionPcHex ?? "-"} payloadPcRange={FormatPayloadPcRange(sprite)} header={sprite.HeaderValueHex} control={sprite.ControlValueHex} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} texture={sprite.HeaderPayload.Mode1Fields.TextureEnabled} points={FormatPoints(sprite.Vertices)} rawPoints={FormatRawPoints(sprite.Vertices)} payloadWords={FormatPayloadWords(sprite.PayloadWords)}"));
+                    $"#{entry.Index} status={PreviewStatus(sprite)} region={sprite.Region} list={sprite.ListTypeName ?? "-"} headerPc={sprite.HeaderInstructionPcHex ?? "-"} controlPc={sprite.ControlInstructionPcHex ?? "-"} payloadPcRange={FormatPayloadPcRange(sprite)} header={sprite.HeaderValueHex} control={sprite.ControlValueHex} color={sprite.Rgb565Hex} argb={sprite.HeaderPayload.ArgbHex} texture={sprite.HeaderPayload.Mode1Fields.TextureEnabled} cmdTexture={HasTexturePayload(sprite.HeaderValue)} uv16={HasPackedUv(sprite.HeaderValue)} points={FormatPoints(sprite.Vertices)} rawPoints={FormatRawPoints(sprite.Vertices)} payloadWords={FormatPayloadWords(sprite.PayloadWords)}"));
         }
     }
 
@@ -71,6 +71,12 @@ public static class DreamcastPvrTaSpriteLogWriter
 
     private static string FormatLimit(int? limit) =>
         limit?.ToString(CultureInfo.InvariantCulture) ?? "all";
+
+    private static bool HasTexturePayload(uint headerValue) =>
+        (headerValue & 0x0000_0008u) != 0;
+
+    private static bool HasPackedUv(uint headerValue) =>
+        (headerValue & 0x0000_0001u) != 0;
 
     private sealed record IndexedSprite(int Index, DreamcastPvrTaSpriteSummary Sprite);
 }

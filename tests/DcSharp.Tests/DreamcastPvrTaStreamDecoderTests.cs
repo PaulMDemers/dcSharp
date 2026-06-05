@@ -236,9 +236,10 @@ public class DreamcastPvrTaStreamDecoderTests
     }
 
     [Theory]
-    [InlineData(0x0000_0000u, "Dummy0", "Dummy1", "Dummy2", "Dummy3")]
-    [InlineData(0x0200_0000u, "Dummy", "Auv", "Buv", "Cuv")]
+    [InlineData(0xA084_0000u, 0x0200_0000u, "Dummy0", "Dummy1", "Dummy2", "Dummy3")]
+    [InlineData(0xA084_0008u, 0x0000_0000u, "Dummy", "Auv", "Buv", "Cuv")]
     public void TracksSpriteVertexPayloadWordsAfterSpriteHeader(
+        uint headerValue,
         uint mode1,
         string payload11Name,
         string payload12Name,
@@ -247,7 +248,7 @@ public class DreamcastPvrTaStreamDecoderTests
     {
         var writes = new[]
         {
-            CreateWrite("TA_INPUT", 0xA084_0000),
+            CreateWrite("TA_INPUT", headerValue),
             CreateWrite("TA_INPUT", mode1),
             CreateWrite("TA_INPUT", 0x0000_0000),
             CreateWrite("TA_INPUT", 0x0000_0000),

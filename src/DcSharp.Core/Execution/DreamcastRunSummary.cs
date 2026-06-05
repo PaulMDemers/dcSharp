@@ -807,6 +807,8 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
     string Rgb565Hex,
     string ArgbHex,
     bool TextureEnabled,
+    bool TexturePayload,
+    bool Uv16Bit,
     string WidthBucket,
     string HeightBucket,
     int Count,
@@ -828,6 +830,8 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
                 sprite.Rgb565Hex,
                 sprite.HeaderPayload.ArgbHex,
                 sprite.HeaderPayload.Mode1Fields.TextureEnabled,
+                HasSpriteTexturePayload(sprite.HeaderValue),
+                HasSpritePackedUv(sprite.HeaderValue),
                 SizeBucket(SpriteWidth(sprite)),
                 SizeBucket(SpriteHeight(sprite)),
                 sprite.HeaderInstructionPc,
@@ -849,6 +853,8 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
                 group.Key.Rgb565Hex,
                 group.Key.ArgbHex,
                 group.Key.TextureEnabled,
+                group.Key.TexturePayload,
+                group.Key.Uv16Bit,
                 group.Key.WidthBucket,
                 group.Key.HeightBucket,
                 group.Count(),
@@ -912,6 +918,12 @@ public sealed record DreamcastPvrTaSpriteShapeGroupSummary(
         firstPayloadInstructionPcHex == lastPayloadInstructionPcHex
             ? firstPayloadInstructionPcHex ?? "-"
             : $"{firstPayloadInstructionPcHex ?? "-"}-{lastPayloadInstructionPcHex ?? "-"}";
+
+    private static bool HasSpriteTexturePayload(uint headerValue) =>
+        (headerValue & 0x0000_0008u) != 0;
+
+    private static bool HasSpritePackedUv(uint headerValue) =>
+        (headerValue & 0x0000_0001u) != 0;
 }
 
 public sealed record DreamcastVideoSampleSummary(
@@ -1449,6 +1461,8 @@ internal sealed record PvrTaSpriteShapeGroupKey(
     string Rgb565Hex,
     string ArgbHex,
     bool TextureEnabled,
+    bool TexturePayload,
+    bool Uv16Bit,
     string WidthBucket,
     string HeightBucket,
     uint? HeaderInstructionPc,
