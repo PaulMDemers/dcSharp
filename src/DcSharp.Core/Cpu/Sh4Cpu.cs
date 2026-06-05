@@ -6776,6 +6776,18 @@ public sealed class Sh4Cpu
             return $"stc gbr,r{n} ; r{n}=0x{State.R[n]:X8}";
         }
 
+        if ((opcode & 0xF0FF) == 0x0032)
+        {
+            State.R[n] = State.Ssr;
+            return $"stc ssr,r{n} ; r{n}=0x{State.R[n]:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x0042)
+        {
+            State.R[n] = State.Spc;
+            return $"stc spc,r{n} ; r{n}=0x{State.R[n]:X8}";
+        }
+
         if ((opcode & 0xF0FF) == 0x006A)
         {
             State.R[n] = State.Fpscr;
@@ -6828,6 +6840,18 @@ public sealed class Sh4Cpu
         {
             State.Gbr = State.R[n];
             return $"ldc r{n},gbr ; gbr=0x{State.Gbr:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x403E)
+        {
+            State.Ssr = State.R[n];
+            return $"ldc r{n},ssr ; ssr=0x{State.Ssr:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x404E)
+        {
+            State.Spc = State.R[n];
+            return $"ldc r{n},spc ; spc=0x{State.Spc:X8}";
         }
 
         if (highNibble == 0x6 && lowNibble == 0x0)

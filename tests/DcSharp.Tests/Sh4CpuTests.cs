@@ -5896,6 +5896,35 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void ExecutesSavedControlRegisterTransfers()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x403E); // ldc r0,ssr
+        WriteInstruction(memory, 0x8C01_0002, 0x414E); // ldc r1,spc
+        WriteInstruction(memory, 0x8C01_0004, 0x0232); // stc ssr,r2
+        WriteInstruction(memory, 0x8C01_0006, 0x0342); // stc spc,r3
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[0] = 0x6000_00F0;
+        cpu.State.R[1] = 0x8C01_2340;
+
+        var loadSsr = cpu.Step();
+        Assert.Equal(0x6000_00F0u, cpu.State.Ssr);
+        Assert.Equal("ldc r0,ssr ; ssr=0x600000F0", loadSsr.Trace);
+
+        var loadSpc = cpu.Step();
+        Assert.Equal(0x8C01_2340u, cpu.State.Spc);
+        Assert.Equal("ldc r1,spc ; spc=0x8C012340", loadSpc.Trace);
+
+        var storeSsr = cpu.Step();
+        Assert.Equal(0x6000_00F0u, cpu.State.R[2]);
+        Assert.Equal("stc ssr,r2 ; r2=0x600000F0", storeSsr.Trace);
+
+        var storeSpc = cpu.Step();
+        Assert.Equal(0x8C01_2340u, cpu.State.R[3]);
+        Assert.Equal("stc spc,r3 ; r3=0x8C012340", storeSpc.Trace);
+    }
+
+    [Fact]
     public void ExecutesGbrByteLogicalOperations()
     {
         var memory = new DreamcastMemory();
