@@ -1983,18 +1983,36 @@ public sealed class DreamcastMemory
         pvrTaCommandWrites.Add(write);
         if (pvrTaState.Accept(write) is { } renderCommand)
         {
+            var renderTargetPixelOffset = CurrentPvrPreviewRenderTargetPixelOffset();
             if (renderCommand.Strip is { } strip)
             {
-                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth, PvrPreviewWidth, useScreenCoordinates: true);
+                DreamcastPvrPreviewRenderer.RenderStrip(strip, pvrVram, pvrPreviewDepth, PvrPreviewWidth, useScreenCoordinates: true, renderTargetPixelOffset);
             }
             else if (renderCommand.Sprite is { } sprite)
             {
-                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, PvrPreviewWidth, useScreenCoordinates: true);
+                DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, PvrPreviewWidth, useScreenCoordinates: true, renderTargetPixelOffset);
             }
         }
 
         deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value, CurrentInstructionPc));
         return true;
+    }
+
+    private int CurrentPvrPreviewRenderTargetPixelOffset()
+    {
+        var renderAddress = externalRegisters.GetValueOrDefault(PvrRegisterBase + 0x0060);
+        if (renderAddress == 0)
+        {
+            renderAddress = externalRegisters.GetValueOrDefault(PvrRegisterBase + 0x0050);
+        }
+
+        var byteOffset = (int)(renderAddress & 0x00FF_FFFFu);
+        if (byteOffset < 0 || byteOffset >= pvrVram.Length)
+        {
+            return 0;
+        }
+
+        return byteOffset / 2;
     }
 
     private void LogPvrRegisterAccess(MemoryAccessKind kind, uint originalAddress, uint externalAddress, int size, uint value)

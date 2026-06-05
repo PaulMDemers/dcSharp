@@ -291,6 +291,25 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void CanRenderSpritePreviewAtTargetPixelOffset()
+    {
+        var vram = new byte[4096];
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x07E0,
+                [(1, 1, 0.0f, 0.0f), (2, 1, 0.0f, 0.0f), (2, 2, 0.0f, 0.0f), (1, 2, 0.0f, 0.0f)],
+                argb: 0xFF00_FF00),
+            vram,
+            DreamcastPvrPreviewRenderer.Width,
+            useScreenCoordinates: false,
+            targetPixelOffset: 16);
+
+        Assert.Equal(0x0000, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x07E0, ReadRgb565(vram, 16, 0));
+    }
+
+    [Fact]
     public void RendersSubpixelSpriteFootprintForThinRenderableQuad()
     {
         const int previewWidth = 640;

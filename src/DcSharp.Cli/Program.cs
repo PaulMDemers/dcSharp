@@ -525,6 +525,11 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
 {
     Console.WriteLine($"Video VRAM: nonzero={video.NonZeroBytes}, checksum={video.Fnv1A32Hex}, first={video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={video.PvrRegisterAccessCount}, taWrites={video.PvrTaCommandWriteCount}, taStrips={video.PvrTaStrips.Count}, taSprites={video.PvrTaSprites.Count}{FormatPvrTaSpriteCounts(video)}");
+    if (video.PvrDisplay.HasConfiguredState)
+    {
+        Console.WriteLine($"PVR display: {FormatPvrDisplay(video.PvrDisplay)}");
+    }
+
     Console.WriteLine($"PVR TA diag: {FormatPvrTaDiagnostics(video.PvrTaDiagnostics)}");
     if (video.PvrTaLists.Count > 0)
     {
@@ -903,6 +908,11 @@ static void RunElf(string path, string[] args)
     var videoSummary = DreamcastVideoSummary.FromSnapshot(result.Video);
     Console.WriteLine($"Video VRAM: nonzero={result.Video.NonZeroBytes}, checksum={result.Video.Fnv1A32Hex}, first={result.Video.FirstNonZeroOffsetHex ?? "none"}");
     Console.WriteLine($"PVR: registers={result.Video.PvrRegisterAccesses.Count}, taWrites={result.Video.PvrTaCommandWrites.Count}, taStrips={videoSummary.PvrTaStrips.Count}, taSprites={videoSummary.PvrTaSprites.Count}{FormatPvrTaSpriteCounts(videoSummary)}");
+    if (videoSummary.PvrDisplay.HasConfiguredState)
+    {
+        Console.WriteLine($"PVR display: {FormatPvrDisplay(videoSummary.PvrDisplay)}");
+    }
+
     Console.WriteLine($"PVR TA diag: {FormatPvrTaDiagnostics(videoSummary.PvrTaDiagnostics)}");
     var pvrTaLists = videoSummary.PvrTaLists;
     if (pvrTaLists.Count > 0)
@@ -1288,8 +1298,34 @@ static void DumpFramebuffer(DreamcastRunResult result, CliRunOptions options)
     }
 
     using var stream = File.Create(path);
-    DreamcastFramebufferPngWriter.WriteRgb565Png(stream, result.Video.Vram, options.FramebufferWidth, options.FramebufferHeight);
+    var byteOffset = FramebufferDumpByteOffset(result.Video, options.FramebufferWidth, options.FramebufferHeight);
+    DreamcastFramebufferPngWriter.WriteRgb565Png(stream, result.Video.Vram.AsSpan(byteOffset), options.FramebufferWidth, options.FramebufferHeight);
 }
+
+static int FramebufferDumpByteOffset(DreamcastVideoSnapshot video, int width, int height)
+{
+    var requiredBytes = checked(width * height * 2);
+    var renderAddress = PvrRegisterValue(video, "PVR_RENDER_ADDR");
+    var framebufferAddress = PvrRegisterValue(video, "PVR_FB_ADDR");
+    foreach (var candidate in new[] { renderAddress, framebufferAddress })
+    {
+        if (candidate is not { } address || address == 0)
+        {
+            continue;
+        }
+
+        var offset = (int)(address & 0x00FF_FFFFu);
+        if (offset >= 0 && offset + requiredBytes <= video.Vram.Length)
+        {
+            return offset;
+        }
+    }
+
+    return 0;
+}
+
+static uint? PvrRegisterValue(DreamcastVideoSnapshot video, string name) =>
+    video.PvrRegisters.FirstOrDefault(register => string.Equals(register.Name, name, StringComparison.Ordinal))?.Value;
 
 static void DumpAudioWav(DreamcastRunResult result, string path)
 {
@@ -2224,6 +2260,23 @@ static string FormatNullableFloat(float? value) =>
 
 static string FormatPvrTaTextureMode(DreamcastPvrTaTextureModeGroupSummary mode) =>
     $"{mode.PrimitiveKind}:{mode.ListTypeName ?? "none"}:{(mode.TextureEnabled ? "tex" : "flat")}:vq={mode.VqEnabled}:mip={mode.MipMapEnabled}:twid={!mode.NonTwiddled}:pix={mode.PixelFormatName}x{mode.Count}";
+
+static string FormatPvrDisplay(DreamcastPvrDisplaySummary display)
+{
+    var addresses =
+        $"fb={display.FramebufferAddressHex ?? "-"}"
+        + $"/il={display.InterlacedFramebufferAddressHex ?? "-"}"
+        + $" render={display.RenderAddressHex ?? "-"}"
+        + $"/alt={display.AlternateRenderAddressHex ?? "-"}";
+    var ranges =
+        $"clip={display.PixelClipX?.Display ?? "-"}x{display.PixelClipY?.Display ?? "-"}";
+    var sizes =
+        $"fbSize={display.FramebufferSizeHex ?? "-"} bitmap={display.BitmapXHex ?? "-"}x{display.BitmapYHex ?? "-"}";
+    var config =
+        $"cfg={display.FramebufferConfig1Hex ?? "-"}/{display.FramebufferConfig2Hex ?? "-"}"
+        + $" video={display.VideoConfigHex ?? "-"} scaler={display.ScalerConfigHex ?? "-"} palette={display.PaletteConfigHex ?? "-"}";
+    return $"{addresses} {ranges} {sizes} {config}";
+}
 
 static string FormatPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
     sprite.HasRenderablePreviewArea

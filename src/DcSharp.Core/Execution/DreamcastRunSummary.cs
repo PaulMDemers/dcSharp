@@ -467,6 +467,9 @@ public sealed record DreamcastVideoSummary(
     public DreamcastPvrTaDiagnosticsSummary PvrTaDiagnostics =>
         DreamcastPvrTaDiagnosticsSummary.FromVideo(this);
 
+    public DreamcastPvrDisplaySummary PvrDisplay =>
+        DreamcastPvrDisplaySummary.FromRegisters(PvrRegisters);
+
     public static DreamcastVideoSummary FromSnapshot(DreamcastVideoSnapshot snapshot, int recentCount = 32) =>
         new(
             snapshot.VramBytes,
@@ -943,6 +946,76 @@ public sealed record DreamcastPvrRegisterValueSummary(
     public static DreamcastPvrRegisterValueSummary FromRegister(DreamcastPvrRegisterValue register) =>
         new(register.Offset, register.OffsetHex, register.Name, register.Value, register.ValueHex);
 }
+
+public sealed record DreamcastPvrDisplaySummary(
+    string? FramebufferAddressHex,
+    string? InterlacedFramebufferAddressHex,
+    string? RenderAddressHex,
+    string? AlternateRenderAddressHex,
+    DreamcastPvrRegisterRangeSummary? PixelClipX,
+    DreamcastPvrRegisterRangeSummary? PixelClipY,
+    string? FramebufferSizeHex,
+    string? BitmapXHex,
+    string? BitmapYHex,
+    string? FramebufferConfig1Hex,
+    string? FramebufferConfig2Hex,
+    string? VideoConfigHex,
+    string? ScalerConfigHex,
+    string? PaletteConfigHex)
+{
+    public bool HasConfiguredState =>
+        FramebufferAddressHex is not null
+        || InterlacedFramebufferAddressHex is not null
+        || RenderAddressHex is not null
+        || AlternateRenderAddressHex is not null
+        || PixelClipX is not null
+        || PixelClipY is not null
+        || FramebufferSizeHex is not null
+        || BitmapXHex is not null
+        || BitmapYHex is not null
+        || FramebufferConfig1Hex is not null
+        || FramebufferConfig2Hex is not null
+        || VideoConfigHex is not null
+        || ScalerConfigHex is not null
+        || PaletteConfigHex is not null;
+
+    public static DreamcastPvrDisplaySummary FromRegisters(IReadOnlyList<DreamcastPvrRegisterValueSummary> registers) =>
+        new(
+            FormatAddress(Find(registers, "PVR_FB_ADDR")),
+            FormatAddress(Find(registers, "PVR_FB_IL_ADDR")),
+            FormatAddress(Find(registers, "PVR_RENDER_ADDR")),
+            FormatAddress(Find(registers, "PVR_RENDER_ADDR_2")),
+            DecodeRange(Find(registers, "PVR_PCLIP_X")),
+            DecodeRange(Find(registers, "PVR_PCLIP_Y")),
+            Find(registers, "PVR_FB_SIZE")?.ValueHex,
+            Find(registers, "PVR_BITMAP_X")?.ValueHex,
+            Find(registers, "PVR_BITMAP_Y")?.ValueHex,
+            Find(registers, "PVR_FB_CFG_1")?.ValueHex,
+            Find(registers, "PVR_FB_CFG_2")?.ValueHex,
+            Find(registers, "PVR_VIDEO_CFG")?.ValueHex,
+            Find(registers, "PVR_SCALER_CFG")?.ValueHex,
+            Find(registers, "PVR_PALETTE_CFG")?.ValueHex);
+
+    private static DreamcastPvrRegisterValueSummary? Find(IReadOnlyList<DreamcastPvrRegisterValueSummary> registers, string name) =>
+        registers.FirstOrDefault(register => string.Equals(register.Name, name, StringComparison.Ordinal));
+
+    private static string? FormatAddress(DreamcastPvrRegisterValueSummary? register) =>
+        register is null ? null : $"0x{register.Value & 0x00FF_FFFFu:X6}";
+
+    private static DreamcastPvrRegisterRangeSummary? DecodeRange(DreamcastPvrRegisterValueSummary? register)
+    {
+        if (register is null)
+        {
+            return null;
+        }
+
+        var start = (int)(register.Value & 0x3FFu);
+        var end = (int)((register.Value >> 16) & 0x3FFu);
+        return new DreamcastPvrRegisterRangeSummary(start, end, $"{start}-{end}");
+    }
+}
+
+public sealed record DreamcastPvrRegisterRangeSummary(int Start, int End, string Display);
 
 public sealed record DreamcastPvrRegisterAccessSummary(
     MemoryAccessKind Kind,

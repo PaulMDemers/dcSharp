@@ -7,22 +7,25 @@ public static class DreamcastPvrPreviewRenderer
     public const int Width = 320;
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram) =>
-        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates: false, Width);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates: false, Width, targetPixelOffset: 0);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, Width);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, Width, targetPixelOffset: 0);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, int previewWidth, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, previewWidth);
+        RenderStrip(strip, vram, [], useDepth: false, useScreenCoordinates, previewWidth, targetPixelOffset: 0);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates: false, Width);
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates: false, Width, targetPixelOffset: 0);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, Width);
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, Width, targetPixelOffset: 0);
 
     public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, int previewWidth, bool useScreenCoordinates) =>
-        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, previewWidth);
+        RenderStrip(strip, vram, depthBuffer, previewWidth, useScreenCoordinates, targetPixelOffset: 0);
+
+    public static void RenderStrip(DreamcastPvrTaStrip strip, Span<byte> vram, Span<float> depthBuffer, int previewWidth, bool useScreenCoordinates, int targetPixelOffset) =>
+        RenderStrip(strip, vram, depthBuffer, useDepth: true, useScreenCoordinates, previewWidth, targetPixelOffset);
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram) =>
         RenderSprite(sprite, vram, useScreenCoordinates: false);
@@ -31,6 +34,9 @@ public static class DreamcastPvrPreviewRenderer
         => RenderSprite(sprite, vram, Width, useScreenCoordinates);
 
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
+        => RenderSprite(sprite, vram, previewWidth, useScreenCoordinates, targetPixelOffset: 0);
+
+    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates, int targetPixelOffset)
     {
         if (sprite.Rgb565 == 0 || !sprite.HasFinitePreviewCoordinates)
         {
@@ -39,7 +45,7 @@ public static class DreamcastPvrPreviewRenderer
 
         if (!sprite.HasRenderablePreviewArea)
         {
-            RenderDegenerateSprite(sprite, vram, previewWidth, useScreenCoordinates);
+            RenderDegenerateSprite(sprite, vram, previewWidth, useScreenCoordinates, targetPixelOffset);
             return;
         }
 
@@ -71,18 +77,18 @@ public static class DreamcastPvrPreviewRenderer
                     continue;
                 }
 
-                var pixelIndex = PreviewPixelIndex(x, y, previewWidth);
+                var pixelIndex = targetPixelOffset + PreviewPixelIndex(x, y, previewWidth);
                 wrotePixel |= WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
             }
         }
 
         if (!wrotePixel)
         {
-            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth);
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset);
         }
         else if (IsThinSprite(ordered))
         {
-            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth);
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset);
         }
     }
 
@@ -97,7 +103,8 @@ public static class DreamcastPvrPreviewRenderer
         DreamcastPvrTaSprite sprite,
         IReadOnlyList<DreamcastPvrPreviewSpriteVertex> vertices,
         Span<byte> vram,
-        int previewWidth)
+        int previewWidth,
+        int targetPixelOffset)
     {
         var minX = vertices.Min(vertex => vertex.X);
         var minY = vertices.Min(vertex => vertex.Y);
@@ -124,7 +131,7 @@ public static class DreamcastPvrPreviewRenderer
             {
                 for (var y = startY; y <= endY; y++)
                 {
-                    WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
                 }
             }
         }
@@ -143,13 +150,13 @@ public static class DreamcastPvrPreviewRenderer
             {
                 for (var x = startX; x <= endX; x++)
                 {
-                    WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
                 }
             }
         }
     }
 
-    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
+    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates, int targetPixelOffset)
     {
         var originX = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewX);
         var originY = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewY);
@@ -160,7 +167,7 @@ public static class DreamcastPvrPreviewRenderer
 
         for (var index = 0; index < vertices.Length; index++)
         {
-            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram, previewWidth);
+            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram, previewWidth, targetPixelOffset);
         }
     }
 
@@ -169,7 +176,8 @@ public static class DreamcastPvrPreviewRenderer
         DreamcastPvrPreviewSpriteVertex a,
         DreamcastPvrPreviewSpriteVertex b,
         Span<byte> vram,
-        int previewWidth)
+        int previewWidth,
+        int targetPixelOffset)
     {
         var x0 = (int)MathF.Round(a.X);
         var y0 = (int)MathF.Round(a.Y);
@@ -189,7 +197,7 @@ public static class DreamcastPvrPreviewRenderer
 
             var u = Lerp(a.U, b.U, weight);
             var v = Lerp(a.V, b.V, weight);
-            WriteSpritePreviewPixel(sprite, vram, PreviewPixelIndex(x, y, previewWidth), u, v);
+            WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), u, v);
         }
     }
 
@@ -291,7 +299,8 @@ public static class DreamcastPvrPreviewRenderer
         Span<float> depthBuffer,
         bool useDepth,
         bool useScreenCoordinates,
-        int previewWidth)
+        int previewWidth,
+        int targetPixelOffset)
     {
         if (strip.Vertices.Count < 3)
         {
@@ -303,7 +312,7 @@ public static class DreamcastPvrPreviewRenderer
         for (var index = 0; index <= strip.Vertices.Count - 3; index++)
         {
             var vertices = strip.Vertices.Skip(index).Take(3).ToArray();
-            RenderTriangle(strip, vertices, originX, originY, vram, depthBuffer, useDepth, previewWidth);
+            RenderTriangle(strip, vertices, originX, originY, vram, depthBuffer, useDepth, previewWidth, targetPixelOffset);
         }
     }
 
@@ -315,7 +324,8 @@ public static class DreamcastPvrPreviewRenderer
         Span<byte> vram,
         Span<float> depthBuffer,
         bool useDepth,
-        int previewWidth)
+        int previewWidth,
+        int targetPixelOffset)
     {
         var a = new Vector2(vertices[0].X - originX, vertices[0].Y - originY);
         var b = new Vector2(vertices[1].X - originX, vertices[1].Y - originY);
@@ -337,7 +347,7 @@ public static class DreamcastPvrPreviewRenderer
                 var point = new Vector2(x, y);
                 if (IsInsideTriangle(point, a, b, c))
                 {
-                    var pixelIndex = PreviewPixelIndex(x, y, previewWidth);
+                    var pixelIndex = targetPixelOffset + PreviewPixelIndex(x, y, previewWidth);
                     if (!PassesDepth(strip, vertices, pixelIndex, depthBuffer, useDepth))
                     {
                         continue;

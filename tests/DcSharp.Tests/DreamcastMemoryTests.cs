@@ -512,6 +512,45 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void VideoSummaryDecodesPvrDisplayRegisters()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_8050, 0x0060_0000);
+        memory.WriteUInt32(0xA05F_8054, 0x0068_0000);
+        memory.WriteUInt32(0xA05F_8060, 0x0070_0000);
+        memory.WriteUInt32(0xA05F_8064, 0x0078_0000);
+        memory.WriteUInt32(0xA05F_8068, (639u << 16) | 0u);
+        memory.WriteUInt32(0xA05F_806C, (479u << 16) | 0u);
+        memory.WriteUInt32(0xA05F_805C, 0x013F_01DF);
+        memory.WriteUInt32(0xA05F_80EC, 0x0000_0280);
+        memory.WriteUInt32(0xA05F_80F0, 0x0000_01E0);
+        memory.WriteUInt32(0xA05F_8044, 0x0080_0000);
+        memory.WriteUInt32(0xA05F_8048, 0x0000_0001);
+        memory.WriteUInt32(0xA05F_80E8, 0x0000_0003);
+        memory.WriteUInt32(0xA05F_80F4, 0x0000_0400);
+        memory.WriteUInt32(0xA05F_8108, 0x0000_0002);
+
+        var display = DreamcastVideoSummary.FromSnapshot(memory.CreateVideoSnapshot()).PvrDisplay;
+
+        Assert.True(display.HasConfiguredState);
+        Assert.Equal("0x600000", display.FramebufferAddressHex);
+        Assert.Equal("0x680000", display.InterlacedFramebufferAddressHex);
+        Assert.Equal("0x700000", display.RenderAddressHex);
+        Assert.Equal("0x780000", display.AlternateRenderAddressHex);
+        Assert.Equal("0-639", display.PixelClipX?.Display);
+        Assert.Equal("0-479", display.PixelClipY?.Display);
+        Assert.Equal("0x013F01DF", display.FramebufferSizeHex);
+        Assert.Equal("0x00000280", display.BitmapXHex);
+        Assert.Equal("0x000001E0", display.BitmapYHex);
+        Assert.Equal("0x00800000", display.FramebufferConfig1Hex);
+        Assert.Equal("0x00000001", display.FramebufferConfig2Hex);
+        Assert.Equal("0x00000003", display.VideoConfigHex);
+        Assert.Equal("0x00000400", display.ScalerConfigHex);
+        Assert.Equal("0x00000002", display.PaletteConfigHex);
+    }
+
+    [Fact]
     public void PvrIdentityRegistersReportDreamcastValues()
     {
         var memory = new DreamcastMemory();
@@ -832,6 +871,20 @@ public class DreamcastMemoryTests
         Assert.Equal("0x8C1007E8", sprite.FirstPayloadInstructionPcHex);
         Assert.Equal(0x8C10_0804u, sprite.LastPayloadInstructionPc);
         Assert.Equal("0x8C100804", sprite.LastPayloadInstructionPcHex);
+    }
+
+    [Fact]
+    public void PvrTaPreviewRendersIntoConfiguredRenderTarget()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(0xA05F_8060, 0x20);
+        WritePvrSpritePacket(memory);
+
+        var snapshot = memory.CreateVideoSnapshot();
+
+        Assert.Equal(0x0000, ReadPreviewRgb565(snapshot.Vram, 2, 2));
+        Assert.Equal(0x07E0, ReadPreviewRgb565(snapshot.Vram, 0x20, 2, 2));
     }
 
     private static void WritePvrVertexPacket(DreamcastMemory memory, bool endOfStrip, int x, int y, ushort color)
@@ -1803,6 +1856,12 @@ public class DreamcastMemoryTests
     private static ushort ReadPreviewRgb565(byte[] vram, int x, int y)
     {
         var offset = ((y * 640) + x) * 2;
+        return (ushort)(vram[offset] | (vram[offset + 1] << 8));
+    }
+
+    private static ushort ReadPreviewRgb565(byte[] vram, int byteOffset, int x, int y)
+    {
+        var offset = byteOffset + (((y * 640) + x) * 2);
         return (ushort)(vram[offset] | (vram[offset + 1] << 8));
     }
 }
