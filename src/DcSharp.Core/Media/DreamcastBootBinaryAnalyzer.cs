@@ -6,6 +6,7 @@ public static class DreamcastBootBinaryAnalyzer
 {
     private const int AnalysisBytes = 4096;
     private const uint DefaultLoadAddress = 0x8C01_0000;
+    private const uint WindowsCeGdromPayloadOffset = 2048;
     private const int WindowsCeHeaderEntryOffsetField = 0x18;
     private const uint WindowsCeExpectedLoadAddress = 0x0C01_0000;
 
@@ -88,11 +89,16 @@ public static class DreamcastBootBinaryAnalyzer
 
         var total = sampleLength / 2;
         var windowsCe = TryDetectWindowsCeBootInfo(data);
+        var windowsCePayloadOffset = windowsCe is not null && data.Length > WindowsCeGdromPayloadOffset
+            ? WindowsCeGdromPayloadOffset
+            : (uint?)null;
         var suggestedEntryPoint = windowsCe is { } windowsCeInfo
-            ? DefaultLoadAddress + windowsCeInfo.EntryOffset
+            ? DefaultLoadAddress + (windowsCePayloadOffset is { } payloadOffset && windowsCeInfo.EntryOffset >= payloadOffset
+                ? windowsCeInfo.EntryOffset - payloadOffset
+                : windowsCeInfo.EntryOffset)
             : DefaultLoadAddress;
         var jumpTargetFileOffset = windowsCe?.EntryJumpTarget is { } jumpTarget && jumpTarget >= DefaultLoadAddress
-            ? (uint?)(jumpTarget - DefaultLoadAddress)
+            ? (uint?)(jumpTarget - DefaultLoadAddress + (windowsCePayloadOffset ?? 0))
             : null;
         var jumpTargetSample = jumpTargetFileOffset is { } targetOffset
             ? OpcodeSampleAt(data, targetOffset)
@@ -105,6 +111,8 @@ public static class DreamcastBootBinaryAnalyzer
             windowsCe is not null,
             windowsCe?.EntryOffset,
             windowsCe is { } detected ? $"0x{detected.EntryOffset:X}" : null,
+            windowsCePayloadOffset,
+            windowsCePayloadOffset is { } detectedPayloadOffset ? $"0x{detectedPayloadOffset:X}" : null,
             windowsCe?.EntryJumpTarget,
             windowsCe?.EntryJumpTarget is { } target ? $"0x{target:X8}" : null,
             jumpTargetFileOffset,
@@ -221,7 +229,7 @@ public static class DreamcastBootBinaryAnalyzer
         var highNibble = opcode >> 12;
         var lowNibble = opcode & 0xF;
 
-        if (opcode is 0x0008 or 0x0009 or 0x000B or 0x0018 or 0x0019 or 0x001B or 0x0028 or 0x0029 or 0x002B or 0xF3FD or 0xFBFD)
+        if (opcode is 0x0008 or 0x0009 or 0x000B or 0x0018 or 0x0019 or 0x001B or 0x0028 or 0x0029 or 0x002B or 0x0038 or 0xF3FD or 0xFBFD)
         {
             return true;
         }
@@ -301,6 +309,8 @@ public sealed record DreamcastBootBinaryCandidate(
     bool HasWindowsCeHeader,
     uint? WindowsCeEntryOffset,
     string? WindowsCeEntryOffsetHex,
+    uint? WindowsCePayloadOffset,
+    string? WindowsCePayloadOffsetHex,
     uint? WindowsCeEntryJumpTarget,
     string? WindowsCeEntryJumpTargetHex,
     uint? WindowsCeEntryJumpTargetFileOffset,

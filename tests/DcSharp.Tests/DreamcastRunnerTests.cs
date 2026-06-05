@@ -47,6 +47,35 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunsSh4LoadTlbAsPlaceholder()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            [
+                0x38, 0x00, // ldtlb
+                0x01, 0xE0  // mov #1,r0
+            ],
+            new DreamcastRunOptions(InstructionLimit: 2, TraceTailLength: 2));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Equal(1u, result.Cpu.R[0]);
+        Assert.Contains(result.TraceTail, step => step.Trace == "ldtlb");
+    }
+
+    [Fact]
+    public void RunsSh4LoadControlBankRegister()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            [
+                0x2A, 0xEE, // mov #42,r14
+                0xCE, 0x4E  // ldc r14,r4_bank
+            ],
+            new DreamcastRunOptions(InstructionLimit: 2, TraceTailLength: 2));
+
+        Assert.Equal(DreamcastStopReason.InstructionLimit, result.StopReason);
+        Assert.Contains(result.TraceTail, step => step.Trace == "ldc r14,r4_bank ; r4_bank=0x0000002A");
+    }
+
+    [Fact]
     public void CapturesFinalMemorySnapshotWhenRequested()
     {
         var raw = new byte[]

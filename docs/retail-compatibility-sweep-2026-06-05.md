@@ -36,7 +36,7 @@ The generic smoke path did not observe GD-ROM sector reads or TA command writes 
 | The Grinch (USA) | GDI | `FirmwareExit`, `PC=0x8C0000E8` after 1,386,943 instructions | GDI extraction now succeeds from volume `GRINCH`; still requests BIOS CD menu, `function=2`. |
 | Legacy of Kain - Soul Reaver (USA) | CUE | `InstructionLimit`, `PC=0x8C038934` | Reaches generic execution budget. |
 | Rayman 2 - The Great Escape (USA) | CUE | `InstructionLimit`, `PC=0x8C0D18B0` | Reaches generic execution budget. |
-| Sega Rally 2 (USA) | CUE | `UnsupportedInstruction` at `PC=0x8C0120E0` after 8,887,176 instructions | WinCE `0WINCEOS.BIN` is now selected as original layout, and the soft-reset HLE enters the header-reported stub at `0x8C010800`. That stub jumps to `0x8C0120E0`, which currently contains header/data-looking bytes (`0x0000 0x0000 0x6550 0x6167...`), so the frontier is WinCE image loader/relocation behavior. |
+| Sega Rally 2 (USA) | CUE | `MemoryFault` fetching `PC=0xFFFFFD1F` after 8,917,382 instructions | WinCE `0WINCEOS.BIN` now follows the GD-ROM payload mapping: the first `0x800` bytes are skipped from the runtime payload, and the remaining image is loaded at `0x8C010000`. Sega Rally reaches real WinCE startup code, executes `ldtlb`, installs a low-virtual RAM mapping, handles the observed banked-register `ldc`, and now falls into an odd negative WinCE API/syscall thunk. |
 | Sonic Adventure (USA, Rev A) | GDI | `UnsupportedInstruction` at `PC=0x8C000000` after 46,589,874 instructions | GDI extraction now succeeds from volume `SONIC_ADV`; unlike the CUE fallback, the GDI path exposes a zero-PC firmware/callback-style frontier. |
 | Sonic Adventure 2 (USA) | CUE | `UnsupportedInstruction` at `PC=0x8C000000` after 44,590,162 instructions | Guest jumps through pointer `0x8C17EC60`, which currently contains zero; likely firmware callback/table state. |
 | Sonic Shuffle (USA) | GDI | `InstructionLimit`, `PC=0x8C02A0C0` | GDI extraction now succeeds from volume `SONIC_SHUFFLE`; the CUE fallback now moves past modem and AICA RTC reads to a zero-PC firmware/callback-style frontier at 12,139,952 instructions. |
@@ -84,17 +84,20 @@ Sega Rally 2 uses `0WINCEOS.BIN` rather than the normal `1ST_READ.BIN` path. The
 
 - Header load address field: `0x0C010000`
 - Entry offset field: `0x800`
-- Suggested entry point: `0x8C010800`
-- Entry trampoline target: `0x8C0120E0` / file offset `0x20E0`
+- GD-ROM payload offset: `0x800`
+- Suggested entry point: `0x8C010000`
+- Entry trampoline target: `0x8C0120E0` / file offset `0x28E0`
 
-Running from IP.BIN now reaches the WinCE entry stub:
+The GD-ROM loader behavior matches the WinCE REIOS path used by Flycast: the header-sized first `0x800` bytes are parked separately, while the payload beginning at file offset `0x800` is loaded at `0x8C010000`. Running from IP.BIN now reaches the WinCE entry stub at the corrected payload base:
 
 ```text
-0x8C010804: 0xD001  mov.l @(0x01,pc),r0 ; [0x8C01080C]=0x8C0120E0
-0x8C010808: 0x402B  jmp @r0 ; target=0x8C0120E0
+0x8C010004: 0xD001  mov.l @(0x01,pc),r0 ; [0x8C01000C]=0x8C0120E0
+0x8C010008: 0x402B  jmp @r0 ; target=0x8C0120E0
 ```
 
-The target bytes are not currently executable startup code. They begin with zero words followed by ASCII-like data (`Pegasus`, `Zone...`). This makes Sega Rally 2 a WinCE loader/relocation/decompression problem rather than a generic SH-4 decode issue.
+With the corrected file-offset mapping, target `0x8C0120E0` corresponds to file offset `0x28E0`, where executable startup code begins. The next observed WinCE bootstrap sequence writes `PTEH=0x00005800` and `PTEL=0x0C13194A`, executes `ldtlb`, and fetches through the resulting low virtual page (`0x00005B90 -> 0x0C131B90`). A minimal 1 KiB TLB entry path now covers that access, and SH-4 banked-register `ldc r14,r4_bank` is decoded for the following context setup.
+
+The current frontier is no longer image relocation. Sega Rally now jumps through `r1=0xFFFFFD1F`, an odd negative WinCE API/syscall thunk address. The next slice needs WinCE syscall/exception dispatch or enough HLE to return from the first bootstrap API calls.
 
 ### Bootstrap/Firmware Frontiers
 
@@ -105,6 +108,6 @@ The target bytes are not currently executable startup code. They begin with zero
 
 ## Next Work
 
-1. Trace Sega Rally 2's WinCE bootstrap format: identify how `0WINCEOS.BIN` maps/copies/decompresses the code expected at `0x8C0120E0`, then teach the smoke loader enough of that path to enter executable WinCE startup code.
+1. Add WinCE API/syscall thunk handling for Sega Rally 2's odd negative call target family, starting with the first observed jump to `0xFFFFFD1F`.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.

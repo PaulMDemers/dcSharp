@@ -593,9 +593,10 @@ public class DreamcastMediaImageLoaderTests
         Assert.Equal("original", analysis.RecommendedLayout);
         Assert.True(analysis.Original.HasWindowsCeHeader);
         Assert.Equal(0x800u, analysis.Original.WindowsCeEntryOffset);
-        Assert.Equal("0x8C010800", analysis.Original.SuggestedEntryPointHex);
+        Assert.Equal(0x800u, analysis.Original.WindowsCePayloadOffset);
+        Assert.Equal("0x8C010000", analysis.Original.SuggestedEntryPointHex);
         Assert.Equal(0x8C010820u, analysis.Original.WindowsCeEntryJumpTarget);
-        Assert.Equal(0x820u, analysis.Original.WindowsCeEntryJumpTargetFileOffset);
+        Assert.Equal(0x1020u, analysis.Original.WindowsCeEntryJumpTargetFileOffset);
         Assert.StartsWith(
             "0x0009 0xE001 0x000B 0x0009",
             analysis.Original.WindowsCeEntryJumpTargetFirstWordsHex,
@@ -899,7 +900,7 @@ public class DreamcastMediaImageLoaderTests
 
     private static byte[] CreateWindowsCeBootHeaderBinary()
     {
-        var data = new byte[0x1000];
+        var data = new byte[0x1800];
         WriteUInt32BothEndian(data, 0x14, 0x0C01_0000);
         WriteUInt32BothEndian(data, 0x18, 0x800);
         data[0x800] = 0x09;
@@ -915,10 +916,10 @@ public class DreamcastMediaImageLoaderTests
         data[0x80A] = 0x09;
         data[0x80B] = 0x00;
         WriteUInt32LittleEndian(data, 0x80C, 0x8C01_0820);
-        WriteUInt16LittleEndian(data, 0x820, 0x0009);
-        WriteUInt16LittleEndian(data, 0x822, 0xE001);
-        WriteUInt16LittleEndian(data, 0x824, 0x000B);
-        WriteUInt16LittleEndian(data, 0x826, 0x0009);
+        WriteUInt16LittleEndian(data, 0x1020, 0x0009);
+        WriteUInt16LittleEndian(data, 0x1022, 0xE001);
+        WriteUInt16LittleEndian(data, 0x1024, 0x000B);
+        WriteUInt16LittleEndian(data, 0x1026, 0x0009);
         return data;
     }
 

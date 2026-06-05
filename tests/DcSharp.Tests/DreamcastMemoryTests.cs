@@ -17,6 +17,19 @@ public class DreamcastMemoryTests
         Assert.Equal(expectedPhysical, DreamcastMemory.TranslateAddress(address));
     }
 
+    [Fact]
+    public void LoadsTlbEntryForLowVirtualRamFetches()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt16(0x8C13_1B90, 0xE001);
+        memory.WriteUInt32(0xFF00_0000, 0x0000_5800);
+        memory.WriteUInt32(0xFF00_0004, 0x0C13_194A);
+
+        memory.LoadTlbFromRegisters();
+
+        Assert.Equal(0xE001, memory.ReadInstructionUInt16(0x0000_5B90));
+    }
+
     [Theory]
     [InlineData(0x0301_00C0u, 0x0101_00C0u)]
     [InlineData(0x025F_8000u, 0x005F_8000u)]

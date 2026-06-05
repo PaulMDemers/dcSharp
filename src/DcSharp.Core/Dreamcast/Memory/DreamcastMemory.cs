@@ -73,10 +73,15 @@ public sealed class DreamcastMemory
     private const uint Sh4Tra = 0xFF00_0020;
     private const uint Sh4Expevt = 0xFF00_0024;
     private const uint Sh4Intevt = 0xFF00_0028;
+    private const uint Sh4Pteh = 0xFF00_0000;
+    private const uint Sh4Ptel = 0xFF00_0004;
     private const uint Sh4Qacr0 = 0xFF00_0038;
     private const uint Sh4Qacr1 = 0xFF00_003C;
     private const uint Sh4DmaChannel2Source = 0xFFA0_0020;
     private const uint Sh4DmaChannel2TransferCount = 0xFFA0_0028;
+    private const uint TlbPageMask = 0xFFFF_FC00;
+    private const uint TlbOffsetMask = 0x0000_03FF;
+    private const uint TlbValidBit = 0x0000_0100;
     private const uint StoreQueueBase = 0xE000_0000;
     private const uint StoreQueueLimit = 0xE400_0000;
     private const uint StoreQueueAddressMask = 0x03FF_FFE0;
@@ -128,6 +133,7 @@ public sealed class DreamcastMemory
     private readonly byte[] operandCacheRamArea2 = new byte[OperandCacheRamAreaBytes];
     private readonly byte[] storeQueues = new byte[StoreQueueCount * StoreQueueBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
+    private readonly List<Sh4TlbEntry> tlbEntries = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly Dictionary<uint, uint> aicaRegisters = [];
     private readonly DreamcastAicaPlaybackState[] aicaPlayback = CreateAicaPlaybackStates();
@@ -253,6 +259,40 @@ public sealed class DreamcastMemory
     public static uint TranslateAddress(uint address) =>
         IsP4Address(address) ? address : address & PhysicalMask;
 
+    public void LoadTlbFromRegisters()
+    {
+        var pteh = p4Registers.GetValueOrDefault(Sh4Pteh);
+        var ptel = p4Registers.GetValueOrDefault(Sh4Ptel);
+        if ((ptel & TlbValidBit) == 0)
+        {
+            return;
+        }
+
+        var entry = new Sh4TlbEntry(
+            pteh & TlbPageMask,
+            (ptel & PhysicalMask) & TlbPageMask);
+        tlbEntries.RemoveAll(existing => existing.VirtualPage == entry.VirtualPage);
+        tlbEntries.Add(entry);
+    }
+
+    private uint TranslateAddressForAccess(uint address)
+    {
+        if (address < P1Base)
+        {
+            var virtualPage = address & TlbPageMask;
+            for (var index = tlbEntries.Count - 1; index >= 0; index--)
+            {
+                var entry = tlbEntries[index];
+                if (entry.VirtualPage == virtualPage)
+                {
+                    return entry.PhysicalPage | (address & TlbOffsetMask);
+                }
+            }
+        }
+
+        return TranslateAddress(address);
+    }
+
     public static uint NormalizePhysicalAddress(uint physical) =>
         physical >= Area0MirrorBase && physical < Area0MirrorLimit
             ? physical - Area0MirrorOffset
@@ -289,7 +329,7 @@ public sealed class DreamcastMemory
             return false;
         }
 
-        var physical = TranslateAddress(address);
+        var physical = TranslateAddressForAccess(address);
         if (physical < SystemRamPhysicalBase)
         {
             return false;
@@ -321,7 +361,7 @@ public sealed class DreamcastMemory
             return false;
         }
 
-        var physical = TranslateAddress(address);
+        var physical = TranslateAddressForAccess(address);
         if (physical >= PvrVram32PhysicalBase && physical < PvrVram32PhysicalBase + PvrVramByteCount)
         {
             offset = (int)(physical - PvrVram32PhysicalBase);
@@ -373,19 +413,19 @@ public sealed class DreamcastMemory
         return false;
     }
 
-    private static bool IsBootRomAddress(uint address, int length)
+    private bool IsBootRomAddress(uint address, int length)
     {
         if (length < 0)
         {
             return false;
         }
 
-        var physical = TranslateAddress(address);
+        var physical = TranslateAddressForAccess(address);
         return physical >= BootRomPhysicalBase
             && (ulong)physical + (uint)length <= (ulong)BootRomPhysicalBase + BootRomBytes;
     }
 
-    private static bool TryGetBiosVectorTableOffset(uint address, int length, out int offset)
+    private bool TryGetBiosVectorTableOffset(uint address, int length, out int offset)
     {
         offset = 0;
         if (length < 0)
@@ -393,7 +433,7 @@ public sealed class DreamcastMemory
             return false;
         }
 
-        var physical = TranslateAddress(address);
+        var physical = TranslateAddressForAccess(address);
         if (physical < BiosVectorTableBase
             || (ulong)physical + (uint)length > (ulong)BiosVectorTableBase + BiosVectorTableBytes)
         {
@@ -1703,7 +1743,7 @@ public sealed class DreamcastMemory
             return true;
         }
 
-        var physicalDestination = TranslateAddress(destination);
+        var physicalDestination = TranslateAddressForAccess(destination);
         if (physicalDestination >= PvrTaInputBase && physicalDestination < PvrTaYuvLimit)
         {
             for (var offset = 0; offset < length; offset += 4)
@@ -2256,7 +2296,7 @@ public sealed class DreamcastMemory
 
     private bool TryWritePvrTa(uint address, ReadOnlySpan<byte> data)
     {
-        var physical = TranslateAddress(address);
+        var physical = TranslateAddressForAccess(address);
         var region = physical switch
         {
             >= PvrTaInputBase and < PvrTaInputLimit => "TA_INPUT",
@@ -2804,6 +2844,8 @@ public sealed class DreamcastMemory
     }
 
     private static byte ToUnsignedAxis(sbyte value) => (byte)(value + 128);
+
+    private sealed record Sh4TlbEntry(uint VirtualPage, uint PhysicalPage);
 }
 
 internal sealed class DreamcastAicaPlaybackState

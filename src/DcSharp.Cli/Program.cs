@@ -334,6 +334,11 @@ static void PrintBootBinaryCandidate(DreamcastBootBinaryCandidate candidate)
     Console.WriteLine($"  ELF: {candidate.IsElf}");
     Console.WriteLine($"  Dreamcast startup stub: {candidate.HasDreamcastStartupStub}");
     Console.WriteLine($"  Windows CE header: {candidate.HasWindowsCeHeader}");
+    if (candidate.WindowsCePayloadOffsetHex is not null)
+    {
+        Console.WriteLine($"  Windows CE GD-ROM payload offset: {candidate.WindowsCePayloadOffsetHex}");
+    }
+
     Console.WriteLine($"  Suggested entry: {candidate.SuggestedEntryPointHex}{(candidate.WindowsCeEntryOffsetHex is null ? string.Empty : $" (offset {candidate.WindowsCeEntryOffsetHex})")}");
     if (candidate.WindowsCeEntryJumpTargetHex is not null)
     {
@@ -359,10 +364,15 @@ static void BootSmoke(string path, string[] args)
     var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, sourcePath, sourceKind);
     var selectedLayout = ResolveBootLayout(requestedLayout, analysis);
     var selectedCandidate = selectedLayout == "descrambled" ? analysis.Descrambled : analysis.Original;
+    var bootPayloadOffset = selectedLayout == "original" && selectedCandidate.WindowsCePayloadOffset is { } windowsCePayloadOffset
+        ? windowsCePayloadOffset
+        : 0;
     var bootEntryPoint = selectedCandidate.SuggestedEntryPoint;
     var bootBytes = selectedLayout == "descrambled"
         ? DreamcastBootScrambler.Descramble(data)
-        : data;
+        : bootPayloadOffset == 0
+            ? data
+            : data[(int)bootPayloadOffset..];
     var options = ParseRunOptions(runArgs);
     byte[]? ipBin = null;
     var enterIpBin = false;
@@ -504,7 +514,7 @@ static void BootSmoke(string path, string[] args)
     var summary = DreamcastRunSummary.FromResult(result, options.Emulation);
     if (options.EmitJson)
     {
-        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, ipBin is not null, result.MemoryRegionWrites, summary)));
+        Console.WriteLine(SerializeJson(new BootSmokeCliReport(analysis, selectedLayout, bootPayloadOffset, ipBin is not null, result.MemoryRegionWrites, summary)));
         return;
     }
 
@@ -513,6 +523,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Selected layout: {selectedLayout}");
     Console.WriteLine($"Analyzer recommendation: {analysis.RecommendedLayout}");
     Console.WriteLine($"Load address: {analysis.LoadAddressHex}");
+    Console.WriteLine($"Boot payload offset: 0x{bootPayloadOffset:X}");
     Console.WriteLine($"Boot entry: 0x{bootEntryPoint:X8}");
     Console.WriteLine($"IP.BIN seeded: {ipBin is not null}");
     Console.WriteLine($"Bytes loaded: {bootBytes.Length}");
@@ -2879,6 +2890,7 @@ internal sealed record BootExtractionCliReport(
 internal sealed record BootSmokeCliReport(
     DreamcastBootBinaryAnalysis Analysis,
     string SelectedLayout,
+    uint BootPayloadOffset,
     bool IpBinSeeded,
     IReadOnlyList<DreamcastMemoryRegionWriteSummary> MemoryRegionWrites,
     DreamcastRunSummary Summary);

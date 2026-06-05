@@ -6136,6 +6136,12 @@ public sealed class Sh4Cpu
             return $"rte ; target=0x{State.Spc:X8}, sr=0x{State.Sr:X8}";
         }
 
+        if (opcode == 0x0038)
+        {
+            memory.LoadTlbFromRegisters();
+            return "ldtlb";
+        }
+
         if ((opcode & 0xF0FF) == 0x0083)
         {
             memory.Prefetch(State.R[n]);
@@ -6852,6 +6858,14 @@ public sealed class Sh4Cpu
         {
             State.Spc = State.R[n];
             return $"ldc r{n},spc ; spc=0x{State.Spc:X8}";
+        }
+
+        if ((opcode & 0xF08F) == 0x408E)
+        {
+            var sourceRegister = (opcode >> 8) & 0xF;
+            var bankIndex = (opcode >> 4) & 0x7;
+            State.RBank[bankIndex] = State.R[sourceRegister];
+            return $"ldc r{sourceRegister},r{bankIndex}_bank ; r{bankIndex}_bank=0x{State.RBank[bankIndex]:X8}";
         }
 
         if (highNibble == 0x6 && lowNibble == 0x0)
