@@ -108,6 +108,53 @@ public class DreamcastPvrTaSpriteLogWriterTests
     }
 
     [Fact]
+    public void WritesModeTableProvenanceFromWatchedMemory()
+    {
+        var sprite = CreateSpriteSummary();
+        var reads = new[]
+        {
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C094, 4, sprite.HeaderValue, 0x8C10_07D0, 0x60C2),
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C098, 4, sprite.HeaderPayload.Mode1, 0x8C10_07D8, 0x53C1),
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C09C, 4, sprite.HeaderPayload.Mode2, 0x8C10_07DC, 0x52C2),
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C0A0, 4, sprite.HeaderPayload.Mode3, 0x8C10_07E4, 0x53C3)
+        };
+        var writes = new[]
+        {
+            new MemoryAccess(MemoryAccessKind.Write, 0x8C20_C09C, 4, 0x0000_04C0, 0x8C10_05CC, 0x1C02),
+            new MemoryAccess(MemoryAccessKind.Write, 0x8C20_C09C, 4, sprite.HeaderPayload.Mode2, 0x8C10_0658, 0x1C12)
+        };
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaModeTableTraceWriter.WriteText(writer, [sprite], reads, writes, limit: null, previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("# sprites=1 groups=1 reads=4 writes=2 skipped=0 limit=all status=all", text);
+        Assert.Contains("#0 status=renderable count=1 region=TA_INPUT list=OpaquePolygon", text);
+        Assert.Contains("header=0xA0840009 control=0xF0000000 effectiveTexture=True mode1=0x80000000 mode2=0x941004C0 mode3=0x00001234", text);
+        Assert.Contains("tableCandidates=0x8C20C094:readPcs=0x8C1007D0,0x8C1007D8,0x8C1007DC,0x8C1007E4", text);
+        Assert.Contains("tableWrites=0x8C20C094:mode2@+0x08=0x000004C0,pc=0x8C1005CC", text);
+        Assert.Contains("mode2@+0x08=0x941004C0,pc=0x8C100658", text);
+    }
+
+    [Fact]
+    public void InfersModeTableBaseWhenHeaderReadIsNotCaptured()
+    {
+        var sprite = CreateSpriteSummary();
+        var reads = new[]
+        {
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C098, 4, sprite.HeaderPayload.Mode1, 0x8C10_07D8, 0x53C1),
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C09C, 4, sprite.HeaderPayload.Mode2, 0x8C10_07DC, 0x52C2),
+            new MemoryAccess(MemoryAccessKind.Read, 0x8C20_C0A0, 4, sprite.HeaderPayload.Mode3, 0x8C10_07E4, 0x53C3)
+        };
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaModeTableTraceWriter.WriteText(writer, [sprite], reads, [], limit: null, previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("tableCandidates=0x8C20C094:readPcs=0x8C1007D8,0x8C1007DC,0x8C1007E4", text);
+    }
+
+    [Fact]
     public void FiltersByPreviewStatusAndPreservesOriginalIndexes()
     {
         var renderable = CreateSpriteSummary();
@@ -130,6 +177,7 @@ public class DreamcastPvrTaSpriteLogWriterTests
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteLogWriter.WriteText(writer, [], limit: -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteTextureSampleTraceWriter.WriteText(writer, [], [], limit: -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaTextureModeTraceWriter.WriteText(writer, [], [], limit: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaModeTableTraceWriter.WriteText(writer, [], [], [], limit: -1));
     }
 
     private static DreamcastPvrTaSpriteSummary CreateSpriteSummary(bool hasRenderablePreviewArea = true)
