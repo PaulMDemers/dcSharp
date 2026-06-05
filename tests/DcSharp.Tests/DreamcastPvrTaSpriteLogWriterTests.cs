@@ -84,6 +84,30 @@ public class DreamcastPvrTaSpriteLogWriterTests
     }
 
     [Fact]
+    public void WritesTextureModeCandidates()
+    {
+        var sprite = CreateSpriteSummary();
+        var vram = new byte[0x20000];
+        vram[0x1234] = 0x01;
+        vram[0x1235] = 0x80;
+        vram[0x4C0] = 0x34;
+        vram[0x8060] = 0x12;
+        using var writer = new StringWriter();
+
+        DreamcastPvrTaTextureModeTraceWriter.WriteText(writer, [sprite], vram, limit: null, previewStatus: null);
+
+        var text = writer.ToString();
+        Assert.Contains("# sprites=1 groups=1 skipped=0 limit=all status=all vramBytes=131072", text);
+        Assert.Contains("#0 status=renderable count=1 region=TA_INPUT list=OpaquePolygon", text);
+        Assert.Contains("effectiveTexture=True mode1=0x80000000 mode2=0x941004C0 mode3=0x00001234 decodedBase=0x00001234", text);
+        Assert.Contains("texSize=8x8 texFormat=Argb1555 texLayout=twiddled vq=False mip=False", text);
+        Assert.Contains("decodedMode3@0x00001234:inBounds=True:bytes=128:nonZero=2:first=0x00001234:word0=0x8001", text);
+        Assert.Contains("mode2Low16@0x000004C0:inBounds=True:bytes=128:nonZero=1:first=0x000004C0:word0=0x0034", text);
+        Assert.Contains("mode2Low16Shift3@0x00002600:inBounds=True", text);
+        Assert.Contains("mode2Low21Shift3@0x00802600:inBounds=False", text);
+    }
+
+    [Fact]
     public void FiltersByPreviewStatusAndPreservesOriginalIndexes()
     {
         var renderable = CreateSpriteSummary();
@@ -105,6 +129,7 @@ public class DreamcastPvrTaSpriteLogWriterTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteLogWriter.WriteText(writer, [], limit: -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaSpriteTextureSampleTraceWriter.WriteText(writer, [], [], limit: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DreamcastPvrTaTextureModeTraceWriter.WriteText(writer, [], [], limit: -1));
     }
 
     private static DreamcastPvrTaSpriteSummary CreateSpriteSummary(bool hasRenderablePreviewArea = true)
