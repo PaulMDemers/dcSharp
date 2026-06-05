@@ -136,6 +136,45 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void WindowsCePerformCallbackTransfersToCallbackFunction()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var memory = new DreamcastMemory();
+        var state = new Sh4State { Pc = 0xFFFF_FD1F, Pr = 0x8C02_2D7C };
+        state.R[4] = 0x8C13_7538;
+        state.R[5] = 0x8CEE_E654;
+        state.R[6] = 1;
+        state.R[7] = 0x8C13_7534;
+        memory.WriteUInt32(0x8C13_7538, 0x0CEE_EFE2);
+        memory.WriteUInt32(0x8C13_753C, 0x8C02_1FA0);
+        memory.WriteUInt32(0x8C13_7540, 0x8C01_16E0);
+
+        Assert.True(handler.TryHandle(state, memory, out var trace));
+
+        Assert.Equal(0x8C02_1FA0u, state.Pc);
+        Assert.Equal(0x8C02_2D7Cu, state.Pr);
+        Assert.Equal(0x8C01_16E0u, state.R[4]);
+        Assert.Equal(0x8CEE_E654u, state.R[5]);
+        Assert.Equal(1u, state.R[6]);
+        Assert.Equal(0x8C13_7534u, state.R[7]);
+        Assert.Equal("firmware wince hle WIN32.PerformCallBack address=0xFFFFFD1F callback=0x8C137538, hproc=0x0CEEEFE2, pfn=0x8C021FA0, arg0=0x8C0116E0 ; pc=0x8C021FA0, pr=0x8C022D7C", trace);
+    }
+
+    [Fact]
+    public void WindowsCeSimpleSyscallReturnsZeroToCaller()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = 0xFFFF_FD5D, Pr = 0x8C02_0000 };
+        state.R[4] = 42;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x8C02_0000u, state.Pc);
+        Assert.Equal(0u, state.R[0]);
+        Assert.Equal("firmware wince hle WIN32.Sleep address=0xFFFFFD5D r4=0x0000002A, r5=0x00000000, r6=0x00000000, r7=0x00000000 ; r0=0x00000000, pc=0x8C020000", trace);
+    }
+
+    [Fact]
     public void GdromCheckCommandReportsCompletedReadAndTransferredBytes()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));

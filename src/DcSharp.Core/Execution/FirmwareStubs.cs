@@ -118,6 +118,10 @@ internal static class FirmwareStubs
         private const uint GdromCommandDmaReadStreamEx = 38;
         private const uint GdromCommandPioReadStreamEx = 39;
         private const uint GdromCommandGetVersion = 40;
+        private const uint WindowsCeFirstMethod = 0xFFFF_FE01;
+        private const uint WindowsCeApiCallScale = 2;
+        private const uint WindowsCeWin32ApiId = 0;
+        private const uint WindowsCePerformCallBackMethod = 0x71;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
@@ -150,6 +154,11 @@ internal static class FirmwareStubs
 
         public bool TryHandle(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
         {
+            if (TryHandleWindowsCeSyscall(state, memory, out trace))
+            {
+                return true;
+            }
+
             if (state.Pc == SystemHleStub)
             {
                 var systemR4 = state.R[4];
@@ -220,6 +229,90 @@ internal static class FirmwareStubs
             trace = $"firmware gdrom hle func={function} r4=0x{r4:X8}, r5=0x{r5:X8}, r6=0x{r6:X8}, r7=0x{r7:X8} ; r0=0x{state.R[0]:X8}";
             return true;
         }
+
+        private static bool TryHandleWindowsCeSyscall(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
+        {
+            var address = state.Pc;
+            if ((address & 1) == 0 || address > WindowsCeFirstMethod || (address & 0xFFFF_0000) != 0xFFFF_0000)
+            {
+                trace = string.Empty;
+                return false;
+            }
+
+            var (apiId, methodId, apiName, methodName) = DecodeWindowsCeSyscall(address);
+            if (apiId == WindowsCeWin32ApiId && methodId == WindowsCePerformCallBackMethod)
+            {
+                var callbackInfo = state.R[4];
+                var hProc = memory.ReadUInt32(callbackInfo);
+                var pfn = memory.ReadUInt32(callbackInfo + 4);
+                var arg0 = memory.ReadUInt32(callbackInfo + 8);
+                state.R[4] = arg0;
+                state.Pc = pfn;
+                trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} callback=0x{callbackInfo:X8}, hproc=0x{hProc:X8}, pfn=0x{pfn:X8}, arg0=0x{arg0:X8} ; pc=0x{state.Pc:X8}, pr=0x{state.Pr:X8}";
+                return true;
+            }
+
+            state.R[0] = 0;
+            state.Pc = state.Pr;
+            trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} r4=0x{state.R[4]:X8}, r5=0x{state.R[5]:X8}, r6=0x{state.R[6]:X8}, r7=0x{state.R[7]:X8} ; r0=0x{state.R[0]:X8}, pc=0x{state.Pc:X8}";
+            return true;
+        }
+
+        private static (uint ApiId, uint MethodId, string ApiName, string MethodName) DecodeWindowsCeSyscall(uint address)
+        {
+            var scaled = (WindowsCeFirstMethod - address) / WindowsCeApiCallScale;
+            var apiId = (scaled >> 8) & 0x3F;
+            var methodId = scaled & 0xFF;
+            return (apiId, methodId, WindowsCeApiName(apiId), WindowsCeMethodName(apiId, methodId));
+        }
+
+        private static string WindowsCeApiName(uint apiId) =>
+            apiId switch
+            {
+                0 => "WIN32",
+                1 => "CURTHREAD",
+                2 => "CURPROC",
+                3 => "WDMAPI",
+                4 => "EVENT",
+                5 => "MUTEX",
+                6 => "APISET",
+                7 => "FILE",
+                8 => "FIND",
+                9 => "DBFILE",
+                10 => "DBFIND",
+                11 => "SOCKET",
+                12 => "INTERFACE",
+                13 => "SEMAPHORE",
+                14 => "FSMAP",
+                15 => "WNETENUM",
+                16 => "GDI",
+                17 => "WMGR",
+                18 => "INIT",
+                19 => "COMM",
+                20 => "FILESYS",
+                21 => "SHELL",
+                22 => "DEVMGR",
+                23 => "TAPI",
+                24 => "PATCHER",
+                25 => "IMM",
+                26 => "WNET",
+                31 => "USER",
+                _ => $"API{apiId}"
+            };
+
+        private static string WindowsCeMethodName(uint apiId, uint methodId) =>
+            apiId == WindowsCeWin32ApiId
+                ? methodId switch
+                {
+                    13 => "GetTickCount",
+                    82 => "Sleep",
+                    95 => "GetLastError",
+                    113 => "PerformCallBack",
+                    126 => "QueryPerformanceCounter",
+                    127 => "QueryPerformanceFrequency",
+                    _ => $"Method{methodId}"
+                }
+                : $"Method{methodId}";
 
         private uint HandleGdrom(uint function, DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory) =>
             function switch

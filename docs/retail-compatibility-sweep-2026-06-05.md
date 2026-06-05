@@ -36,7 +36,7 @@ The generic smoke path did not observe GD-ROM sector reads or TA command writes 
 | The Grinch (USA) | GDI | `FirmwareExit`, `PC=0x8C0000E8` after 1,386,943 instructions | GDI extraction now succeeds from volume `GRINCH`; still requests BIOS CD menu, `function=2`. |
 | Legacy of Kain - Soul Reaver (USA) | CUE | `InstructionLimit`, `PC=0x8C038934` | Reaches generic execution budget. |
 | Rayman 2 - The Great Escape (USA) | CUE | `InstructionLimit`, `PC=0x8C0D18B0` | Reaches generic execution budget. |
-| Sega Rally 2 (USA) | CUE | `MemoryFault` fetching `PC=0xFFFFFD1F` after 8,917,382 instructions | WinCE `0WINCEOS.BIN` now follows the GD-ROM payload mapping: the first `0x800` bytes are skipped from the runtime payload, and the remaining image is loaded at `0x8C010000`. Sega Rally reaches real WinCE startup code, executes `ldtlb`, installs a low-virtual RAM mapping, handles the observed banked-register `ldc`, and now falls into an odd negative WinCE API/syscall thunk. |
+| Sega Rally 2 (USA) | CUE | `InstructionLimit`, `PC=0x8C017782` at 30M instructions | WinCE `0WINCEOS.BIN` now follows the GD-ROM payload mapping: the first `0x800` bytes are skipped from the runtime payload, and the remaining image is loaded at `0x8C010000`. Sega Rally reaches real WinCE startup code, executes `ldtlb`, installs a low-virtual RAM mapping, handles the observed banked-register `ldc`, dispatches the first `WIN32.PerformCallBack` thunk, and now runs inside a repeating WinCE scheduler/list-management path rather than faulting. |
 | Sonic Adventure (USA, Rev A) | GDI | `UnsupportedInstruction` at `PC=0x8C000000` after 46,589,874 instructions | GDI extraction now succeeds from volume `SONIC_ADV`; unlike the CUE fallback, the GDI path exposes a zero-PC firmware/callback-style frontier. |
 | Sonic Adventure 2 (USA) | CUE | `UnsupportedInstruction` at `PC=0x8C000000` after 44,590,162 instructions | Guest jumps through pointer `0x8C17EC60`, which currently contains zero; likely firmware callback/table state. |
 | Sonic Shuffle (USA) | GDI | `InstructionLimit`, `PC=0x8C02A0C0` | GDI extraction now succeeds from volume `SONIC_SHUFFLE`; the CUE fallback now moves past modem and AICA RTC reads to a zero-PC firmware/callback-style frontier at 12,139,952 instructions. |
@@ -97,7 +97,7 @@ The GD-ROM loader behavior matches the WinCE REIOS path used by Flycast: the hea
 
 With the corrected file-offset mapping, target `0x8C0120E0` corresponds to file offset `0x28E0`, where executable startup code begins. The next observed WinCE bootstrap sequence writes `PTEH=0x00005800` and `PTEL=0x0C13194A`, executes `ldtlb`, and fetches through the resulting low virtual page (`0x00005B90 -> 0x0C131B90`). A minimal 1 KiB TLB entry path now covers that access, and SH-4 banked-register `ldc r14,r4_bank` is decoded for the following context setup.
 
-The current frontier is no longer image relocation. Sega Rally now jumps through `r1=0xFFFFFD1F`, an odd negative WinCE API/syscall thunk address. The next slice needs WinCE syscall/exception dispatch or enough HLE to return from the first bootstrap API calls.
+The first odd negative thunk is `0xFFFFFD1F`, which decodes as `WIN32.PerformCallBack`. The observed `CALLBACKINFO` block at `0x8C137538` contains `hProc=0x0CEEEFE2`, `pfn=0x8C021FA0`, and `pvArg0=0x8C0116E0`. A narrow WinCE HLE path now transfers control to that callback with `pvArg0` as the first argument and leaves `PR` pointing back to the original caller. With that in place, Sega Rally reaches 20M and 30M instruction budgets. The current profile is a repeating WinCE scheduler/list-management path around `0x8C0176A8-0x8C017A00` plus low virtual helper calls such as `0x00005BC0`.
 
 ### Bootstrap/Firmware Frontiers
 
@@ -108,6 +108,6 @@ The current frontier is no longer image relocation. Sega Rally now jumps through
 
 ## Next Work
 
-1. Add WinCE API/syscall thunk handling for Sega Rally 2's odd negative call target family, starting with the first observed jump to `0xFFFFFD1F`.
+1. Classify Sega Rally 2's post-`PerformCallBack` WinCE scheduler/list loop and decide whether it needs a real timer/event source, an additional syscall HLE, or a guarded fast-forward.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.
