@@ -295,7 +295,7 @@ public class DreamcastPvrPreviewRendererTests
     {
         var vram = new byte[4096];
 
-        DreamcastPvrPreviewRenderer.RenderSprite(
+        var stats = DreamcastPvrPreviewRenderer.RenderSprite(
             CreateSprite(
                 0x07E0,
                 [(1, 1, 0.0f, 0.0f), (2, 1, 0.0f, 0.0f), (2, 2, 0.0f, 0.0f), (1, 2, 0.0f, 0.0f)],
@@ -307,6 +307,11 @@ public class DreamcastPvrPreviewRendererTests
 
         Assert.Equal(0x0000, ReadRgb565(vram, 0, 0));
         Assert.Equal(0x07E0, ReadRgb565(vram, 16, 0));
+        Assert.Equal(1, stats.SpriteCalls);
+        Assert.True(stats.PixelWriteAttempts >= stats.PixelsWritten);
+        Assert.True(stats.PixelsWritten > 0);
+        Assert.Equal(0, stats.ZeroRgbWritePixels);
+        Assert.Equal(0, stats.SubpixelFallbacks);
     }
 
     [Fact]

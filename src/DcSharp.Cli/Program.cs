@@ -2244,11 +2244,15 @@ static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostic
         $"prims=strips:{diagnostics.StripCount}/tris:{diagnostics.StripTriangleCount}/sprites:{diagnostics.SpriteCount} " +
         $"stripDrops=short:{diagnostics.DroppedShortStripCount}/zero:{diagnostics.DroppedZeroColorPrimitiveCount}/mixed:{diagnostics.DroppedMixedFlatColorStripCount} " +
         $"sprites=renderable:{diagnostics.RenderableSpriteCount}/degenerate:{diagnostics.DegenerateSpriteCount}/nonfinite:{diagnostics.NonfiniteSpriteCount} " +
+        $"spriteRender={FormatPvrPreviewRenderStats(diagnostics.PreviewRenderStats)} " +
         $"bounds=all:{FormatPvrTaBounds(diagnostics.CombinedBounds)} strips:{FormatPvrTaBounds(diagnostics.StripBounds)} sprites:{FormatPvrTaBounds(diagnostics.SpriteBounds)} " +
         $"clipRisk=x<0:{diagnostics.CombinedBounds.NegativeXCount}/x>=w:{diagnostics.CombinedBounds.RightClippedCount}/y<0:{diagnostics.CombinedBounds.NegativeYCount} " +
         $"zeroExtent=w:{diagnostics.CombinedBounds.ZeroWidthCount}/h:{diagnostics.CombinedBounds.ZeroHeightCount} " +
         $"tex={textures}";
 }
+
+static string FormatPvrPreviewRenderStats(DreamcastPvrPreviewRenderStatsSummary stats) =>
+    $"calls:{stats.SpriteCalls}/attempts:{stats.PixelWriteAttempts}/written:{stats.PixelsWritten}/zero:{stats.ZeroRgbWritePixels}/alpha:{stats.AlphaBlendedPixels}/punchReject:{stats.PunchThroughRejectedPixels}/fallback:{stats.SubpixelFallbacks}/oob:{stats.OutOfBoundsWritePixels}";
 
 static string FormatPvrTaBounds(DreamcastPvrTaBoundsSummary bounds) =>
     bounds.HasBounds

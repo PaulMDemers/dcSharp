@@ -871,6 +871,10 @@ public class DreamcastMemoryTests
         Assert.Equal("0x8C1007E8", sprite.FirstPayloadInstructionPcHex);
         Assert.Equal(0x8C10_0804u, sprite.LastPayloadInstructionPc);
         Assert.Equal("0x8C100804", sprite.LastPayloadInstructionPcHex);
+        Assert.Equal(1, snapshot.PvrPreviewRenderStats.SpriteCalls);
+        Assert.True(snapshot.PvrPreviewRenderStats.PixelWriteAttempts >= snapshot.PvrPreviewRenderStats.PixelsWritten);
+        Assert.True(snapshot.PvrPreviewRenderStats.PixelsWritten > 0);
+        Assert.Equal(0, snapshot.PvrPreviewRenderStats.ZeroRgbWritePixels);
     }
 
     [Fact]

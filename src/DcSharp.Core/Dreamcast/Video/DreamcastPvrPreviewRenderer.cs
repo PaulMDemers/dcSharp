@@ -36,17 +36,19 @@ public static class DreamcastPvrPreviewRenderer
     public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates)
         => RenderSprite(sprite, vram, previewWidth, useScreenCoordinates, targetPixelOffset: 0);
 
-    public static void RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates, int targetPixelOffset)
+    public static DreamcastPvrPreviewRenderStats RenderSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates, int targetPixelOffset)
     {
+        var stats = new DreamcastPvrPreviewRenderStatsBuilder();
+        stats.SpriteCalls++;
         if (sprite.Rgb565 == 0 || !sprite.HasFinitePreviewCoordinates)
         {
-            return;
+            return stats.ToStats();
         }
 
         if (!sprite.HasRenderablePreviewArea)
         {
-            RenderDegenerateSprite(sprite, vram, previewWidth, useScreenCoordinates, targetPixelOffset);
-            return;
+            RenderDegenerateSprite(sprite, vram, previewWidth, useScreenCoordinates, targetPixelOffset, stats);
+            return stats.ToStats();
         }
 
         var originX = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewX);
@@ -78,18 +80,20 @@ public static class DreamcastPvrPreviewRenderer
                 }
 
                 var pixelIndex = targetPixelOffset + PreviewPixelIndex(x, y, previewWidth);
-                wrotePixel |= WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV);
+                wrotePixel |= WriteSpritePreviewPixel(sprite, vram, pixelIndex, sourceU, sourceV, stats);
             }
         }
 
         if (!wrotePixel)
         {
-            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset);
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset, stats);
         }
         else if (IsThinSprite(ordered))
         {
-            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset);
+            RenderSubpixelSpriteFootprint(sprite, ordered, vram, previewWidth, targetPixelOffset, stats);
         }
+
+        return stats.ToStats();
     }
 
     private static bool IsThinSprite(IReadOnlyList<DreamcastPvrPreviewSpriteVertex> vertices)
@@ -104,8 +108,10 @@ public static class DreamcastPvrPreviewRenderer
         IReadOnlyList<DreamcastPvrPreviewSpriteVertex> vertices,
         Span<byte> vram,
         int previewWidth,
-        int targetPixelOffset)
+        int targetPixelOffset,
+        DreamcastPvrPreviewRenderStatsBuilder stats)
     {
+        stats.SubpixelFallbacks++;
         var minX = vertices.Min(vertex => vertex.X);
         var minY = vertices.Min(vertex => vertex.Y);
         var maxX = vertices.Max(vertex => vertex.X);
@@ -131,7 +137,7 @@ public static class DreamcastPvrPreviewRenderer
             {
                 for (var y = startY; y <= endY; y++)
                 {
-                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV, stats);
                 }
             }
         }
@@ -150,13 +156,19 @@ public static class DreamcastPvrPreviewRenderer
             {
                 for (var x = startX; x <= endX; x++)
                 {
-                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV);
+                    WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), sourceU, sourceV, stats);
                 }
             }
         }
     }
 
-    private static void RenderDegenerateSprite(DreamcastPvrTaSprite sprite, Span<byte> vram, int previewWidth, bool useScreenCoordinates, int targetPixelOffset)
+    private static void RenderDegenerateSprite(
+        DreamcastPvrTaSprite sprite,
+        Span<byte> vram,
+        int previewWidth,
+        bool useScreenCoordinates,
+        int targetPixelOffset,
+        DreamcastPvrPreviewRenderStatsBuilder stats)
     {
         var originX = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewX);
         var originY = useScreenCoordinates ? 0.0f : sprite.Vertices.Take(4).Min(vertex => vertex.PreviewY);
@@ -167,7 +179,7 @@ public static class DreamcastPvrPreviewRenderer
 
         for (var index = 0; index < vertices.Length; index++)
         {
-            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram, previewWidth, targetPixelOffset);
+            DrawSpritePreviewLine(sprite, vertices[index], vertices[(index + 1) % vertices.Length], vram, previewWidth, targetPixelOffset, stats);
         }
     }
 
@@ -177,7 +189,8 @@ public static class DreamcastPvrPreviewRenderer
         DreamcastPvrPreviewSpriteVertex b,
         Span<byte> vram,
         int previewWidth,
-        int targetPixelOffset)
+        int targetPixelOffset,
+        DreamcastPvrPreviewRenderStatsBuilder stats)
     {
         var x0 = (int)MathF.Round(a.X);
         var y0 = (int)MathF.Round(a.Y);
@@ -197,7 +210,7 @@ public static class DreamcastPvrPreviewRenderer
 
             var u = Lerp(a.U, b.U, weight);
             var v = Lerp(a.V, b.V, weight);
-            WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), u, v);
+            WriteSpritePreviewPixel(sprite, vram, targetPixelOffset + PreviewPixelIndex(x, y, previewWidth), u, v, stats);
         }
     }
 
@@ -206,18 +219,22 @@ public static class DreamcastPvrPreviewRenderer
         Span<byte> vram,
         int pixelIndex,
         float sourceU,
-        float sourceV)
+        float sourceV,
+        DreamcastPvrPreviewRenderStatsBuilder stats)
     {
+        stats.PixelWriteAttempts++;
         var source = SpriteSourceSample(sprite, vram, sourceU, sourceV);
         if (IsPunchThrough(sprite)
             && SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex) < 128)
         {
+            stats.PunchThroughRejectedPixels++;
             return false;
         }
 
         var sourceAlpha = SourceAlpha((byte)(sprite.HeaderPayload.Argb >> 24), source.Alpha, source.AlphaMultipliesVertex);
         if (sprite.HeaderPayload.Mode2Fields.AlphaEnabled)
         {
+            stats.AlphaBlendedPixels++;
             source = source with
             {
                 Rgb565 = BlendRgb565(
@@ -230,6 +247,7 @@ public static class DreamcastPvrPreviewRenderer
         }
         else if (IsTranslucent(sprite) && sourceAlpha < byte.MaxValue)
         {
+            stats.AlphaBlendedPixels++;
             source = source with
             {
                 Rgb565 = BlendRgb565(
@@ -241,7 +259,19 @@ public static class DreamcastPvrPreviewRenderer
             };
         }
 
+        if (source.Rgb565 == 0)
+        {
+            stats.ZeroRgbWritePixels++;
+        }
+
+        if (!IsRgb565PixelInBounds(vram, pixelIndex))
+        {
+            stats.OutOfBoundsWritePixels++;
+            return false;
+        }
+
         WriteRgb565Pixel(vram, pixelIndex, source.Rgb565);
+        stats.PixelsWritten++;
         return true;
     }
 
@@ -908,6 +938,12 @@ public static class DreamcastPvrPreviewRenderer
         return offset + 1 >= vram.Length ? (ushort)0 : (ushort)(vram[offset] | (vram[offset + 1] << 8));
     }
 
+    private static bool IsRgb565PixelInBounds(ReadOnlySpan<byte> vram, int pixelIndex)
+    {
+        var offset = pixelIndex * 2;
+        return offset >= 0 && offset + 1 < vram.Length;
+    }
+
     private static void WriteRgb565Pixel(Span<byte> vram, int pixelIndex, ushort color)
     {
         var offset = pixelIndex * 2;
@@ -930,4 +966,51 @@ public static class DreamcastPvrPreviewRenderer
         float Y,
         float U,
         float V);
+}
+
+public sealed record DreamcastPvrPreviewRenderStats(
+    int SpriteCalls,
+    int PixelWriteAttempts,
+    int PixelsWritten,
+    int ZeroRgbWritePixels,
+    int AlphaBlendedPixels,
+    int PunchThroughRejectedPixels,
+    int SubpixelFallbacks,
+    int OutOfBoundsWritePixels)
+{
+    public static DreamcastPvrPreviewRenderStats Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0);
+
+    public DreamcastPvrPreviewRenderStats Add(DreamcastPvrPreviewRenderStats other) =>
+        new(
+            SpriteCalls + other.SpriteCalls,
+            PixelWriteAttempts + other.PixelWriteAttempts,
+            PixelsWritten + other.PixelsWritten,
+            ZeroRgbWritePixels + other.ZeroRgbWritePixels,
+            AlphaBlendedPixels + other.AlphaBlendedPixels,
+            PunchThroughRejectedPixels + other.PunchThroughRejectedPixels,
+            SubpixelFallbacks + other.SubpixelFallbacks,
+            OutOfBoundsWritePixels + other.OutOfBoundsWritePixels);
+}
+
+internal sealed class DreamcastPvrPreviewRenderStatsBuilder
+{
+    public int SpriteCalls { get; set; }
+    public int PixelWriteAttempts { get; set; }
+    public int PixelsWritten { get; set; }
+    public int ZeroRgbWritePixels { get; set; }
+    public int AlphaBlendedPixels { get; set; }
+    public int PunchThroughRejectedPixels { get; set; }
+    public int SubpixelFallbacks { get; set; }
+    public int OutOfBoundsWritePixels { get; set; }
+
+    public DreamcastPvrPreviewRenderStats ToStats() =>
+        new(
+            SpriteCalls,
+            PixelWriteAttempts,
+            PixelsWritten,
+            ZeroRgbWritePixels,
+            AlphaBlendedPixels,
+            PunchThroughRejectedPixels,
+            SubpixelFallbacks,
+            OutOfBoundsWritePixels);
 }

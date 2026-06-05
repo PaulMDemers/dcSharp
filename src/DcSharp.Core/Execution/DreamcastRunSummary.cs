@@ -450,7 +450,8 @@ public sealed record DreamcastVideoSummary(
     IReadOnlyList<DreamcastPvrTaStripSummary> PvrTaStrips,
     IReadOnlyList<DreamcastPvrTaSpriteSummary> PvrTaSprites,
     IReadOnlyList<DreamcastPvrTaCommandKindSummary> PvrTaCommandKinds,
-    DreamcastPvrTaAssemblyDiagnosticsSummary PvrTaAssemblyDiagnostics)
+    DreamcastPvrTaAssemblyDiagnosticsSummary PvrTaAssemblyDiagnostics,
+    DreamcastPvrPreviewRenderStatsSummary PvrPreviewRenderStats)
 {
     public int PvrTaRenderableSpriteCount => PvrTaSprites.Count(sprite => sprite.HasRenderablePreviewArea);
 
@@ -521,7 +522,8 @@ public sealed record DreamcastVideoSummary(
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => new DreamcastPvrTaCommandKindSummary(group.Key, group.Count()))
                 .ToArray(),
-            DreamcastPvrTaAssemblyDiagnosticsSummary.FromDiagnostics(snapshot.PvrTaAssemblyDiagnostics));
+            DreamcastPvrTaAssemblyDiagnosticsSummary.FromDiagnostics(snapshot.PvrTaAssemblyDiagnostics),
+            DreamcastPvrPreviewRenderStatsSummary.FromStats(snapshot.PvrPreviewRenderStats));
 
     internal static string GetPvrTaSpritePreviewStatus(DreamcastPvrTaSpriteSummary sprite) =>
         sprite.HasRenderablePreviewArea
@@ -543,6 +545,7 @@ public sealed record DreamcastPvrTaDiagnosticsSummary(
     int DroppedShortStripCount,
     int DroppedZeroColorPrimitiveCount,
     int DroppedMixedFlatColorStripCount,
+    DreamcastPvrPreviewRenderStatsSummary PreviewRenderStats,
     DreamcastPvrTaBoundsSummary StripBounds,
     DreamcastPvrTaBoundsSummary SpriteBounds,
     DreamcastPvrTaBoundsSummary CombinedBounds,
@@ -573,11 +576,34 @@ public sealed record DreamcastPvrTaDiagnosticsSummary(
             video.PvrTaAssemblyDiagnostics.DroppedShortStripCount,
             video.PvrTaAssemblyDiagnostics.DroppedZeroColorPrimitiveCount,
             video.PvrTaAssemblyDiagnostics.DroppedMixedFlatColorStripCount,
+            video.PvrPreviewRenderStats,
             stripBounds,
             spriteBounds,
             combinedBounds,
             DreamcastPvrTaTextureModeGroupSummary.FromVideo(video));
     }
+}
+
+public sealed record DreamcastPvrPreviewRenderStatsSummary(
+    int SpriteCalls,
+    int PixelWriteAttempts,
+    int PixelsWritten,
+    int ZeroRgbWritePixels,
+    int AlphaBlendedPixels,
+    int PunchThroughRejectedPixels,
+    int SubpixelFallbacks,
+    int OutOfBoundsWritePixels)
+{
+    public static DreamcastPvrPreviewRenderStatsSummary FromStats(DreamcastPvrPreviewRenderStats stats) =>
+        new(
+            stats.SpriteCalls,
+            stats.PixelWriteAttempts,
+            stats.PixelsWritten,
+            stats.ZeroRgbWritePixels,
+            stats.AlphaBlendedPixels,
+            stats.PunchThroughRejectedPixels,
+            stats.SubpixelFallbacks,
+            stats.OutOfBoundsWritePixels);
 }
 
 public sealed record DreamcastPvrTaAssemblyDiagnosticsSummary(
