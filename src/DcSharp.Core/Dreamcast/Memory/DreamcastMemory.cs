@@ -745,6 +745,92 @@ public sealed class DreamcastMemory
         return false;
     }
 
+    public bool TryPeekByte(uint address, out byte value)
+    {
+        value = 0;
+        if (TryGetPvrVramOffset(address, 1, out var vramOffset))
+        {
+            value = pvrVram[vramOffset];
+            return true;
+        }
+
+        if (TryGetAicaRamOffset(address, 1, out var aicaOffset))
+        {
+            value = aicaRam[aicaOffset];
+            return true;
+        }
+
+        if (TryGetOperandCacheRamOffset(address, 1, out var operandCacheRam, out var operandCacheOffset))
+        {
+            value = operandCacheRam[operandCacheOffset];
+            return true;
+        }
+
+        if (TryGetBiosVectorTableOffset(address, 1, out var biosVectorOffset))
+        {
+            value = biosVectorTable[biosVectorOffset];
+            return true;
+        }
+
+        if (IsBootRomAddress(address, 1))
+        {
+            value = 0;
+            return true;
+        }
+
+        if (TryGetSystemRamOffset(address, 1, out var systemRamOffset))
+        {
+            value = systemRam[systemRamOffset];
+            return true;
+        }
+
+        return false;
+    }
+
+    public DreamcastMemorySnapshot CreateMemorySnapshot(
+        IReadOnlyList<DreamcastMemoryAddressRange> ranges,
+        int maxBytesPerRange = 4096)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+
+        if (maxBytesPerRange < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxBytesPerRange), "Memory snapshot max bytes must be zero or greater.");
+        }
+
+        var capturedRanges = new List<DreamcastMemorySnapshotRange>(ranges.Count);
+        foreach (var range in ranges)
+        {
+            var start = Math.Min(range.StartAddress, range.EndAddress);
+            var end = Math.Max(range.StartAddress, range.EndAddress);
+            var requestedBytes = ((ulong)end - start) + 1;
+            var capturedBytes = (int)Math.Min(requestedBytes, (uint)maxBytesPerRange);
+            var bytes = new byte[capturedBytes];
+            var readable = true;
+            for (var index = 0; index < bytes.Length; index++)
+            {
+                if (!TryPeekByte(start + (uint)index, out bytes[index]))
+                {
+                    readable = false;
+                    Array.Resize(ref bytes, index);
+                    break;
+                }
+            }
+
+            var capturedEnd = bytes.Length == 0 ? start : start + (uint)(bytes.Length - 1);
+            capturedRanges.Add(new DreamcastMemorySnapshotRange(
+                start,
+                end,
+                capturedEnd,
+                requestedBytes,
+                readable,
+                requestedBytes > (uint)bytes.Length,
+                bytes));
+        }
+
+        return new DreamcastMemorySnapshot(capturedRanges);
+    }
+
     public bool TryGetBiosInterruptHandler(int interruptLevel, out uint vectorAddress, out uint handlerAddress)
     {
         vectorAddress = 0;

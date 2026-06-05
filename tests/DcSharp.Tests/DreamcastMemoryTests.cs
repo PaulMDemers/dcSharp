@@ -516,6 +516,67 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CreatesBoundedMemorySnapshotsWithoutRecordingReads()
+    {
+        var memory = new DreamcastMemory(readWatch: new DreamcastMemoryReadWatch(0, uint.MaxValue));
+        memory.WriteUInt32(0x8C20_C094, 0xA000_0009);
+        memory.WriteUInt32(0x8C20_C098, 0x8000_0000);
+        memory.WriteUInt16(0x1100_0000, 0xF800);
+
+        var snapshot = memory.CreateMemorySnapshot(
+            [
+                new DreamcastMemoryAddressRange(0x8C20_C094, 0x8C20_C0A3),
+                new DreamcastMemoryAddressRange(0x1100_0000, 0x1100_001F)
+            ],
+            maxBytesPerRange: 16);
+
+        Assert.Empty(memory.WatchedReads);
+        Assert.Collection(
+            snapshot.Ranges,
+            range =>
+            {
+                Assert.Equal("0x8C20C094", range.StartAddressHex);
+                Assert.Equal(16, range.Bytes.Length);
+                Assert.False(range.Truncated);
+                Assert.True(range.Readable);
+                Assert.Equal(new byte[] { 0x09, 0x00, 0x00, 0xA0 }, range.Bytes.Take(4));
+            },
+            range =>
+            {
+                Assert.Equal("0x11000000", range.StartAddressHex);
+                Assert.Equal(16, range.Bytes.Length);
+                Assert.True(range.Truncated);
+                Assert.True(range.Readable);
+                Assert.Equal(0x00, range.Bytes[0]);
+                Assert.Equal(0xF8, range.Bytes[1]);
+            });
+    }
+
+    [Fact]
+    public void WritesMemorySnapshotLog()
+    {
+        var snapshot = new DreamcastMemorySnapshot(
+            [
+                new DreamcastMemorySnapshotRange(
+                    0x8C20_C094,
+                    0x8C20_C0A3,
+                    0x8C20_C0A3,
+                    16,
+                    true,
+                    false,
+                    [0x09, 0x00, 0x00, 0xA0, 0x00, 0x00, 0x00, 0x80, 0xC0, 0x04, 0x88, 0x20, 0x00, 0x00, 0x00, 0x00])
+            ]);
+        using var writer = new StringWriter();
+
+        DreamcastMemorySnapshotLogWriter.WriteText(writer, snapshot);
+
+        var text = writer.ToString();
+        Assert.Contains("# Dreamcast final memory snapshot", text);
+        Assert.Contains("#0 start=0x8C20C094 end=0x8C20C0A3 capturedEnd=0x8C20C0A3 requestedBytes=16 capturedBytes=16 readable=True truncated=False nonZero=7 firstNonZero=0x8C20C094", text);
+        Assert.Contains("0x8C20C094: bytes=09 00 00 A0 00 00 00 80 C0 04 88 20 00 00 00 00 words=0xA0000009,0x80000000,0x208804C0,0x00000000", text);
+    }
+
+    [Fact]
     public void PvrDmaCopiesSystemRamToTextureMemoryAndRaisesEvent()
     {
         var memory = new DreamcastMemory();

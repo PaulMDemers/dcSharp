@@ -47,6 +47,29 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void CapturesFinalMemorySnapshotWhenRequested()
+    {
+        var raw = new byte[]
+        {
+            0x09, 0x00, // nop
+            0x09, 0x00  // nop
+        };
+
+        var result = new DreamcastRunner().RunRawBinary(
+            raw,
+            new DreamcastRunOptions(
+                InstructionLimit: 1,
+                TraceTailLength: 0,
+                FinalMemorySnapshot: new DreamcastFinalMemorySnapshotOptions(
+                    [new DreamcastMemoryAddressRange(0x8C01_0000, 0x8C01_0003)])));
+
+        Assert.NotNull(result.FinalMemorySnapshot);
+        var range = Assert.Single(result.FinalMemorySnapshot.Ranges);
+        Assert.Equal("0x8C010000", range.StartAddressHex);
+        Assert.Equal(raw, range.Bytes);
+    }
+
+    [Fact]
     public void CapturesPcProfile()
     {
         var raw = new byte[]
