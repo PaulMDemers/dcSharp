@@ -600,6 +600,20 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunUsesConfiguredSoftResetEntryPoint()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateFirmwareSoftResetBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 6,
+                TraceTailLength: 4,
+                SoftResetEntryPoint: 0x8C01_0008));
+
+        Assert.Equal(1u, result.Cpu.R[0]);
+        Assert.Contains(result.TraceTail, step => step.Trace.Contains("pc=0x8C010008", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void CapturesFilteredTraceLog()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));
@@ -1169,6 +1183,18 @@ public class DreamcastRunnerTests
         0x09, 0x00, // nop
         0x1C, 0x00, 0x00, 0xFF
     ];
+
+    private static byte[] CreateFirmwareSoftResetBinary()
+    {
+        var bytes = new byte[0x10];
+        WriteUInt16(bytes, 0x00, 0xD302); // mov.l @(0x02,pc),r3
+        WriteUInt16(bytes, 0x02, 0xE400); // mov #0,r4
+        WriteUInt16(bytes, 0x04, 0x430B); // jsr @r3
+        WriteUInt16(bytes, 0x06, 0x0009); // nop
+        WriteUInt16(bytes, 0x08, 0xE001); // mov #1,r0
+        WriteUInt32(bytes, 0x0C, 0x8C00_00E8);
+        return bytes;
+    }
 
     private static byte[] CreateBootWorkWriteBinary() =>
     [

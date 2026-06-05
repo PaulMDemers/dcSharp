@@ -87,7 +87,8 @@ internal static class FirmwareStubs
     private static string NormalizeIsoIdentifier(string value) =>
         new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
-    public static FirmwareTrapHandler CreateTrapHandler() => new();
+    public static FirmwareTrapHandler CreateTrapHandler(uint softResetEntryPoint = 0x8C01_0000, uint softResetStackPointer = 0x8D00_0000) =>
+        new(softResetEntryPoint, softResetStackPointer);
 
     internal sealed class FirmwareTrapHandler
     {

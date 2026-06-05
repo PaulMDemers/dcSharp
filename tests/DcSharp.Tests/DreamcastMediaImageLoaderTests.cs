@@ -583,8 +583,24 @@ public class DreamcastMediaImageLoaderTests
         Assert.Equal("0x8C010000", analysis.LoadAddressHex);
     }
 
+    [Fact]
+    public void BootBinaryAnalyzerDetectsWindowsCeEntryHeader()
+    {
+        var data = CreateWindowsCeBootHeaderBinary();
 
+        var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, "0WINCEOS.BIN", "test");
 
+        Assert.Equal("original", analysis.RecommendedLayout);
+        Assert.True(analysis.Original.HasWindowsCeHeader);
+        Assert.Equal(0x800u, analysis.Original.WindowsCeEntryOffset);
+        Assert.Equal("0x8C010800", analysis.Original.SuggestedEntryPointHex);
+        Assert.Equal(0x8C010820u, analysis.Original.WindowsCeEntryJumpTarget);
+        Assert.Equal(0x820u, analysis.Original.WindowsCeEntryJumpTargetFileOffset);
+        Assert.StartsWith(
+            "0x0009 0xE001 0x000B 0x0009",
+            analysis.Original.WindowsCeEntryJumpTargetFirstWordsHex,
+            StringComparison.Ordinal);
+    }
 
     [Fact]
     public void LoadFromGdiMapsAbsoluteLbaFrom2352ByteDataTrack()
@@ -881,6 +897,31 @@ public class DreamcastMediaImageLoaderTests
         return data;
     }
 
+    private static byte[] CreateWindowsCeBootHeaderBinary()
+    {
+        var data = new byte[0x1000];
+        WriteUInt32BothEndian(data, 0x14, 0x0C01_0000);
+        WriteUInt32BothEndian(data, 0x18, 0x800);
+        data[0x800] = 0x09;
+        data[0x801] = 0x00;
+        data[0x802] = 0x09;
+        data[0x803] = 0x00;
+        data[0x804] = 0x01;
+        data[0x805] = 0xD0;
+        data[0x806] = 0x09;
+        data[0x807] = 0x00;
+        data[0x808] = 0x2B;
+        data[0x809] = 0x40;
+        data[0x80A] = 0x09;
+        data[0x80B] = 0x00;
+        WriteUInt32LittleEndian(data, 0x80C, 0x8C01_0820);
+        WriteUInt16LittleEndian(data, 0x820, 0x0009);
+        WriteUInt16LittleEndian(data, 0x822, 0xE001);
+        WriteUInt16LittleEndian(data, 0x824, 0x000B);
+        WriteUInt16LittleEndian(data, 0x826, 0x0009);
+        return data;
+    }
+
     private static int WriteDirectoryRecord(Span<byte> destination, int offset, uint extent, uint dataLength, byte flags, byte[] name)
     {
         var length = 33 + name.Length + (name.Length % 2 == 0 ? 1 : 0);
@@ -904,4 +945,10 @@ public class DreamcastMediaImageLoaderTests
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(destination.Slice(offset + 4, 4), value);
     }
+
+    private static void WriteUInt32LittleEndian(Span<byte> destination, int offset, uint value) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
+
+    private static void WriteUInt16LittleEndian(Span<byte> destination, int offset, ushort value) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(destination.Slice(offset, 2), value);
 }

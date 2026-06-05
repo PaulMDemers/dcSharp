@@ -43,7 +43,7 @@ public sealed class DreamcastRunner
             memory.RaiseVBlankBegin();
         }
 
-        var firmwareTrap = FirmwareStubs.CreateTrapHandler();
+        var firmwareTrap = FirmwareStubs.CreateTrapHandler(options.SoftResetEntryPoint);
         var cpu = new Sh4Cpu(memory, load.EntryPoint, firmwareTrap.TryHandle);
         cpu.State.R[15] = options.InitialStackPointer;
         cpu.State.Sr = options.InitialStatusRegister;
@@ -1155,6 +1155,7 @@ public sealed record DreamcastRunOptions(
     string? StopOnDeviceDomain = null,
     uint InitialStackPointer = 0x8D00_0000,
     uint InitialStatusRegister = 0,
+    uint SoftResetEntryPoint = DreamcastRawBinaryLoader.DefaultLoadAddress,
     bool SeedInitialVBlank = false,
     DreamcastMemoryWriteWatch? MemoryWriteWatch = null,
     DreamcastMemoryReadWatch? MemoryReadWatch = null,

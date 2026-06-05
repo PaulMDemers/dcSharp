@@ -333,6 +333,17 @@ static void PrintBootBinaryCandidate(DreamcastBootBinaryCandidate candidate)
     Console.WriteLine($"{candidate.Layout}:");
     Console.WriteLine($"  ELF: {candidate.IsElf}");
     Console.WriteLine($"  Dreamcast startup stub: {candidate.HasDreamcastStartupStub}");
+    Console.WriteLine($"  Windows CE header: {candidate.HasWindowsCeHeader}");
+    Console.WriteLine($"  Suggested entry: {candidate.SuggestedEntryPointHex}{(candidate.WindowsCeEntryOffsetHex is null ? string.Empty : $" (offset {candidate.WindowsCeEntryOffsetHex})")}");
+    if (candidate.WindowsCeEntryJumpTargetHex is not null)
+    {
+        Console.WriteLine($"  Windows CE entry jump target: {candidate.WindowsCeEntryJumpTargetHex}{(candidate.WindowsCeEntryJumpTargetFileOffsetHex is null ? string.Empty : $" (file offset {candidate.WindowsCeEntryJumpTargetFileOffsetHex})")}");
+        if (candidate.WindowsCeEntryJumpTargetOpcodeCount is not null)
+        {
+            Console.WriteLine($"  Windows CE jump target sample: {candidate.WindowsCeEntryJumpTargetRecognizedOpcodeCount}/{candidate.WindowsCeEntryJumpTargetOpcodeCount} ({candidate.WindowsCeEntryJumpTargetFirstWordsHex})");
+        }
+    }
+
     Console.WriteLine($"  SH-4 opcode sample: {candidate.RecognizedOpcodeCount}/{candidate.TotalOpcodeCount} ({candidate.RecognizedOpcodeRatio:P1})");
     Console.WriteLine($"  NOP/zero/fill opcodes: {candidate.NopCount}/{candidate.ZeroOpcodeCount}/{candidate.FillOpcodeCount}");
     Console.WriteLine($"  First words: {candidate.FirstWordsHex}");
@@ -347,6 +358,8 @@ static void BootSmoke(string path, string[] args)
     var (data, sourcePath, sourceKind) = ReadBootAnalysisInput(path, scanSectors);
     var analysis = DreamcastBootBinaryAnalyzer.Analyze(data, sourcePath, sourceKind);
     var selectedLayout = ResolveBootLayout(requestedLayout, analysis);
+    var selectedCandidate = selectedLayout == "descrambled" ? analysis.Descrambled : analysis.Original;
+    var bootEntryPoint = selectedCandidate.SuggestedEntryPoint;
     var bootBytes = selectedLayout == "descrambled"
         ? DreamcastBootScrambler.Descramble(data)
         : data;
@@ -362,6 +375,7 @@ static void BootSmoke(string path, string[] args)
             Emulation = options.Emulation with
             {
                 Media = DreamcastMediaImageLoader.LoadFromFile(path),
+                SoftResetEntryPoint = bootEntryPoint,
                 SeedInitialVBlank = options.SeedInitialVBlankOverride ?? enterIpBin,
                 InitialStatusRegister = enterIpBin && options.Emulation.InitialStatusRegister == 0
                     ? ipBinInitialStatusRegister
@@ -375,7 +389,7 @@ static void BootSmoke(string path, string[] args)
         options.Emulation,
         analysis.LoadAddress,
         ipBin,
-        enterIpBin ? ipBinEntryPoint : null);
+        enterIpBin ? ipBinEntryPoint : bootEntryPoint);
 
     if (options.FramebufferDumpPath is not null)
     {
@@ -499,6 +513,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Selected layout: {selectedLayout}");
     Console.WriteLine($"Analyzer recommendation: {analysis.RecommendedLayout}");
     Console.WriteLine($"Load address: {analysis.LoadAddressHex}");
+    Console.WriteLine($"Boot entry: 0x{bootEntryPoint:X8}");
     Console.WriteLine($"IP.BIN seeded: {ipBin is not null}");
     Console.WriteLine($"Bytes loaded: {bootBytes.Length}");
     Console.WriteLine($"Instructions: {result.Cpu.InstructionsExecuted}");
