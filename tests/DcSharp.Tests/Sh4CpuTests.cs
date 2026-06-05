@@ -1164,6 +1164,124 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsDoa2FpuPowerStoreLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_38C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_38C0);
+        InitializeDoa2FpuPowerStoreState(normal, 5, BitConverter.SingleToUInt32Bits(2.0f), BitConverter.SingleToUInt32Bits(1.5f));
+        InitializeDoa2FpuPowerStoreState(fast, 5, BitConverter.SingleToUInt32Bits(2.0f), BitConverter.SingleToUInt32Bits(1.5f));
+
+        var normalStart = StepUntilPc(normal, 0x8C10_38C4);
+        var fastStart = StepUntilPc(fast, 0x8C10_38C4);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2FpuPowerStoreLoop(fastStart, 21, out var skippedInstructions));
+        Assert.Equal(21UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_0040), fastMemory.ReadUInt32(0x8C20_0040));
+        Assert.Equal(BitConverter.SingleToUInt32Bits(48.0f), fastMemory.ReadUInt32(0x8C20_0040));
+    }
+
+    [Fact]
+    public void FastForwardsDoa2FpuPowerStoreLoopWithRoundToZeroOverflow()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_38C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_38C0);
+        InitializeDoa2FpuPowerStoreState(normal, 3, BitConverter.SingleToUInt32Bits(float.MaxValue), BitConverter.SingleToUInt32Bits(2.0f));
+        InitializeDoa2FpuPowerStoreState(fast, 3, BitConverter.SingleToUInt32Bits(float.MaxValue), BitConverter.SingleToUInt32Bits(2.0f));
+        normal.State.Fpscr = Sh4State.FpscrDnBit | 1u;
+        fast.State.Fpscr = Sh4State.FpscrDnBit | 1u;
+
+        var normalStart = StepUntilPc(normal, 0x8C10_38C4);
+        var fastStart = StepUntilPc(fast, 0x8C10_38C4);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardDoa2FpuPowerStoreLoop(fastStart, 13, out var skippedInstructions));
+        Assert.Equal(13UL, skippedInstructions);
+        for (var index = 0ul; index < skippedInstructions; index++)
+        {
+            normal.Step();
+        }
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.Fr, fast.State.Fr);
+        Assert.Equal(normal.State.Fpscr, fast.State.Fpscr);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C20_0040), fastMemory.ReadUInt32(0x8C20_0040));
+        Assert.Equal(0x7F7F_FFFFu, fastMemory.ReadUInt32(0x8C20_0040));
+        Assert.Equal(
+            Sh4State.FpscrCauseOverflowBit | Sh4State.FpscrCauseInexactBit,
+            fast.State.Fpscr & Sh4State.FpscrCauseMask);
+        Assert.Equal(
+            Sh4State.FpscrFlagOverflowBit | Sh4State.FpscrFlagInexactBit,
+            fast.State.Fpscr & Sh4State.FpscrFlagMask);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FpuPowerStoreLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_38C0);
+        InitializeDoa2FpuPowerStoreState(cpu, 5, BitConverter.SingleToUInt32Bits(2.0f), BitConverter.SingleToUInt32Bits(1.5f));
+
+        var start = StepUntilPc(cpu, 0x8C10_38C4);
+
+        Assert.False(cpu.TryFastForwardDoa2FpuPowerStoreLoop(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_38C6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FpuPowerStoreLoopWhenFpscrModeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_38C0);
+        InitializeDoa2FpuPowerStoreState(cpu, 5, BitConverter.SingleToUInt32Bits(2.0f), BitConverter.SingleToUInt32Bits(1.5f));
+        cpu.State.Fpscr = Sh4State.FpscrSzBit;
+
+        var start = StepUntilPc(cpu, 0x8C10_38C4);
+
+        Assert.False(cpu.TryFastForwardDoa2FpuPowerStoreLoop(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardDoa2FpuPowerStoreLoopWhenDestinationIsOutsideSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        WriteDoa2FpuPowerStoreLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_38C0);
+        InitializeDoa2FpuPowerStoreState(cpu, 5, BitConverter.SingleToUInt32Bits(2.0f), BitConverter.SingleToUInt32Bits(1.5f));
+        cpu.State.R[1] = 0xA500_0000;
+
+        var start = StepUntilPc(cpu, 0x8C10_38C4);
+
+        Assert.False(cpu.TryFastForwardDoa2FpuPowerStoreLoop(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsDoa2TableDivideSetupLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -7309,6 +7427,33 @@ public class Sh4CpuTests
         cpu.State.R[7] = 0xFFFF_FFFF;
         cpu.State.Pr = 0x8C01_206A;
         cpu.State.T = false;
+    }
+
+    private static void WriteDoa2FpuPowerStoreLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_38C0, 0x4415);
+        WriteInstruction(memory, 0x8C10_38C2, 0x8F04);
+        WriteInstruction(memory, 0x8C10_38C4, 0x6763);
+        WriteInstruction(memory, 0x8C10_38C6, 0x7701);
+        WriteInstruction(memory, 0x8C10_38C8, 0x3743);
+        WriteInstruction(memory, 0x8C10_38CA, 0x8FFC);
+        WriteInstruction(memory, 0x8C10_38CC, 0xF642);
+        WriteInstruction(memory, 0x8C10_38CE, 0xF167);
+        WriteInstruction(memory, 0x8C10_38D0, 0x7501);
+        WriteInstruction(memory, 0x8C10_38D2, 0x35C3);
+        WriteInstruction(memory, 0x8C10_38D4, 0x8BE2);
+        WriteInstruction(memory, 0x8C10_38D6, 0x0009);
+    }
+
+    private static void InitializeDoa2FpuPowerStoreState(Sh4Cpu cpu, uint exponent, uint factorBits, uint seedBits)
+    {
+        cpu.State.R[0] = 0x40;
+        cpu.State.R[1] = 0x8C20_0000;
+        cpu.State.R[4] = exponent;
+        cpu.State.R[6] = 0;
+        cpu.State.R[7] = 0xDEAD_BEEF;
+        cpu.State.Fr[4] = factorBits;
+        cpu.State.Fr[6] = seedBits;
     }
 
     private static void WriteDoa2TableDivideSetupLoop(DreamcastMemory memory)

@@ -1131,6 +1131,55 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardDoa2FpuPowerStoreLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_38C4
+            || step.Opcode != 0x6763
+            || State.Pc != 0x8C10_38C6)
+        {
+            return false;
+        }
+
+        if (!IsDoa2FpuPowerStoreLoop()
+            || (State.Fpscr & (Sh4State.FpscrPrBit | Sh4State.FpscrSzBit)) != 0
+            || !State.T)
+        {
+            return false;
+        }
+
+        var exponent = unchecked((int)State.R[4]);
+        var counter = unchecked((int)State.R[7]);
+        if (exponent <= 0 || counter >= exponent)
+        {
+            return false;
+        }
+
+        var iterations = exponent - counter;
+        skippedInstructions = ((ulong)iterations * 4) + 1;
+        if (skippedInstructions > maxInstructionsToSkip
+            || State.R[0] > uint.MaxValue - State.R[1]
+            || !memory.TryGetSystemRamOffset(State.R[1] + State.R[0], 4, out _))
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        for (var iteration = 0; iteration < iterations; iteration++)
+        {
+            State.R[7]++;
+            State.T = unchecked((int)State.R[7]) >= exponent;
+            ExecuteFpuMove(0xF642, 6, 4, 0x2);
+        }
+
+        memory.WriteUInt32(State.R[1] + State.R[0], State.Fr[6]);
+        State.Pc = 0x8C10_38D0;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2TableDivideSetupLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -4583,6 +4632,19 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_7876) == 0x7001
         && memory.ReadInstructionUInt16(0x8C10_7878) == 0x000B
         && memory.ReadInstructionUInt16(0x8C10_787A) == 0x6043;
+
+    private bool IsDoa2FpuPowerStoreLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_38C0) == 0x4415
+        && memory.ReadInstructionUInt16(0x8C10_38C2) == 0x8F04
+        && memory.ReadInstructionUInt16(0x8C10_38C4) == 0x6763
+        && memory.ReadInstructionUInt16(0x8C10_38C6) == 0x7701
+        && memory.ReadInstructionUInt16(0x8C10_38C8) == 0x3743
+        && memory.ReadInstructionUInt16(0x8C10_38CA) == 0x8FFC
+        && memory.ReadInstructionUInt16(0x8C10_38CC) == 0xF642
+        && memory.ReadInstructionUInt16(0x8C10_38CE) == 0xF167
+        && memory.ReadInstructionUInt16(0x8C10_38D0) == 0x7501
+        && memory.ReadInstructionUInt16(0x8C10_38D2) == 0x35C3
+        && memory.ReadInstructionUInt16(0x8C10_38D4) == 0x8BE2;
 
     private bool IsDoa2HighRamZeroFillLoop() =>
         memory.ReadInstructionUInt16(0x8C11_333C) == 0x2540
