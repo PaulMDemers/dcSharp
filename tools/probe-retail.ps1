@@ -2,6 +2,7 @@ param(
     [int]$ScanSectors = 1024,
     [int]$VBlankInterval = 1000,
     [int]$BootstrapInstructions = 12000000,
+    [int]$SegaRallyInstructions = 12000000,
     [int]$LegacyInstructions = 12000000,
     [switch]$Doa2SpriteProbe,
     [long]$Doa2SpriteProbeInstructions = 150000000,
@@ -13,13 +14,17 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $cliProject = Join-Path $repoRoot "src\DcSharp.Cli"
-$cliDll = Join-Path $cliProject "bin\Debug\net10.0\DcSharp.Cli.dll"
+$releaseCliDll = Join-Path $cliProject "bin\Release\net10.0\DcSharp.Cli.dll"
+$debugCliDll = Join-Path $cliProject "bin\Debug\net10.0\DcSharp.Cli.dll"
+$cliDll = if (Test-Path -LiteralPath $releaseCliDll) { $releaseCliDll } else { $debugCliDll }
 
 function Invoke-BootSmoke {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][long]$Instructions
+        [Parameter(Mandatory = $true)][long]$Instructions,
+        [bool]$StopOnUnmapped = $true,
+        [string[]]$ExtraRunArgs = @()
     )
 
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -39,8 +44,12 @@ function Invoke-BootSmoke {
         '--scan-sectors', $ScanSectors,
         '--instructions', $Instructions,
         '--trace-tail', 12,
-        '--stop-on-unmapped',
         '--vblank-interval', $VBlankInterval)
+    if ($StopOnUnmapped) {
+        $commandArgs += '--stop-on-unmapped'
+    }
+
+    $commandArgs += $ExtraRunArgs
 
     $output = & dotnet @commandArgs
 
@@ -202,6 +211,7 @@ function Assert-PvrTaSpriteShapeGroup {
 }
 
 $deadOrAlive = Join-Path $repoRoot "retail_discs\Dead or Alive 2 (USA)\Dead or Alive 2 (USA).cue"
+$segaRally = Join-Path $repoRoot "retail_discs\Sega Rally 2 (USA)\Sega Rally 2 (USA).cue"
 $rayman = Join-Path $repoRoot "retail_discs\Rayman 2 - The Great Escape (USA) (EnFrDeEsIt)\Rayman 2 - The Great Escape (USA) (En,Fr,De,Es,It).cue"
 $legacy = Join-Path $repoRoot "retail_discs\Legacy of Kain - Soul Reaver (USA)\Legacy of Kain - Soul Reaver (USA).cue"
 
@@ -281,6 +291,22 @@ if ($LongDoa2) {
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "FirmwareExit"
         Assert-NotContains "Dead or Alive 2 long" $longDoaOutput "Stopped on Unmapped"
     }
+}
+
+$segaWinceLog = Join-Path $repoRoot "artifacts\tmp\sega-rally2-wince-syscalls.probe.txt"
+$segaOutput = Invoke-BootSmoke "Sega Rally 2 WinCE" $segaRally $SegaRallyInstructions $false @('--wince-syscall-log', $segaWinceLog, '--wince-syscall-log-limit', 16, '--vblank-interval', 200000)
+if ($segaOutput) {
+    Assert-Contains "Sega Rally 2 WinCE" $segaOutput "Stopped: InstructionLimit"
+    Assert-Contains "Sega Rally 2 WinCE" $segaOutput "Boot payload offset: 0x800"
+    Assert-Contains "Sega Rally 2 WinCE" $segaOutput "Boot entry: 0x8C010000"
+    Assert-NotContains "Sega Rally 2 WinCE" $segaOutput "MemoryFault"
+    if (-not (Test-Path -LiteralPath $segaWinceLog)) {
+        throw "Sega Rally 2 WinCE did not write syscall log: $segaWinceLog"
+    }
+
+    $segaWinceLogText = Get-Content -LiteralPath $segaWinceLog -Raw
+    Assert-Contains "Sega Rally 2 WinCE syscall log" $segaWinceLogText "0xFFFFFD1F"
+    Assert-Contains "Sega Rally 2 WinCE syscall log" $segaWinceLogText "WIN32.PerformCallBack"
 }
 
 $raymanOutput = Invoke-BootSmoke "Rayman 2" $rayman $BootstrapInstructions
