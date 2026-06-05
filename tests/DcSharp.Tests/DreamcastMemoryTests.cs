@@ -17,6 +17,15 @@ public class DreamcastMemoryTests
         Assert.Equal(expectedPhysical, DreamcastMemory.TranslateAddress(address));
     }
 
+    [Theory]
+    [InlineData(0x0301_00C0u, 0x0101_00C0u)]
+    [InlineData(0x025F_8000u, 0x005F_8000u)]
+    [InlineData(0x0060_0004u, 0x0060_0004u)]
+    public void NormalizesAreaZeroPhysicalMirror(uint physical, uint expectedCanonical)
+    {
+        Assert.Equal(expectedCanonical, DreamcastMemory.NormalizePhysicalAddress(physical));
+    }
+
     [Fact]
     public void TreatsBootRomAreaAsMappedReadOnlySpace()
     {
@@ -83,6 +92,54 @@ public class DreamcastMemoryTests
 
         Assert.Equal(0x1234_5678u, memory.ReadUInt32(address));
         Assert.Empty(memory.DeviceAccesses);
+    }
+
+    [Theory]
+    [InlineData(0xA060_0004u)]
+    [InlineData(0xA301_00C0u)]
+    public void ReadsAbsentExpansionDevicesAsZeroWithoutUnmappedFault(uint address)
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.Equal(0, memory.ReadByte(address));
+
+        var access = Assert.Single(memory.DeviceAccesses);
+        Assert.Equal(MemoryAccessKind.Read, access.Kind);
+        Assert.Equal(address, access.Address);
+        Assert.Equal(1, access.Size);
+        Assert.Equal(0u, access.Value);
+    }
+
+    [Theory]
+    [InlineData(0xA060_0004u)]
+    [InlineData(0xA301_00C0u)]
+    public void WritesAbsentExpansionDevicesWithoutUnmappedFault(uint address)
+    {
+        var memory = new DreamcastMemory();
+
+        memory.WriteUInt32(address, 0x1234_5678);
+
+        var access = Assert.Single(memory.DeviceAccesses);
+        Assert.Equal(MemoryAccessKind.Write, access.Kind);
+        Assert.Equal(address, access.Address);
+        Assert.Equal(4, access.Size);
+        Assert.Equal(0x1234_5678u, access.Value);
+    }
+
+    [Fact]
+    public void MapsAicaRtcRegisters()
+    {
+        var memory = new DreamcastMemory();
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA071_0000));
+        memory.WriteUInt32(0xA071_0004, 0x1234_5678);
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0xA071_0004));
+
+        Assert.DoesNotContain(memory.DeviceAccesses, access => access.Kind is MemoryAccessKind.UnmappedRead or MemoryAccessKind.UnmappedWrite);
+        Assert.Contains(memory.DeviceAccesses, access =>
+            access.Kind == MemoryAccessKind.Read
+            && access.Address == 0xA071_0000
+            && access.Size == 4);
     }
 
     [Fact]

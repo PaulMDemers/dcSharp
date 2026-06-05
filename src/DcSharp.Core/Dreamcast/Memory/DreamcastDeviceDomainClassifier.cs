@@ -4,8 +4,10 @@ public static class DreamcastDeviceDomainClassifier
 {
     public const string Aica = "aica";
     public const string Asic = "asic";
+    public const string External = "external";
     public const string Holly = "holly";
     public const string Maple = "maple";
+    public const string Modem = "modem";
     public const string Pvr = "pvr";
     public const string Scif = "scif";
     public const string Sh4 = "sh4";
@@ -21,7 +23,7 @@ public static class DreamcastDeviceDomainClassifier
         }
 
         var address = access.Address;
-        var physical = DreamcastMemory.TranslateAddress(address);
+        var physical = DreamcastMemory.NormalizePhysicalAddress(DreamcastMemory.TranslateAddress(address));
 
         if (address is >= 0xFFE8_0000 and < 0xFFE8_0100)
         {
@@ -66,6 +68,17 @@ public static class DreamcastDeviceDomainClassifier
         if (physical is >= 0x005F_6C00 and < 0x005F_6D00)
         {
             return Maple;
+        }
+
+        if (physical is >= 0x0060_0000 and < 0x0060_0800)
+        {
+            return Modem;
+        }
+
+        if (physical is >= 0x0100_0000 and < 0x0200_0000
+            or >= 0x1400_0000 and < 0x1800_0000)
+        {
+            return External;
         }
 
         if (physical is >= 0x005F_6900 and < 0x005F_6940)

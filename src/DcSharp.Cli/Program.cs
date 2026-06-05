@@ -2538,8 +2538,10 @@ static string ParseDeviceDomain(string text)
     {
         DreamcastDeviceDomainClassifier.Aica
             or DreamcastDeviceDomainClassifier.Asic
+            or DreamcastDeviceDomainClassifier.External
             or DreamcastDeviceDomainClassifier.Holly
             or DreamcastDeviceDomainClassifier.Maple
+            or DreamcastDeviceDomainClassifier.Modem
             or DreamcastDeviceDomainClassifier.Pvr
             or DreamcastDeviceDomainClassifier.Scif
             or DreamcastDeviceDomainClassifier.Sh4

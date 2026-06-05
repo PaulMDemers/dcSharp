@@ -18,19 +18,19 @@ dotnet src\DcSharp.Cli\bin\Release\net10.0\DcSharp.Cli.dll media boot-smoke <des
 ## Summary
 
 - 11 retail titles were probed.
-- 6 titles reached the 50M instruction cap without an unsupported opcode or unmapped stop.
-- 1 title stopped on a concrete unmapped device read.
+- 7 titles reached the 50M instruction cap without an unsupported opcode or unmapped stop.
+- 0 titles in the current preferred-descriptor matrix stop on concrete unmapped device reads.
 - 3 titles stopped on bad/unsupported execution after boot handoff or firmware callback behavior.
 - 1 title exited through the BIOS CD-menu path.
 - The GDI extraction blocker is fixed for the five affected descriptors. They now extract `1ST_READ.BIN` from the later high-density ISO9660 volume rather than the low-density session volume.
 
-The generic smoke path did not observe GD-ROM sector reads or TA command writes for this new batch. That makes the next broad-compatibility work less about rendering first and more about remaining bootstrap layout selection, firmware callback/table state, and missing device-region modeling.
+The generic smoke path did not observe GD-ROM sector reads or TA command writes for this new batch. That makes the next broad-compatibility work less about rendering first and more about remaining bootstrap layout selection and firmware callback/table state.
 
 ## Results
 
 | Title | Descriptor Used | 50M Result | Frontier |
 | --- | --- | --- | --- |
-| Crazy Taxi (USA) | CUE | `DeviceAccessStop` at `PC=0xAC0040BA` after 7,341,356 instructions | Fixed missing SH-4 `ldc r0,ssr` decode first; next blocker is byte read from `0xA30100C0`. |
+| Crazy Taxi (USA) | CUE | `InstructionLimit`, `PC=0xAC0047DA` | Fixed missing SH-4 `ldc r0,ssr`, then modeled the area-0 mirror/external-device read at `0xA30100C0`. Current frontier is a long cached-bootstrap loop polling SCIF status. |
 | Dead or Alive 2 (USA) | CUE | `InstructionLimit`, `PC=0x8C129E4A` | Generic smoke reaches the budget; existing title-specific probes remain the deeper rendering path. |
 | Gauntlet Legends (USA) | GDI | `InstructionLimit`, `PC=0x8C037A3A` | GDI extraction now succeeds from volume `GAUNT1`, boot extent `0x8595B`, 3,761,284 bytes. |
 | The Grinch (USA) | GDI | `FirmwareExit`, `PC=0x8C0000E8` after 1,386,943 instructions | GDI extraction now succeeds from volume `GRINCH`; still requests BIOS CD menu, `function=2`. |
@@ -39,7 +39,7 @@ The generic smoke path did not observe GD-ROM sector reads or TA command writes 
 | Sega Rally 2 (USA) | CUE | `UnsupportedInstruction` at `PC=0x8C010002` after 8,887,171 instructions | Handoff target contains invalid-looking startup words; forcing descrambled layout still produces invalid execution. Treat as media extraction/layout selection before CPU work. |
 | Sonic Adventure (USA, Rev A) | GDI | `UnsupportedInstruction` at `PC=0x8C000000` after 46,589,874 instructions | GDI extraction now succeeds from volume `SONIC_ADV`; unlike the CUE fallback, the GDI path exposes a zero-PC firmware/callback-style frontier. |
 | Sonic Adventure 2 (USA) | CUE | `UnsupportedInstruction` at `PC=0x8C000000` after 44,590,162 instructions | Guest jumps through pointer `0x8C17EC60`, which currently contains zero; likely firmware callback/table state. |
-| Sonic Shuffle (USA) | GDI | `InstructionLimit`, `PC=0x8C02A0C0` | GDI extraction now succeeds from volume `SONIC_SHUFFLE`; the CUE fallback still exposes the `0xA0600004` unmapped read. |
+| Sonic Shuffle (USA) | GDI | `InstructionLimit`, `PC=0x8C02A0C0` | GDI extraction now succeeds from volume `SONIC_SHUFFLE`; the CUE fallback now moves past modem and AICA RTC reads to a zero-PC firmware/callback-style frontier at 12,139,952 instructions. |
 | Wetrix+ (USA) | GDI | `InstructionLimit`, `PC=0x8C16652C` | GDI extraction now succeeds from volume `WETRIXPLUS`, boot extent `0x85DB7`, 1,475,872 bytes. |
 
 ## Focused Findings
@@ -70,23 +70,24 @@ Fixed GDI descriptors:
 
 ### Device Frontiers
 
-Crazy Taxi and the Sonic Shuffle CUE fallback give clean unmapped stops instead of vague compatibility failures:
+The first device-frontier pass retired the unmapped stops that were blocking Crazy Taxi and the Sonic Shuffle CUE fallback:
 
-- Crazy Taxi: `0xA30100C0`, byte read, cached bootstrap region.
-- Sonic Shuffle CUE fallback: `0xA0600004`, byte read after setting a small external-style pointer. The GDI path now reaches the instruction limit instead, so this should be treated as a descriptor/layout-sensitive frontier.
+- Crazy Taxi: `0xA30100C0` normalizes through the documented `0x02000000-0x03FFFFFF` area-0 mirror to the `0x01000000-0x01FFFFFF` external-device window. Absent external devices now read as zero and log under the `external` domain.
+- Sonic Shuffle CUE fallback: `0xA0600004` is in the `0x00600000-0x006007FF` modem window. Absent modem reads now return zero and log under the `modem` domain.
+- Sonic Shuffle CUE fallback then reached `0xA0710000`, the AICA RTC control window. The AICA aperture now includes `0x00710000-0x0071000B`.
 
-Both should be classified and probed through narrow memory-map tests before modeling behavior.
+These changes make the current frontiers more specific: Crazy Taxi is waiting in cached bootstrap/SCIF code, and Sonic Shuffle CUE joins the zero-PC firmware/callback family instead of stopping on an unmapped read.
 
 ### Bootstrap/Firmware Frontiers
 
 - Sega Rally 2 appears to load an invalid or wrongly transformed first boot word at `0x8C010000`; this should be investigated with extraction/analyze tooling before adding CPU instructions.
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
 - Sonic Adventure now does the same from the fixed GDI path, while the CUE fallback reaches the instruction budget. Compare CUE/GDI IP.BIN work-area and high-density media state before treating it as a CPU issue.
+- Sonic Shuffle CUE now joins this family after modem/AICA RTC modeling, while Sonic Shuffle GDI reaches the instruction budget.
 - The Grinch asks for the BIOS CD menu with system function `2`, which usually means the disc/authentication/media path did not satisfy the title's boot expectation.
 
 ## Next Work
 
-1. Add device-domain classification/tests for `0xA0600004` and `0xA30100C0`, then decide whether they need open-bus returns, modem/G2 handling, or focused HLE.
-2. Trace Sega Rally 2 extraction with `media extract-boot` and `media analyze-boot` artifacts to determine whether the boot binary is selected, biased, or descrambled incorrectly.
-3. Trace Sonic Adventure and Sonic Adventure 2 around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
-4. Re-run the full sweep after each fix and keep this report as the baseline.
+1. Trace Sega Rally 2 extraction with `media extract-boot` and `media analyze-boot` artifacts to determine whether the boot binary is selected, biased, or descrambled incorrectly.
+2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
+3. Re-run the full sweep after each fix and keep this report as the baseline.

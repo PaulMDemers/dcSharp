@@ -30,6 +30,15 @@ public sealed class DreamcastMemory
     private const uint PvrTaTexture64PhysicalBase = 0x1100_0000;
     private const uint PvrTaTexture32PhysicalBase = 0x1300_0000;
     private const int PvrVramByteCount = 8 * 1024 * 1024;
+    private const uint Area0MirrorBase = 0x0200_0000;
+    private const uint Area0MirrorLimit = 0x0400_0000;
+    private const uint Area0MirrorOffset = 0x0200_0000;
+    private const uint ModemPhysicalBase = 0x0060_0000;
+    private const uint ModemPhysicalLimit = 0x0060_0800;
+    private const uint Area0ExternalDevicePhysicalBase = 0x0100_0000;
+    private const uint Area0ExternalDevicePhysicalLimit = 0x0200_0000;
+    private const uint Area5ExternalDevicePhysicalBase = 0x1400_0000;
+    private const uint Area5ExternalDevicePhysicalLimit = 0x1800_0000;
     private const uint P4Base = 0xE000_0000;
     private const uint ExternalRegisterBase = 0x005F_0000;
     private const uint ExternalRegisterLimit = 0x0060_0000;
@@ -51,7 +60,7 @@ public sealed class DreamcastMemory
     private const uint PvrTaYuvLimit = 0x1100_0000;
     private const int PvrPreviewWidth = 640;
     private const uint AicaRegisterBase = 0x0070_0000;
-    private const uint AicaRegisterLimit = 0x0071_0000;
+    private const uint AicaRegisterLimit = 0x0071_000C;
     private const uint AicaRamBase = 0x0080_0000;
     private const uint AicaRamBytes = 2 * 1024 * 1024;
     private const uint OperandCacheRamArea1Base = 0x7C00_0000;
@@ -244,6 +253,11 @@ public sealed class DreamcastMemory
     public static uint TranslateAddress(uint address) =>
         IsP4Address(address) ? address : address & PhysicalMask;
 
+    public static uint NormalizePhysicalAddress(uint physical) =>
+        physical >= Area0MirrorBase && physical < Area0MirrorLimit
+            ? physical - Area0MirrorOffset
+            : physical;
+
     public void AdvanceHardware(ulong instructions)
     {
         if (instructions == 0)
@@ -412,6 +426,12 @@ public sealed class DreamcastMemory
             return;
         }
 
+        if (TryTranslateExpansionDevice(address, out var expansionAddress))
+        {
+            WriteExpansionDevice(address, expansionAddress, data);
+            return;
+        }
+
         if (TryWritePvrTa(address, data))
         {
             return;
@@ -500,6 +520,13 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryTranslateExpansionDevice(address, out var expansionAddress))
+        {
+            var value = (byte)(ReadExpansionDevice(address, expansionAddress, 1) & 0xFF);
+            RecordWatchedRead(address, 1, value);
+            return value;
+        }
+
         if (TryGetPvrVramOffset(address, 1, out var vramOffset))
         {
             var value = pvrVram[vramOffset];
@@ -571,6 +598,13 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryTranslateExpansionDevice(address, out var expansionAddress))
+        {
+            var value = (ushort)(ReadExpansionDevice(address, expansionAddress, 2) & 0xFFFF);
+            RecordWatchedRead(address, 2, value);
+            return value;
+        }
+
         if (TryGetPvrVramOffset(address, 2, out var vramOffset))
         {
             var value = (ushort)(pvrVram[vramOffset] | (pvrVram[vramOffset + 1] << 8));
@@ -638,6 +672,13 @@ public sealed class DreamcastMemory
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             var value = ReadExternal(address, externalAddress, 4);
+            RecordWatchedRead(address, 4, value);
+            return value;
+        }
+
+        if (TryTranslateExpansionDevice(address, out var expansionAddress))
+        {
+            var value = ReadExpansionDevice(address, expansionAddress, 4);
             RecordWatchedRead(address, 4, value);
             return value;
         }
@@ -1299,13 +1340,21 @@ public sealed class DreamcastMemory
 
     private static bool TryTranslateExternalRegister(uint address, out uint externalAddress)
     {
-        externalAddress = TranslateAddress(address);
+        externalAddress = NormalizePhysicalAddress(TranslateAddress(address));
         return externalAddress >= ExternalRegisterBase && externalAddress < ExternalRegisterLimit;
+    }
+
+    private static bool TryTranslateExpansionDevice(uint address, out uint expansionAddress)
+    {
+        expansionAddress = NormalizePhysicalAddress(TranslateAddress(address));
+        return expansionAddress is >= ModemPhysicalBase and < ModemPhysicalLimit
+            or >= Area0ExternalDevicePhysicalBase and < Area0ExternalDevicePhysicalLimit
+            or >= Area5ExternalDevicePhysicalBase and < Area5ExternalDevicePhysicalLimit;
     }
 
     private static bool TryTranslateAicaRegister(uint address, out uint aicaAddress)
     {
-        aicaAddress = TranslateAddress(address);
+        aicaAddress = NormalizePhysicalAddress(TranslateAddress(address));
         return aicaAddress >= AicaRegisterBase && aicaAddress < AicaRegisterLimit;
     }
 
@@ -1493,6 +1542,17 @@ public sealed class DreamcastMemory
         return masked;
     }
 
+    private uint ReadExpansionDevice(uint originalAddress, uint expansionAddress, int size)
+    {
+        if (size is not (1 or 2 or 4))
+        {
+            throw new MemoryMapException($"Unsupported expansion-device read size: {size}");
+        }
+
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, originalAddress, size, 0));
+        return 0;
+    }
+
     private uint ReadExternalRegisterValue(uint aligned) =>
         aligned switch
         {
@@ -1541,6 +1601,16 @@ public sealed class DreamcastMemory
         {
             CompletePvrDma();
         }
+    }
+
+    private void WriteExpansionDevice(uint originalAddress, uint expansionAddress, ReadOnlySpan<byte> data)
+    {
+        if (data.Length is not (1 or 2 or 4))
+        {
+            throw new MemoryMapException($"Unsupported expansion-device write size: {data.Length}");
+        }
+
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Write, originalAddress, data.Length, ToValue(data)));
     }
 
     private void RaiseAsicEvent(ushort code)
@@ -2706,6 +2776,9 @@ public sealed class DreamcastMemory
             0x2800 => "AICA_MASTER_VOLUME",
             0x280D => "AICA_MONITOR_CHANNEL",
             0x2814 => "AICA_MONITOR_POSITION",
+            0x10000 => "AICA_RTC_SECONDS",
+            0x10004 => "AICA_RTC_ALARM_OR_CONTROL",
+            0x10008 => "AICA_RTC_ENABLE_OR_CONTROL",
             _ => $"AICA_REG_{offset:X4}"
         };
     }
