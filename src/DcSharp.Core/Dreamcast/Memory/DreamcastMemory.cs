@@ -121,6 +121,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastPvrTaCommandWrite> pvrTaCommandWrites = [];
     private readonly DreamcastPvrTaState pvrTaState = new();
     private DreamcastPvrPreviewRenderStats pvrPreviewRenderStats = DreamcastPvrPreviewRenderStats.Empty;
+    private readonly HashSet<int> pvrPreviewWrittenPixelIndices = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
@@ -918,7 +919,7 @@ public sealed class DreamcastMemory
             pvrTaState.CompletedStrips.ToArray(),
             pvrTaState.CompletedSprites.ToArray(),
             pvrTaState.AssemblyDiagnostics,
-            pvrPreviewRenderStats,
+            pvrPreviewRenderStats with { UniquePixelsWritten = pvrPreviewWrittenPixelIndices.Count },
             (byte[])pvrVram.Clone());
     }
 
@@ -1993,7 +1994,13 @@ public sealed class DreamcastMemory
             else if (renderCommand.Sprite is { } sprite)
             {
                 pvrPreviewRenderStats = pvrPreviewRenderStats.Add(
-                    DreamcastPvrPreviewRenderer.RenderSprite(sprite, pvrVram, PvrPreviewWidth, useScreenCoordinates: true, renderTargetPixelOffset));
+                    DreamcastPvrPreviewRenderer.RenderSprite(
+                        sprite,
+                        pvrVram,
+                        PvrPreviewWidth,
+                        useScreenCoordinates: true,
+                        renderTargetPixelOffset,
+                        pixelIndex => pvrPreviewWrittenPixelIndices.Add(pixelIndex)));
             }
         }
 

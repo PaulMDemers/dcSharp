@@ -874,6 +874,8 @@ public class DreamcastMemoryTests
         Assert.Equal(1, snapshot.PvrPreviewRenderStats.SpriteCalls);
         Assert.True(snapshot.PvrPreviewRenderStats.PixelWriteAttempts >= snapshot.PvrPreviewRenderStats.PixelsWritten);
         Assert.True(snapshot.PvrPreviewRenderStats.PixelsWritten > 0);
+        Assert.True(snapshot.PvrPreviewRenderStats.UniquePixelsWritten > 0);
+        Assert.True(snapshot.PvrPreviewRenderStats.UniquePixelsWritten <= snapshot.PvrPreviewRenderStats.PixelsWritten);
         Assert.Equal(0, snapshot.PvrPreviewRenderStats.ZeroRgbWritePixels);
     }
 

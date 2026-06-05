@@ -310,6 +310,8 @@ public class DreamcastPvrPreviewRendererTests
         Assert.Equal(1, stats.SpriteCalls);
         Assert.True(stats.PixelWriteAttempts >= stats.PixelsWritten);
         Assert.True(stats.PixelsWritten > 0);
+        Assert.True(stats.UniquePixelsWritten > 0);
+        Assert.True(stats.UniquePixelsWritten <= stats.PixelsWritten);
         Assert.Equal(0, stats.ZeroRgbWritePixels);
         Assert.Equal(0, stats.SubpixelFallbacks);
     }

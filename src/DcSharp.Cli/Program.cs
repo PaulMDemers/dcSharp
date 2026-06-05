@@ -2252,7 +2252,7 @@ static string FormatPvrTaDiagnostics(DreamcastPvrTaDiagnosticsSummary diagnostic
 }
 
 static string FormatPvrPreviewRenderStats(DreamcastPvrPreviewRenderStatsSummary stats) =>
-    $"calls:{stats.SpriteCalls}/attempts:{stats.PixelWriteAttempts}/written:{stats.PixelsWritten}/zero:{stats.ZeroRgbWritePixels}/alpha:{stats.AlphaBlendedPixels}/punchReject:{stats.PunchThroughRejectedPixels}/fallback:{stats.SubpixelFallbacks}/oob:{stats.OutOfBoundsWritePixels}";
+    $"calls:{stats.SpriteCalls}/attempts:{stats.PixelWriteAttempts}/written:{stats.PixelsWritten}/unique:{stats.UniquePixelsWritten}/zero:{stats.ZeroRgbWritePixels}/alpha:{stats.AlphaBlendedPixels}/punchReject:{stats.PunchThroughRejectedPixels}/fallback:{stats.SubpixelFallbacks}/oob:{stats.OutOfBoundsWritePixels}";
 
 static string FormatPvrTaBounds(DreamcastPvrTaBoundsSummary bounds) =>
     bounds.HasBounds
