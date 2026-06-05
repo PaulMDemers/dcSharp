@@ -16,6 +16,8 @@ public class DreamcastPvrTaSpriteLogWriterTests
         var text = writer.ToString();
         Assert.Contains("# sprites=1 matched=1 skipped=0 limit=all status=all", text);
         Assert.Contains("#0 status=renderable region=TA_INPUT list=OpaquePolygon headerPc=0x8C1007FA controlPc=0x8C10084C payloadPcRange=0x8C10084C-0x8C100850", text);
+        Assert.Contains("texture=False cmdTexture=True uv16=True mode1=0x80000000 mode2=0x941004C0 mode3=0x00001234", text);
+        Assert.Contains("texBase=0x00001234 texSize=8x8 texFormat=Argb1555 texLayout=twiddled texFilter=Nearest texShading=ModulateAlpha alpha=poly=True/tex=True", text);
         Assert.Contains("points=A:1,1:0,0/B:3,1:0,0/C:1,3:0,0/D:3,3:0,0", text);
         Assert.Contains("rawPoints=A:0x3F800000,0x3F800000,z=0x3F800000", text);
         Assert.Contains("payloadWords=Ax=0x3F800000/Ay=0x3F800000/Az=0x3F800000/Bx=0x40400000", text);
@@ -55,15 +57,15 @@ public class DreamcastPvrTaSpriteLogWriterTests
             "OpaquePolygon",
             false,
             4,
-            0xA084_0000,
-            "0xA0840000");
-        var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [0, 0, 0, 0xFFFF_0000, 0, 0, 0]);
+            0xA084_0009,
+            "0xA0840009");
+        var payload = DreamcastPvrTaSpriteHeaderPayload.FromPayload(header, [0x8000_0000, 0x9410_04C0, 0x0000_1234, 0xFFFF_0000, 0, 0, 0]);
         var sprite = new DreamcastPvrTaSprite(
             "TA_INPUT",
             0,
             "OpaquePolygon",
-            0xA084_0000,
-            "0xA0840000",
+            0xA084_0009,
+            "0xA0840009",
             0x8C10_07FA,
             "0x8C1007FA",
             payload,

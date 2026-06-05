@@ -777,6 +777,30 @@ public class DreamcastPvrPreviewRendererTests
     }
 
     [Fact]
+    public void DoesNotSampleSpriteTextureWhenOnlyCommandCarriesUvPayload()
+    {
+        var vram = new byte[4096];
+        const uint textureBase = 0x400;
+        WriteTexturePixel(vram, textureBase, 0, 0, 0xF800);
+        WriteTexturePixel(vram, textureBase, 7, 0, 0x07E0);
+        WriteTexturePixel(vram, textureBase, 4, 4, 0xFFFF);
+
+        DreamcastPvrPreviewRenderer.RenderSprite(
+            CreateSprite(
+                0x001F,
+                [(1, 1, 0.0f, 0.0f), (3, 1, 1.0f, 0.0f), (3, 3, 1.0f, 1.0f), (1, 3, 0.0f, 1.0f)],
+                textureEnabled: false,
+                nonTwiddled: true,
+                textureBase: textureBase,
+                headerValue: 0xA084_0009),
+            vram);
+
+        Assert.Equal(0x001F, ReadRgb565(vram, 0, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 2, 0));
+        Assert.Equal(0x001F, ReadRgb565(vram, 1, 1));
+    }
+
+    [Fact]
     public void FlipsClampedTextureCoordinatesForSprite()
     {
         var vram = new byte[4096];
