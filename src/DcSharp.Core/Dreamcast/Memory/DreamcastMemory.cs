@@ -2538,7 +2538,13 @@ public sealed class DreamcastMemory
         var previousValue = TryPeekValue(address, data.Length, out var peekedValue)
             ? peekedValue
             : (uint?)null;
-        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, ToValue(data), CurrentInstructionPc, CurrentInstructionOpcode, previousValue));
+        var value = ToValue(data);
+        if (writeWatch.ChangedOnly && previousValue == value)
+        {
+            return;
+        }
+
+        watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value, CurrentInstructionPc, CurrentInstructionOpcode, previousValue));
     }
 
     private void RecordWatchedRead(uint address, int size, uint value)
@@ -3222,7 +3228,8 @@ public sealed record DreamcastMemoryWriteWatch(
     IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null,
     uint? StartPc = null,
     uint? EndPc = null,
-    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null)
+    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null,
+    bool ChangedOnly = false)
 {
     public bool ShouldRecord(uint address, int length, uint? pc)
     {
