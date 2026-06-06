@@ -1795,6 +1795,8 @@ static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
     new(0x8C13_1B20u, 0x8C13_1B28u),
     new(0x8C13_1D10u, 0x8C13_1D50u),
     new(0x8C13_64F0u, 0x8C13_6668u),
+    new(0x8C13_7000u, 0x8C13_77FFu),
+    new(0x8C13_8A60u, 0x8C13_8ADFu),
     new(0x8CEE_E000u, 0x8CEE_EFFFu),
     new(0x01E4_C000u, 0x01E4_CFFFu)
 ];
@@ -1803,6 +1805,19 @@ static IReadOnlyList<WindowsCeSchedulerPointerSnapshot> WindowsCeSchedulerPointe
 [
     new(0x8C13_1894u, "current-thread-object", 0x100u),
     new(0x8C13_1B24u, "module-or-file-list-root", 0x120u)
+];
+
+static IReadOnlyList<uint> WindowsCeSchedulerNestedPointerOffsets() =>
+[
+    0x0Cu,
+    0x10u,
+    0x1Cu,
+    0x20u,
+    0x24u,
+    0x34u,
+    0x48u,
+    0xACu,
+    0xB0u
 ];
 
 static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
@@ -1876,22 +1891,57 @@ static void DumpWindowsCeSchedulerPointerSnapshot(
     }
 
     writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{pointer.SourceAddress:X8} {pointer.Label} target=0x{target:X8} bytes=0x{pointer.ByteCount:X}"));
+    DumpWindowsCeSchedulerObjectWords(writer, snapshot, target, pointer.ByteCount, "  ");
+    DumpWindowsCeSchedulerNestedPointerSnapshots(writer, snapshot, pointer, target);
+}
 
+static bool DumpWindowsCeSchedulerObjectWords(
+    TextWriter writer,
+    DreamcastMemorySnapshot snapshot,
+    uint target,
+    uint byteCount,
+    string indent)
+{
     var wroteAny = false;
-    for (uint offset = 0; offset + 4u <= pointer.ByteCount; offset += 4u)
+    for (uint offset = 0; offset + 4u <= byteCount; offset += 4u)
     {
         if (!TryReadSnapshotUInt32(snapshot, target + offset, out var value) || value == 0)
         {
             continue;
         }
 
-        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  +0x{offset:X3} addr=0x{target + offset:X8} value=0x{value:X8} signed={(int)value}"));
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}+0x{offset:X3} addr=0x{target + offset:X8} value=0x{value:X8} signed={(int)value}"));
         wroteAny = true;
     }
 
     if (!wroteAny)
     {
-        writer.WriteLine("  (no nonzero captured words)");
+        writer.WriteLine($"{indent}(no nonzero captured words)");
+    }
+
+    return wroteAny;
+}
+
+static void DumpWindowsCeSchedulerNestedPointerSnapshots(
+    TextWriter writer,
+    DreamcastMemorySnapshot snapshot,
+    WindowsCeSchedulerPointerSnapshot pointer,
+    uint target)
+{
+    var visitedTargets = new HashSet<uint> { target };
+    foreach (var offset in WindowsCeSchedulerNestedPointerOffsets())
+    {
+        if (offset + 4u > pointer.ByteCount
+            || !TryReadSnapshotUInt32(snapshot, target + offset, out var nestedTarget)
+            || nestedTarget == 0
+            || !visitedTargets.Add(nestedTarget)
+            || !TryReadSnapshotUInt32(snapshot, nestedTarget, out _))
+        {
+            continue;
+        }
+
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  nested +0x{offset:X3} target=0x{nestedTarget:X8} bytes=0x80"));
+        DumpWindowsCeSchedulerObjectWords(writer, snapshot, nestedTarget, 0x80u, "    ");
     }
 }
 
