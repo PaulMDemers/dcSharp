@@ -496,6 +496,11 @@ static void BootSmoke(string path, string[] args)
         DumpWindowsCeSyscallLog(result, options.WindowsCeSyscallLogPath);
     }
 
+    if (options.WindowsCeSchedulerLogPath is not null)
+    {
+        DumpWindowsCeSchedulerLog(result, options.WindowsCeSchedulerLogPath);
+    }
+
     if (options.DeviceLogPath is not null)
     {
         DumpDeviceLog(result, options);
@@ -1746,6 +1751,76 @@ static void DumpMemorySnapshotLog(DreamcastRunResult result, string path)
     DreamcastMemorySnapshotLogWriter.WriteText(writer, result.FinalMemorySnapshot);
 }
 
+static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshotFields() =>
+[
+    new(0x8C13_1884u, "kernel-data+0x1884"),
+    new(0x8C13_1888u, "kernel-data+0x1888"),
+    new(0x8C13_1898u, "kernel-data+0x1898"),
+    new(0x8C13_1AA4u, "scheduler-dispatch-state"),
+    new(0x8C13_1AA8u, "scheduler-dispatch-next"),
+    new(0x8C13_64F4u, "runqueue-or-thread-list-head"),
+    new(0x8C13_64FCu, "runqueue-or-thread-list-next"),
+    new(0x8C13_6524u, "timer-or-wait-list-head"),
+    new(0x8C13_6540u, "current-wait-delta"),
+    new(0x8C13_6544u, "next-wait-delta"),
+    new(0x8C13_659Cu, "wake-or-time-state"),
+    new(0x8C13_6664u, "scheduler-tail-state")
+];
+
+static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
+[
+    new(0x8C13_1880u, 0x8C13_18A0u),
+    new(0x8C13_1AA0u, 0x8C13_1AB0u),
+    new(0x8C13_64F0u, 0x8C13_6668u)
+];
+
+static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
+{
+    if (result.FinalMemorySnapshot is null)
+    {
+        throw new InvalidDataException("Final memory snapshot was not captured for this run.");
+    }
+
+    using var writer = CreateTextLog(path);
+    writer.WriteLine("# Windows CE scheduler snapshot");
+    writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"# instructions={result.Cpu.InstructionsExecuted} pc=0x{result.Cpu.Pc:X8}"));
+    writer.WriteLine("# columns: address label value signed");
+
+    foreach (var field in WindowsCeSchedulerSnapshotFields())
+    {
+        if (TryReadSnapshotUInt32(result.FinalMemorySnapshot, field.Address, out var value))
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{field.Address:X8} {field.Label} value=0x{value:X8} signed={(int)value}"));
+        }
+        else
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{field.Address:X8} {field.Label} value=unavailable"));
+        }
+    }
+}
+
+static bool TryReadSnapshotUInt32(DreamcastMemorySnapshot snapshot, uint address, out uint value)
+{
+    foreach (var range in snapshot.Ranges)
+    {
+        if (address < range.StartAddress
+            || address + 3u > range.CapturedEndAddress)
+        {
+            continue;
+        }
+
+        var offset = (int)(address - range.StartAddress);
+        value = (uint)(range.Bytes[offset]
+            | (range.Bytes[offset + 1] << 8)
+            | (range.Bytes[offset + 2] << 16)
+            | (range.Bytes[offset + 3] << 24));
+        return true;
+    }
+
+    value = 0;
+    return false;
+}
+
 static StreamWriter CreateTextLog(string path)
 {
     var fullPath = Path.GetFullPath(path);
@@ -1842,6 +1917,7 @@ static CliRunOptions ParseRunOptions(string[] args)
     ulong? pcProfileEndInstruction = null;
     string? windowsCeSyscallLogPath = null;
     var windowsCeSyscallLogLimit = 256;
+    string? windowsCeSchedulerLogPath = null;
     string? deviceLogPath = null;
     MemoryAccessKind? deviceKind = null;
     AddressRange? deviceAddressRange = null;
@@ -2147,6 +2223,10 @@ static CliRunOptions ParseRunOptions(string[] args)
                 windowsCeSyscallLogLimit = parsedWindowsCeSyscallLogLimit;
                 index++;
                 break;
+            case "--wince-scheduler-log" when index + 1 < args.Length:
+                windowsCeSchedulerLogPath = args[index + 1];
+                index++;
+                break;
             case "--device-log" when index + 1 < args.Length:
                 deviceLogPath = args[index + 1];
                 index++;
@@ -2417,10 +2497,16 @@ static CliRunOptions ParseRunOptions(string[] args)
             memoryReadPcRanges.Count == 0
                 ? null
                 : memoryReadPcRanges.Select(range => new DreamcastMemoryAddressRange(range.Start, range.End)).ToArray());
-    var finalMemorySnapshot = memorySnapshotLogPath is null
+    var finalMemorySnapshotRanges = new List<AddressRange>(memorySnapshotRanges);
+    if (windowsCeSchedulerLogPath is not null)
+    {
+        finalMemorySnapshotRanges.AddRange(WindowsCeSchedulerSnapshotRanges());
+    }
+
+    var finalMemorySnapshot = finalMemorySnapshotRanges.Count == 0
         ? null
         : new DreamcastFinalMemorySnapshotOptions(
-            memorySnapshotRanges.Select(range => new DreamcastMemoryAddressRange(range.Start, range.End)).ToArray(),
+            finalMemorySnapshotRanges.Select(range => new DreamcastMemoryAddressRange(range.Start, range.End)).ToArray(),
             memorySnapshotMaxBytes);
 
     return new CliRunOptions(
@@ -2510,6 +2596,7 @@ static CliRunOptions ParseRunOptions(string[] args)
         fpuMemoryLogPath,
         pcProfileLogPath,
         windowsCeSyscallLogPath,
+        windowsCeSchedulerLogPath,
         deviceLogPath,
         deviceKind,
         deviceAddressRange,
@@ -2850,7 +2937,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--wince-syscall-log path] [--wince-syscall-log-limit count] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--wince-syscall-log path] [--wince-syscall-log-limit count] [--wince-scheduler-log path] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --cpu-snapshot-pc, --fpu-memory-address, --fpu-memory-pc, --memory-write-address, --memory-write-pc, --memory-read-address, --memory-read-pc, and --memory-snapshot-address may be repeated for multiple ranges. --fpu-write-register and --fpu-memory-register may be repeated for multiple registers. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, --cpu-snapshot-instruction, --fpu-memory-instruction, and --pc-profile-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");
     Console.WriteLine("    Use --vblank-interval 0 to disable synthetic VBlank events.");
@@ -2916,6 +3003,7 @@ internal sealed record CliRunOptions(
     string? FpuMemoryLogPath,
     string? PcProfileLogPath,
     string? WindowsCeSyscallLogPath,
+    string? WindowsCeSchedulerLogPath,
     string? DeviceLogPath,
     MemoryAccessKind? DeviceKind,
     AddressRange? DeviceAddressRange,
@@ -2949,6 +3037,8 @@ internal sealed record AddressRange(uint Start, uint End)
 {
     public bool Contains(uint address) => address >= Start && address <= End;
 }
+
+internal sealed record WindowsCeSchedulerSnapshotField(uint Address, string Label);
 
 internal sealed record FixtureReport(
     string Name,

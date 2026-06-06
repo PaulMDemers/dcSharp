@@ -362,6 +362,46 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandWritesWindowsCeSchedulerLog()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateNopBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "1",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: InstructionLimit", result.StandardOutput);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("# Windows CE scheduler snapshot", log);
+            Assert.Contains("0x8C131AA4 scheduler-dispatch-state value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandSeedsIpBinForCueInput()
     {
         var repoRoot = FindRepoRoot();
