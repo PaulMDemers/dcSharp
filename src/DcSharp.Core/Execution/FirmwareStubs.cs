@@ -309,6 +309,7 @@ internal static class FirmwareStubs
                 WindowsCeWin32ApiId => methodId switch
                 {
                     13 => "GetTickCount",
+                    78 => "CreateCrit",
                     82 => "Sleep",
                     95 => "GetLastError",
                     113 => "PerformCallBack",

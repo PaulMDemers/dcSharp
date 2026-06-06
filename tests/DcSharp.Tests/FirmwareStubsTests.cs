@@ -191,6 +191,22 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void WindowsCeWin32CreateCritDecodesByName()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = 0xFFFF_FD65, Pr = 0x01E3_8A3E };
+        state.R[4] = 0x01E4_C0C0;
+        state.R[5] = 1;
+        state.R[7] = 0x8CEE_E5F4;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x01E3_8A3Eu, state.Pc);
+        Assert.Equal(0u, state.R[0]);
+        Assert.Equal("firmware wince hle WIN32.CreateCrit address=0xFFFFFD65 r4=0x01E4C0C0, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x00000000, pc=0x01E38A3E", trace);
+    }
+
+    [Fact]
     public void GdromCheckCommandReportsCompletedReadAndTransferredBytes()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));
