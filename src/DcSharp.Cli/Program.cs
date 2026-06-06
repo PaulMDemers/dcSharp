@@ -1820,6 +1820,26 @@ static IReadOnlyList<uint> WindowsCeSchedulerNestedPointerOffsets() =>
     0xB0u
 ];
 
+static IReadOnlyList<WindowsCeSchedulerObjectKeyField> WindowsCeSchedulerObjectKeyFields() =>
+[
+    new(0x00Cu, "link-or-source-a"),
+    new(0x010u, "link-or-source-b"),
+    new(0x014u, "state-or-flags"),
+    new(0x018u, "base-or-entry"),
+    new(0x01Cu, "wait-link-or-copy-source"),
+    new(0x020u, "handler-or-list"),
+    new(0x024u, "priority-or-flags"),
+    new(0x034u, "owner-or-thread"),
+    new(0x038u, "derived-base"),
+    new(0x048u, "metadata-or-thread-copy"),
+    new(0x04Cu, "metadata-flags"),
+    new(0x054u, "metadata-block"),
+    new(0x058u, "metadata-tag"),
+    new(0x05Cu, "mapped-entry-or-size"),
+    new(0x060u, "mapped-base"),
+    new(0x064u, "mapped-size")
+];
+
 static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
 {
     if (result.FinalMemorySnapshot is null)
@@ -1903,14 +1923,22 @@ static bool DumpWindowsCeSchedulerObjectWords(
     string indent)
 {
     var wroteAny = false;
+    var keyFields = WindowsCeSchedulerObjectKeyFields();
     for (uint offset = 0; offset + 4u <= byteCount; offset += 4u)
     {
-        if (!TryReadSnapshotUInt32(snapshot, target + offset, out var value) || value == 0)
+        if (!TryReadSnapshotUInt32(snapshot, target + offset, out var value))
         {
             continue;
         }
 
-        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}+0x{offset:X3} addr=0x{target + offset:X8} value=0x{value:X8} signed={(int)value}"));
+        var keyField = keyFields.FirstOrDefault(field => field.Offset == offset);
+        if (value == 0 && keyField is null)
+        {
+            continue;
+        }
+
+        var label = keyField is null ? string.Empty : $" {keyField.Label}";
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}+0x{offset:X3}{label} addr=0x{target + offset:X8} value=0x{value:X8} signed={(int)value}"));
         wroteAny = true;
     }
 
@@ -3165,6 +3193,8 @@ internal sealed record AddressRange(uint Start, uint End)
 internal sealed record WindowsCeSchedulerSnapshotField(uint Address, string Label);
 
 internal sealed record WindowsCeSchedulerPointerSnapshot(uint SourceAddress, string Label, uint ByteCount);
+
+internal sealed record WindowsCeSchedulerObjectKeyField(uint Offset, string Label);
 
 internal sealed record FixtureReport(
     string Name,
