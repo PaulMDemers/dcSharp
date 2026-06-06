@@ -151,6 +151,7 @@ public sealed class DreamcastMemory
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<MemoryAccess> watchedReads = [];
     private readonly List<MemoryAccess> watchedWrites = [];
+    private readonly HashSet<WatchedMemoryWriteKey> watchedWriteKeys = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrDmaTransfer> pvrDmaTransfers = [];
     private readonly List<DreamcastStoreQueueFlush> storeQueueFlushes = [];
@@ -227,7 +228,11 @@ public sealed class DreamcastMemory
         }
     }
 
-    public void ResetWatchedWrites() => watchedWrites.Clear();
+    public void ResetWatchedWrites()
+    {
+        watchedWrites.Clear();
+        watchedWriteKeys.Clear();
+    }
 
     public void ResetWatchedReads() => watchedReads.Clear();
 
@@ -2544,6 +2549,11 @@ public sealed class DreamcastMemory
             return;
         }
 
+        if (writeWatch.Distinct && !watchedWriteKeys.Add(new WatchedMemoryWriteKey(address, data.Length, value, CurrentInstructionPc, CurrentInstructionOpcode)))
+        {
+            return;
+        }
+
         watchedWrites.Add(new MemoryAccess(MemoryAccessKind.Write, address, data.Length, value, CurrentInstructionPc, CurrentInstructionOpcode, previousValue));
     }
 
@@ -3221,6 +3231,8 @@ public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size,
     public string? OpcodeHex => Opcode is { } opcode ? $"0x{opcode:X4}" : null;
 }
 
+internal readonly record struct WatchedMemoryWriteKey(uint Address, int Size, uint Value, uint? Pc, ushort? Opcode);
+
 public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
@@ -3229,7 +3241,8 @@ public sealed record DreamcastMemoryWriteWatch(
     uint? StartPc = null,
     uint? EndPc = null,
     IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null,
-    bool ChangedOnly = false)
+    bool ChangedOnly = false,
+    bool Distinct = false)
 {
     public bool ShouldRecord(uint address, int length, uint? pc)
     {

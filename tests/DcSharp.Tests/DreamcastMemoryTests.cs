@@ -300,6 +300,26 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CanCaptureOnlyDistinctWatchedMemoryWrites()
+    {
+        var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(
+            StartAddress: 0x8C01_0000,
+            EndAddress: 0x8C01_0003,
+            Distinct: true));
+        memory.CurrentInstructionPc = 0x8C02_0000;
+        memory.CurrentInstructionOpcode = 0x1234;
+
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0000, 1);
+        memory.WriteUInt32(0x8C01_0000, 2);
+
+        Assert.Collection(
+            memory.WatchedWrites,
+            first => Assert.Equal(1u, first.Value),
+            second => Assert.Equal(2u, second.Value));
+    }
+
+    [Fact]
     public void CapturesWatchedMemoryWritesByProgramCounterRange()
     {
         var memory = new DreamcastMemory(writeWatch: new DreamcastMemoryWriteWatch(
