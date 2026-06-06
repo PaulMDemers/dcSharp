@@ -1765,7 +1765,7 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_1D4Cu, "callback-allocation-slot"),
     new(0x8C13_64F4u, "scheduler-pending-tick-delta"),
     new(0x8C13_64FCu, "runqueue-or-thread-list-next"),
-    new(0x8C13_6524u, "timer-or-wait-list-head"),
+    new(0x8C13_6524u, "scheduler-wait-active-flag"),
     new(0x8C13_6540u, "current-wait-delta"),
     new(0x8C13_6544u, "next-wait-delta"),
     new(0x8C13_6548u, "timer-wheel-slot0-head"),
