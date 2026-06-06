@@ -1785,6 +1785,7 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_6580u, "timer-wheel-slot7-head"),
     new(0x8C13_6584u, "timer-wheel-slot7-tail"),
     new(0x8C13_659Cu, "wake-or-time-state"),
+    new(0x8C13_65ACu, "scheduler-expired-list-head"),
     new(0x8C13_6664u, "scheduler-tail-state")
 ];
 
