@@ -175,6 +175,22 @@ public class FirmwareStubsTests
     }
 
     [Fact]
+    public void WindowsCeCurProcUnusedMethodDecodesByName()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = 0xFFFF_F9F9, Pr = 0x01E3_24F6 };
+        state.R[4] = 0x42;
+        state.R[5] = 1;
+        state.R[7] = 0x8CEE_E5F4;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x01E3_24F6u, state.Pc);
+        Assert.Equal(0u, state.R[0]);
+        Assert.Equal("firmware wince hle CURPROC.Unused4 address=0xFFFFF9F9 r4=0x00000042, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x00000000, pc=0x01E324F6", trace);
+    }
+
+    [Fact]
     public void GdromCheckCommandReportsCompletedReadAndTransferredBytes()
     {
         var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(2), 2048));

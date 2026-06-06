@@ -397,6 +397,8 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131B24 module-or-file-list-root value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
+            Assert.Contains("0x8C131B24 module-or-file-list-root target=0x00000000 (null)", log);
         }
         finally
         {

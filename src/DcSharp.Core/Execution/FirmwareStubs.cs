@@ -304,8 +304,9 @@ internal static class FirmwareStubs
             };
 
         private static string WindowsCeMethodName(uint apiId, uint methodId) =>
-            apiId == WindowsCeWin32ApiId
-                ? methodId switch
+            apiId switch
+            {
+                WindowsCeWin32ApiId => methodId switch
                 {
                     13 => "GetTickCount",
                     82 => "Sleep",
@@ -314,8 +315,23 @@ internal static class FirmwareStubs
                     126 => "QueryPerformanceCounter",
                     127 => "QueryPerformanceFrequency",
                     _ => $"Method{methodId}"
-                }
-                : $"Method{methodId}";
+                },
+                2 => methodId switch
+                {
+                    0 => "ProcCloseHandle",
+                    2 => "ProcTerminate",
+                    3 => "ProcGetCode",
+                    4 => "Unused4",
+                    5 => "ProcFlushICache",
+                    6 => "ProcReadMemory",
+                    7 => "ProcWriteMemory",
+                    8 => "ProcDebug",
+                    9 => "ProcGetModInfo",
+                    10 => "ProcSetVer",
+                    _ => $"Method{methodId}"
+                },
+                _ => $"Method{methodId}"
+            };
 
         private uint HandleGdrom(uint function, DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory) =>
             function switch

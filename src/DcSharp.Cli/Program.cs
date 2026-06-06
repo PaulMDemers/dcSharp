@@ -1794,7 +1794,15 @@ static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
     new(0x8C13_1B20u, 0x8C13_1B28u),
     new(0x8C13_1D10u, 0x8C13_1D50u),
-    new(0x8C13_64F0u, 0x8C13_6668u)
+    new(0x8C13_64F0u, 0x8C13_6668u),
+    new(0x8CEE_E000u, 0x8CEE_EFFFu),
+    new(0x01E4_C000u, 0x01E4_CFFFu)
+];
+
+static IReadOnlyList<WindowsCeSchedulerPointerSnapshot> WindowsCeSchedulerPointerSnapshots() =>
+[
+    new(0x8C13_1894u, "current-thread-object", 0x100u),
+    new(0x8C13_1B24u, "module-or-file-list-root", 0x120u)
 ];
 
 static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
@@ -1820,6 +1828,12 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
             writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{field.Address:X8} {field.Label} value=unavailable"));
         }
     }
+
+    writer.WriteLine("# pointer snapshots");
+    foreach (var pointer in WindowsCeSchedulerPointerSnapshots())
+    {
+        DumpWindowsCeSchedulerPointerSnapshot(writer, result.FinalMemorySnapshot, pointer);
+    }
 }
 
 static bool TryReadSnapshotUInt32(DreamcastMemorySnapshot snapshot, uint address, out uint value)
@@ -1842,6 +1856,43 @@ static bool TryReadSnapshotUInt32(DreamcastMemorySnapshot snapshot, uint address
 
     value = 0;
     return false;
+}
+
+static void DumpWindowsCeSchedulerPointerSnapshot(
+    TextWriter writer,
+    DreamcastMemorySnapshot snapshot,
+    WindowsCeSchedulerPointerSnapshot pointer)
+{
+    if (!TryReadSnapshotUInt32(snapshot, pointer.SourceAddress, out var target))
+    {
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{pointer.SourceAddress:X8} {pointer.Label} target=unavailable"));
+        return;
+    }
+
+    if (target == 0)
+    {
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{pointer.SourceAddress:X8} {pointer.Label} target=0x00000000 (null)"));
+        return;
+    }
+
+    writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{pointer.SourceAddress:X8} {pointer.Label} target=0x{target:X8} bytes=0x{pointer.ByteCount:X}"));
+
+    var wroteAny = false;
+    for (uint offset = 0; offset + 4u <= pointer.ByteCount; offset += 4u)
+    {
+        if (!TryReadSnapshotUInt32(snapshot, target + offset, out var value) || value == 0)
+        {
+            continue;
+        }
+
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  +0x{offset:X3} addr=0x{target + offset:X8} value=0x{value:X8} signed={(int)value}"));
+        wroteAny = true;
+    }
+
+    if (!wroteAny)
+    {
+        writer.WriteLine("  (no nonzero captured words)");
+    }
 }
 
 static StreamWriter CreateTextLog(string path)
@@ -3062,6 +3113,8 @@ internal sealed record AddressRange(uint Start, uint End)
 }
 
 internal sealed record WindowsCeSchedulerSnapshotField(uint Address, string Label);
+
+internal sealed record WindowsCeSchedulerPointerSnapshot(uint SourceAddress, string Label, uint ByteCount);
 
 internal sealed record FixtureReport(
     string Name,
