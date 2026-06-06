@@ -1756,10 +1756,13 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_1884u, "kernel-data+0x1884"),
     new(0x8C13_1888u, "kernel-tick-total"),
     new(0x8C13_188Cu, "kernel-tick-delta"),
+    new(0x8C13_1894u, "current-thread-object"),
     new(0x8C13_1898u, "kernel-data+0x1898"),
     new(0x8C13_1AA4u, "scheduler-dispatch-state"),
     new(0x8C13_1AA8u, "scheduler-dispatch-next"),
+    new(0x8C13_1B24u, "module-or-file-list-root"),
     new(0x8C13_1D14u, "timer-wheel-max-delta"),
+    new(0x8C13_1D4Cu, "callback-allocation-slot"),
     new(0x8C13_64F4u, "runqueue-or-thread-list-head"),
     new(0x8C13_64FCu, "runqueue-or-thread-list-next"),
     new(0x8C13_6524u, "timer-or-wait-list-head"),
@@ -1789,7 +1792,8 @@ static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
 [
     new(0x8C13_1880u, 0x8C13_18A0u),
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
-    new(0x8C13_1D10u, 0x8C13_1D18u),
+    new(0x8C13_1B20u, 0x8C13_1B28u),
+    new(0x8C13_1D10u, 0x8C13_1D50u),
     new(0x8C13_64F0u, 0x8C13_6668u)
 ];
 

@@ -157,7 +157,7 @@ public class FirmwareStubsTests
         Assert.Equal(0x8CEE_E654u, state.R[5]);
         Assert.Equal(1u, state.R[6]);
         Assert.Equal(0x8C13_7534u, state.R[7]);
-        Assert.Equal("firmware wince hle WIN32.PerformCallBack address=0xFFFFFD1F callback=0x8C137538, hproc=0x0CEEEFE2, pfn=0x8C021FA0, arg0=0x8C0116E0 ; pc=0x8C021FA0, pr=0x8C022D7C", trace);
+        Assert.Equal("firmware wince hle WIN32.PerformCallBack address=0xFFFFFD1F callback=0x8C137538, hproc=0x0CEEEFE2, pfn=0x8C021FA0, arg0=0x8C0116E0, r5=0x8CEEE654, r6=0x00000001, r7=0x8C137534 ; pc=0x8C021FA0, pr=0x8C022D7C", trace);
     }
 
     [Fact]

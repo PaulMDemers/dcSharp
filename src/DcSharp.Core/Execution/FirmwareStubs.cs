@@ -246,9 +246,12 @@ internal static class FirmwareStubs
                 var hProc = memory.ReadUInt32(callbackInfo);
                 var pfn = memory.ReadUInt32(callbackInfo + 4);
                 var arg0 = memory.ReadUInt32(callbackInfo + 8);
+                var r5 = state.R[5];
+                var r6 = state.R[6];
+                var r7 = state.R[7];
                 state.R[4] = arg0;
                 state.Pc = pfn;
-                trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} callback=0x{callbackInfo:X8}, hproc=0x{hProc:X8}, pfn=0x{pfn:X8}, arg0=0x{arg0:X8} ; pc=0x{state.Pc:X8}, pr=0x{state.Pr:X8}";
+                trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} callback=0x{callbackInfo:X8}, hproc=0x{hProc:X8}, pfn=0x{pfn:X8}, arg0=0x{arg0:X8}, r5=0x{r5:X8}, r6=0x{r6:X8}, r7=0x{r7:X8} ; pc=0x{state.Pc:X8}, pr=0x{state.Pr:X8}";
                 return true;
             }
 
