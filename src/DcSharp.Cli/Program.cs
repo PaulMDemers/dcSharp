@@ -1759,11 +1759,28 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_1898u, "kernel-data+0x1898"),
     new(0x8C13_1AA4u, "scheduler-dispatch-state"),
     new(0x8C13_1AA8u, "scheduler-dispatch-next"),
+    new(0x8C13_1D14u, "timer-wheel-max-delta"),
     new(0x8C13_64F4u, "runqueue-or-thread-list-head"),
     new(0x8C13_64FCu, "runqueue-or-thread-list-next"),
     new(0x8C13_6524u, "timer-or-wait-list-head"),
     new(0x8C13_6540u, "current-wait-delta"),
     new(0x8C13_6544u, "next-wait-delta"),
+    new(0x8C13_6548u, "timer-wheel-slot0-head"),
+    new(0x8C13_654Cu, "timer-wheel-slot0-tail"),
+    new(0x8C13_6550u, "timer-wheel-slot1-head"),
+    new(0x8C13_6554u, "timer-wheel-slot1-tail"),
+    new(0x8C13_6558u, "timer-wheel-slot2-head"),
+    new(0x8C13_655Cu, "timer-wheel-slot2-tail"),
+    new(0x8C13_6560u, "timer-wheel-slot3-head"),
+    new(0x8C13_6564u, "timer-wheel-slot3-tail"),
+    new(0x8C13_6568u, "timer-wheel-slot4-head"),
+    new(0x8C13_656Cu, "timer-wheel-slot4-tail"),
+    new(0x8C13_6570u, "timer-wheel-slot5-head"),
+    new(0x8C13_6574u, "timer-wheel-slot5-tail"),
+    new(0x8C13_6578u, "timer-wheel-slot6-head"),
+    new(0x8C13_657Cu, "timer-wheel-slot6-tail"),
+    new(0x8C13_6580u, "timer-wheel-slot7-head"),
+    new(0x8C13_6584u, "timer-wheel-slot7-tail"),
     new(0x8C13_659Cu, "wake-or-time-state"),
     new(0x8C13_6664u, "scheduler-tail-state")
 ];
@@ -1772,6 +1789,7 @@ static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
 [
     new(0x8C13_1880u, 0x8C13_18A0u),
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
+    new(0x8C13_1D10u, 0x8C13_1D18u),
     new(0x8C13_64F0u, 0x8C13_6668u)
 ];
 
