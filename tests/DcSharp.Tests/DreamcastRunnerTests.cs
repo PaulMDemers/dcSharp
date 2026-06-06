@@ -593,6 +593,24 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunAppliesMemoryPokeBeforeMatchingPcExecutes()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateBootWorkReadBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 2,
+                TraceTailLength: 0,
+                MemoryWriteWatch: new DreamcastMemoryWriteWatch(0x8C00_C000, 0x8C00_C003),
+                MemoryPokesOnPc:
+                [
+                    new DreamcastMemoryPokeOnPc(0x8C01_0002, 0x8C00_C000, 0x1234_5678)
+                ]));
+
+        Assert.Equal(0x1234_5678u, result.Cpu.R[0]);
+        Assert.Empty(result.WatchedMemoryWrites);
+    }
+
+    [Fact]
     public void RunCanSeedInitialVBlankEvent()
     {
         var result = new DreamcastRunner().RunRawBinary(

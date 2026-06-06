@@ -105,6 +105,8 @@ Use `--wince-syscall-log` on longer probes to capture odd negative WinCE API thu
 
 A changed-only current-thread/object write trace confirms the final `0x0211` current-thread flags are guest-driven rather than a stale queue-removal bug: initialization writes `0x0011`, timer-wheel enqueue at `0x8C0165D0` raises it to `0x0111`, scheduler removal at `0x8C0179A6` lowers it back to `0x0011`, and `0x8C01AB18` raises it to `0x0211` after the priority-bucket insert. The mapped module caller at `0x01E324DC-0x01E324FA` directly tests the return from `CURPROC.Unused4`: with the current zero return it takes the `bt 0x01E32586` path, converts the result to `r0=1`, and returns to `0x8C020660`. The parent then reads `current-thread +0x48` at `0x8CEEEEE4`; because that field remains zero it exits toward `0x8C023690` and the scheduler. A temporary nonzero-return experiment was measured and rejected; it exposes three subsequent `WIN32.CreateCrit` (`0xFFFFFD65`) calls that initialize critical-section objects at `0x01E4C0C0`, `0x01E4C014`, and `0x01E4C060`, but still reaches the same 50M scheduler/tick loop with no GD-ROM reads or TA work.
 
+A one-shot `--memory-poke-pc` diagnostic now supports controlled branch experiments without patching emulator code. Forcing `0x8C1376DC` nonzero just before `0x8C017B7E` decodes the hidden constructor branch: it calls `0x8C017AC4`, receives `0x8CEEEE08`, stores that into `current-thread +0x48`, and zeroes fields at offsets `+0x00`, `+0x08`, and `+0x14` in the allocated object. The next parent path then passes the null test at `0x8C02343E-0x8C023442`, but compares region ids derived from source `+0x0C=0x02000000` and source `+0x20=0x8C011924`; after `shld #-25` those are `1` and `0x46`, so the parent takes `bf 0x8C023506` and returns to the scheduler. A second synthetic run that also forces source `+0x0C` to `0x8C010000` reaches a later scheduler loop and increases boot-binary writes from roughly 101 KiB to roughly 245 KiB in the short probe, but still records no GD-ROM reads or TA work. That makes the next real target the descriptor producer/loader semantics for the `0x02000000` low-virtual source field and the runnable/module state after the region-matched path, not a permanent forced nonzero `+0x1C` fix.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
@@ -114,6 +116,6 @@ A changed-only current-thread/object write trace confirms the final `0x0211` cur
 
 ## Next Work
 
-1. Trace the producer of current-thread `+0x48` / source object `0x8C1376C0 +0x1C`; the real `CURPROC.Unused4` zero path and the rejected nonzero `WIN32.CreateCrit` path both converge on that zero-field scheduler exit.
+1. Trace the producer and intended interpretation of Sega Rally's source descriptor fields `0x8C1376C0 +0x0C/+0x1C/+0x20`; the controlled `+0x1C` and region-matched pokes expose later gates but are not fixes.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.

@@ -60,12 +60,14 @@ public sealed class DreamcastRunner
         var shouldSnapshotFpu = options.FpuAnomalyCapture is not null || options.FpuRegisterWatch is not null;
         var frBefore = shouldSnapshotFpu ? new uint[16] : null;
         var xfBefore = shouldSnapshotFpu ? new uint[16] : null;
+        var appliedMemoryPokesOnPc = options.MemoryPokesOnPc is null ? null : new bool[options.MemoryPokesOnPc.Count];
 
         try
         {
             while (cpu.State.InstructionsExecuted < options.InstructionLimit)
             {
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
+                ApplyMemoryPokesOnPc(memory, options.MemoryPokesOnPc, appliedMemoryPokesOnPc, cpu.State.Pc);
                 var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
                 Sh4StepResult step;
                 var nextInstruction = cpu.State.InstructionsExecuted + 1;
@@ -786,6 +788,25 @@ public sealed class DreamcastRunner
         return options.Ranges is not { Count: > 0 } || options.Ranges.Any(range => range.Contains(pc));
     }
 
+    private static void ApplyMemoryPokesOnPc(DreamcastMemory memory, IReadOnlyList<DreamcastMemoryPokeOnPc>? pokes, bool[]? appliedPokes, uint pc)
+    {
+        if (pokes is null || appliedPokes is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < pokes.Count; index++)
+        {
+            if (appliedPokes[index] || pokes[index].Pc != pc)
+            {
+                continue;
+            }
+
+            memory.PatchUInt32(pokes[index].Address, pokes[index].Value);
+            appliedPokes[index] = true;
+        }
+    }
+
     private static Sh4CpuSnapshot CreateCpuSnapshot(ulong instruction, Sh4State state, DreamcastMemory memory) =>
         new(
             instruction,
@@ -1182,7 +1203,10 @@ public sealed record DreamcastRunOptions(
     DreamcastFpuMemoryWatchOptions? FpuMemoryWatch = null,
     DreamcastPcProfileOptions? PcProfile = null,
     DreamcastFinalMemorySnapshotOptions? FinalMemorySnapshot = null,
-    DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null);
+    DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null,
+    IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null);
+
+public sealed record DreamcastMemoryPokeOnPc(uint Pc, uint Address, uint Value);
 
 public sealed record DreamcastFinalMemorySnapshotOptions(
     IReadOnlyList<DreamcastMemoryAddressRange> Ranges,

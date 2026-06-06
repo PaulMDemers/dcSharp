@@ -657,9 +657,27 @@ public sealed class DreamcastMemory
         return true;
     }
 
-    public void Write(uint address, ReadOnlySpan<byte> data)
+    public void Write(uint address, ReadOnlySpan<byte> data) => Write(address, data, recordWatchedWrite: true);
+
+    public void PatchUInt32(uint address, uint value)
     {
-        RecordWatchedWrite(address, data);
+        Span<byte> bytes =
+        [
+            (byte)value,
+            (byte)(value >> 8),
+            (byte)(value >> 16),
+            (byte)(value >> 24)
+        ];
+
+        Write(address, bytes, recordWatchedWrite: false);
+    }
+
+    private void Write(uint address, ReadOnlySpan<byte> data, bool recordWatchedWrite)
+    {
+        if (recordWatchedWrite)
+        {
+            RecordWatchedWrite(address, data);
+        }
 
         if (IsStoreQueueAddress(address))
         {
