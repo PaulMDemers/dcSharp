@@ -75,13 +75,22 @@ public sealed class DreamcastMemory
     private const uint Sh4Intevt = 0xFF00_0028;
     private const uint Sh4Pteh = 0xFF00_0000;
     private const uint Sh4Ptel = 0xFF00_0004;
+    private const uint Sh4Mmucr = 0xFF00_0010;
+    private const uint Sh4MmucrAddressTranslation = 0x0000_0001;
     private const uint Sh4Qacr0 = 0xFF00_0038;
     private const uint Sh4Qacr1 = 0xFF00_003C;
     private const uint Sh4DmaChannel2Source = 0xFFA0_0020;
     private const uint Sh4DmaChannel2TransferCount = 0xFFA0_0028;
-    private const uint TlbPageMask = 0xFFFF_FC00;
-    private const uint TlbOffsetMask = 0x0000_03FF;
     private const uint TlbValidBit = 0x0000_0100;
+    private const uint TlbSizeHighBit = 0x0000_0080;
+    private const uint TlbSizeLowBit = 0x0000_0010;
+    private const uint TlbOneKilobytePageSize = 1024;
+    private const uint TlbFourKilobytePageSize = 4 * 1024;
+    private const uint TlbSixtyFourKilobytePageSize = 64 * 1024;
+    private const uint TlbOneMegabytePageSize = 1024 * 1024;
+    private const uint MmuLowVirtualRamBase = 0x0100_0000;
+    private const uint MmuLowVirtualRamLimit = 0x0400_0000;
+    private const int MmuLowVirtualRamBytes = 48 * 1024 * 1024;
     private const uint StoreQueueBase = 0xE000_0000;
     private const uint StoreQueueLimit = 0xE400_0000;
     private const uint StoreQueueAddressMask = 0x03FF_FFE0;
@@ -127,6 +136,7 @@ public sealed class DreamcastMemory
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
     private readonly byte[] biosVectorTable = new byte[BiosVectorTableBytes];
     private readonly byte[] pvrVram = new byte[PvrVramByteCount];
+    private byte[]? mmuLowVirtualRam;
     private readonly float[] pvrPreviewDepth = new float[PvrVramByteCount / 2];
     private readonly byte[] aicaRam = new byte[HardwareProfile.AudioRamBytes];
     private readonly byte[] operandCacheRamArea1 = new byte[OperandCacheRamAreaBytes];
@@ -134,6 +144,7 @@ public sealed class DreamcastMemory
     private readonly byte[] storeQueues = new byte[StoreQueueCount * StoreQueueBytes];
     private readonly Dictionary<uint, uint> p4Registers = [];
     private readonly List<Sh4TlbEntry> tlbEntries = [];
+    private readonly List<WinCeSectionMapping> winCeSectionMappings = [];
     private readonly Dictionary<uint, uint> externalRegisters = [];
     private readonly Dictionary<uint, uint> aicaRegisters = [];
     private readonly DreamcastAicaPlaybackState[] aicaPlayback = CreateAicaPlaybackStates();
@@ -161,6 +172,8 @@ public sealed class DreamcastMemory
     private readonly DreamcastMemoryWriteWatch? writeWatch;
     private readonly List<byte> serialOutput = [];
     private ulong pvrVBlankStatusTicksRemaining;
+    private uint mmuLowVirtualWriteGeneration;
+    private uint winCeSectionMappingGeneration = uint.MaxValue;
     private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
     [
         new("IP.BIN", 0x8C00_8000, 0x8000),
@@ -268,29 +281,224 @@ public sealed class DreamcastMemory
             return;
         }
 
+        var pageSize = TlbPageSize(ptel);
+        var offsetMask = pageSize - 1;
+        var pageMask = ~offsetMask;
         var entry = new Sh4TlbEntry(
-            pteh & TlbPageMask,
-            (ptel & PhysicalMask) & TlbPageMask);
-        tlbEntries.RemoveAll(existing => existing.VirtualPage == entry.VirtualPage);
+            pteh & pageMask,
+            (ptel & PhysicalMask) & pageMask,
+            pageMask,
+            offsetMask);
+        tlbEntries.RemoveAll(existing => existing.PageMask == entry.PageMask && existing.VirtualPage == entry.VirtualPage);
         tlbEntries.Add(entry);
     }
 
     private uint TranslateAddressForAccess(uint address)
     {
-        if (address < P1Base)
+        if (TryTranslateTlbAddress(address, out var physical))
         {
-            var virtualPage = address & TlbPageMask;
-            for (var index = tlbEntries.Count - 1; index >= 0; index--)
-            {
-                var entry = tlbEntries[index];
-                if (entry.VirtualPage == virtualPage)
-                {
-                    return entry.PhysicalPage | (address & TlbOffsetMask);
-                }
-            }
+            return physical;
         }
 
         return TranslateAddress(address);
+    }
+
+    private bool TryTranslateTlbAddress(uint address, out uint physical)
+    {
+        physical = 0;
+        if (address >= P1Base)
+        {
+            return false;
+        }
+
+        for (var index = tlbEntries.Count - 1; index >= 0; index--)
+        {
+            var entry = tlbEntries[index];
+            if (entry.Contains(address))
+            {
+                physical = entry.Translate(address);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsMmuAddressTranslationEnabled() =>
+        (p4Registers.GetValueOrDefault(Sh4Mmucr) & Sh4MmucrAddressTranslation) != 0;
+
+    private bool TryGetMmuLowVirtualRamOffset(uint address, int length, out int offset)
+    {
+        offset = 0;
+        if (length < 0
+            || !IsMmuAddressTranslationEnabled()
+            || TryTranslateTlbAddress(address, out _)
+            || address < MmuLowVirtualRamBase
+            || address >= MmuLowVirtualRamLimit)
+        {
+            return false;
+        }
+
+        var relative = address - MmuLowVirtualRamBase;
+        if ((ulong)relative + (uint)length > MmuLowVirtualRamBytes)
+        {
+            return false;
+        }
+
+        offset = (int)relative;
+        return true;
+    }
+
+    private static uint TlbPageSize(uint ptel)
+    {
+        var size = ((ptel & TlbSizeHighBit) != 0, (ptel & TlbSizeLowBit) != 0);
+        return size switch
+        {
+            (false, false) => TlbOneKilobytePageSize,
+            (false, true) => TlbFourKilobytePageSize,
+            (true, false) => TlbSixtyFourKilobytePageSize,
+            _ => TlbOneMegabytePageSize
+        };
+    }
+
+    private bool TryReadWinCeSectionMappedUInt32(uint address, out uint value)
+    {
+        value = 0;
+        if (!TryGetWinCeSectionMappedSource(address, 4, out var source))
+        {
+            return false;
+        }
+
+        value = ReadUInt32(source);
+        return true;
+    }
+
+    private bool TryReadWinCeSectionMappedUInt16(uint address, out ushort value)
+    {
+        value = 0;
+        if (!TryGetWinCeSectionMappedSource(address, 2, out var source))
+        {
+            return false;
+        }
+
+        value = ReadUInt16(source);
+        return true;
+    }
+
+    private bool TryReadWinCeSectionMappedByte(uint address, out byte value)
+    {
+        value = 0;
+        if (!TryGetWinCeSectionMappedSource(address, 1, out var source))
+        {
+            return false;
+        }
+
+        value = ReadByte(source);
+        return true;
+    }
+
+    private bool TryGetWinCeSectionMappedSource(uint address, int length, out uint source)
+    {
+        source = 0;
+        if (length < 0 || address >= MmuLowVirtualRamBase + Area0MirrorOffset)
+        {
+            return false;
+        }
+
+        RebuildWinCeSectionMappingsIfNeeded();
+        for (var index = winCeSectionMappings.Count - 1; index >= 0; index--)
+        {
+            var mapping = winCeSectionMappings[index];
+            if (mapping.Contains(address, length))
+            {
+                source = mapping.SourceStart + (address - mapping.VirtualStart);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void RebuildWinCeSectionMappingsIfNeeded()
+    {
+        if (winCeSectionMappingGeneration == mmuLowVirtualWriteGeneration)
+        {
+            return;
+        }
+
+        winCeSectionMappings.Clear();
+        winCeSectionMappingGeneration = mmuLowVirtualWriteGeneration;
+        if (mmuLowVirtualRam is null)
+        {
+            return;
+        }
+
+        var tableStart = (int)(0x0200_0000 - MmuLowVirtualRamBase);
+        var tableLimit = Math.Min(tableStart + 2 * 1024 * 1024, mmuLowVirtualRam.Length - 0x1C);
+        for (var offset = tableStart; offset < tableLimit; offset += 4)
+        {
+            // WinCE builds a compact runtime section table in low virtual memory before full page-table emulation exists here.
+            var virtualSize = ReadUInt32From(mmuLowVirtualRam, offset);
+            var rva = ReadUInt32From(mmuLowVirtualRam, offset + 4);
+            var destination = ReadUInt32From(mmuLowVirtualRam, offset + 8);
+            var rawSize = ReadUInt32From(mmuLowVirtualRam, offset + 0x14);
+
+            if (!IsPlausibleWinCeSectionDescriptor(virtualSize, rva, destination, rawSize))
+            {
+                continue;
+            }
+
+            var destinationImageBase = destination - rva;
+            var virtualImageBase = destinationImageBase - Area0MirrorOffset;
+            var virtualStart = virtualImageBase + rva;
+            var mappedBytes = Math.Max(virtualSize, rawSize);
+            if (!TryFindWinCeSectionSource(virtualSize, rva, rawSize, destination, out var source))
+            {
+                continue;
+            }
+
+            var mapping = new WinCeSectionMapping(virtualStart, source, mappedBytes);
+            if (!winCeSectionMappings.Contains(mapping))
+            {
+                winCeSectionMappings.Add(mapping);
+            }
+        }
+    }
+
+    private static bool IsPlausibleWinCeSectionDescriptor(uint virtualSize, uint rva, uint destination, uint rawSize) =>
+        virtualSize is > 0 and < 0x0040_0000
+        && rawSize < 0x0040_0000
+        && rva is >= 0x0000_1000 and < 0x0100_0000
+        && destination is >= 0x0300_0000 and < MmuLowVirtualRamLimit
+        && destination >= rva + Area0MirrorOffset;
+
+    private bool TryFindWinCeSectionSource(
+        uint virtualSize,
+        uint rva,
+        uint rawSize,
+        uint destination,
+        out uint source)
+    {
+        source = 0;
+        for (var offset = 0; offset + 0x18 <= systemRam.Length; offset += 4)
+        {
+            if (ReadUInt32From(systemRam, offset) != virtualSize
+                || ReadUInt32From(systemRam, offset + 4) != rva
+                || ReadUInt32From(systemRam, offset + 8) != rawSize
+                || ReadUInt32From(systemRam, offset + 0x10) != destination)
+            {
+                continue;
+            }
+
+            var candidateSource = ReadUInt32From(systemRam, offset + 0x0C);
+            if (TryGetSystemRamOffset(candidateSource, 1, out _))
+            {
+                source = candidateSource;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static uint NormalizePhysicalAddress(uint physical) =>
@@ -460,6 +668,14 @@ public sealed class DreamcastMemory
             return;
         }
 
+        if (TryGetMmuLowVirtualRamOffset(address, data.Length, out var mmuLowVirtualOffset))
+        {
+            mmuLowVirtualRam ??= new byte[MmuLowVirtualRamBytes];
+            data.CopyTo(mmuLowVirtualRam.AsSpan(mmuLowVirtualOffset));
+            mmuLowVirtualWriteGeneration++;
+            return;
+        }
+
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             WriteExternal(address, externalAddress, data);
@@ -553,6 +769,15 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryGetMmuLowVirtualRamOffset(address, 1, out var mmuLowVirtualOffset))
+        {
+            var value = TryReadWinCeSectionMappedByte(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam?[mmuLowVirtualOffset] ?? 0;
+            RecordWatchedRead(address, 1, value);
+            return value;
+        }
+
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             var value = (byte)(ReadExternal(address, externalAddress, 1) & 0xFF);
@@ -631,6 +856,17 @@ public sealed class DreamcastMemory
             return value;
         }
 
+        if (TryGetMmuLowVirtualRamOffset(address, 2, out var mmuLowVirtualOffset))
+        {
+            var value = TryReadWinCeSectionMappedUInt16(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam is null
+                ? (ushort)0
+                : (ushort)(mmuLowVirtualRam[mmuLowVirtualOffset] | (mmuLowVirtualRam[mmuLowVirtualOffset + 1] << 8));
+            RecordWatchedRead(address, 2, value);
+            return value;
+        }
+
         if (TryTranslateExternalRegister(address, out var externalAddress))
         {
             var value = (ushort)(ReadExternal(address, externalAddress, 2) & 0xFFFF);
@@ -705,6 +941,15 @@ public sealed class DreamcastMemory
         if (IsP4Address(address))
         {
             var value = ReadP4(address, 4);
+            RecordWatchedRead(address, 4, value);
+            return value;
+        }
+
+        if (TryGetMmuLowVirtualRamOffset(address, 4, out var mmuLowVirtualOffset))
+        {
+            var value = TryReadWinCeSectionMappedUInt32(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam is null ? 0 : ReadUInt32From(mmuLowVirtualRam, mmuLowVirtualOffset);
             RecordWatchedRead(address, 4, value);
             return value;
         }
@@ -817,6 +1062,14 @@ public sealed class DreamcastMemory
             return true;
         }
 
+        if (TryGetMmuLowVirtualRamOffset(address, 4, out var mmuLowVirtualOffset))
+        {
+            value = TryReadWinCeSectionMappedUInt32(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam is null ? 0 : ReadUInt32From(mmuLowVirtualRam, mmuLowVirtualOffset);
+            return true;
+        }
+
         if (TryGetSystemRamOffset(address, 4, out var systemRamOffset))
         {
             value = ReadUInt32From(systemRam, systemRamOffset);
@@ -856,6 +1109,14 @@ public sealed class DreamcastMemory
         if (IsBootRomAddress(address, 1))
         {
             value = 0;
+            return true;
+        }
+
+        if (TryGetMmuLowVirtualRamOffset(address, 1, out var mmuLowVirtualOffset))
+        {
+            value = TryReadWinCeSectionMappedByte(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam?[mmuLowVirtualOffset] ?? 0;
             return true;
         }
 
@@ -1039,6 +1300,15 @@ public sealed class DreamcastMemory
 
     public ushort ReadInstructionUInt16(uint address)
     {
+        if (TryGetMmuLowVirtualRamOffset(address, 2, out var mmuLowVirtualOffset))
+        {
+            return TryReadWinCeSectionMappedUInt16(address, out var mappedValue)
+                ? mappedValue
+                : mmuLowVirtualRam is null
+                ? (ushort)0
+                : (ushort)(mmuLowVirtualRam[mmuLowVirtualOffset] | (mmuLowVirtualRam[mmuLowVirtualOffset + 1] << 8));
+        }
+
         if (!TryGetSystemRamOffset(address, 2, out var offset))
         {
             throw new MemoryMapException($"Instruction fetch outside Dreamcast system RAM: address=0x{address:X8}");
@@ -2845,7 +3115,18 @@ public sealed class DreamcastMemory
 
     private static byte ToUnsignedAxis(sbyte value) => (byte)(value + 128);
 
-    private sealed record Sh4TlbEntry(uint VirtualPage, uint PhysicalPage);
+    private sealed record Sh4TlbEntry(uint VirtualPage, uint PhysicalPage, uint PageMask, uint OffsetMask)
+    {
+        public bool Contains(uint address) => (address & PageMask) == VirtualPage;
+
+        public uint Translate(uint address) => PhysicalPage | (address & OffsetMask);
+    }
+
+    private sealed record WinCeSectionMapping(uint VirtualStart, uint SourceStart, uint ByteCount)
+    {
+        public bool Contains(uint address, int length) =>
+            address >= VirtualStart && (ulong)(address - VirtualStart) + (uint)length <= ByteCount;
+    }
 }
 
 internal sealed class DreamcastAicaPlaybackState

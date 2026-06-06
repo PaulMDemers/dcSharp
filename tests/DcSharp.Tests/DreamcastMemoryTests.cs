@@ -30,6 +30,57 @@ public class DreamcastMemoryTests
         Assert.Equal(0xE001, memory.ReadInstructionUInt16(0x0000_5B90));
     }
 
+    [Fact]
+    public void LoadsTlbEntryWithSh4PageSizeBits()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C10_1234, 0x1234_5678);
+        memory.WriteUInt32(0xFF00_0000, 0x0200_0000);
+        memory.WriteUInt32(0xFF00_0004, 0x0C10_0190);
+
+        memory.LoadTlbFromRegisters();
+
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0x0200_1234));
+    }
+
+    [Fact]
+    public void BacksMmuEnabledLowVirtualRamWithoutUsingAreaZeroExternalMirror()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xFF00_0010, 0x0000_0001);
+
+        memory.WriteUInt32(0x01E3_24DC, 0x1234_5678);
+        memory.WriteUInt32(0x0201_0000, 0x89AB_CDEF);
+
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0x01E3_24DC));
+        Assert.Equal(0x89AB_CDEFu, memory.ReadUInt32(0x0201_0000));
+        Assert.DoesNotContain(memory.DeviceAccesses, access => access.Address == 0x01E3_24DC);
+        Assert.DoesNotContain(memory.DeviceAccesses, access => access.Address == 0x0201_0000);
+    }
+
+    [Fact]
+    public void MapsWinCeSectionVirtualAddressBackToLoadedSourceBytes()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xFF00_0010, 0x0000_0001);
+        memory.WriteUInt16(0x8C03_34DC, 0x2F86);
+
+        memory.WriteUInt32(0x8C08_DF84, 0x0001_A0EF);
+        memory.WriteUInt32(0x8C08_DF88, 0x0000_1000);
+        memory.WriteUInt32(0x8C08_DF8C, 0x0001_A200);
+        memory.WriteUInt32(0x8C08_DF90, 0x8C03_2000);
+        memory.WriteUInt32(0x8C08_DF94, 0x03E3_1000);
+        memory.WriteUInt32(0x8C08_DF98, 0x6000_0020);
+
+        memory.WriteUInt32(0x0201_0000, 0x0001_A0EF);
+        memory.WriteUInt32(0x0201_0004, 0x0000_1000);
+        memory.WriteUInt32(0x0201_0008, 0x03E3_1000);
+        memory.WriteUInt32(0x0201_0010, 0x6000_0020);
+        memory.WriteUInt32(0x0201_0014, 0x0001_A200);
+
+        Assert.Equal(0x2F86, memory.ReadInstructionUInt16(0x01E3_24DC));
+    }
+
     [Theory]
     [InlineData(0x0301_00C0u, 0x0101_00C0u)]
     [InlineData(0x025F_8000u, 0x005F_8000u)]
