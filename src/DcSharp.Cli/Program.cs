@@ -1754,7 +1754,8 @@ static void DumpMemorySnapshotLog(DreamcastRunResult result, string path)
 static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshotFields() =>
 [
     new(0x8C13_1884u, "kernel-data+0x1884"),
-    new(0x8C13_1888u, "kernel-data+0x1888"),
+    new(0x8C13_1888u, "kernel-tick-total"),
+    new(0x8C13_188Cu, "kernel-tick-delta"),
     new(0x8C13_1898u, "kernel-data+0x1898"),
     new(0x8C13_1AA4u, "scheduler-dispatch-state"),
     new(0x8C13_1AA8u, "scheduler-dispatch-next"),
