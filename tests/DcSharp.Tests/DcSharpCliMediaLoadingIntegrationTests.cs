@@ -412,6 +412,8 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131AAC scheduler-dispatch-ring-priority0 value=0x00 signed=0", log);
             Assert.Contains("# dispatch ring", log);
             Assert.Contains("dispatch-ring-summary head=0x00000000 tail=0x00000000 empty=True priority-bytes=0x00,0x00,0x00,0x00 masks=0x00000000,0x00000000,0x00000000,0x00000000 selected-queue-head=0x00000000 selected-queue-state=0x00000000", log);
+            Assert.Contains("# yield handoff", log);
+            Assert.Contains("yield-handoff-summary yield-byte=0x00 critical-byte=0x00 current-thread=0x00000000 thread-flags=unavailable work-item=unavailable", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
@@ -537,6 +539,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("work-item-summary queue-link=0x8CEEE44C resolved-object=0x8CEEE448 flags=0x00010004 current-thread=0x8CEEEE9C return-pc=0x8C018D94", log);
             Assert.Contains("work-item-resolved-object target=0x8CEEE448 bytes=0x80", log);
             Assert.Contains("+0x008 addr=0x8CEEE450 value=0x8C137554 signed=-1944881836", log);
+            Assert.Contains("yield-handoff-summary yield-byte=0x00 critical-byte=0x00 current-thread=0x8CEEEE9C thread-flags=0x00000000 work-item=0x8C137554 work-item-flags=0x00010004 resolved-object=0x8CEEE448 work-item-return-pc=0x8C018D94 saved-return=0x00000000 saved-sp=0x00000000 saved-pr=0x00000000 saved-sr=0x00000000", log);
         }
         finally
         {

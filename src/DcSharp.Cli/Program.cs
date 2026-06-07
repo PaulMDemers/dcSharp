@@ -1918,6 +1918,7 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
     }
 
     DumpWindowsCeSchedulerDispatchRingSummary(writer, result.FinalMemorySnapshot);
+    DumpWindowsCeSchedulerYieldHandoffSummary(writer, result.FinalMemorySnapshot);
 
     writer.WriteLine("# pointer snapshots");
     foreach (var pointer in WindowsCeSchedulerPointerSnapshots())
@@ -1951,9 +1952,47 @@ static void DumpWindowsCeSchedulerDispatchRingSummary(TextWriter writer, Dreamca
         $"dispatch-ring-summary head={FormatOptionalUInt32(hasHead, head)} tail={FormatOptionalUInt32(hasTail, tail)} empty={FormatOptionalBool(hasHead && hasTail, head == tail)} priority-bytes={FormatPriorityBytes(hasPriorities, priorities)} masks={FormatMasks(hasMasks, masks)} selected-queue-head={FormatOptionalUInt32(hasSelectedQueueHead, selectedQueueHead)} selected-queue-state={FormatOptionalUInt32(hasSelectedQueueState, selectedQueueState)}"));
 }
 
+static void DumpWindowsCeSchedulerYieldHandoffSummary(TextWriter writer, DreamcastMemorySnapshot snapshot)
+{
+    writer.WriteLine("# yield handoff");
+    var hasYieldByte = TryReadSnapshotByte(snapshot, 0x8C13_1884u, out var yieldByte);
+    var hasCriticalByte = TryReadSnapshotByte(snapshot, 0x8C13_1885u, out var criticalByte);
+    var hasCurrentThread = TryReadSnapshotUInt32(snapshot, 0x8C13_1894u, out var currentThread);
+
+    uint threadFlags = 0;
+    uint workItem = 0;
+    uint savedReturn = 0;
+    uint savedSp = 0;
+    uint savedPr = 0;
+    uint savedSr = 0;
+    uint workItemFlags = 0;
+    uint resolvedObject = 0;
+    uint workItemReturnPc = 0;
+
+    var hasThreadFlags = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread, out threadFlags);
+    var hasWorkItem = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread + 0x34u, out workItem);
+    var hasSavedReturn = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread + 0x70u, out savedReturn);
+    var hasSavedSp = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread + 0xACu, out savedSp);
+    var hasSavedPr = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread + 0xB0u, out savedPr);
+    var hasSavedSr = currentThread != 0 && TryReadSnapshotUInt32(snapshot, currentThread + 0xB4u, out savedSr);
+
+    var hasWorkItemFlags = hasWorkItem && workItem != 0 && TryReadSnapshotUInt32(snapshot, workItem + 0x14u, out workItemFlags);
+    var hasResolvedObject = hasWorkItem && workItem != 0 && TryReadSnapshotUInt32(snapshot, workItem + 0x10u, out resolvedObject);
+    var hasWorkItemReturnPc = hasWorkItem && workItem != 0 && TryReadSnapshotUInt32(snapshot, workItem + 0x24u, out workItemReturnPc);
+
+    writer.WriteLine(string.Create(
+        CultureInfo.InvariantCulture,
+        $"yield-handoff-summary yield-byte={FormatOptionalByte(hasYieldByte, yieldByte)} critical-byte={FormatOptionalByte(hasCriticalByte, criticalByte)} current-thread={FormatOptionalUInt32(hasCurrentThread, currentThread)} thread-flags={FormatOptionalUInt32(hasThreadFlags, threadFlags)} work-item={FormatOptionalUInt32(hasWorkItem, workItem)} work-item-flags={FormatOptionalUInt32(hasWorkItemFlags, workItemFlags)} resolved-object={FormatOptionalUInt32(hasResolvedObject, resolvedObject)} work-item-return-pc={FormatOptionalUInt32(hasWorkItemReturnPc, workItemReturnPc)} saved-return={FormatOptionalUInt32(hasSavedReturn, savedReturn)} saved-sp={FormatOptionalUInt32(hasSavedSp, savedSp)} saved-pr={FormatOptionalUInt32(hasSavedPr, savedPr)} saved-sr={FormatOptionalUInt32(hasSavedSr, savedSr)}"));
+}
+
 static string FormatOptionalUInt32(bool available, uint value) =>
     available
         ? string.Create(CultureInfo.InvariantCulture, $"0x{value:X8}")
+        : "unavailable";
+
+static string FormatOptionalByte(bool available, byte value) =>
+    available
+        ? string.Create(CultureInfo.InvariantCulture, $"0x{value:X2}")
         : "unavailable";
 
 static string FormatOptionalBool(bool available, bool value) =>
