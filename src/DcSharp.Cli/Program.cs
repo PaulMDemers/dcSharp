@@ -1762,9 +1762,13 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_18A4u, "dispatch-table-slot1"),
     new(0x8C13_18A8u, "dispatch-table-slot2"),
     new(0x8C13_18ACu, "dispatch-table-slot3"),
+    new(0x8C13_19A0u, "scheduler-priority-mask0"),
+    new(0x8C13_19A4u, "scheduler-priority-mask1"),
+    new(0x8C13_19A8u, "scheduler-priority-mask2"),
+    new(0x8C13_19ACu, "scheduler-priority-mask3"),
     new(0x8C13_1AA0u, "scheduler-dispatch-entry"),
-    new(0x8C13_1AA4u, "scheduler-dispatch-state"),
-    new(0x8C13_1AA8u, "scheduler-dispatch-next"),
+    new(0x8C13_1AA4u, "scheduler-dispatch-ring-head"),
+    new(0x8C13_1AA8u, "scheduler-dispatch-ring-tail"),
     new(0x8C13_1B00u, "module-record-current"),
     new(0x8C13_1B04u, "module-record-size"),
     new(0x8C13_1B0Cu, "module-record-mask"),
@@ -1775,6 +1779,8 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_1B2Cu, "module-or-file-record-id"),
     new(0x8C13_1B30u, "module-record-metadata"),
     new(0x8C13_1B34u, "module-record-arena-base"),
+    new(0x8C13_1B40u, "scheduler-selected-queue-head"),
+    new(0x8C13_1B44u, "scheduler-selected-queue-state"),
     new(0x8C13_1D14u, "timer-wheel-max-delta"),
     new(0x8C13_1D4Cu, "callback-allocation-slot"),
     new(0x8C13_64B8u, "active-object-chain-head"),
@@ -1809,14 +1815,19 @@ static IReadOnlyList<WindowsCeSchedulerByteSnapshotField> WindowsCeSchedulerByte
     new(0x8C13_1884u, "scheduler-yield-request-byte"),
     new(0x8C13_1885u, "scheduler-critical-byte"),
     new(0x8C13_1886u, "scheduler-kdata-byte2"),
-    new(0x8C13_1887u, "scheduler-kdata-byte3")
+    new(0x8C13_1887u, "scheduler-kdata-byte3"),
+    new(0x8C13_1AACu, "scheduler-dispatch-ring-priority0"),
+    new(0x8C13_1AADu, "scheduler-dispatch-ring-priority1"),
+    new(0x8C13_1AAEu, "scheduler-dispatch-ring-priority2"),
+    new(0x8C13_1AAFu, "scheduler-dispatch-ring-priority3")
 ];
 
 static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
 [
     new(0x8C13_1880u, 0x8C13_18B0u),
+    new(0x8C13_19A0u, 0x8C13_19B0u),
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
-    new(0x8C13_1B00u, 0x8C13_1B38u),
+    new(0x8C13_1B00u, 0x8C13_1B48u),
     new(0x8C13_1D10u, 0x8C13_1D50u),
     new(0x8C13_64B0u, 0x8C13_6668u),
     new(0x8C13_7000u, 0x8C13_77FFu),

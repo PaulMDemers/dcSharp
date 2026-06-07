@@ -393,8 +393,10 @@ public class DcSharpCliMediaLoadingIntegrationTests
             var log = File.ReadAllText(logPath);
             Assert.Contains("# Windows CE scheduler snapshot", log);
             Assert.Contains("0x8C131894 current-thread-object value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C1319A0 scheduler-priority-mask0 value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131AA0 scheduler-dispatch-entry value=0x00000000 signed=0", log);
-            Assert.Contains("0x8C131AA4 scheduler-dispatch-state value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131AA4 scheduler-dispatch-ring-head value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131AA8 scheduler-dispatch-ring-tail value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B00 module-record-current value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B20 module-or-file-list-link value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B24 module-or-file-list-root value=0x00000000 signed=0", log);
@@ -407,6 +409,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("# byte fields", log);
             Assert.Contains("0x8C131884 scheduler-yield-request-byte value=0x00 signed=0", log);
             Assert.Contains("0x8C131885 scheduler-critical-byte value=0x00 signed=0", log);
+            Assert.Contains("0x8C131AAC scheduler-dispatch-ring-priority0 value=0x00 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
