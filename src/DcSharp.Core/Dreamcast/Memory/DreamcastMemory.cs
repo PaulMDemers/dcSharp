@@ -52,7 +52,9 @@ public sealed class DreamcastMemory
     private const uint PvrDmaLength = 0x005F_6804;
     private const uint PvrDmaStart = 0x005F_6808;
     private const uint PvrSyncStatus = 0x005F_810C;
-    private const uint PvrSyncStatusVBlank = 0x0000_0001;
+    private const uint PvrSyncStatusScanlineSample = 0x0000_0001;
+    private const uint PvrSyncStatusVBlank = 0x0000_2000;
+    private const uint PvrSyncStatusVBlankWindow = PvrSyncStatusScanlineSample | PvrSyncStatusVBlank;
     private const ulong PvrVBlankStatusTicks = 128;
     private const uint PvrTaInputBase = 0x1000_0000;
     private const uint PvrTaInputLimit = 0x1080_0000;
@@ -1892,7 +1894,7 @@ public sealed class DreamcastMemory
         {
             PvrId => PvrIdValue,
             PvrRevision => PvrRevisionValue,
-            PvrSyncStatus when pvrVBlankStatusTicksRemaining != 0 => externalRegisters.GetValueOrDefault(aligned) | PvrSyncStatusVBlank,
+            PvrSyncStatus when pvrVBlankStatusTicksRemaining != 0 => externalRegisters.GetValueOrDefault(aligned) | PvrSyncStatusVBlankWindow,
             _ => externalRegisters.GetValueOrDefault(aligned)
         };
 

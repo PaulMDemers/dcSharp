@@ -5,6 +5,7 @@ namespace DcSharp.Core.Execution;
 
 internal static class FirmwareStubs
 {
+    private const uint DefaultNoOpCallback = 0x8C00_0000;
     private const uint SyscallSysinfoVector = 0x8C00_00B0;
     private const uint SyscallFlashromVector = 0x8C00_00B8;
     private const uint SyscallGdromVector = 0x8C00_00BC;
@@ -211,6 +212,14 @@ internal static class FirmwareStubs
                 return true;
             }
 
+            if (state.Pc == DefaultNoOpCallback)
+            {
+                state.R[0] = 0;
+                state.Pc = state.Pr;
+                trace = $"firmware default callback hle ; pc=0x{state.Pc:X8}, r0=0x{state.R[0]:X8}";
+                return true;
+            }
+
             if (state.Pc != GdromHleStub)
             {
                 trace = string.Empty;
@@ -390,7 +399,8 @@ internal static class FirmwareStubs
         private uint SendCommand(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory)
         {
             var commandId = nextCommandId++;
-            var command = GdromQueuedCommand.Pending(state.R[4], state.R[5]);
+            var parameterWords = CaptureParameterWords(memory, state.R[5]);
+            var command = GdromQueuedCommand.Pending(state.R[4], state.R[5], parameterWords);
             commands[commandId] = command;
             memory.RecordGdromCommandActivity(
                 "send",
@@ -405,7 +415,7 @@ internal static class FirmwareStubs
                 command.Status1,
                 command.TransferredBytes,
                 command.AtaStatus,
-                "command queued");
+                $"command queued{FormatParameterWords(parameterWords)}");
             return commandId;
         }
 
@@ -417,7 +427,7 @@ internal static class FirmwareStubs
                 return 0;
             }
 
-            var executed = ExecuteCommand(pending.Value.Command!.Value, pending.Value.ParameterAddress ?? 0, memory);
+            var executed = ExecuteCommand(pending.Value, memory);
             commands[pending.Key] = executed;
             memory.RaiseGdromCommandStatus();
             memory.RecordGdromCommandActivity(
@@ -437,84 +447,85 @@ internal static class FirmwareStubs
             return 0;
         }
 
-        private static GdromQueuedCommand ExecuteCommand(uint command, uint parameters, DreamcastMemory memory)
+        private static GdromQueuedCommand ExecuteCommand(GdromQueuedCommand queued, DreamcastMemory memory)
         {
+            var command = queued.Command!.Value;
+            var parameters = queued.ParameterAddress ?? 0;
             if (command is GdromCommandPioRead or GdromCommandDmaRead)
             {
-                if (command == GdromCommandDmaRead)
-                {
-                    memory.ExecuteGdromDmaReadCommand(parameters);
-                }
-                else
-                {
-                    memory.ExecuteGdromPioReadCommand(parameters);
-                }
+                var sector = ReadParameterWord(queued, memory, 0);
+                var sectorCount = ReadParameterWord(queued, memory, 1);
+                var destination = ReadParameterWord(queued, memory, 2);
+                memory.ExecuteGdromReadCommand(parameters, sector, destination, sectorCount, raiseDmaComplete: command == GdromCommandDmaRead);
 
                 var read = memory.CreateGdromSnapshot().ReadCommands.LastOrDefault();
                 return read?.Success == true
-                    ? GdromQueuedCommand.Completed(command, parameters, 0, 0, read.BytesRead, 0)
-                    : GdromQueuedCommand.Failed(command, parameters, MapReadFailureStatus(read), 0, read?.BytesRead ?? 0, 0);
+                    ? GdromQueuedCommand.Completed(command, parameters, queued.ParameterWords, 0, 0, read.BytesRead, 0)
+                    : GdromQueuedCommand.Failed(command, parameters, queued.ParameterWords, MapReadFailureStatus(read), 0, read?.BytesRead ?? 0, 0);
             }
 
             if (command == GdromCommandGetToc2)
             {
-                return WriteToc2(parameters, memory);
+                return WriteToc2(queued, memory);
             }
 
             if (command == GdromCommandInit)
             {
-                return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
+                return GdromQueuedCommand.Completed(command, parameters, queued.ParameterWords, 0, 0, 0, 0);
             }
 
             if (command == GdromCommandGetVersion)
             {
-                WriteGetVersion(parameters, memory);
-                return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
+                WriteGetVersion(queued, memory);
+                return GdromQueuedCommand.Completed(command, parameters, queued.ParameterWords, 0, 0, 0, 0);
             }
 
             if (command is GdromCommandDmaReadStream or GdromCommandPioReadStream or GdromCommandDmaReadStreamEx or GdromCommandPioReadStreamEx)
             {
-                return StartStream(command, parameters, memory);
+                return StartStream(queued, memory);
             }
 
-            return GdromQueuedCommand.Completed(command, parameters, 0, 0, 0, 0);
+            return GdromQueuedCommand.Completed(command, parameters, queued.ParameterWords, 0, 0, 0, 0);
         }
 
-        private static GdromQueuedCommand StartStream(uint command, uint parameters, DreamcastMemory memory)
+        private static GdromQueuedCommand StartStream(GdromQueuedCommand queued, DreamcastMemory memory)
         {
+            var command = queued.Command!.Value;
+            var parameters = queued.ParameterAddress ?? 0;
             if (parameters == 0)
             {
-                return GdromQueuedCommand.Failed(command, parameters, 0, 0, 0, 0);
+                return GdromQueuedCommand.Failed(command, parameters, queued.ParameterWords, 0, 0, 0, 0);
             }
 
             var snapshot = memory.CreateGdromSnapshot();
             if (!snapshot.HasMedia)
             {
-                return GdromQueuedCommand.Failed(command, parameters, GdromNoDiscStatus, 0, 0, 0);
+                return GdromQueuedCommand.Failed(command, parameters, queued.ParameterWords, GdromNoDiscStatus, 0, 0, 0);
             }
 
-            var sector = memory.ReadUInt32(parameters);
-            var sectorCount = memory.ReadUInt32(parameters + 4);
-            return GdromQueuedCommand.Streaming(command, parameters, sector, sectorCount);
+            var sector = ReadParameterWord(queued, memory, 0);
+            var sectorCount = ReadParameterWord(queued, memory, 1);
+            return GdromQueuedCommand.Streaming(command, parameters, queued.ParameterWords, sector, sectorCount);
         }
 
         private static int MapReadFailureStatus(DreamcastGdromReadCommand? read) =>
             read?.Status == "no media image loaded" ? GdromNoDiscStatus : 0;
 
-        private static GdromQueuedCommand WriteToc2(uint parameters, DreamcastMemory memory)
+        private static GdromQueuedCommand WriteToc2(GdromQueuedCommand queued, DreamcastMemory memory)
         {
+            var parameters = queued.ParameterAddress ?? 0;
             var snapshot = memory.CreateGdromSnapshot();
-            var buffer = parameters == 0 ? 0 : memory.ReadUInt32(parameters + 4);
+            var buffer = parameters == 0 ? 0 : ReadParameterWord(queued, memory, 1);
             if (!snapshot.HasMedia)
             {
                 memory.RecordGdromTocCommand(parameters, buffer == 0 ? null : buffer, null, null, null, null, false, "no media image loaded");
-                return GdromQueuedCommand.Failed(GdromCommandGetToc2, parameters, GdromNoDiscStatus, 0, 0, 0);
+                return GdromQueuedCommand.Failed(GdromCommandGetToc2, parameters, queued.ParameterWords, GdromNoDiscStatus, 0, 0, 0);
             }
 
             if (buffer == 0)
             {
                 memory.RecordGdromTocCommand(parameters, null, null, null, null, null, false, "missing TOC buffer");
-                return GdromQueuedCommand.Failed(GdromCommandGetToc2, parameters, 0, 0, 0, 0);
+                return GdromQueuedCommand.Failed(GdromCommandGetToc2, parameters, queued.ParameterWords, 0, 0, 0, 0);
             }
 
             for (var i = 0; i < GdromTocWords; i++)
@@ -539,17 +550,18 @@ internal static class FirmwareStubs
             memory.WriteUInt32(buffer + 400, (uint)lastTrack << 16);
             memory.WriteUInt32(buffer + 404, PackTocEntry(0, leadoutFad));
             memory.RecordGdromTocCommand(parameters, buffer, firstTrack, lastTrack, dataTrackStartFad, leadoutFad, true, "TOC written");
-            return GdromQueuedCommand.Completed(GdromCommandGetToc2, parameters, 0, 0, 0, 0);
+            return GdromQueuedCommand.Completed(GdromCommandGetToc2, parameters, queued.ParameterWords, 0, 0, 0, 0);
         }
 
-        private static void WriteGetVersion(uint parameters, DreamcastMemory memory)
+        private static void WriteGetVersion(GdromQueuedCommand queued, DreamcastMemory memory)
         {
+            var parameters = queued.ParameterAddress ?? 0;
             if (parameters == 0)
             {
                 return;
             }
 
-            var buffer = memory.ReadUInt32(parameters);
+            var buffer = ReadParameterWord(queued, memory, 0);
             if (buffer == 0)
             {
                 return;
@@ -575,7 +587,7 @@ internal static class FirmwareStubs
             var removeAfterReport = false;
             if (!commands.TryGetValue(state.R[4], out var command))
             {
-                command = new GdromQueuedCommand(null, null, GdromNoActive, 0, 0, 0, 0);
+                command = new GdromQueuedCommand(null, null, null, GdromNoActive, 0, 0, 0, 0);
             }
             else
             {
@@ -806,6 +818,46 @@ internal static class FirmwareStubs
             }
         }
 
+        private static uint[]? CaptureParameterWords(DreamcastMemory memory, uint address)
+        {
+            if (address == 0)
+            {
+                return null;
+            }
+
+            var words = new uint[4];
+            for (var index = 0; index < words.Length; index++)
+            {
+                if (!memory.TryPeekUInt32(address + ((uint)index * 4), out words[index]))
+                {
+                    return null;
+                }
+            }
+
+            return words;
+        }
+
+        private static uint ReadParameterWord(GdromQueuedCommand command, DreamcastMemory memory, int index)
+        {
+            if (command.ParameterWords is { } words && (uint)index < (uint)words.Count)
+            {
+                return words[index];
+            }
+
+            var baseAddress = command.ParameterAddress ?? 0;
+            return baseAddress == 0 ? 0 : memory.ReadUInt32(baseAddress + ((uint)index * 4));
+        }
+
+        private static string FormatParameterWords(IReadOnlyList<uint>? words)
+        {
+            if (words is null || words.Count < 4)
+            {
+                return string.Empty;
+            }
+
+            return $" paramsWords=0x{words[0]:X8},0x{words[1]:X8},0x{words[2]:X8},0x{words[3]:X8}";
+        }
+
         private static string SystemCallMessage(uint function) =>
             function switch
             {
@@ -845,6 +897,7 @@ internal static class FirmwareStubs
         private sealed record GdromQueuedCommand(
             uint? Command,
             uint? ParameterAddress,
+            IReadOnlyList<uint>? ParameterWords,
             int Response,
             int Status0,
             int Status1,
@@ -854,17 +907,17 @@ internal static class FirmwareStubs
             uint? StreamRemainingSectors = null,
             uint LastTransferRemainingBytes = 0)
         {
-            public static GdromQueuedCommand Pending(uint command, uint parameters) =>
-                new(command, parameters, GdromProcessing, 0, 0, 0, 0);
+            public static GdromQueuedCommand Pending(uint command, uint parameters, IReadOnlyList<uint>? parameterWords) =>
+                new(command, parameters, parameterWords, GdromProcessing, 0, 0, 0, 0);
 
-            public static GdromQueuedCommand Completed(uint command, uint parameters, int status0, int status1, int transferredBytes, int ataStatus) =>
-                new(command, parameters, GdromCompleted, status0, status1, transferredBytes, ataStatus);
+            public static GdromQueuedCommand Completed(uint command, uint parameters, IReadOnlyList<uint>? parameterWords, int status0, int status1, int transferredBytes, int ataStatus) =>
+                new(command, parameters, parameterWords, GdromCompleted, status0, status1, transferredBytes, ataStatus);
 
-            public static GdromQueuedCommand Failed(uint command, uint parameters, int status0, int status1, int transferredBytes, int ataStatus) =>
-                new(command, parameters, GdromFailed, status0, status1, transferredBytes, ataStatus);
+            public static GdromQueuedCommand Failed(uint command, uint parameters, IReadOnlyList<uint>? parameterWords, int status0, int status1, int transferredBytes, int ataStatus) =>
+                new(command, parameters, parameterWords, GdromFailed, status0, status1, transferredBytes, ataStatus);
 
-            public static GdromQueuedCommand Streaming(uint command, uint parameters, uint sector, uint sectorCount) =>
-                new(command, parameters, GdromStreaming, 0, 0, 0, 0, sector, sectorCount);
+            public static GdromQueuedCommand Streaming(uint command, uint parameters, IReadOnlyList<uint>? parameterWords, uint sector, uint sectorCount) =>
+                new(command, parameters, parameterWords, GdromStreaming, 0, 0, 0, 0, sector, sectorCount);
         }
     }
 }

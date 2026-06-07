@@ -120,6 +120,20 @@ public class FirmwareStubsTests
         Assert.Equal("firmware system hle func=3 r4=0x00000003, r5=0x12345678, r6=0x00000000, r7=0x00000000, pr=0x8C012450 ; r0=0x00000000", trace);
     }
 
+    [Fact]
+    public void DefaultBiosCallbackReturnsToCaller()
+    {
+        var handler = FirmwareStubs.CreateTrapHandler();
+        var state = new Sh4State { Pc = 0x8C00_0000, Pr = 0x8C01_6708 };
+        state.R[0] = 0x1234_5678;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
+
+        Assert.Equal(0x8C01_6708u, state.Pc);
+        Assert.Equal(0u, state.R[0]);
+        Assert.Equal("firmware default callback hle ; pc=0x8C016708, r0=0x00000000", trace);
+    }
+
     [Theory]
     [InlineData(1, "System BIOS menu requested: function=1")]
     [InlineData(2, "System BIOS CD menu requested: function=2")]
@@ -529,6 +543,28 @@ public class FirmwareStubsTests
         Assert.Equal(0x0000_AFC8u, toc.DataTrackStartFad);
         Assert.Equal(0x0000_AFCBu, toc.LeadoutFad);
         Assert.Equal("TOC written", toc.Status);
+    }
+
+    [Fact]
+    public void GdromCommandUsesQueuedParameterSnapshot()
+    {
+        var memory = new DreamcastMemory(media: new RawSectorMediaImage(CreateMediaData(3), 2048));
+        const uint laterStackValue = DestinationAddress;
+        memory.WriteUInt32(ParameterAddress, 0);
+        memory.WriteUInt32(ParameterAddress + 4, TocAddress);
+        var handler = FirmwareStubs.CreateTrapHandler();
+
+        var commandId = SendGdromCommand(handler, memory, GdromCommandGetToc2, ParameterAddress);
+        memory.WriteUInt32(ParameterAddress + 4, laterStackValue);
+
+        Assert.Equal(0u, ExecGdromServer(handler, memory));
+        var response = CheckGdromCommand(handler, memory, commandId);
+        var toc = Assert.Single(memory.CreateGdromSnapshot().TocCommands);
+
+        Assert.Equal(GdromCompleted, response);
+        Assert.Equal(0x4000_AFC8u, memory.ReadUInt32(TocAddress + 8));
+        Assert.Equal(0u, memory.ReadUInt32(laterStackValue + 8));
+        Assert.Equal(TocAddress, toc.BufferAddress);
     }
 
     [Fact]

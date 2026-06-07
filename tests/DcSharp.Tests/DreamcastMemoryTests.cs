@@ -943,14 +943,17 @@ public class DreamcastMemoryTests
         var memory = new DreamcastMemory();
 
         Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x2000u);
 
         memory.RaiseVBlankBegin();
 
         Assert.NotEqual(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+        Assert.NotEqual(0u, memory.ReadUInt32(0xA05F_810C) & 0x2000u);
 
         memory.AdvanceHardware(128);
 
         Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x3FFu);
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_810C) & 0x2000u);
     }
 
     [Fact]
