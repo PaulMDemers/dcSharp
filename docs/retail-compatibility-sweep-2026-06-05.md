@@ -111,6 +111,8 @@ A no-poke producer trace narrows that descriptor diagnosis further: `0x8C01DD56-
 
 The region-matched synthetic branch has now been followed into its later steady state. With both `source +0x1C` and `source +0x0C=0x8C010000` poked before `0x8C017B7E`, Sega Rally reaches the context-switch/tick loop around `0x8C0123AE`, `0x8C0178EC`, `0x8C0179FC`, and `0x8C02DB24`. The final snapshot shows `current-thread-object=0x8CEEEE9C`, `kernel-tick-total` advancing, `scheduler-tail-state` advancing, wait-active set, empty timer-wheel slots, and no GD-ROM reads or TA work. The log now labels the transient dispatch/list words at `0x8C131AA0` and `0x8C131B20`, and suppresses `0x00C0C0C0` arena-fill objects that can otherwise resemble descriptors.
 
+A producer/consumer trace splits that state from the actual missing queue source. `0x8C131AA0=0x8C012296` is installed once during cached kernel table setup at `0xAC013456`; the steady scheduler loop instead repeatedly reads `0x8C131AA4` and `0x8C131AA8`, both still zero. `0x8C131B20=0x8C136410` is initialized as part of a larger module/region record at `0x8C131B00` by `0x8C0295D0-0x8C0295F2`, while the list root at `0x8C131B24` remains zero and is read by `0x8C022864`, `0x8C020370`, and `0x8C01E5FA`. The next trace should therefore look for the real writer to `0x8C131AA4/AA8` or `0x8C131B24`, not the setup-only vector entry at `0x8C131AA0`.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
@@ -120,6 +122,6 @@ The region-matched synthetic branch has now been followed into its later steady 
 
 ## Next Work
 
-1. Trace the real runnable/module state feeding Sega Rally's region-matched synthetic scheduler/tick loop; the controlled `+0x1C`/region pokes expose later gates but are not fixes.
+1. Trace the real writer that should populate Sega Rally's `0x8C131AA4/AA8` dispatch state or `0x8C131B24` module/list root; the controlled `+0x1C`/region pokes expose later gates but are not fixes.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.
