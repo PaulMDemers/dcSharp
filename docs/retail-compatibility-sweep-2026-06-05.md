@@ -107,6 +107,8 @@ A changed-only current-thread/object write trace confirms the final `0x0211` cur
 
 A one-shot `--memory-poke-pc` diagnostic now supports controlled branch experiments without patching emulator code. Forcing `0x8C1376DC` nonzero just before `0x8C017B7E` decodes the hidden constructor branch: it calls `0x8C017AC4`, receives `0x8CEEEE08`, stores that into `current-thread +0x48`, and zeroes fields at offsets `+0x00`, `+0x08`, and `+0x14` in the allocated object. The next parent path then passes the null test at `0x8C02343E-0x8C023442`, but compares region ids derived from source `+0x0C=0x02000000` and source `+0x20=0x8C011924`; after `shld #-25` those are `1` and `0x46`, so the parent takes `bf 0x8C023506` and returns to the scheduler. A second synthetic run that also forces source `+0x0C` to `0x8C010000` reaches a later scheduler loop and increases boot-binary writes from roughly 101 KiB to roughly 245 KiB in the short probe, but still records no GD-ROM reads or TA work. That makes the next real target the descriptor producer/loader semantics for the `0x02000000` low-virtual source field and the runnable/module state after the region-matched path, not a permanent forced nonzero `+0x1C` fix.
 
+A no-poke producer trace narrows that descriptor diagnosis further: `0x8C01DD56-0x8C01DD58` computes `source +0x0C` as `(source byte 0 + 1) << 25`, so `0x02000000` is a deliberate guest descriptor value rather than a host translation artifact. The same initializer writes literal `0x8C011924` to `source +0x20`, hard-zeroes `source +0x1C`, and later computes `source +0x38 = source +0x0C + source +0x18 = 0x8E010000`. `--wince-scheduler-log` now reports this descriptor summary directly, including the region mismatch, derived-base match, and null copy-source field.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
@@ -116,6 +118,6 @@ A one-shot `--memory-poke-pc` diagnostic now supports controlled branch experime
 
 ## Next Work
 
-1. Trace the producer and intended interpretation of Sega Rally's source descriptor fields `0x8C1376C0 +0x0C/+0x1C/+0x20`; the controlled `+0x1C` and region-matched pokes expose later gates but are not fixes.
+1. Trace the runnable/module state after Sega Rally's region-matched synthetic path; the real descriptor producer is now decoded, and the controlled `+0x1C`/region pokes expose later gates but are not fixes.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.

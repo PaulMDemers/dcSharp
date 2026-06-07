@@ -446,6 +446,45 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandDecodesWindowsCeDescriptorFields()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateWindowsCeSchedulerDescriptorBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "12",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("descriptor-region-check base-or-region=0x02000000 region=0x01 handler=0x8C011924 region=0x46 match=False", log);
+            Assert.Contains("descriptor-derived-base base-or-region=0x02000000 runtime-base=0x8C010000 expected=0x8E010000 recorded=0x8E010000 match=True", log);
+            Assert.Contains("descriptor-copy-source value=0x00000000 null=True", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandSeedsIpBinForCueInput()
     {
         var repoRoot = FindRepoRoot();
@@ -787,6 +826,30 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x09, 0x00
     ];
 
+    private static byte[] CreateWindowsCeSchedulerDescriptorBootBinary()
+    {
+        var data = new byte[0x50];
+        WriteUInt16LittleEndian(data, 0x00, 0xD10B); // mov.l @(0x0B,pc),r1 ; current-thread pointer slot
+        WriteUInt16LittleEndian(data, 0x02, 0xD20C); // mov.l @(0x0C,pc),r2 ; descriptor object
+        WriteUInt16LittleEndian(data, 0x04, 0x2122); // mov.l r2,@r1
+        WriteUInt16LittleEndian(data, 0x06, 0x6123); // mov r2,r1
+        WriteUInt16LittleEndian(data, 0x08, 0xD30B); // mov.l @(0x0B,pc),r3 ; base-or-region
+        WriteUInt16LittleEndian(data, 0x0A, 0x1133); // mov.l r3,@(0x3,r1)
+        WriteUInt16LittleEndian(data, 0x0C, 0xD30B); // mov.l @(0x0B,pc),r3 ; runtime base
+        WriteUInt16LittleEndian(data, 0x0E, 0x1136); // mov.l r3,@(0x6,r1)
+        WriteUInt16LittleEndian(data, 0x10, 0xD30B); // mov.l @(0x0B,pc),r3 ; handler
+        WriteUInt16LittleEndian(data, 0x12, 0x1138); // mov.l r3,@(0x8,r1)
+        WriteUInt16LittleEndian(data, 0x14, 0xD30B); // mov.l @(0x0B,pc),r3 ; derived base
+        WriteUInt16LittleEndian(data, 0x16, 0x113E); // mov.l r3,@(0xE,r1)
+        WriteUInt32LittleEndian(data, 0x30, 0x8C13_1894);
+        WriteUInt32LittleEndian(data, 0x34, 0x8C13_76C0);
+        WriteUInt32LittleEndian(data, 0x38, 0x0200_0000);
+        WriteUInt32LittleEndian(data, 0x3C, 0x8C01_0000);
+        WriteUInt32LittleEndian(data, 0x40, 0x8C01_1924);
+        WriteUInt32LittleEndian(data, 0x44, 0x8E01_0000);
+        return data;
+    }
+
     private static byte[] CreateUnmappedReadBootBinary() =>
     [
         0x01, 0xD1, // mov.l @(0x01,pc),r1
@@ -844,6 +907,12 @@ public class DcSharpCliMediaLoadingIntegrationTests
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), value);
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(destination.Slice(offset + 4, 4), value);
     }
+
+    private static void WriteUInt16LittleEndian(byte[] destination, int offset, ushort value) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(destination.AsSpan(offset, 2), value);
+
+    private static void WriteUInt32LittleEndian(byte[] destination, int offset, uint value) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination.AsSpan(offset, 4), value);
 
     private static string FindRepoRoot()
     {

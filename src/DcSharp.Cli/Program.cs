@@ -1913,6 +1913,7 @@ static void DumpWindowsCeSchedulerPointerSnapshot(
 
     writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{pointer.SourceAddress:X8} {pointer.Label} target=0x{target:X8} bytes=0x{pointer.ByteCount:X}"));
     DumpWindowsCeSchedulerObjectWords(writer, snapshot, target, pointer.ByteCount, "  ");
+    DumpWindowsCeSchedulerDescriptorSummary(writer, snapshot, target, "  ");
     DumpWindowsCeSchedulerNestedPointerSnapshots(writer, snapshot, pointer, target);
 }
 
@@ -1971,6 +1972,49 @@ static void DumpWindowsCeSchedulerNestedPointerSnapshots(
 
         writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  nested +0x{offset:X3} target=0x{nestedTarget:X8} bytes=0x80"));
         DumpWindowsCeSchedulerObjectWords(writer, snapshot, nestedTarget, 0x80u, "    ");
+        DumpWindowsCeSchedulerDescriptorSummary(writer, snapshot, nestedTarget, "    ");
+    }
+}
+
+static void DumpWindowsCeSchedulerDescriptorSummary(
+    TextWriter writer,
+    DreamcastMemorySnapshot snapshot,
+    uint target,
+    string indent)
+{
+    var hasBaseOrRegion = TryReadSnapshotUInt32(snapshot, target + 0x0Cu, out var baseOrRegion);
+    var hasRuntimeBase = TryReadSnapshotUInt32(snapshot, target + 0x18u, out var runtimeBase);
+    var hasCopySource = TryReadSnapshotUInt32(snapshot, target + 0x1Cu, out var copySource);
+    var hasHandler = TryReadSnapshotUInt32(snapshot, target + 0x20u, out var handler);
+    var hasDerivedBase = TryReadSnapshotUInt32(snapshot, target + 0x38u, out var derivedBase);
+    if (!hasBaseOrRegion || baseOrRegion == 0 || !hasRuntimeBase || runtimeBase == 0)
+    {
+        return;
+    }
+
+    if (hasBaseOrRegion && hasHandler && handler != 0)
+    {
+        var baseRegion = baseOrRegion >> 25;
+        var handlerRegion = handler >> 25;
+        writer.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"{indent}descriptor-region-check base-or-region=0x{baseOrRegion:X8} region=0x{baseRegion:X2} handler=0x{handler:X8} region=0x{handlerRegion:X2} match={baseRegion == handlerRegion}"));
+    }
+
+    if (hasBaseOrRegion && hasRuntimeBase)
+    {
+        var expectedDerivedBase = baseOrRegion + runtimeBase;
+        var derivedText = hasDerivedBase
+            ? $" recorded=0x{derivedBase:X8} match={derivedBase == expectedDerivedBase}"
+            : " recorded=unavailable";
+        writer.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"{indent}descriptor-derived-base base-or-region=0x{baseOrRegion:X8} runtime-base=0x{runtimeBase:X8} expected=0x{expectedDerivedBase:X8}{derivedText}"));
+    }
+
+    if (hasCopySource)
+    {
+        writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}descriptor-copy-source value=0x{copySource:X8} null={copySource == 0}"));
     }
 }
 
