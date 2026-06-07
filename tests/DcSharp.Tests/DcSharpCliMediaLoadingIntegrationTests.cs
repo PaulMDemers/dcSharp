@@ -404,6 +404,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1318A0 dispatch-table-slot0 value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1318A4 dispatch-table-slot1 value=0x00000000 signed=0", log);
+            Assert.Contains("# byte fields", log);
+            Assert.Contains("0x8C131884 scheduler-yield-request-byte value=0x00 signed=0", log);
+            Assert.Contains("0x8C131885 scheduler-critical-byte value=0x00 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
@@ -447,6 +450,47 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131894 current-thread-object target=0x8C1376C0 bytes=0x100", log);
             Assert.Contains("+0x01C wait-link-or-copy-source addr=0x8C1376DC value=0x00000000 signed=0", log);
             Assert.Contains("+0x048 metadata-or-thread-copy addr=0x8C137708 value=0x00000000 signed=0", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MediaBootSmokeCommandWritesWindowsCeSchedulerByteFlags()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateWindowsCeSchedulerByteFlagsBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "6",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("0x8C131884 kernel-data+0x1884 value=0x80000101 signed=-2147483391", log);
+            Assert.Contains("0x8C131884 scheduler-yield-request-byte value=0x01 signed=1", log);
+            Assert.Contains("0x8C131885 scheduler-critical-byte value=0x01 signed=1", log);
+            Assert.Contains("0x8C131886 scheduler-kdata-byte2 value=0x00 signed=0", log);
+            Assert.Contains("0x8C131887 scheduler-kdata-byte3 value=0x80 signed=-128", log);
         }
         finally
         {
@@ -913,6 +957,20 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x09, 0x00, // literal alignment
         0x94, 0x18, 0x13, 0x8C, // 0x8C131894
         0xC0, 0x76, 0x13, 0x8C, // 0x8C1376C0
+        0x09, 0x00,
+        0x09, 0x00
+    ];
+
+    private static byte[] CreateWindowsCeSchedulerByteFlagsBootBinary() =>
+    [
+        0x02, 0xD1, // mov.l @(0x02,pc),r1
+        0x03, 0xD2, // mov.l @(0x03,pc),r2
+        0x22, 0x21, // mov.l r2,@r1
+        0x05, 0xA0, // bra after literals
+        0x09, 0x00, // nop
+        0x09, 0x00, // literal alignment
+        0x84, 0x18, 0x13, 0x8C, // 0x8C131884
+        0x01, 0x01, 0x00, 0x80, // 0x80000101
         0x09, 0x00,
         0x09, 0x00
     ];

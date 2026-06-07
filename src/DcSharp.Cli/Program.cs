@@ -1804,6 +1804,14 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_6664u, "scheduler-tail-state")
 ];
 
+static IReadOnlyList<WindowsCeSchedulerByteSnapshotField> WindowsCeSchedulerByteSnapshotFields() =>
+[
+    new(0x8C13_1884u, "scheduler-yield-request-byte"),
+    new(0x8C13_1885u, "scheduler-critical-byte"),
+    new(0x8C13_1886u, "scheduler-kdata-byte2"),
+    new(0x8C13_1887u, "scheduler-kdata-byte3")
+];
+
 static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
 [
     new(0x8C13_1880u, 0x8C13_18B0u),
@@ -1880,6 +1888,19 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
         }
     }
 
+    writer.WriteLine("# byte fields");
+    foreach (var field in WindowsCeSchedulerByteSnapshotFields())
+    {
+        if (TryReadSnapshotByte(result.FinalMemorySnapshot, field.Address, out var value))
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{field.Address:X8} {field.Label} value=0x{value:X2} signed={(sbyte)value}"));
+        }
+        else
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x{field.Address:X8} {field.Label} value=unavailable"));
+        }
+    }
+
     writer.WriteLine("# pointer snapshots");
     foreach (var pointer in WindowsCeSchedulerPointerSnapshots())
     {
@@ -1887,6 +1908,24 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
     }
 
     DumpWindowsCeSchedulerActiveObjectChain(writer, result.FinalMemorySnapshot);
+}
+
+static bool TryReadSnapshotByte(DreamcastMemorySnapshot snapshot, uint address, out byte value)
+{
+    foreach (var range in snapshot.Ranges)
+    {
+        if (address < range.StartAddress
+            || address > range.CapturedEndAddress)
+        {
+            continue;
+        }
+
+        value = range.Bytes[(int)(address - range.StartAddress)];
+        return true;
+    }
+
+    value = 0;
+    return false;
 }
 
 static bool TryReadSnapshotUInt32(DreamcastMemorySnapshot snapshot, uint address, out uint value)
@@ -3338,6 +3377,8 @@ internal sealed record AddressRange(uint Start, uint End)
 }
 
 internal sealed record WindowsCeSchedulerSnapshotField(uint Address, string Label);
+
+internal sealed record WindowsCeSchedulerByteSnapshotField(uint Address, string Label);
 
 internal sealed record WindowsCeSchedulerPointerSnapshot(uint SourceAddress, string Label, uint ByteCount);
 
