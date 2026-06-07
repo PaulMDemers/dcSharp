@@ -1861,7 +1861,11 @@ static IReadOnlyList<WindowsCeSchedulerObjectKeyField> WindowsCeSchedulerObjectK
     new(0x058u, "metadata-tag"),
     new(0x05Cu, "mapped-entry-or-size"),
     new(0x060u, "mapped-base"),
-    new(0x064u, "mapped-size")
+    new(0x064u, "mapped-size"),
+    new(0x070u, "saved-wrapper-return"),
+    new(0x0ACu, "saved-wrapper-sp"),
+    new(0x0B0u, "saved-wrapper-pr"),
+    new(0x0B4u, "saved-wrapper-sr")
 ];
 
 static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)

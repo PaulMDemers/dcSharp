@@ -450,6 +450,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131894 current-thread-object target=0x8C1376C0 bytes=0x100", log);
             Assert.Contains("+0x01C wait-link-or-copy-source addr=0x8C1376DC value=0x00000000 signed=0", log);
             Assert.Contains("+0x048 metadata-or-thread-copy addr=0x8C137708 value=0x00000000 signed=0", log);
+            Assert.Contains("+0x070 saved-wrapper-return addr=0x8C137730 value=0x00000000 signed=0", log);
         }
         finally
         {
