@@ -113,6 +113,8 @@ The region-matched synthetic branch has now been followed into its later steady 
 
 A producer/consumer trace splits that state from the actual missing queue source. `0x8C131AA0=0x8C012296` is installed once during cached kernel table setup at `0xAC013456`; the steady scheduler loop instead repeatedly reads `0x8C131AA4` and `0x8C131AA8`, both still zero. `0x8C131B20=0x8C136410` is initialized as part of a larger module/region record at `0x8C131B00` by `0x8C0295D0-0x8C0295F2`. A real no-poke consumer trace shows the module/list root is not globally missing: `0x8C022F4C` writes `0x8C131B24=0x8CEEE5F4`, and `0x8C01E5FA` later walks that root through the live module object containing the mapped entrypoint metadata. The corrected frontier is therefore the real producer/meaning of `0x8C131AA4/AA8`, plus the reason the synthetic region-matched path reaches a later loop with the module root absent, not the setup-only vector entry at `0x8C131AA0`.
 
+The real-versus-synthetic module-root difference is now explained. In the real path, the object being prepared at `r8=0x8CEEE5F4` has `+0xB0=0x02010000`; `0x8C022EDC` loads that value, `0x8C022F08` takes the nonzero branch to `0x8C022F20`, and `0x8C022F4C` links the object into `0x8C131B24`. In the region-matched synthetic path, the forced descriptor changes produce a different object at `r8=0x8CEEE4E4` whose `+0xB0` remains zero; `0x8C022F06-0x8C022F14` exits through `0x8C023536`, then `0x8C023674` calls the cleanup/unlink helper at `0x8C020354`, so `0x8C131B24` is never populated. That makes the missing synthetic root a side effect of the diagnostic poke, not the primary compatibility gap.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
@@ -122,6 +124,6 @@ A producer/consumer trace splits that state from the actual missing queue source
 
 ## Next Work
 
-1. Trace the real writer or state machine that should populate Sega Rally's `0x8C131AA4/AA8` dispatch state, and compare the real module-root write at `0x8C022F4C` against the synthetic region-matched route where `0x8C131B24` ends absent; the controlled `+0x1C`/region pokes expose later gates but are not fixes.
+1. Trace the real writer or state machine that should populate Sega Rally's `0x8C131AA4/AA8` dispatch state; the controlled `+0x1C`/region pokes expose later gates but perturb module-object state and are not fixes.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.
