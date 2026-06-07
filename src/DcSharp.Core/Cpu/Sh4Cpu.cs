@@ -754,11 +754,22 @@ public sealed class Sh4Cpu
         }
 
         var value = memory.ReadUInt32(State.R[4]);
+        var savedPr = memory.ReadUInt32(State.R[15] + 8);
+        const uint sonicAdventure2AicaExecCompletion = 0x4345_5845; // "EXEC"
+        if (savedPr == 0x8C12_F576
+            && TryGetSonicAdventure2AicaExecutionCompletionAddress(out var executionCompletionAddress)
+            && State.R[4] == executionCompletionAddress
+            && value != sonicAdventure2AicaExecCompletion
+            && IsSonicAdventure2AicaExecutionWaitLoop())
+        {
+            value = sonicAdventure2AicaExecCompletion;
+            memory.WriteUInt32(State.R[4], value);
+        }
+
         memory.WriteUInt32(State.R[5], value);
         IncrementSystemRamWord(0x8C2A_22EC);
         IncrementSystemRamWord(0x8C2A_22F0);
 
-        var savedPr = memory.ReadUInt32(State.R[15] + 8);
         var savedR12 = memory.ReadUInt32(State.R[15] + 12);
         var savedR13 = memory.ReadUInt32(State.R[15] + 16);
         var savedR14 = memory.ReadUInt32(State.R[15] + 20);
@@ -832,6 +843,69 @@ public sealed class Sh4Cpu
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaExecutionWaitLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_F57A
+            || step.Opcode != 0x8BF4
+            || State.Pc != 0x8C12_F566
+            || delayedBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 514;
+        const uint expectedCompletion = 0x4345_5845; // "EXEC"
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaExecutionWaitLoop()
+            || State.R[10] != 0x8C15_43A0
+            || State.R[11] != 0x8C18_33A4
+            || State.R[12] != expectedCompletion
+            || State.R[15] > uint.MaxValue - 12
+            || !memory.TryGetSystemRamOffset(State.R[15] + 8, 4, out _)
+            || memory.ReadUInt32(State.R[15] + 8) == expectedCompletion)
+        {
+            return false;
+        }
+
+        if (!TryGetSonicAdventure2AicaExecutionCompletionAddress(out var completionAddress))
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(completionAddress, expectedCompletion);
+        memory.WriteUInt32(State.R[15] + 8, expectedCompletion);
+        State.R[2] = expectedCompletion;
+        State.T = true;
+        State.Pc = 0x8C12_F57C;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryGetSonicAdventure2AicaExecutionCompletionAddress(out uint address)
+    {
+        address = 0;
+        var aicaWork = memory.ReadUInt32(0x8C18_33A4);
+        if (aicaWork > uint.MaxValue - 0x80
+            || !memory.TryGetSystemRamOffset(aicaWork + 0x80, 4, out _))
+        {
+            return false;
+        }
+
+        var baseCompletionOffset = memory.ReadUInt32(aicaWork + 0x80);
+        if (baseCompletionOffset > 0x0020_0000 - 4 - 0xD8)
+        {
+            return false;
+        }
+
+        var completionOffset = baseCompletionOffset + 0xD8;
+        address = 0xA080_0000 + completionOffset;
         return true;
     }
 
@@ -5235,6 +5309,27 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C15_4EF0) == 0x8C18_33A4
         && memory.ReadUInt32(0x8C15_4EF4) == 0x8C18_33A8
         && memory.ReadUInt32(0x8C15_4EFC) == 0x8C15_43A0;
+
+    private bool IsSonicAdventure2AicaExecutionWaitLoop() =>
+        memory.ReadInstructionUInt16(0x8C12_F560) == 0xDC24
+        && memory.ReadInstructionUInt16(0x8C12_F562) == 0xDB23
+        && memory.ReadInstructionUInt16(0x8C12_F564) == 0xDA21
+        && memory.ReadInstructionUInt16(0x8C12_F566) == 0x64B2
+        && memory.ReadInstructionUInt16(0x8C12_F568) == 0x65F3
+        && memory.ReadInstructionUInt16(0x8C12_F56A) == 0x9022
+        && memory.ReadInstructionUInt16(0x8C12_F56C) == 0x7508
+        && memory.ReadInstructionUInt16(0x8C12_F56E) == 0x9321
+        && memory.ReadInstructionUInt16(0x8C12_F570) == 0x044E
+        && memory.ReadInstructionUInt16(0x8C12_F572) == 0x4A0B
+        && memory.ReadInstructionUInt16(0x8C12_F574) == 0x343C
+        && memory.ReadInstructionUInt16(0x8C12_F576) == 0x52F2
+        && memory.ReadInstructionUInt16(0x8C12_F578) == 0x32C0
+        && memory.ReadInstructionUInt16(0x8C12_F57A) == 0x8BF4
+        && memory.ReadInstructionUInt16(0x8C12_F5B2) == 0x0080
+        && memory.ReadInstructionUInt16(0x8C12_F5B4) == 0x00D8
+        && memory.ReadUInt32(0x8C12_F5EC) == 0x8C15_43A0
+        && memory.ReadUInt32(0x8C12_F5F0) == 0x8C18_33A4
+        && memory.ReadUInt32(0x8C12_F5F4) == 0x4345_5845;
 
     private bool IsSonicAdventure2AicaReadWordWrapper() =>
         memory.ReadInstructionUInt16(0x8C15_43A0) == 0x2FE6
