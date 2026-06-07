@@ -395,8 +395,12 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131894 current-thread-object value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131AA0 scheduler-dispatch-entry value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131AA4 scheduler-dispatch-state value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131B00 module-record-current value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B20 module-or-file-list-link value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B24 module-or-file-list-root value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131B28 module-or-file-region-base value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131B2C module-or-file-record-id value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131B30 module-record-metadata value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
