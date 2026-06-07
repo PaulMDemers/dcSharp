@@ -1758,8 +1758,10 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_188Cu, "kernel-tick-delta"),
     new(0x8C13_1894u, "current-thread-object"),
     new(0x8C13_1898u, "kernel-data+0x1898"),
+    new(0x8C13_1AA0u, "scheduler-dispatch-entry"),
     new(0x8C13_1AA4u, "scheduler-dispatch-state"),
     new(0x8C13_1AA8u, "scheduler-dispatch-next"),
+    new(0x8C13_1B20u, "module-or-file-list-link"),
     new(0x8C13_1B24u, "module-or-file-list-root"),
     new(0x8C13_1D14u, "timer-wheel-max-delta"),
     new(0x8C13_1D4Cu, "callback-allocation-slot"),
@@ -1987,7 +1989,10 @@ static void DumpWindowsCeSchedulerDescriptorSummary(
     var hasCopySource = TryReadSnapshotUInt32(snapshot, target + 0x1Cu, out var copySource);
     var hasHandler = TryReadSnapshotUInt32(snapshot, target + 0x20u, out var handler);
     var hasDerivedBase = TryReadSnapshotUInt32(snapshot, target + 0x38u, out var derivedBase);
-    if (!hasBaseOrRegion || baseOrRegion == 0 || !hasRuntimeBase || runtimeBase == 0)
+    if (!hasBaseOrRegion
+        || baseOrRegion == 0
+        || !hasRuntimeBase
+        || !IsLikelyWindowsCeDescriptorRuntimeBase(runtimeBase))
     {
         return;
     }
@@ -2017,6 +2022,10 @@ static void DumpWindowsCeSchedulerDescriptorSummary(
         writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}descriptor-copy-source value=0x{copySource:X8} null={copySource == 0}"));
     }
 }
+
+static bool IsLikelyWindowsCeDescriptorRuntimeBase(uint runtimeBase) =>
+    runtimeBase is >= 0x0100_0000u and < 0x0400_0000u
+    || runtimeBase is >= 0x8C00_0000u and < 0x9000_0000u;
 
 static StreamWriter CreateTextLog(string path)
 {

@@ -109,6 +109,8 @@ A one-shot `--memory-poke-pc` diagnostic now supports controlled branch experime
 
 A no-poke producer trace narrows that descriptor diagnosis further: `0x8C01DD56-0x8C01DD58` computes `source +0x0C` as `(source byte 0 + 1) << 25`, so `0x02000000` is a deliberate guest descriptor value rather than a host translation artifact. The same initializer writes literal `0x8C011924` to `source +0x20`, hard-zeroes `source +0x1C`, and later computes `source +0x38 = source +0x0C + source +0x18 = 0x8E010000`. `--wince-scheduler-log` now reports this descriptor summary directly, including the region mismatch, derived-base match, and null copy-source field.
 
+The region-matched synthetic branch has now been followed into its later steady state. With both `source +0x1C` and `source +0x0C=0x8C010000` poked before `0x8C017B7E`, Sega Rally reaches the context-switch/tick loop around `0x8C0123AE`, `0x8C0178EC`, `0x8C0179FC`, and `0x8C02DB24`. The final snapshot shows `current-thread-object=0x8CEEEE9C`, `kernel-tick-total` advancing, `scheduler-tail-state` advancing, wait-active set, empty timer-wheel slots, and no GD-ROM reads or TA work. The log now labels the transient dispatch/list words at `0x8C131AA0` and `0x8C131B20`, and suppresses `0x00C0C0C0` arena-fill objects that can otherwise resemble descriptors.
+
 ### Bootstrap/Firmware Frontiers
 
 - Sonic Adventure 2 jumps through a zero callback/table pointer to `0x8C000000`, which points at missing firmware initialization state or a callback-registration side effect.
@@ -118,6 +120,6 @@ A no-poke producer trace narrows that descriptor diagnosis further: `0x8C01DD56-
 
 ## Next Work
 
-1. Trace the runnable/module state after Sega Rally's region-matched synthetic path; the real descriptor producer is now decoded, and the controlled `+0x1C`/region pokes expose later gates but are not fixes.
+1. Trace the real runnable/module state feeding Sega Rally's region-matched synthetic scheduler/tick loop; the controlled `+0x1C`/region pokes expose later gates but are not fixes.
 2. Trace Sonic Adventure, Sonic Adventure 2, and Sonic Shuffle CUE around their zero-PC firmware/callback frontiers and compare GDI versus CUE work-area state.
 3. Re-run the full sweep after each fix and keep this report as the baseline.

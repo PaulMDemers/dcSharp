@@ -393,7 +393,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
             var log = File.ReadAllText(logPath);
             Assert.Contains("# Windows CE scheduler snapshot", log);
             Assert.Contains("0x8C131894 current-thread-object value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131AA0 scheduler-dispatch-entry value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131AA4 scheduler-dispatch-state value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C131B20 module-or-file-list-link value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B24 module-or-file-list-root value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
@@ -477,6 +479,48 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("descriptor-region-check base-or-region=0x02000000 region=0x01 handler=0x8C011924 region=0x46 match=False", log);
             Assert.Contains("descriptor-derived-base base-or-region=0x02000000 runtime-base=0x8C010000 expected=0x8E010000 recorded=0x8E010000 match=True", log);
             Assert.Contains("descriptor-copy-source value=0x00000000 null=True", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MediaBootSmokeCommandIgnoresFilledWindowsCeDescriptorLookalike()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(
+                bootPath,
+                CreateWindowsCeSchedulerDescriptorBootBinary(runtimeBase: 0x00C0_C0C0, handler: 0x00C0_C0C0, derivedBase: 0x00C0_C0C0));
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "12",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("+0x018 base-or-entry addr=0x8C1376D8 value=0x00C0C0C0 signed=12632256", log);
+            Assert.DoesNotContain("descriptor-region-check", log);
+            Assert.DoesNotContain("descriptor-derived-base", log);
+            Assert.DoesNotContain("descriptor-copy-source", log);
         }
         finally
         {
@@ -826,7 +870,11 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x09, 0x00
     ];
 
-    private static byte[] CreateWindowsCeSchedulerDescriptorBootBinary()
+    private static byte[] CreateWindowsCeSchedulerDescriptorBootBinary(
+        uint baseOrRegion = 0x0200_0000,
+        uint runtimeBase = 0x8C01_0000,
+        uint handler = 0x8C01_1924,
+        uint derivedBase = 0x8E01_0000)
     {
         var data = new byte[0x50];
         WriteUInt16LittleEndian(data, 0x00, 0xD10B); // mov.l @(0x0B,pc),r1 ; current-thread pointer slot
@@ -843,10 +891,10 @@ public class DcSharpCliMediaLoadingIntegrationTests
         WriteUInt16LittleEndian(data, 0x16, 0x113E); // mov.l r3,@(0xE,r1)
         WriteUInt32LittleEndian(data, 0x30, 0x8C13_1894);
         WriteUInt32LittleEndian(data, 0x34, 0x8C13_76C0);
-        WriteUInt32LittleEndian(data, 0x38, 0x0200_0000);
-        WriteUInt32LittleEndian(data, 0x3C, 0x8C01_0000);
-        WriteUInt32LittleEndian(data, 0x40, 0x8C01_1924);
-        WriteUInt32LittleEndian(data, 0x44, 0x8E01_0000);
+        WriteUInt32LittleEndian(data, 0x38, baseOrRegion);
+        WriteUInt32LittleEndian(data, 0x3C, runtimeBase);
+        WriteUInt32LittleEndian(data, 0x40, handler);
+        WriteUInt32LittleEndian(data, 0x44, derivedBase);
         return data;
     }
 
