@@ -1917,6 +1917,8 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
         }
     }
 
+    DumpWindowsCeSchedulerDispatchRingSummary(writer, result.FinalMemorySnapshot);
+
     writer.WriteLine("# pointer snapshots");
     foreach (var pointer in WindowsCeSchedulerPointerSnapshots())
     {
@@ -1924,6 +1926,59 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
     }
 
     DumpWindowsCeSchedulerActiveObjectChain(writer, result.FinalMemorySnapshot);
+}
+
+static void DumpWindowsCeSchedulerDispatchRingSummary(TextWriter writer, DreamcastMemorySnapshot snapshot)
+{
+    writer.WriteLine("# dispatch ring");
+    var hasHead = TryReadSnapshotUInt32(snapshot, 0x8C13_1AA4u, out var head);
+    var hasTail = TryReadSnapshotUInt32(snapshot, 0x8C13_1AA8u, out var tail);
+    var hasSelectedQueueHead = TryReadSnapshotUInt32(snapshot, 0x8C13_1B40u, out var selectedQueueHead);
+    var hasSelectedQueueState = TryReadSnapshotUInt32(snapshot, 0x8C13_1B44u, out var selectedQueueState);
+
+    var priorities = new byte[4];
+    var masks = new uint[4];
+    var hasPriorities = true;
+    var hasMasks = true;
+    for (var index = 0; index < 4; index++)
+    {
+        hasPriorities &= TryReadSnapshotByte(snapshot, 0x8C13_1AACu + (uint)index, out priorities[index]);
+        hasMasks &= TryReadSnapshotUInt32(snapshot, 0x8C13_19A0u + (uint)(index * 4), out masks[index]);
+    }
+
+    writer.WriteLine(string.Create(
+        CultureInfo.InvariantCulture,
+        $"dispatch-ring-summary head={FormatOptionalUInt32(hasHead, head)} tail={FormatOptionalUInt32(hasTail, tail)} empty={FormatOptionalBool(hasHead && hasTail, head == tail)} priority-bytes={FormatPriorityBytes(hasPriorities, priorities)} masks={FormatMasks(hasMasks, masks)} selected-queue-head={FormatOptionalUInt32(hasSelectedQueueHead, selectedQueueHead)} selected-queue-state={FormatOptionalUInt32(hasSelectedQueueState, selectedQueueState)}"));
+}
+
+static string FormatOptionalUInt32(bool available, uint value) =>
+    available
+        ? string.Create(CultureInfo.InvariantCulture, $"0x{value:X8}")
+        : "unavailable";
+
+static string FormatOptionalBool(bool available, bool value) =>
+    available
+        ? (value ? "True" : "False")
+        : "unavailable";
+
+static string FormatPriorityBytes(bool available, IReadOnlyList<byte> priorities)
+{
+    if (!available)
+    {
+        return "unavailable";
+    }
+
+    return string.Join(",", priorities.Select(priority => string.Create(CultureInfo.InvariantCulture, $"0x{priority:X2}")));
+}
+
+static string FormatMasks(bool available, IReadOnlyList<uint> masks)
+{
+    if (!available)
+    {
+        return "unavailable";
+    }
+
+    return string.Join(",", masks.Select(mask => string.Create(CultureInfo.InvariantCulture, $"0x{mask:X8}")));
 }
 
 static bool TryReadSnapshotByte(DreamcastMemorySnapshot snapshot, uint address, out byte value)

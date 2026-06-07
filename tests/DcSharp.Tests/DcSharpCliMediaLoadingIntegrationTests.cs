@@ -410,6 +410,8 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131884 scheduler-yield-request-byte value=0x00 signed=0", log);
             Assert.Contains("0x8C131885 scheduler-critical-byte value=0x00 signed=0", log);
             Assert.Contains("0x8C131AAC scheduler-dispatch-ring-priority0 value=0x00 signed=0", log);
+            Assert.Contains("# dispatch ring", log);
+            Assert.Contains("dispatch-ring-summary head=0x00000000 tail=0x00000000 empty=True priority-bytes=0x00,0x00,0x00,0x00 masks=0x00000000,0x00000000,0x00000000,0x00000000 selected-queue-head=0x00000000 selected-queue-state=0x00000000", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
