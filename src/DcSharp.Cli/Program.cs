@@ -1773,6 +1773,7 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_1B34u, "module-record-arena-base"),
     new(0x8C13_1D14u, "timer-wheel-max-delta"),
     new(0x8C13_1D4Cu, "callback-allocation-slot"),
+    new(0x8C13_64B8u, "active-object-chain-head"),
     new(0x8C13_64F4u, "scheduler-pending-tick-delta"),
     new(0x8C13_64FCu, "runqueue-or-thread-list-next"),
     new(0x8C13_6524u, "scheduler-wait-active-flag"),
@@ -1805,7 +1806,7 @@ static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
     new(0x8C13_1B00u, 0x8C13_1B38u),
     new(0x8C13_1D10u, 0x8C13_1D50u),
-    new(0x8C13_64F0u, 0x8C13_6668u),
+    new(0x8C13_64B0u, 0x8C13_6668u),
     new(0x8C13_7000u, 0x8C13_77FFu),
     new(0x8C13_8A60u, 0x8C13_8ADFu),
     new(0x8CEE_E000u, 0x8CEE_EFFFu),
@@ -1880,6 +1881,8 @@ static void DumpWindowsCeSchedulerLog(DreamcastRunResult result, string path)
     {
         DumpWindowsCeSchedulerPointerSnapshot(writer, result.FinalMemorySnapshot, pointer);
     }
+
+    DumpWindowsCeSchedulerActiveObjectChain(writer, result.FinalMemorySnapshot);
 }
 
 static bool TryReadSnapshotUInt32(DreamcastMemorySnapshot snapshot, uint address, out uint value)
@@ -1925,6 +1928,56 @@ static void DumpWindowsCeSchedulerPointerSnapshot(
     DumpWindowsCeSchedulerObjectWords(writer, snapshot, target, pointer.ByteCount, "  ");
     DumpWindowsCeSchedulerDescriptorSummary(writer, snapshot, target, "  ");
     DumpWindowsCeSchedulerNestedPointerSnapshots(writer, snapshot, pointer, target);
+}
+
+static void DumpWindowsCeSchedulerActiveObjectChain(TextWriter writer, DreamcastMemorySnapshot snapshot)
+{
+    const uint headAddress = 0x8C13_64B8u;
+    const uint nextOffset = 0x18u;
+    const int maxNodes = 16;
+
+    writer.WriteLine("# active object chain");
+    if (!TryReadSnapshotUInt32(snapshot, headAddress, out var node))
+    {
+        writer.WriteLine("0x8C1364B8 active-object-chain-head target=unavailable");
+        return;
+    }
+
+    if (node == 0)
+    {
+        writer.WriteLine("0x8C1364B8 active-object-chain-head target=0x00000000 (null)");
+        return;
+    }
+
+    writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"0x8C1364B8 active-object-chain-head target=0x{node:X8}"));
+    var visited = new HashSet<uint>();
+    for (var index = 0; index < maxNodes; index++)
+    {
+        if (!visited.Add(node))
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  [{index}] node=0x{node:X8} cycle=True"));
+            return;
+        }
+
+        if (!TryReadSnapshotUInt32(snapshot, node, out var linkOrOwner)
+            || !TryReadSnapshotUInt32(snapshot, node + nextOffset, out var next))
+        {
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  [{index}] node=0x{node:X8} unavailable=True"));
+            return;
+        }
+
+        writer.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"  [{index}] node=0x{node:X8} link-or-owner=0x{linkOrOwner:X8} next=0x{next:X8}"));
+        if (next == 0)
+        {
+            return;
+        }
+
+        node = next;
+    }
+
+    writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  truncated=True max-nodes={maxNodes} next=0x{node:X8}"));
 }
 
 static bool DumpWindowsCeSchedulerObjectWords(

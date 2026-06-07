@@ -403,6 +403,7 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131B30 module-record-metadata value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
             Assert.Contains("0x8C131B24 module-or-file-list-root target=0x00000000 (null)", log);
         }
@@ -483,6 +484,46 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("descriptor-region-check base-or-region=0x02000000 region=0x01 handler=0x8C011924 region=0x46 match=False", log);
             Assert.Contains("descriptor-derived-base base-or-region=0x02000000 runtime-base=0x8C010000 expected=0x8E010000 recorded=0x8E010000 match=True", log);
             Assert.Contains("descriptor-copy-source value=0x00000000 null=True", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void MediaBootSmokeCommandWritesWindowsCeActiveObjectChain()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateWindowsCeActiveObjectChainBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "13",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("# active object chain", log);
+            Assert.Contains("0x8C1364B8 active-object-chain-head target=0x8CEEE100", log);
+            Assert.Contains("[0] node=0x8CEEE100 link-or-owner=0x8C136380 next=0x8CEEE180", log);
+            Assert.Contains("[1] node=0x8CEEE180 link-or-owner=0x8C134980 next=0x00000000", log);
         }
         finally
         {
@@ -899,6 +940,30 @@ public class DcSharpCliMediaLoadingIntegrationTests
         WriteUInt32LittleEndian(data, 0x3C, runtimeBase);
         WriteUInt32LittleEndian(data, 0x40, handler);
         WriteUInt32LittleEndian(data, 0x44, derivedBase);
+        return data;
+    }
+
+    private static byte[] CreateWindowsCeActiveObjectChainBootBinary()
+    {
+        var data = new byte[0x44];
+        WriteUInt16LittleEndian(data, 0x00, 0xD10B); // mov.l @(0x0B,pc),r1 ; active chain head slot
+        WriteUInt16LittleEndian(data, 0x02, 0xD20C); // mov.l @(0x0C,pc),r2 ; first object
+        WriteUInt16LittleEndian(data, 0x04, 0x2122); // mov.l r2,@r1
+        WriteUInt16LittleEndian(data, 0x06, 0x6123); // mov r2,r1
+        WriteUInt16LittleEndian(data, 0x08, 0xD30B); // mov.l @(0x0B,pc),r3 ; first owner/link
+        WriteUInt16LittleEndian(data, 0x0A, 0x2132); // mov.l r3,@r1
+        WriteUInt16LittleEndian(data, 0x0C, 0xD30B); // mov.l @(0x0B,pc),r3 ; second object
+        WriteUInt16LittleEndian(data, 0x0E, 0x1136); // mov.l r3,@(0x6,r1)
+        WriteUInt16LittleEndian(data, 0x10, 0x6133); // mov r3,r1
+        WriteUInt16LittleEndian(data, 0x12, 0xD30B); // mov.l @(0x0B,pc),r3 ; second owner/link
+        WriteUInt16LittleEndian(data, 0x14, 0x2132); // mov.l r3,@r1
+        WriteUInt16LittleEndian(data, 0x16, 0xE300); // mov #0,r3
+        WriteUInt16LittleEndian(data, 0x18, 0x1136); // mov.l r3,@(0x6,r1)
+        WriteUInt32LittleEndian(data, 0x30, 0x8C13_64B8);
+        WriteUInt32LittleEndian(data, 0x34, 0x8CEE_E100);
+        WriteUInt32LittleEndian(data, 0x38, 0x8C13_6380);
+        WriteUInt32LittleEndian(data, 0x3C, 0x8CEE_E180);
+        WriteUInt32LittleEndian(data, 0x40, 0x8C13_4980);
         return data;
     }
 
