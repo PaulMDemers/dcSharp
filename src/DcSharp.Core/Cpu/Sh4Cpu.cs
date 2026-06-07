@@ -998,6 +998,150 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2PrsDecompressor(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C02_3E20
+            || step.Opcode != 0x2F96
+            || State.Pc != 0x8C02_3E22
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2PrsDecompressor()
+            || !memory.TryGetSystemRamOffset(State.R[4], 1, out _)
+            || !memory.TryGetSystemRamOffset(State.R[5], 1, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        const int maxCompressedBytes = 8 * 1024 * 1024;
+        const int maxOutputBytes = 8 * 1024 * 1024;
+        var sourceStart = State.R[4];
+        var source = sourceStart;
+        var destinationStart = State.R[5];
+        var destination = destinationStart;
+        var output = new List<byte>(4096);
+        var estimatedInstructions = 7UL;
+
+        if (!TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var control))
+        {
+            return false;
+        }
+
+        var controlBitsRemaining = 8;
+        while (true)
+        {
+            if (!TryReadSonicAdventure2PrsBit(ref source, sourceStart, maxCompressedBytes, ref control, ref controlBitsRemaining, ref estimatedInstructions, out var literal))
+            {
+                return false;
+            }
+
+            if (literal)
+            {
+                if (!TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var value)
+                    || !TryAppendSonicAdventure2PrsByte(output, maxOutputBytes, ref destination, value))
+                {
+                    return false;
+                }
+
+                estimatedInstructions += 4;
+                continue;
+            }
+
+            if (!TryReadSonicAdventure2PrsBit(ref source, sourceStart, maxCompressedBytes, ref control, ref controlBitsRemaining, ref estimatedInstructions, out var longReference))
+            {
+                return false;
+            }
+
+            int count;
+            int offset;
+            if (!longReference)
+            {
+                if (!TryReadSonicAdventure2PrsBit(ref source, sourceStart, maxCompressedBytes, ref control, ref controlBitsRemaining, ref estimatedInstructions, out var countHighBit)
+                    || !TryReadSonicAdventure2PrsBit(ref source, sourceStart, maxCompressedBytes, ref control, ref controlBitsRemaining, ref estimatedInstructions, out var countLowBit)
+                    || !TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var offsetByte))
+                {
+                    return false;
+                }
+
+                count = (countHighBit ? 2 : 0) + (countLowBit ? 1 : 0) + 2;
+                offset = unchecked((int)(0xFFFF_FF00u | offsetByte));
+                estimatedInstructions += 12;
+            }
+            else
+            {
+                if (!TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var tokenLow)
+                    || !TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var tokenHigh))
+                {
+                    return false;
+                }
+
+                var token = (ushort)(tokenLow | (tokenHigh << 8));
+                if (token == 0)
+                {
+                    estimatedInstructions += 12;
+                    break;
+                }
+
+                offset = unchecked((int)(((uint)token >> 3) | 0xFFFF_E000u));
+                count = tokenLow & 7;
+                if (count == 0)
+                {
+                    if (!TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out var extendedCount))
+                    {
+                        return false;
+                    }
+
+                    count = extendedCount + 1;
+                    estimatedInstructions += 22;
+                }
+                else
+                {
+                    count += 2;
+                    estimatedInstructions += 18;
+                }
+            }
+
+            if (!TryCopySonicAdventure2PrsReference(output, destinationStart, maxOutputBytes, ref destination, offset, count))
+            {
+                return false;
+            }
+
+            estimatedInstructions += (ulong)count * 5;
+        }
+
+        if (estimatedInstructions > maxInstructionsToSkip
+            || destinationStart > uint.MaxValue - (uint)output.Count
+            || !memory.TryGetSystemRamOffset(destinationStart, output.Count, out _))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < output.Count; index++)
+        {
+            memory.Write(destinationStart + (uint)index, [output[index]]);
+        }
+
+        skippedInstructions = estimatedInstructions;
+        State.R[0] = (uint)output.Count;
+        State.R[1] = 0;
+        State.R[2] = 0;
+        State.R[3] = destinationStart;
+        State.R[4] = source;
+        State.R[5] = destination;
+        State.R[15] += 4;
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardDoa2SystemRamClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -5138,6 +5282,176 @@ public sealed class Sh4Cpu
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2PrsDecompressor() =>
+        memory.ReadInstructionUInt16(0x8C02_3E20) == 0x2F96
+        && memory.ReadInstructionUInt16(0x8C02_3E22) == 0x2F86
+        && memory.ReadInstructionUInt16(0x8C02_3E24) == 0x9904
+        && memory.ReadInstructionUInt16(0x8C02_3E26) == 0x9804
+        && memory.ReadInstructionUInt16(0x8C02_3E28) == 0x6644
+        && memory.ReadInstructionUInt16(0x8C02_3E2A) == 0xE709
+        && memory.ReadInstructionUInt16(0x8C02_3E2C) == 0xA005
+        && memory.ReadInstructionUInt16(0x8C02_3E2E) == 0x6353
+        && memory.ReadInstructionUInt16(0x8C02_3E30) == 0xFF00
+        && memory.ReadInstructionUInt16(0x8C02_3E32) == 0xE000
+        && memory.ReadInstructionUInt16(0x8C02_3E34) == 0x6144
+        && memory.ReadInstructionUInt16(0x8C02_3E36) == 0x2510
+        && memory.ReadInstructionUInt16(0x8C02_3E38) == 0x7501
+        && memory.ReadInstructionUInt16(0x8C02_3E3A) == 0x4710
+        && memory.ReadInstructionUInt16(0x8C02_3E3C) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C02_3E3E) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E40) == 0x6644
+        && memory.ReadInstructionUInt16(0x8C02_3E42) == 0xE708
+        && memory.ReadInstructionUInt16(0x8C02_3E44) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E46) == 0x89F5
+        && memory.ReadInstructionUInt16(0x8C02_3E48) == 0x4710
+        && memory.ReadInstructionUInt16(0x8C02_3E4A) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C02_3E4C) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E4E) == 0x6644
+        && memory.ReadInstructionUInt16(0x8C02_3E50) == 0xE708
+        && memory.ReadInstructionUInt16(0x8C02_3E52) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E54) == 0x8919
+        && memory.ReadInstructionUInt16(0x8C02_3E56) == 0xE000
+        && memory.ReadInstructionUInt16(0x8C02_3E58) == 0x4710
+        && memory.ReadInstructionUInt16(0x8C02_3E5A) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C02_3E5C) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E5E) == 0x6644
+        && memory.ReadInstructionUInt16(0x8C02_3E60) == 0xE708
+        && memory.ReadInstructionUInt16(0x8C02_3E62) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E64) == 0x4024
+        && memory.ReadInstructionUInt16(0x8C02_3E66) == 0x4710
+        && memory.ReadInstructionUInt16(0x8C02_3E68) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C02_3E6A) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E6C) == 0x6644
+        && memory.ReadInstructionUInt16(0x8C02_3E6E) == 0xE708
+        && memory.ReadInstructionUInt16(0x8C02_3E70) == 0x4601
+        && memory.ReadInstructionUInt16(0x8C02_3E72) == 0x6244
+        && memory.ReadInstructionUInt16(0x8C02_3E74) == 0x4024
+        && memory.ReadInstructionUInt16(0x8C02_3E76) == 0x229B
+        && memory.ReadInstructionUInt16(0x8C02_3E78) == 0x7002
+        && memory.ReadInstructionUInt16(0x8C02_3E7A) == 0x325C
+        && memory.ReadInstructionUInt16(0x8C02_3E7C) == 0x6124
+        && memory.ReadInstructionUInt16(0x8C02_3E7E) == 0x4010
+        && memory.ReadInstructionUInt16(0x8C02_3E80) == 0x2510
+        && memory.ReadInstructionUInt16(0x8C02_3E82) == 0x8FFB
+        && memory.ReadInstructionUInt16(0x8C02_3E84) == 0x7501
+        && memory.ReadInstructionUInt16(0x8C02_3E86) == 0xAFD8
+        && memory.ReadInstructionUInt16(0x8C02_3E88) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C02_3E8A) == 0x6044
+        && memory.ReadInstructionUInt16(0x8C02_3E8C) == 0x6144
+        && memory.ReadInstructionUInt16(0x8C02_3E8E) == 0x620C
+        && memory.ReadInstructionUInt16(0x8C02_3E90) == 0x4118
+        && memory.ReadInstructionUInt16(0x8C02_3E92) == 0x221B
+        && memory.ReadInstructionUInt16(0x8C02_3E94) == 0x2228
+        && memory.ReadInstructionUInt16(0x8C02_3E96) == 0x890A
+        && memory.ReadInstructionUInt16(0x8C02_3E98) == 0x4209
+        && memory.ReadInstructionUInt16(0x8C02_3E9A) == 0x4201
+        && memory.ReadInstructionUInt16(0x8C02_3E9C) == 0xC907
+        && memory.ReadInstructionUInt16(0x8C02_3E9E) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C02_3EA0) == 0x8FEA
+        && memory.ReadInstructionUInt16(0x8C02_3EA2) == 0x228B
+        && memory.ReadInstructionUInt16(0x8C02_3EA4) == 0x6044
+        && memory.ReadInstructionUInt16(0x8C02_3EA6) == 0x325C
+        && memory.ReadInstructionUInt16(0x8C02_3EA8) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C02_3EAA) == 0xAFE7
+        && memory.ReadInstructionUInt16(0x8C02_3EAC) == 0x7001
+        && memory.ReadInstructionUInt16(0x8C02_3EAE) == 0x68F6
+        && memory.ReadInstructionUInt16(0x8C02_3EB0) == 0x69F6
+        && memory.ReadInstructionUInt16(0x8C02_3EB2) == 0x6053
+        && memory.ReadInstructionUInt16(0x8C02_3EB4) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C02_3EB6) == 0x3038;
+
+    private bool TryReadSonicAdventure2PrsByte(ref uint source, uint sourceStart, int maxCompressedBytes, out byte value)
+    {
+        value = 0;
+        if (source < sourceStart
+            || source - sourceStart >= maxCompressedBytes
+            || !memory.TryGetSystemRamOffset(source, 1, out _))
+        {
+            return false;
+        }
+
+        value = memory.ReadByte(source);
+        source++;
+        return true;
+    }
+
+    private bool TryReadSonicAdventure2PrsBit(
+        ref uint source,
+        uint sourceStart,
+        int maxCompressedBytes,
+        ref byte control,
+        ref int controlBitsRemaining,
+        ref ulong estimatedInstructions,
+        out bool bit)
+    {
+        bit = false;
+        if (controlBitsRemaining == 0)
+        {
+            if (!TryReadSonicAdventure2PrsByte(ref source, sourceStart, maxCompressedBytes, out control))
+            {
+                return false;
+            }
+
+            controlBitsRemaining = 8;
+            estimatedInstructions += 5;
+        }
+        else
+        {
+            estimatedInstructions += 3;
+        }
+
+        bit = (control & 1) != 0;
+        control >>= 1;
+        controlBitsRemaining--;
+        return true;
+    }
+
+    private static bool TryAppendSonicAdventure2PrsByte(List<byte> output, int maxOutputBytes, ref uint destination, byte value)
+    {
+        if (output.Count >= maxOutputBytes || destination == uint.MaxValue)
+        {
+            return false;
+        }
+
+        output.Add(value);
+        destination++;
+        return true;
+    }
+
+    private static bool TryCopySonicAdventure2PrsReference(
+        List<byte> output,
+        uint destinationStart,
+        int maxOutputBytes,
+        ref uint destination,
+        int offset,
+        int count)
+    {
+        if (count <= 0)
+        {
+            return false;
+        }
+
+        var copySource = unchecked(destination + (uint)offset);
+        if (copySource < destinationStart || copySource >= destination)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < count; index++)
+        {
+            var outputIndex = copySource - destinationStart;
+            if (outputIndex >= output.Count
+                || !TryAppendSonicAdventure2PrsByte(output, maxOutputBytes, ref destination, output[(int)outputIndex]))
+            {
+                return false;
+            }
+
+            copySource++;
+        }
+
         return true;
     }
 
