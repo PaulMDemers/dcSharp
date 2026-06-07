@@ -1846,6 +1846,7 @@ static IReadOnlyList<uint> WindowsCeSchedulerNestedPointerOffsets() =>
 
 static IReadOnlyList<WindowsCeSchedulerObjectKeyField> WindowsCeSchedulerObjectKeyFields() =>
 [
+    new(0x000u, "self-or-link"),
     new(0x00Cu, "link-or-source-a"),
     new(0x010u, "link-or-source-b"),
     new(0x014u, "state-or-flags"),
@@ -2082,8 +2083,38 @@ static void DumpWindowsCeSchedulerNestedPointerSnapshots(
 
         writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  nested +0x{offset:X3} target=0x{nestedTarget:X8} bytes=0x80"));
         DumpWindowsCeSchedulerObjectWords(writer, snapshot, nestedTarget, 0x80u, "    ");
+        DumpWindowsCeSchedulerWorkItemSummary(writer, snapshot, nestedTarget, "    ");
         DumpWindowsCeSchedulerDescriptorSummary(writer, snapshot, nestedTarget, "    ");
     }
+}
+
+static void DumpWindowsCeSchedulerWorkItemSummary(
+    TextWriter writer,
+    DreamcastMemorySnapshot snapshot,
+    uint target,
+    string indent)
+{
+    if (!TryReadSnapshotUInt32(snapshot, target + 0x10u, out var resolvedObject)
+        || !TryReadSnapshotUInt32(snapshot, target + 0x14u, out var flags)
+        || flags != 0x0001_0004u)
+    {
+        return;
+    }
+
+    TryReadSnapshotUInt32(snapshot, target, out var queueLink);
+    TryReadSnapshotUInt32(snapshot, target + 0x18u, out var threadObject);
+    TryReadSnapshotUInt32(snapshot, target + 0x24u, out var returnPc);
+    writer.WriteLine(string.Create(
+        CultureInfo.InvariantCulture,
+        $"{indent}work-item-summary queue-link=0x{queueLink:X8} resolved-object=0x{resolvedObject:X8} flags=0x{flags:X8} current-thread=0x{threadObject:X8} return-pc=0x{returnPc:X8}"));
+
+    if (resolvedObject == 0 || !TryReadSnapshotUInt32(snapshot, resolvedObject, out _))
+    {
+        return;
+    }
+
+    writer.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{indent}work-item-resolved-object target=0x{resolvedObject:X8} bytes=0x80"));
+    DumpWindowsCeSchedulerObjectWords(writer, snapshot, resolvedObject, 0x80u, indent + "  ");
 }
 
 static void DumpWindowsCeSchedulerDescriptorSummary(

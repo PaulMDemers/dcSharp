@@ -500,6 +500,46 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandSummarizesWindowsCeSchedulerWorkItem()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "0WINCEOS.BIN");
+        var logPath = Path.Combine(mediaDirectory, "scheduler.txt");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateWindowsCeSchedulerWorkItemBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "80",
+                "--trace-tail",
+                "0",
+                "--wince-scheduler-log",
+                logPath);
+
+            Assert.Equal(0, result.ExitCode);
+            var log = File.ReadAllText(logPath);
+            Assert.Contains("nested +0x034 target=0x8C137554 bytes=0x80", log);
+            Assert.Contains("work-item-summary queue-link=0x8CEEE44C resolved-object=0x8CEEE448 flags=0x00010004 current-thread=0x8CEEEE9C return-pc=0x8C018D94", log);
+            Assert.Contains("work-item-resolved-object target=0x8CEEE448 bytes=0x80", log);
+            Assert.Contains("+0x008 addr=0x8CEEE450 value=0x8C137554 signed=-1944881836", log);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandDecodesWindowsCeDescriptorFields()
     {
         var repoRoot = FindRepoRoot();
@@ -975,6 +1015,42 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x09, 0x00,
         0x09, 0x00
     ];
+
+    private static byte[] CreateWindowsCeSchedulerWorkItemBootBinary()
+    {
+        var stores = new (uint Address, uint Value)[]
+        {
+            (0x8C13_1894, 0x8CEE_EE9C),
+            (0x8CEE_EED0, 0x8C13_7554),
+            (0x8C13_7554, 0x8CEE_E44C),
+            (0x8C13_7564, 0x8CEE_E448),
+            (0x8C13_7568, 0x0001_0004),
+            (0x8C13_756C, 0x8CEE_EE9C),
+            (0x8C13_7578, 0x8C01_8D94),
+            (0x8CEE_E448, 0x0CEE_E49E),
+            (0x8CEE_E450, 0x8C13_7554)
+        };
+        var data = new byte[(stores.Length * 20) + 8];
+        for (var index = 0; index < stores.Length; index++)
+        {
+            var offset = index * 20;
+            WriteUInt16LittleEndian(data, offset + 0x00, 0xD102); // mov.l @(0x02,pc),r1
+            WriteUInt16LittleEndian(data, offset + 0x02, 0xD203); // mov.l @(0x03,pc),r2
+            WriteUInt16LittleEndian(data, offset + 0x04, 0x2122); // mov.l r2,@r1
+            WriteUInt16LittleEndian(data, offset + 0x06, 0xA005); // bra next store block
+            WriteUInt16LittleEndian(data, offset + 0x08, 0x0009); // nop
+            WriteUInt16LittleEndian(data, offset + 0x0A, 0x0009); // literal alignment
+            WriteUInt32LittleEndian(data, offset + 0x0C, stores[index].Address);
+            WriteUInt32LittleEndian(data, offset + 0x10, stores[index].Value);
+        }
+
+        for (var offset = stores.Length * 20; offset < data.Length; offset += 2)
+        {
+            WriteUInt16LittleEndian(data, offset, 0x0009);
+        }
+
+        return data;
+    }
 
     private static byte[] CreateWindowsCeSchedulerDescriptorBootBinary(
         uint baseOrRegion = 0x0200_0000,
