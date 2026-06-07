@@ -1758,6 +1758,10 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
     new(0x8C13_188Cu, "kernel-tick-delta"),
     new(0x8C13_1894u, "current-thread-object"),
     new(0x8C13_1898u, "kernel-data+0x1898"),
+    new(0x8C13_18A0u, "dispatch-table-slot0"),
+    new(0x8C13_18A4u, "dispatch-table-slot1"),
+    new(0x8C13_18A8u, "dispatch-table-slot2"),
+    new(0x8C13_18ACu, "dispatch-table-slot3"),
     new(0x8C13_1AA0u, "scheduler-dispatch-entry"),
     new(0x8C13_1AA4u, "scheduler-dispatch-state"),
     new(0x8C13_1AA8u, "scheduler-dispatch-next"),
@@ -1802,7 +1806,7 @@ static IReadOnlyList<WindowsCeSchedulerSnapshotField> WindowsCeSchedulerSnapshot
 
 static IReadOnlyList<AddressRange> WindowsCeSchedulerSnapshotRanges() =>
 [
-    new(0x8C13_1880u, 0x8C13_18A0u),
+    new(0x8C13_1880u, 0x8C13_18B0u),
     new(0x8C13_1AA0u, 0x8C13_1AB0u),
     new(0x8C13_1B00u, 0x8C13_1B38u),
     new(0x8C13_1D10u, 0x8C13_1D50u),

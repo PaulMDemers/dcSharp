@@ -402,6 +402,8 @@ public class DcSharpCliMediaLoadingIntegrationTests
             Assert.Contains("0x8C131B2C module-or-file-record-id value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131B30 module-record-metadata value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131D4C callback-allocation-slot value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C1318A0 dispatch-table-slot0 value=0x00000000 signed=0", log);
+            Assert.Contains("0x8C1318A4 dispatch-table-slot1 value=0x00000000 signed=0", log);
             Assert.Contains("0x8C136540 current-wait-delta value=0x00000000 signed=0", log);
             Assert.Contains("0x8C1364B8 active-object-chain-head value=0x00000000 signed=0", log);
             Assert.Contains("0x8C131894 current-thread-object target=0x00000000 (null)", log);
