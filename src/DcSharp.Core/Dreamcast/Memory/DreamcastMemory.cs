@@ -51,6 +51,12 @@ public sealed class DreamcastMemory
     private const uint PvrDmaState = 0x005F_6800;
     private const uint PvrDmaLength = 0x005F_6804;
     private const uint PvrDmaStart = 0x005F_6808;
+    private const uint G2AicaDmaAddress = 0x005F_7800;
+    private const uint G2AicaDmaRootAddress = 0x005F_7804;
+    private const uint G2AicaDmaLength = 0x005F_7808;
+    private const uint G2AicaDmaDirection = 0x005F_780C;
+    private const uint G2AicaDmaEnable = 0x005F_7814;
+    private const uint G2AicaDmaStart = 0x005F_7818;
     private const uint PvrSyncStatus = 0x005F_810C;
     private const uint PvrSyncStatusScanlineSample = 0x0000_0001;
     private const uint PvrSyncStatusVBlank = 0x0000_2000;
@@ -134,6 +140,7 @@ public sealed class DreamcastMemory
     private const ushort AsicEventMapleDma = 0x000C;
     private const ushort AsicEventGdromCommand = 0x0100;
     private const ushort AsicEventGdromDma = 0x000E;
+    private const ushort AsicEventG2Dma0 = 0x000F;
 
     private readonly byte[] systemRam = new byte[HardwareProfile.SystemRamBytes];
     private readonly byte[] biosVectorTable = new byte[BiosVectorTableBytes];
@@ -1873,7 +1880,7 @@ public sealed class DreamcastMemory
             _ => throw new MemoryMapException($"Unsupported external register read size: {size}")
         };
 
-        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, originalAddress, size, masked));
+        deviceAccesses.Add(new MemoryAccess(MemoryAccessKind.Read, originalAddress, size, masked, CurrentInstructionPc));
         LogPvrRegisterAccess(MemoryAccessKind.Read, originalAddress, externalAddress, size, masked);
         return masked;
     }
@@ -1936,6 +1943,14 @@ public sealed class DreamcastMemory
         if (aligned == PvrDmaStart && data.Length == 4 && (value & 1) != 0)
         {
             CompletePvrDma();
+        }
+
+        if (aligned == G2AicaDmaStart
+            && data.Length == 4
+            && (value & 1) != 0
+            && (externalRegisters.GetValueOrDefault(G2AicaDmaEnable) & 1) != 0)
+        {
+            CompleteG2AicaDma();
         }
     }
 
@@ -2008,6 +2023,61 @@ public sealed class DreamcastMemory
             p4Registers[Sh4DmaChannel2TransferCount] = 0;
             RaiseAsicEvent(AsicEventPvrDma);
         }
+    }
+
+    private void CompleteG2AicaDma()
+    {
+        var aicaAddress = externalRegisters.GetValueOrDefault(G2AicaDmaAddress);
+        var rootAddress = externalRegisters.GetValueOrDefault(G2AicaDmaRootAddress);
+        var lengthUnits = externalRegisters.GetValueOrDefault(G2AicaDmaLength) & 0x7FFF_FFFFu;
+        var byteCount = lengthUnits * 32u;
+        var direction = externalRegisters.GetValueOrDefault(G2AicaDmaDirection) & 1u;
+        var completed = byteCount == 0 || (direction == 0
+            ? TryCopySystemRamToAicaRam(rootAddress, aicaAddress, byteCount)
+            : TryCopyAicaRamToSystemRam(aicaAddress, rootAddress, byteCount));
+
+        externalRegisters[G2AicaDmaStart] = 0;
+        if (completed)
+        {
+            RaiseAsicEvent(AsicEventG2Dma0);
+        }
+    }
+
+    private bool TryCopySystemRamToAicaRam(uint source, uint destination, uint byteCount)
+    {
+        if (byteCount > int.MaxValue)
+        {
+            return false;
+        }
+
+        var length = (int)byteCount;
+        if (!TryGetSystemRamOffset(source, length, out var sourceOffset)
+            || !TryGetAicaRamOffset(destination, length, out var destinationOffset))
+        {
+            return false;
+        }
+
+        systemRam.AsSpan(sourceOffset, length).CopyTo(aicaRam.AsSpan(destinationOffset, length));
+        return true;
+    }
+
+    private bool TryCopyAicaRamToSystemRam(uint source, uint destination, uint byteCount)
+    {
+        if (byteCount > int.MaxValue)
+        {
+            return false;
+        }
+
+        var length = (int)byteCount;
+        if (!TryGetAicaRamOffset(source, length, out var sourceOffset)
+            || !TryGetSystemRamOffset(destination, length, out var destinationOffset))
+        {
+            return false;
+        }
+
+        aicaRam.AsSpan(sourceOffset, length).CopyTo(systemRam.AsSpan(destinationOffset, length));
+        RecordSystemRamWrite(destination, length);
+        return true;
     }
 
     private bool TryCopyPvrDma(uint source, uint destination, uint byteCount, out string status)

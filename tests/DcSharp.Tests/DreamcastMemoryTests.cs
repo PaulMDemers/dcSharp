@@ -830,6 +830,63 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void G2AicaDmaCopiesSystemRamToAicaRamAndRaisesEvent()
+    {
+        var memory = new DreamcastMemory();
+        for (uint offset = 0; offset < 32; offset += 4)
+        {
+            memory.WriteUInt32(0x8C01_0000 + offset, 0xA500_0000u + offset);
+        }
+
+        memory.WriteUInt32(0xA05F_6920, 1u << 15);
+        memory.WriteUInt32(0xA05F_7800, 0x0080_0040);
+        memory.WriteUInt32(0xA05F_7804, 0x0C01_0000);
+        memory.WriteUInt32(0xA05F_7808, 1);
+        memory.WriteUInt32(0xA05F_780C, 0);
+        memory.WriteUInt32(0xA05F_7814, 1);
+
+        memory.WriteUInt32(0xA05F_7818, 1);
+
+        for (uint offset = 0; offset < 32; offset += 4)
+        {
+            Assert.Equal(0xA500_0000u + offset, memory.ReadUInt32(0x0080_0040 + offset));
+        }
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_7818));
+        Assert.True(memory.TryGetPendingExternalInterrupt(out var eventCode, out var level));
+        Assert.Equal(0x0360u, eventCode);
+        Assert.Equal(11, level);
+        var registerA = Assert.Single(memory.CreateAsicSnapshot().EventRegisters, register => register.Name == "A");
+        Assert.Equal(1u << 15, registerA.Ack);
+        Assert.Equal(1u << 15, registerA.PendingIrqB);
+    }
+
+    [Fact]
+    public void G2AicaDmaCopiesAicaRamToSystemRam()
+    {
+        var memory = new DreamcastMemory();
+        for (uint offset = 0; offset < 32; offset += 4)
+        {
+            memory.WriteUInt32(0x0080_0100 + offset, 0x5A00_0000u + offset);
+        }
+
+        memory.WriteUInt32(0xA05F_7800, 0x0080_0100);
+        memory.WriteUInt32(0xA05F_7804, 0x0C02_0000);
+        memory.WriteUInt32(0xA05F_7808, 1);
+        memory.WriteUInt32(0xA05F_780C, 1);
+        memory.WriteUInt32(0xA05F_7814, 1);
+
+        memory.WriteUInt32(0xA05F_7818, 1);
+
+        for (uint offset = 0; offset < 32; offset += 4)
+        {
+            Assert.Equal(0x5A00_0000u + offset, memory.ReadUInt32(0x8C02_0000 + offset));
+        }
+
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_7818));
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();
