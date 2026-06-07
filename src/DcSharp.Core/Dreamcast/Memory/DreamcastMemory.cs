@@ -151,6 +151,7 @@ public sealed class DreamcastMemory
     private readonly List<MemoryAccess> deviceAccesses = [];
     private readonly List<MemoryAccess> watchedReads = [];
     private readonly List<MemoryAccess> watchedWrites = [];
+    private readonly HashSet<WatchedMemoryReadKey> watchedReadKeys = [];
     private readonly HashSet<WatchedMemoryWriteKey> watchedWriteKeys = [];
     private readonly List<DreamcastPvrRegisterAccess> pvrRegisterAccesses = [];
     private readonly List<DreamcastPvrDmaTransfer> pvrDmaTransfers = [];
@@ -2582,6 +2583,11 @@ public sealed class DreamcastMemory
             return;
         }
 
+        if (readWatch.Distinct && !watchedReadKeys.Add(new WatchedMemoryReadKey(address, size, value, CurrentInstructionPc, CurrentInstructionOpcode)))
+        {
+            return;
+        }
+
         watchedReads.Add(new MemoryAccess(MemoryAccessKind.Read, address, size, value, CurrentInstructionPc, CurrentInstructionOpcode));
     }
 
@@ -3251,6 +3257,8 @@ public sealed record MemoryAccess(MemoryAccessKind Kind, uint Address, int Size,
 
 internal readonly record struct WatchedMemoryWriteKey(uint Address, int Size, uint Value, uint? Pc, ushort? Opcode);
 
+internal readonly record struct WatchedMemoryReadKey(uint Address, int Size, uint Value, uint? Pc, ushort? Opcode);
+
 public sealed record DreamcastMemoryWriteWatch(
     uint StartAddress = 0,
     uint EndAddress = uint.MaxValue,
@@ -3290,7 +3298,8 @@ public sealed record DreamcastMemoryReadWatch(
     IReadOnlyList<DreamcastMemoryAddressRange>? Ranges = null,
     uint? StartPc = null,
     uint? EndPc = null,
-    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null)
+    IReadOnlyList<DreamcastMemoryAddressRange>? PcRanges = null,
+    bool Distinct = false)
 {
     public bool ShouldRecord(uint address, int length, uint? pc)
     {
