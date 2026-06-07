@@ -24,8 +24,8 @@ Latest Sonic Adventure 2 audio/G2 progress:
 
 - G2 DMA channel 0 now models the AICA DMA registers at `0xA05F7800/04/08/0C/14/18`, copies between system RAM and AICA RAM, clears the start bit, and raises ASIC event `0x000f`.
 - The former `0xA05F7818` busy-poll now reads clear, moving a 100M run into SA2's AICA/G2 PIO helpers instead of stopping at `0x8C153CEE`.
-- Narrow SA2 fast-forwards now cover the exact VRAM clear loop, the AICA PIO read-word helper, the AICA status wait that depends on unimplemented AICA ARM-side command completion, and the AICA PIO write loop used to upload sound-driver data.
-- A 300M SA2 probe reaches `PC=0x8C170AC6`, with 45 GD-ROM reads and no TA writes yet. The top profile is now repeated AICA status/read traffic around `0x8C1356D8`, `0x8C1543A0`, and `0x8C12F56x`; the next work is to replace the compatibility shims with a more general AICA ARM/audio-driver handshake model or chase the next renderer gate once that traffic collapses.
+- Narrow SA2 fast-forwards now cover the exact VRAM clear loop, the AICA PIO read-word helper, the AICA status wait that depends on unimplemented AICA ARM-side command completion, the AICA PIO write loop used to upload sound-driver data, one-shot external/modem G2 read probes, and the `0x8C1543A0` AICA word-read wrapper.
+- A 300M SA2 probe reaches the same G2/AICA startup region around `0x8C170ABA`, with 45 GD-ROM reads and no TA writes yet. The AICA word-read wrapper skip raises CPU fast-forward coverage to roughly 263.6M instructions and removes `0x8C1356D8` from the top profile; the remaining top cluster is repeated AICA status/read traffic around `0x8C12F56x` and `0x8C1543A0`. The next work is to replace the compatibility shims with a more general AICA ARM/audio-driver handshake model or chase the next renderer gate once that traffic collapses.
 
 ## Work Plan
 
