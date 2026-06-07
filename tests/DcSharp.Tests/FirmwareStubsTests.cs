@@ -175,7 +175,7 @@ public class FirmwareStubsTests
     }
 
     [Fact]
-    public void WindowsCeCurProcUnusedMethodDecodesByName()
+    public void WindowsCeSetProcPermissionsReturnsPreviousPermissions()
     {
         var handler = FirmwareStubs.CreateTrapHandler();
         var state = new Sh4State { Pc = 0xFFFF_F9F9, Pr = 0x01E3_24F6 };
@@ -186,12 +186,22 @@ public class FirmwareStubsTests
         Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
 
         Assert.Equal(0x01E3_24F6u, state.Pc);
-        Assert.Equal(0u, state.R[0]);
-        Assert.Equal("firmware wince hle CURPROC.Unused4 address=0xFFFFF9F9 r4=0x00000042, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x00000000, pc=0x01E324F6", trace);
+        Assert.Equal(0xFFFF_FFFFu, state.R[0]);
+        Assert.Equal("firmware wince hle CURPROC.SetProcPermissions address=0xFFFFF9F9 permissions=0x00000042, previous=0xFFFFFFFF, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0xFFFFFFFF, pc=0x01E324F6", trace);
+
+        state.Pc = 0xFFFF_F9F9;
+        state.Pr = 0x01E3_2500;
+        state.R[4] = 0xFFFF_FFFF;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out trace));
+
+        Assert.Equal(0x01E3_2500u, state.Pc);
+        Assert.Equal(0x42u, state.R[0]);
+        Assert.Equal("firmware wince hle CURPROC.SetProcPermissions address=0xFFFFF9F9 permissions=0xFFFFFFFF, previous=0x00000042, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x00000042, pc=0x01E32500", trace);
     }
 
     [Fact]
-    public void WindowsCeWin32CreateCritDecodesByName()
+    public void WindowsCeWin32CreateCritReturnsStableHandle()
     {
         var handler = FirmwareStubs.CreateTrapHandler();
         var state = new Sh4State { Pc = 0xFFFF_FD65, Pr = 0x01E3_8A3E };
@@ -202,8 +212,16 @@ public class FirmwareStubsTests
         Assert.True(handler.TryHandle(state, new DreamcastMemory(), out var trace));
 
         Assert.Equal(0x01E3_8A3Eu, state.Pc);
-        Assert.Equal(0u, state.R[0]);
-        Assert.Equal("firmware wince hle WIN32.CreateCrit address=0xFFFFFD65 r4=0x01E4C0C0, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x00000000, pc=0x01E38A3E", trace);
+        Assert.Equal(0x0CEE_C100u, state.R[0]);
+        Assert.Equal("firmware wince hle WIN32.CreateCrit address=0xFFFFFD65 criticalSection=0x01E4C0C0, handle=0x0CEEC100, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x0CEEC100, pc=0x01E38A3E", trace);
+
+        state.Pc = 0xFFFF_FD65;
+        state.R[0] = 0;
+
+        Assert.True(handler.TryHandle(state, new DreamcastMemory(), out trace));
+
+        Assert.Equal(0x0CEE_C100u, state.R[0]);
+        Assert.Equal("firmware wince hle WIN32.CreateCrit address=0xFFFFFD65 criticalSection=0x01E4C0C0, handle=0x0CEEC100, r5=0x00000001, r6=0x00000000, r7=0x8CEEE5F4 ; r0=0x0CEEC100, pc=0x01E38A3E", trace);
     }
 
     [Fact]

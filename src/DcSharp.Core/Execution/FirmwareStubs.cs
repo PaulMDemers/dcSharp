@@ -121,7 +121,10 @@ internal static class FirmwareStubs
         private const uint WindowsCeFirstMethod = 0xFFFF_FE01;
         private const uint WindowsCeApiCallScale = 2;
         private const uint WindowsCeWin32ApiId = 0;
+        private const uint WindowsCeCurProcApiId = 2;
+        private const uint WindowsCeCreateCritMethod = 0x4E;
         private const uint WindowsCePerformCallBackMethod = 0x71;
+        private const uint WindowsCeSetProcPermissionsMethod = 4;
         private const int GdromTocWords = 102;
         private const int GdromFailed = -1;
         private const int GdromNoActive = 0;
@@ -140,6 +143,9 @@ internal static class FirmwareStubs
         private uint dmaCallbackParameter;
         private uint pioCallback;
         private uint pioCallbackParameter;
+        private uint windowsCeProcessPermissions = 0xFFFF_FFFF;
+        private uint nextWindowsCeCriticalSectionHandle = 0x0CEE_C100;
+        private readonly Dictionary<uint, uint> windowsCeCriticalSectionHandles = [];
 
         public FirmwareTrapHandler(
             uint softResetEntryPoint = DefaultSoftResetEntryPoint,
@@ -230,7 +236,7 @@ internal static class FirmwareStubs
             return true;
         }
 
-        private static bool TryHandleWindowsCeSyscall(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
+        private bool TryHandleWindowsCeSyscall(DcSharp.Core.Cpu.Sh4State state, DreamcastMemory memory, out string trace)
         {
             var address = state.Pc;
             if ((address & 1) == 0 || address > WindowsCeFirstMethod || (address & 0xFFFF_0000) != 0xFFFF_0000)
@@ -252,6 +258,33 @@ internal static class FirmwareStubs
                 state.R[4] = arg0;
                 state.Pc = pfn;
                 trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} callback=0x{callbackInfo:X8}, hproc=0x{hProc:X8}, pfn=0x{pfn:X8}, arg0=0x{arg0:X8}, r5=0x{r5:X8}, r6=0x{r6:X8}, r7=0x{r7:X8} ; pc=0x{state.Pc:X8}, pr=0x{state.Pr:X8}";
+                return true;
+            }
+
+            if (apiId == WindowsCeWin32ApiId && methodId == WindowsCeCreateCritMethod)
+            {
+                var criticalSection = state.R[4];
+                if (!windowsCeCriticalSectionHandles.TryGetValue(criticalSection, out var handle))
+                {
+                    handle = nextWindowsCeCriticalSectionHandle;
+                    nextWindowsCeCriticalSectionHandle += 4;
+                    windowsCeCriticalSectionHandles.Add(criticalSection, handle);
+                }
+
+                state.R[0] = handle;
+                state.Pc = state.Pr;
+                trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} criticalSection=0x{criticalSection:X8}, handle=0x{handle:X8}, r5=0x{state.R[5]:X8}, r6=0x{state.R[6]:X8}, r7=0x{state.R[7]:X8} ; r0=0x{state.R[0]:X8}, pc=0x{state.Pc:X8}";
+                return true;
+            }
+
+            if (apiId == WindowsCeCurProcApiId && methodId == WindowsCeSetProcPermissionsMethod)
+            {
+                var requestedPermissions = state.R[4];
+                var previousPermissions = windowsCeProcessPermissions;
+                windowsCeProcessPermissions = requestedPermissions;
+                state.R[0] = previousPermissions;
+                state.Pc = state.Pr;
+                trace = $"firmware wince hle {apiName}.{methodName} address=0x{address:X8} permissions=0x{requestedPermissions:X8}, previous=0x{previousPermissions:X8}, r5=0x{state.R[5]:X8}, r6=0x{state.R[6]:X8}, r7=0x{state.R[7]:X8} ; r0=0x{state.R[0]:X8}, pc=0x{state.Pc:X8}";
                 return true;
             }
 
@@ -309,7 +342,7 @@ internal static class FirmwareStubs
                 WindowsCeWin32ApiId => methodId switch
                 {
                     13 => "GetTickCount",
-                    78 => "CreateCrit",
+                    WindowsCeCreateCritMethod => "CreateCrit",
                     82 => "Sleep",
                     95 => "GetLastError",
                     113 => "PerformCallBack",
@@ -317,12 +350,12 @@ internal static class FirmwareStubs
                     127 => "QueryPerformanceFrequency",
                     _ => $"Method{methodId}"
                 },
-                2 => methodId switch
+                WindowsCeCurProcApiId => methodId switch
                 {
                     0 => "ProcCloseHandle",
                     2 => "ProcTerminate",
                     3 => "ProcGetCode",
-                    4 => "Unused4",
+                    4 => "SetProcPermissions",
                     5 => "ProcFlushICache",
                     6 => "ProcReadMemory",
                     7 => "ProcWriteMemory",
