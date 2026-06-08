@@ -2148,6 +2148,96 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2EmptyPointerTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5CDC
+            || step.Opcode != 0x8902
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C13_5CE4
+            || delayedBranchTarget is not null
+            || immediateBranchTarget != 0x8C13_5CE4
+            || State.R[3] != 0)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2EmptyPointerTableScan())
+        {
+            return false;
+        }
+
+        var current = State.R[14];
+        var end = State.R[11];
+        if (current >= end
+            || State.R[13] != current
+            || ((end - current) & 3) != 0)
+        {
+            return false;
+        }
+
+        var remainingEntries = (end - current) / 4;
+        var skippedInstructionCount = ((ulong)remainingEntries * 7) + 5;
+        var bytesToScan = checked((int)remainingEntries * 4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(current, bytesToScan, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 20, out _))
+        {
+            return false;
+        }
+
+        for (var index = 0u; index < remainingEntries; index++)
+        {
+            if (memory.ReadUInt32(current + (index * 4)) != 0)
+            {
+                return false;
+            }
+        }
+
+        var savedPr = memory.ReadUInt32(State.R[15]);
+        var savedR11 = memory.ReadUInt32(State.R[15] + 4);
+        var savedR12 = memory.ReadUInt32(State.R[15] + 8);
+        var savedR13 = memory.ReadUInt32(State.R[15] + 12);
+        var savedR14 = memory.ReadUInt32(State.R[15] + 16);
+
+        State.Pr = savedPr;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] += 20;
+        State.T = true;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2EmptyPointerTableScan()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_5CD8) == 0x63E2
+            && memory.ReadInstructionUInt16(0x8C13_5CDA) == 0x2338
+            && memory.ReadInstructionUInt16(0x8C13_5CDC) == 0x8902
+            && memory.ReadInstructionUInt16(0x8C13_5CE4) == 0x7E04
+            && memory.ReadInstructionUInt16(0x8C13_5CE6) == 0x3EB2
+            && memory.ReadInstructionUInt16(0x8C13_5CE8) == 0x8FF6
+            && memory.ReadInstructionUInt16(0x8C13_5CEA) == 0x7D04
+            && memory.ReadInstructionUInt16(0x8C13_5CEC) == 0xA006
+            && memory.ReadInstructionUInt16(0x8C13_5CEE) == 0x0009
+            && memory.ReadInstructionUInt16(0x8C13_5CFC) == 0x4F26
+            && memory.ReadInstructionUInt16(0x8C13_5CFE) == 0x6BF6
+            && memory.ReadInstructionUInt16(0x8C13_5D00) == 0x6CF6
+            && memory.ReadInstructionUInt16(0x8C13_5D02) == 0x6DF6
+            && memory.ReadInstructionUInt16(0x8C13_5D04) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C13_5D06) == 0x6EF6
+            && memory.ReadUInt16(0x8C13_5D18) == 0x0080
+            && memory.ReadUInt32(0x8C13_5D30) == 0x8C29_BECC
+            && memory.ReadUInt32(0x8C13_5D34) == 0x8C29_BC28
+            && memory.ReadUInt32(0x8C13_5D38) == 0x8C29_B95C;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioWriteLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
