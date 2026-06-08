@@ -1700,6 +1700,57 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2ByteFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0C_1738
+            || step.Opcode != 0x8FFB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget != 0x8C0C_1732
+            || State.Pc != 0x8C0C_173A)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2ByteFillLoop()
+            || State.R[7] >= State.R[6]
+            || State.R[0] == uint.MaxValue)
+        {
+            return false;
+        }
+
+        var remainingBytes = State.R[6] - State.R[7];
+        var remainingStart = State.R[0] + 1;
+        var skippedInstructionCount = 1UL + ((ulong)remainingBytes * 5);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || remainingBytes > int.MaxValue
+            || remainingStart > uint.MaxValue - (remainingBytes - 1)
+            || !memory.TryGetSystemRamOffset(remainingStart, (int)remainingBytes, out _))
+        {
+            return false;
+        }
+
+        var finalR0 = remainingStart + remainingBytes;
+        var fill = new byte[(int)remainingBytes];
+        var value = (byte)State.R[5];
+        if (value != 0)
+        {
+            fill.AsSpan().Fill(value);
+        }
+
+        memory.Write(remainingStart, fill);
+
+        State.R[0] = finalR0;
+        State.R[7] = State.R[6];
+        State.T = true;
+        State.Pc = 0x8C0C_173C;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioWriteLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -6636,6 +6687,18 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_1A54) == 0x89FC
         && memory.ReadUInt16(0x8C11_1AD0) == 0x03FF
         && memory.ReadUInt32(0x8C11_1B18) == 0xA05F_810C;
+
+    private bool IsSonicAdventure2ByteFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C0C_1728) == 0xE700
+        && memory.ReadInstructionUInt16(0x8C0C_172A) == 0x6373
+        && memory.ReadInstructionUInt16(0x8C0C_172C) == 0x3362
+        && memory.ReadInstructionUInt16(0x8C0C_172E) == 0x8D05
+        && memory.ReadInstructionUInt16(0x8C0C_1730) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C0C_1732) == 0x7701
+        && memory.ReadInstructionUInt16(0x8C0C_1734) == 0x2050
+        && memory.ReadInstructionUInt16(0x8C0C_1736) == 0x3762
+        && memory.ReadInstructionUInt16(0x8C0C_1738) == 0x8FFB
+        && memory.ReadInstructionUInt16(0x8C0C_173A) == 0x7001;
 
     private bool IsSonicAdventure2G2DmaStatusSetHelper() =>
         memory.ReadInstructionUInt16(0x8C17_0A98) == 0x0002
