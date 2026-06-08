@@ -124,7 +124,20 @@ public sealed class DreamcastRunner
 
                 CapturePcProfile(options.PcProfile, pcProfile, step, nextInstruction);
                 TryCaptureTraceStep(options.TraceCapture, traceLog, step);
-                if (step.Trace == "sleep" || IsSideEffectFreeIdleLoop(step, memory))
+                if (step.Trace == "sleep")
+                {
+                    scheduler.AdvanceAfterIdle();
+                }
+                else if (options.MemoryReadWatch is null
+                    && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_1D44, 0x8C11_1D4A)
+                    && cpu.TryFastForwardSonicAdventure2AsicVBlankEventPoll(
+                        step,
+                        scheduler.ClampFastForwardToExternalEvent(options.InstructionLimit - cpu.State.InstructionsExecuted),
+                        out var sonicAdventure2AsicVBlankEventPollSkippedInstructions))
+                {
+                    scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AsicVBlankEventPollSkippedInstructions, cpu.State.InstructionsExecuted);
+                }
+                else if (IsSideEffectFreeIdleLoop(step, memory))
                 {
                     scheduler.AdvanceAfterIdle();
                 }
