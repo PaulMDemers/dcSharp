@@ -392,6 +392,151 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinZeroBitGlyphLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8A12
+            || step.Opcode != 0x891B
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || immediateBranchTarget != 0x8C00_8A4C
+            || State.Pc != 0x8C00_8A4C
+            || !State.T
+            || State.R[3] != 0)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C00_89F6) != 0xE01F
+            || memory.ReadInstructionUInt16(0x8C00_89F8) != 0x03FC
+            || memory.ReadInstructionUInt16(0x8C00_89FA) != 0x633C
+            || memory.ReadInstructionUInt16(0x8C00_89FC) != 0x52F5
+            || memory.ReadInstructionUInt16(0x8C00_89FE) != 0x622B
+            || memory.ReadInstructionUInt16(0x8C00_8A00) != 0x432D
+            || memory.ReadInstructionUInt16(0x8C00_8A02) != 0x84F7
+            || memory.ReadInstructionUInt16(0x8C00_8A04) != 0x600C
+            || memory.ReadInstructionUInt16(0x8C00_8A06) != 0x2309
+            || memory.ReadInstructionUInt16(0x8C00_8A08) != 0x1F34
+            || memory.ReadInstructionUInt16(0x8C00_8A0A) != 0x60F2
+            || memory.ReadInstructionUInt16(0x8C00_8A0C) != 0x8801
+            || memory.ReadInstructionUInt16(0x8C00_8A0E) != 0x8B01
+            || memory.ReadInstructionUInt16(0x8C00_8A10) != 0x2338
+            || memory.ReadInstructionUInt16(0x8C00_8A12) != 0x891B
+            || memory.ReadInstructionUInt16(0x8C00_8A4C) != 0x52F2
+            || memory.ReadInstructionUInt16(0x8C00_8A4E) != 0x7201
+            || memory.ReadInstructionUInt16(0x8C00_8A50) != 0x1F22
+            || memory.ReadInstructionUInt16(0x8C00_8A52) != 0x53F8
+            || memory.ReadInstructionUInt16(0x8C00_8A54) != 0x8532
+            || memory.ReadInstructionUInt16(0x8C00_8A56) != 0x6303
+            || memory.ReadInstructionUInt16(0x8C00_8A58) != 0x51F8
+            || memory.ReadInstructionUInt16(0x8C00_8A5A) != 0x8513
+            || memory.ReadInstructionUInt16(0x8C00_8A5C) != 0x230F
+            || memory.ReadInstructionUInt16(0x8C00_8A5E) != 0x001A
+            || memory.ReadInstructionUInt16(0x8C00_8A60) != 0x3203
+            || memory.ReadInstructionUInt16(0x8C00_8A62) != 0x8B01
+            || memory.ReadInstructionUInt16(0x8C00_8A64) != 0xA007
+            || memory.ReadInstructionUInt16(0x8C00_8A66) != 0x0009
+            || memory.ReadInstructionUInt16(0x8C00_8A68) != 0x53F3
+            || memory.ReadInstructionUInt16(0x8C00_8A6A) != 0x52F5
+            || memory.ReadInstructionUInt16(0x8C00_8A6C) != 0x3238
+            || memory.ReadInstructionUInt16(0x8C00_8A6E) != 0x1F25
+            || memory.ReadInstructionUInt16(0x8C00_8A70) != 0x51F5
+            || memory.ReadInstructionUInt16(0x8C00_8A72) != 0x4111
+            || memory.ReadInstructionUInt16(0x8C00_8A74) != 0x89BF
+            || memory.ReadUInt32(0x8C00_8A94) != 0x8C00_98CC
+            || memory.ReadUInt32(0x8C00_8A98) != 0x8C00_9A28
+            || memory.ReadUInt32(0x8C00_8A9C) != 0x8C00_8AD0)
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or >= 0x7E00_0FE0)
+        {
+            return false;
+        }
+
+        var mode = memory.ReadUInt32(stack);
+        var mask = memory.ReadByte(stack + 0x07);
+        var stepValue = memory.ReadUInt32(stack + 0x0C);
+        var bitResult = memory.ReadUInt32(stack + 0x10);
+        var bitCountdown = memory.ReadUInt32(stack + 0x14);
+        var currentByte = memory.ReadByte(stack + 0x1F);
+        var geometry = memory.ReadUInt32(stack + 0x20);
+        if (mode != 1
+            || mask != 1
+            || stepValue != 1
+            || bitResult != 0
+            || bitCountdown > 7
+            || geometry is < 0x7E00_0000 or >= 0x7E00_0FF8)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var cellIndex = memory.ReadUInt32(stack + 0x08);
+        if (cellLimit == 0 || cellIndex >= cellLimit)
+        {
+            return false;
+        }
+
+        var zeroIterations = 0ul;
+        var finalCellIndex = cellIndex;
+        var finalBitCountdown = bitCountdown;
+        while (finalBitCountdown <= 7)
+        {
+            var shifted = (uint)currentByte >> (int)finalBitCountdown;
+            if ((shifted & mask) != 0)
+            {
+                break;
+            }
+
+            var nextCellIndex = finalCellIndex + 1;
+            if (nextCellIndex >= cellLimit)
+            {
+                break;
+            }
+
+            zeroIterations++;
+            finalCellIndex = nextCellIndex;
+            finalBitCountdown--;
+        }
+
+        if (zeroIterations == 0)
+        {
+            return false;
+        }
+
+        var skippedBeforeFinalZeroTail = (zeroIterations - 1) * 34;
+        skippedInstructions = skippedBeforeFinalZeroTail + 19;
+        if (skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt32(stack + 0x08, finalCellIndex);
+        memory.WriteUInt32(stack + 0x14, finalBitCountdown);
+        State.R[0] = cellLimit;
+        State.R[1] = finalBitCountdown;
+        State.R[2] = finalBitCountdown;
+        State.R[3] = stepValue;
+        State.Macl = cellLimit;
+        State.T = finalBitCountdown <= 7;
+        State.Pc = State.T ? 0x8C00_89F6 : 0x8C00_8A76;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         const ulong helperTailInstructions = 14;
