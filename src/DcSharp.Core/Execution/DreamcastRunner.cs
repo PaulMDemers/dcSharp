@@ -422,6 +422,36 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_B4CC, 0x8C16_B5C8)
+                        && cpu.TryFastForwardSonicAdventure2AicaWorkQueueNoWorkPoll(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaWorkQueueSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaWorkQueueSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B16A, 0x8C15_B178)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_09E0, 0x8C17_09FA)
+                        && cpu.TryFastForwardSonicAdventure2G2DmaStatusClearLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2DmaStatusClearSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2DmaStatusClearSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B158, 0x8C15_B19C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_09E0, 0x8C17_09FA)
+                        && cpu.TryFastForwardSonicAdventure2G2DmaStatusClearFunction(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2DmaStatusClearFunctionSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2DmaStatusClearFunctionSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_0A98, 0x8C17_0AE0)
+                        && cpu.TryFastForwardSonicAdventure2G2DmaStatusSetHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2DmaStatusSetSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2DmaStatusSetSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C12_F556, 0x8C12_F560)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_4E94, 0x8C15_4EE8)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_43A0, 0x8C15_43EE)
