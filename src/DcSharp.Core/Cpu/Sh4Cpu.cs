@@ -1655,6 +1655,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2PvrSyncStatusPoll(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_1A54
+            || step.Opcode != 0x89FC
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C11_1A50
+            || delayedBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint syncStatusAddress = 0xA05F_810C;
+        const uint syncStatusMask = 0x03FF;
+        const ulong instructionsPerIteration = 3;
+        var syncStatus = memory.ReadUInt32(syncStatusAddress);
+        if (maxInstructionsToSkip <= instructionsPerIteration
+            || !IsSonicAdventure2PvrSyncStatusPoll()
+            || State.R[4] != syncStatusAddress
+            || State.R[5] != syncStatusMask
+            || State.R[2] != syncStatus
+            || (syncStatus & syncStatusMask) != 0
+            || !State.T)
+        {
+            return false;
+        }
+
+        var iterationsToSkip = (maxInstructionsToSkip - 1) / instructionsPerIteration;
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[2] = syncStatus;
+        State.R[4] = syncStatusAddress;
+        State.R[5] = syncStatusMask;
+        State.T = true;
+        State.Pc = 0x8C11_1A50;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioWriteLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -6582,6 +6627,15 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_1D48) == 0x89FC
         && memory.ReadUInt32(0x8C11_1DF4) == 0xA05F_80E8
         && memory.ReadUInt32(0x8C11_1DF8) == 0xA05F_6900;
+
+    private bool IsSonicAdventure2PvrSyncStatusPoll() =>
+        memory.ReadInstructionUInt16(0x8C11_1A4C) == 0xD432
+        && memory.ReadInstructionUInt16(0x8C11_1A4E) == 0x953F
+        && memory.ReadInstructionUInt16(0x8C11_1A50) == 0x6242
+        && memory.ReadInstructionUInt16(0x8C11_1A52) == 0x2258
+        && memory.ReadInstructionUInt16(0x8C11_1A54) == 0x89FC
+        && memory.ReadUInt16(0x8C11_1AD0) == 0x03FF
+        && memory.ReadUInt32(0x8C11_1B18) == 0xA05F_810C;
 
     private bool IsSonicAdventure2G2DmaStatusSetHelper() =>
         memory.ReadInstructionUInt16(0x8C17_0A98) == 0x0002

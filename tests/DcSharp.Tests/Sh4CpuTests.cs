@@ -1708,6 +1708,44 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2PvrSyncStatusPoll()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2PvrSyncStatusPoll(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C11_1A50);
+        cpu.State.R[4] = 0xA05F_810C;
+        cpu.State.R[5] = 0x03FF;
+
+        var branch = StepMany(cpu, 3);
+
+        Assert.True(cpu.TryFastForwardSonicAdventure2PvrSyncStatusPoll(branch, 302, out var skippedInstructions));
+        Assert.Equal(300UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[2]);
+        Assert.Equal(0xA05F_810Cu, cpu.State.R[4]);
+        Assert.Equal(0x03FFu, cpu.State.R[5]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C11_1A50u, cpu.State.Pc);
+        Assert.Equal(303UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2PvrSyncStatusPollWhenStatusWindowIsOpen()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2PvrSyncStatusPoll(memory);
+        memory.RaiseVBlankBegin();
+        var cpu = new Sh4Cpu(memory, 0x8C11_1A50);
+        cpu.State.R[4] = 0xA05F_810C;
+        cpu.State.R[5] = 0x03FF;
+
+        var branch = StepMany(cpu, 3);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2PvrSyncStatusPoll(branch, 300, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(1u, cpu.State.R[2] & 0x03FF);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2G2PioReadWordHelperForNonAicaSource()
     {
         var memory = new DreamcastMemory();
@@ -9397,6 +9435,17 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C11_1D48, 0x89FC);
         memory.WriteUInt32(0x8C11_1DF4, 0xA05F_80E8);
         memory.WriteUInt32(0x8C11_1DF8, 0xA05F_6900);
+    }
+
+    private static void WriteSonicAdventure2PvrSyncStatusPoll(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C11_1A4C, 0xD432);
+        WriteInstruction(memory, 0x8C11_1A4E, 0x953F);
+        WriteInstruction(memory, 0x8C11_1A50, 0x6242);
+        WriteInstruction(memory, 0x8C11_1A52, 0x2258);
+        WriteInstruction(memory, 0x8C11_1A54, 0x89FC);
+        memory.WriteUInt16(0x8C11_1AD0, 0x03FF);
+        memory.WriteUInt32(0x8C11_1B18, 0xA05F_810C);
     }
 
     private static void WriteSonicAdventure2G2PioWriteLoop(DreamcastMemory memory)
