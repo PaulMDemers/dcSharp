@@ -1793,6 +1793,50 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2ByteCopyLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ByteCopyLoop(memory);
+        memory.Write(0x8C20_2000, [0x11, 0x80, 0x33, 0xF0]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4CB0);
+        cpu.State.R[4] = 0x8C20_3000;
+        cpu.State.R[6] = 4;
+        cpu.State.R[7] = 0x8C20_2000;
+
+        var branch = StepMany(cpu, 5);
+
+        Assert.True(cpu.TryFastForwardSonicAdventure2ByteCopyLoop(branch, 16, out var skippedInstructions));
+        Assert.Equal(16UL, skippedInstructions);
+        Assert.Equal([0x11, 0x80, 0x33, 0xF0], ReadBytes(memory, 0x8C20_3000, 4));
+        Assert.Equal(0xFFFF_FFF0u, cpu.State.R[3]);
+        Assert.Equal(0x8C20_3004u, cpu.State.R[4]);
+        Assert.Equal(0u, cpu.State.R[6]);
+        Assert.Equal(0x8C20_2004u, cpu.State.R[7]);
+        Assert.False(cpu.State.T);
+        Assert.Equal(0x8C13_4CBCu, cpu.State.Pc);
+        Assert.Equal(21UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2ByteCopyLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ByteCopyLoop(memory);
+        memory.Write(0x8C20_2000, [0x11, 0x22, 0x33, 0x44]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4CB0);
+        cpu.State.R[4] = 0x8C20_3000;
+        cpu.State.R[6] = 4;
+        cpu.State.R[7] = 0x8C20_2000;
+
+        var branch = StepMany(cpu, 5);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2ByteCopyLoop(branch, 15, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x11, memory.ReadByte(0x8C20_3000));
+        Assert.Equal(0, memory.ReadByte(0x8C20_3001));
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2G2PioReadWordHelperForNonAicaSource()
     {
         var memory = new DreamcastMemory();
@@ -9509,6 +9553,22 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C0C_173A, 0x7001);
     }
 
+    private static void WriteSonicAdventure2ByteCopyLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_4CA8, 0x4615);
+        WriteInstruction(memory, 0x8C13_4CAA, 0x6743);
+        WriteInstruction(memory, 0x8C13_4CAC, 0x8F06);
+        WriteInstruction(memory, 0x8C13_4CAE, 0x6453);
+        WriteInstruction(memory, 0x8C13_4CB0, 0x6374);
+        WriteInstruction(memory, 0x8C13_4CB2, 0x76FF);
+        WriteInstruction(memory, 0x8C13_4CB4, 0x4615);
+        WriteInstruction(memory, 0x8C13_4CB6, 0x2430);
+        WriteInstruction(memory, 0x8C13_4CB8, 0x8DFA);
+        WriteInstruction(memory, 0x8C13_4CBA, 0x7401);
+        WriteInstruction(memory, 0x8C13_4CBC, 0x000B);
+        WriteInstruction(memory, 0x8C13_4CBE, 0x0009);
+    }
+
     private static void WriteSonicAdventure2G2PioWriteLoop(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C13_5BDA, 0x63F2);
@@ -12218,6 +12278,17 @@ public class Sh4CpuTests
         1 => 0xFFD8_001C,
         _ => 0xFFD8_0028
     };
+
+    private static byte[] ReadBytes(DreamcastMemory memory, uint address, int count)
+    {
+        var bytes = new byte[count];
+        for (var offset = 0; offset < count; offset++)
+        {
+            bytes[offset] = memory.ReadByte(address + (uint)offset);
+        }
+
+        return bytes;
+    }
 
     private static double ReadDouble(Sh4Cpu cpu, int register)
     {
