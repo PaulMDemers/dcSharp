@@ -2327,6 +2327,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2CacheInvalidateLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_F446
+            || step.Opcode != 0x7420
+            || State.Pc != 0x8C10_F440
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2CacheInvalidateLoop()
+            || State.R[5] == 0
+            || State.T)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        var iterationsToSkip = Math.Min((ulong)State.R[5], maxInstructionsToSkip / instructionsPerIteration);
+        if (iterationsToSkip == 0
+            || iterationsToSkip > uint.MaxValue / 32
+            || State.R[4] > uint.MaxValue - ((uint)iterationsToSkip * 32))
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[5] -= (uint)iterationsToSkip;
+        State.R[4] += (uint)iterationsToSkip * 32;
+        var completed = State.R[5] == 0;
+        State.T = completed;
+        State.Pc = completed ? 0x8C10_F448 : 0x8C10_F440;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2CacheInvalidateLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_F440) == 0x0493
+        && memory.ReadInstructionUInt16(0x8C10_F442) == 0x4510
+        && memory.ReadInstructionUInt16(0x8C10_F444) == 0x8FFC
+        && memory.ReadInstructionUInt16(0x8C10_F446) == 0x7420
+        && memory.ReadInstructionUInt16(0x8C10_F448) == 0xD207
+        && memory.ReadUInt32(0x8C10_F468) == 0x8C10_F638;
+
     internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
