@@ -1993,6 +1993,101 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2RecordHashScanToBeforeMatch()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2RecordHashScan(normalMemory);
+        WriteSonicAdventure2RecordHashScan(fastMemory);
+        WriteSonicAdventure2RecordHashScanBytes(normalMemory, 0x8C20_1000, [0x10, 0x11, 0x12, 0x22]);
+        WriteSonicAdventure2RecordHashScanBytes(fastMemory, 0x8C20_1000, [0x10, 0x11, 0x12, 0x22]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_4F3E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_4F3E);
+        InitializeSonicAdventure2RecordHashScanState(normal, 0x8C20_1000, 4, 0x22);
+        InitializeSonicAdventure2RecordHashScanState(fast, 0x8C20_1000, 4, 0x22);
+
+        var normalStart = StepMany(normal, 8);
+        var fastStart = StepMany(fast, 8);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2RecordHashScan(fastStart, 19, out var skippedInstructions));
+        Assert.Equal(19UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(0x8C13_4F3Eu, fast.State.Pc);
+        Assert.Equal(3u, fast.State.R[13]);
+        Assert.Equal(0x8C20_1000u + (3 * 44), fast.State.R[14]);
+        Assert.Equal(0x12u, fast.State.R[0]);
+        Assert.Equal(0x22u, fast.State.R[3]);
+        Assert.False(fast.State.T);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2RecordHashScanPartially()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2RecordHashScan(normalMemory);
+        WriteSonicAdventure2RecordHashScan(fastMemory);
+        WriteSonicAdventure2RecordHashScanBytes(normalMemory, 0x8C20_2000, [0x30, 0x31, 0x32, 0x33, 0x44]);
+        WriteSonicAdventure2RecordHashScanBytes(fastMemory, 0x8C20_2000, [0x30, 0x31, 0x32, 0x33, 0x44]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_4F3E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_4F3E);
+        InitializeSonicAdventure2RecordHashScanState(normal, 0x8C20_2000, 5, 0x44);
+        InitializeSonicAdventure2RecordHashScanState(fast, 0x8C20_2000, 5, 0x44);
+
+        var normalStart = StepMany(normal, 8);
+        var fastStart = StepMany(fast, 8);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2RecordHashScan(fastStart, 10, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(2u, fast.State.R[13]);
+        Assert.Equal(0x8C20_2000u + (2 * 44), fast.State.R[14]);
+        Assert.Equal(0x31u, fast.State.R[0]);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2RecordHashScanWhenNextRecordMatches()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2RecordHashScan(memory);
+        WriteSonicAdventure2RecordHashScanBytes(memory, 0x8C20_3000, [0x55, 0x66]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4F3E);
+        InitializeSonicAdventure2RecordHashScanState(cpu, 0x8C20_3000, 2, 0x66);
+
+        var start = StepMany(cpu, 8);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2RecordHashScan(start, 10, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_4F76u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2RecordHashScanWhenOpcodeDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2RecordHashScan(memory);
+        WriteInstruction(memory, 0x8C13_4F74, 0x8FE2);
+        WriteSonicAdventure2RecordHashScanBytes(memory, 0x8C20_4000, [0x01, 0x02, 0x03]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4F3E);
+        InitializeSonicAdventure2RecordHashScanState(cpu, 0x8C20_4000, 3, 0x44);
+
+        var start = StepMany(cpu, 8);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2RecordHashScan(start, 10, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2RecordCompactionLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -10142,6 +10237,48 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C13_4DB0, 0x000B);
         WriteInstruction(memory, 0x8C13_4DB2, 0x6EF6);
         memory.WriteUInt16(0x8C13_4E9A, 0x00DA);
+    }
+
+    private static void WriteSonicAdventure2RecordHashScan(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_4F3E, 0x84E9);
+        WriteInstruction(memory, 0x8C13_4F40, 0x63AC);
+        WriteInstruction(memory, 0x8C13_4F42, 0x600C);
+        WriteInstruction(memory, 0x8C13_4F44, 0x3030);
+        WriteInstruction(memory, 0x8C13_4F46, 0x8B13);
+        WriteInstruction(memory, 0x8C13_4F48, 0x60F2);
+        WriteInstruction(memory, 0x8C13_4F4A, 0x8801);
+        WriteInstruction(memory, 0x8C13_4F4C, 0x8B07);
+        WriteInstruction(memory, 0x8C13_4F5E, 0x65E3);
+        WriteInstruction(memory, 0x8C13_4F60, 0x750A);
+        WriteInstruction(memory, 0x8C13_4F62, 0xBEE4);
+        WriteInstruction(memory, 0x8C13_4F64, 0x64C3);
+        WriteInstruction(memory, 0x8C13_4F66, 0x8801);
+        WriteInstruction(memory, 0x8C13_4F68, 0x8B02);
+        WriteInstruction(memory, 0x8C13_4F6A, 0x60D3);
+        WriteInstruction(memory, 0x8C13_4F6C, 0xA005);
+        WriteInstruction(memory, 0x8C13_4F6E, 0x7001);
+        WriteInstruction(memory, 0x8C13_4F70, 0x7D01);
+        WriteInstruction(memory, 0x8C13_4F72, 0x3DB3);
+        WriteInstruction(memory, 0x8C13_4F74, 0x8FE3);
+        WriteInstruction(memory, 0x8C13_4F76, 0x7E2C);
+    }
+
+    private static void WriteSonicAdventure2RecordHashScanBytes(DreamcastMemory memory, uint baseAddress, byte[] values)
+    {
+        for (var index = 0u; index < values.Length; index++)
+        {
+            memory.Write(baseAddress + (index * 44) + 9, [values[index]]);
+        }
+    }
+
+    private static void InitializeSonicAdventure2RecordHashScanState(Sh4Cpu cpu, uint baseAddress, uint count, byte target)
+    {
+        cpu.State.R[10] = target;
+        cpu.State.R[11] = count;
+        cpu.State.R[13] = 0;
+        cpu.State.R[14] = baseAddress;
+        cpu.State.T = false;
     }
 
     private static void WriteSonicAdventure2RecordCompactionLoop(DreamcastMemory memory)
