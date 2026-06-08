@@ -1232,6 +1232,151 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaWorkQueueActiveBytePoll()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        WriteSonicAdventure2AicaReadWordWrapper(memory);
+        WriteSonicAdventure2AicaByteReadHelper(memory);
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_56D4, 0x200);
+        memory.WriteUInt32(0x8C2D_56D8, 7);
+        memory.WriteUInt32(0x8C2D_5754, 0x0001_2400);
+        memory.WriteUInt32(0x8C2D_5AF8, 0);
+        memory.Write(0x8CFF_FF6C, [1]);
+        memory.WriteUInt32(0x8CFF_FF70, 7);
+        memory.WriteUInt32(0x8CFF_FF74, 15);
+        memory.WriteUInt32(0x8CFF_FF78, 0x8C15_3AC4);
+        memory.WriteUInt32(0x8CFF_FF7C, 0x8888_8888);
+        memory.WriteUInt32(0x8CFF_FF80, 0x9999_9999);
+        memory.WriteUInt32(0x8CFF_FF84, 0xAAAA_AAAA);
+        memory.WriteUInt32(0x8CFF_FF88, 0xBBBB_BBBB);
+        memory.WriteUInt32(0x8CFF_FF8C, 0xCCCC_CCCC);
+        memory.WriteUInt32(0x8CFF_FF90, 0xDDDD_DDDD);
+        memory.WriteUInt32(0x8CFF_FF94, 0xEEEE_EEEE);
+        var cpu = new Sh4Cpu(memory, 0x8C16_B520);
+        cpu.State.Pr = 0x8C15_3AC4;
+        cpu.State.Sr = 0x4000_0000;
+        cpu.State.R[2] = 1;
+        cpu.State.R[10] = 0x8C2D_56C0;
+        cpu.State.R[11] = 0x200;
+        cpu.State.R[14] = 0x8C2D_56C8;
+        cpu.State.R[15] = 0x8CFF_FF6C;
+
+        var branch = cpu.Step();
+
+        Assert.Equal(0x8C16_B520u, branch.Pc);
+        Assert.Equal(0x8B02, branch.Opcode);
+        Assert.Equal(0x8C16_B528u, cpu.State.Pc);
+        Assert.False(cpu.State.T);
+        Assert.True(cpu.TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePoll(branch, 42, out var skippedInstructions));
+        Assert.Equal(42UL, skippedInstructions);
+        Assert.Equal(1u, memory.ReadUInt32(0x8C2A_22EC));
+        Assert.Equal(1u, memory.ReadUInt32(0x8C2A_22F0));
+        Assert.Equal(0x8C16_B4CCu, memory.ReadUInt32(0x8C18_339C));
+        Assert.Equal(0x0B00_0003u, memory.ReadUInt32(0x8C18_33A0));
+        Assert.Equal(0x0B00_0003u, cpu.State.R[0]);
+        Assert.Equal(0x8C18_33A4u, cpu.State.R[1]);
+        Assert.Equal(0x8C18_33A0u, cpu.State.R[2]);
+        Assert.Equal(0u, cpu.State.R[3]);
+        Assert.Equal(0x8C16_B4CCu, cpu.State.R[4]);
+        Assert.Equal(0x0B00_0003u, cpu.State.R[5]);
+        Assert.Equal(4u, cpu.State.R[6]);
+        Assert.Equal(1u, cpu.State.R[7]);
+        Assert.Equal(0x8888_8888u, cpu.State.R[8]);
+        Assert.Equal(0x9999_9999u, cpu.State.R[9]);
+        Assert.Equal(0xAAAA_AAAAu, cpu.State.R[10]);
+        Assert.Equal(0xBBBB_BBBBu, cpu.State.R[11]);
+        Assert.Equal(0xCCCC_CCCCu, cpu.State.R[12]);
+        Assert.Equal(0xDDDD_DDDDu, cpu.State.R[13]);
+        Assert.Equal(0xEEEE_EEEEu, cpu.State.R[14]);
+        Assert.Equal(0x8CFF_FF98u, cpu.State.R[15]);
+        Assert.False(cpu.State.T);
+        Assert.Equal(0x4000_00F0u, cpu.State.Sr);
+        Assert.Equal(0x8C15_3AC4u, cpu.State.Pc);
+        Assert.Equal(0x8C15_3AC4u, cpu.State.Pr);
+        Assert.Equal(43UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaWorkQueueActiveBytePollWhenCallbackWorkIsPending()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        WriteSonicAdventure2AicaReadWordWrapper(memory);
+        WriteSonicAdventure2AicaByteReadHelper(memory);
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_56D4, 0x200);
+        memory.WriteUInt32(0x8C2D_56D8, 7);
+        memory.WriteUInt32(0x8C2D_5754, 0x0001_2400);
+        memory.WriteUInt32(0x8C2D_5AF8, 1);
+        memory.Write(0x8CFF_FF6C, [1]);
+        memory.WriteUInt32(0x8CFF_FF70, 7);
+        memory.WriteUInt32(0x8CFF_FF74, 15);
+        memory.WriteUInt32(0x8CFF_FF78, 0x8C15_3AC4);
+        var cpu = new Sh4Cpu(memory, 0x8C16_B520);
+        cpu.State.Pr = 0x8C15_3AC4;
+        cpu.State.R[10] = 0x8C2D_56C0;
+        cpu.State.R[11] = 0x200;
+        cpu.State.R[14] = 0x8C2D_56C8;
+        cpu.State.R[15] = 0x8CFF_FF6C;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePoll(branch, 42, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2AicaEmptyWorkTableScan()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkTableScan(memory);
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_56C0, 0x8C2D_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C16_C832);
+        cpu.State.R[2] = 0x1C00;
+        cpu.State.R[9] = 0;
+        cpu.State.R[10] = 0;
+
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardSonicAdventure2AicaEmptyWorkTableScan(branch, 1_300, out var skippedInstructions));
+        Assert.Equal(1_216UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[0]);
+        Assert.Equal(0x6Cu, cpu.State.R[1]);
+        Assert.Equal(0x1C00u, cpu.State.R[2]);
+        Assert.Equal(0x8C18_33A4u, cpu.State.R[3]);
+        Assert.Equal(0x8C2D_56C0u, cpu.State.R[4]);
+        Assert.Equal(0x1C00u, cpu.State.R[9]);
+        Assert.Equal(0x1C00u, cpu.State.R[10]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C16_C838u, cpu.State.Pc);
+        Assert.Equal(1_217UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaWorkTableScanWhenEntryIsActive()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkTableScan(memory);
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_56C0, 0x8C2D_0000);
+        memory.WriteUInt32(0x8C2D_0000 + 0x460 + 0xE0 + 0x6C, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C16_C832);
+        cpu.State.R[2] = 0x1C00;
+        cpu.State.R[9] = 0;
+        cpu.State.R[10] = 0;
+
+        var branch = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaEmptyWorkTableScan(branch, 1_300, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaWorkPollNoWorkInterrupt()
     {
         var memory = new DreamcastMemory();
@@ -9003,6 +9148,7 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C16_B4F4, 0x400E);
         WriteInstruction(memory, 0x8C16_B4F6, 0xD231);
         WriteInstruction(memory, 0x8C16_B4F8, 0x6A22);
+        WriteInstruction(memory, 0x8C16_B520, 0x8B02);
         memory.WriteUInt32(0x8C16_B5BC, 0x8C18_33A4);
         memory.WriteUInt32(0x8C16_B5C4, 0x8C16_BF10);
     }
@@ -9065,6 +9211,53 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C12_F7FE, 0x5326);
         WriteInstruction(memory, 0x8C12_F800, 0x4315);
         WriteInstruction(memory, 0x8C12_F802, 0x89F6);
+    }
+
+    private static void WriteSonicAdventure2AicaActiveWorkCallback(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_500C, 0xD10A);
+        WriteInstruction(memory, 0x8C15_500E, 0x2FE6);
+        WriteInstruction(memory, 0x8C15_5010, 0xD307);
+        WriteInstruction(memory, 0x8C15_5012, 0x900C);
+        WriteInstruction(memory, 0x8C15_5014, 0x2342);
+        WriteInstruction(memory, 0x8C15_5016, 0xD207);
+        WriteInstruction(memory, 0x8C15_5018, 0x2252);
+        WriteInstruction(memory, 0x8C15_501A, 0x6E12);
+        WriteInstruction(memory, 0x8C15_501C, 0x03EE);
+        WriteInstruction(memory, 0x8C15_501E, 0x2338);
+        WriteInstruction(memory, 0x8C15_5020, 0x8903);
+        WriteInstruction(memory, 0x8C15_502A, 0x000B);
+        WriteInstruction(memory, 0x8C15_502C, 0x6EF6);
+        WriteInstruction(memory, 0x8C15_502E, 0x0438);
+        memory.WriteUInt32(0x8C15_5030, 0x8C18_339C);
+        memory.WriteUInt32(0x8C15_5034, 0x8C18_33A0);
+        memory.WriteUInt32(0x8C15_5038, 0x8C18_33A4);
+    }
+
+    private static void WriteSonicAdventure2AicaWorkTableScan(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C16_C6F8, 0xD343);
+        WriteInstruction(memory, 0x8C16_C6FA, 0xE16C);
+        WriteInstruction(memory, 0x8C16_C6FC, 0x9283);
+        WriteInstruction(memory, 0x8C16_C6FE, 0x6432);
+        WriteInstruction(memory, 0x8C16_C700, 0x6042);
+        WriteInstruction(memory, 0x8C16_C702, 0x302C);
+        WriteInstruction(memory, 0x8C16_C704, 0x30AC);
+        WriteInstruction(memory, 0x8C16_C706, 0x001E);
+        WriteInstruction(memory, 0x8C16_C708, 0x8801);
+        WriteInstruction(memory, 0x8C16_C70A, 0x8901);
+        WriteInstruction(memory, 0x8C16_C70C, 0xA08D);
+        WriteInstruction(memory, 0x8C16_C70E, 0x0009);
+        WriteInstruction(memory, 0x8C16_C82A, 0x7A70);
+        WriteInstruction(memory, 0x8C16_C82C, 0x7970);
+        WriteInstruction(memory, 0x8C16_C82E, 0x9213);
+        WriteInstruction(memory, 0x8C16_C830, 0x3A22);
+        WriteInstruction(memory, 0x8C16_C832, 0x8901);
+        WriteInstruction(memory, 0x8C16_C834, 0xAF60);
+        WriteInstruction(memory, 0x8C16_C836, 0x0009);
+        WriteInstruction(memory, 0x8C16_C806, 0x0460);
+        memory.WriteUInt32(0x8C16_C808, 0x8C18_33A4);
+        WriteInstruction(memory, 0x8C16_C858, 0x1C00);
     }
 
     private static void WriteSonicAdventure2G2DmaStatusClearLoop(DreamcastMemory memory)
