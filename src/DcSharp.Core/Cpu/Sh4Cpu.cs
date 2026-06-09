@@ -2588,6 +2588,109 @@ public sealed class Sh4Cpu
             && memory.ReadUInt32(0x8C15_B6F0) == 0x8C15_CE5C;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNameCallBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B918
+            || step.Opcode != 0x931C
+            || State.Pc != 0x8C15_B91A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 10;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaNameCallBridge()
+            || !memory.TryGetSystemRamOffset(State.R[10], 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(State.R[10]);
+        var nameAddress = workBase + memory.ReadUInt16(0x8C15_B954) + State.R[12];
+        if (!memory.TryGetSystemRamOffset(nameAddress, 1, out _))
+        {
+            return false;
+        }
+
+        var nameByte = memory.ReadByte(nameAddress);
+        if (nameByte == 0)
+        {
+            return false;
+        }
+
+        State.R[0] = workBase;
+        State.R[2] = (uint)(sbyte)nameByte;
+        State.R[3] = memory.ReadUInt32(0x8C15_B970);
+        State.R[4] = State.R[13];
+        State.R[5] = State.R[14];
+        State.Pr = 0x8C15_B92E;
+        State.T = false;
+        State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaNameCallBridge() =>
+        memory.ReadInstructionUInt16(0x8C15_B918) == 0x931C
+        && memory.ReadInstructionUInt16(0x8C15_B91A) == 0x60A2
+        && memory.ReadInstructionUInt16(0x8C15_B91C) == 0x330C
+        && memory.ReadInstructionUInt16(0x8C15_B91E) == 0x33CC
+        && memory.ReadInstructionUInt16(0x8C15_B920) == 0x6230
+        && memory.ReadInstructionUInt16(0x8C15_B922) == 0x2228
+        && memory.ReadInstructionUInt16(0x8C15_B924) == 0x8903
+        && memory.ReadInstructionUInt16(0x8C15_B926) == 0xD312
+        && memory.ReadInstructionUInt16(0x8C15_B928) == 0x65E3
+        && memory.ReadInstructionUInt16(0x8C15_B92A) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C15_B92C) == 0x64D3
+        && memory.ReadUInt16(0x8C15_B954) == 0x0F90
+        && memory.ReadUInt32(0x8C15_B970) == 0x8C15_C4DC;
+
+    internal bool TryFastForwardSonicAdventure2AicaNameLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B92E
+            || step.Opcode != 0x7B01
+            || State.Pc != 0x8C15_B930
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 4;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || State.R[13] == uint.MaxValue
+            || State.R[12] == uint.MaxValue)
+        {
+            return false;
+        }
+
+        var compareResult = (int)State.R[11] >= (int)State.R[9];
+        State.R[13]++;
+        State.R[12]++;
+        State.T = compareResult;
+        State.Pc = compareResult ? 0x8C15_B938u : 0x8C15_B918u;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaNameLoopTail() =>
+        memory.ReadInstructionUInt16(0x8C15_B92E) == 0x7B01
+        && memory.ReadInstructionUInt16(0x8C15_B930) == 0x3B93
+        && memory.ReadInstructionUInt16(0x8C15_B932) == 0x7D01
+        && memory.ReadInstructionUInt16(0x8C15_B934) == 0x8FF0
+        && memory.ReadInstructionUInt16(0x8C15_B936) == 0x7C01;
+
     internal bool TryFastForwardSonicAdventure2AicaChannelSetupBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
