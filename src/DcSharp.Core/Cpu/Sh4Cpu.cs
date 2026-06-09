@@ -4154,6 +4154,38 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_C780) == 0x8934
         && memory.ReadUInt16(0x8C15_C7E4) == 0x00FF;
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveChannelReturnBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C56E
+            || step.Opcode != 0xA005
+            || State.Pc != 0x8C15_C570
+            || delayedBranchTarget != 0x8C15_C57C
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 1;
+        if (maxInstructionsToSkip < skippedInstructionCount || !IsSonicAdventure2AicaActiveChannelReturnBridge())
+        {
+            return false;
+        }
+
+        State.R[15] = unchecked(State.R[15] + 4);
+        State.Pc = 0x8C15_C57C;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaActiveChannelReturnBridge() =>
+        memory.ReadInstructionUInt16(0x8C15_C56E) == 0xA005
+        && memory.ReadInstructionUInt16(0x8C15_C570) == 0x7F04
+        && memory.ReadInstructionUInt16(0x8C15_C57C) == 0x6503;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

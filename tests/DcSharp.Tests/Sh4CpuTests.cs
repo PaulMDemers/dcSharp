@@ -3481,6 +3481,52 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaActiveChannelReturnBridge()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(normalMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C56E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C56E);
+        InitializeSonicAdventure2AicaActiveChannelReturnBridgeState(normal, 0x8C20_5000);
+        InitializeSonicAdventure2AicaActiveChannelReturnBridgeState(fast, 0x8C20_5000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaActiveChannelReturnBridge(fastStart, 1, out var skippedInstructions));
+        Assert.Equal(1UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        for (var index = 0; index < 16; index++)
+        {
+            Assert.Equal(normal.State.R[index], fast.State.R[index]);
+        }
+
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaActiveChannelReturnBridgeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_C56E);
+        InitializeSonicAdventure2AicaActiveChannelReturnBridgeState(cpu, 0x8C20_5000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaActiveChannelReturnBridge(start, 0, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_C570u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaDescriptorCopyHelper()
     {
         var normalMemory = new DreamcastMemory();
@@ -12028,6 +12074,9 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C15_C568, 0x2FB6);
         WriteInstruction(memory, 0x8C15_C56A, 0xB0DB);
         WriteInstruction(memory, 0x8C15_C56C, 0x55F2);
+        WriteInstruction(memory, 0x8C15_C56E, 0xA005);
+        WriteInstruction(memory, 0x8C15_C570, 0x7F04);
+        WriteInstruction(memory, 0x8C15_C57C, 0x6503);
         WriteInstruction(memory, 0x8C15_C724, 0x2FE6);
         WriteInstruction(memory, 0x8C15_C726, 0x2FD6);
         WriteInstruction(memory, 0x8C15_C728, 0x2FC6);
@@ -12320,6 +12369,26 @@ public class Sh4CpuTests
         memory.Write(stack, [1]);
         memory.Write(workBase, [0x20, 0, 0x20, 0]);
         memory.Write(slot + 2, [0xAA, 0xBB]);
+    }
+
+    private static void InitializeSonicAdventure2AicaActiveChannelReturnBridgeState(Sh4Cpu cpu, uint stack)
+    {
+        cpu.State.R[0] = 0;
+        cpu.State.R[1] = 0x10C4;
+        cpu.State.R[2] = 0x20;
+        cpu.State.R[3] = 0;
+        cpu.State.R[4] = 1;
+        cpu.State.R[5] = 1;
+        cpu.State.R[6] = 0xFF;
+        cpu.State.R[7] = 0x8C20_2000;
+        cpu.State.R[10] = 0x8C20_3000;
+        cpu.State.R[11] = 0x8C15_C724;
+        cpu.State.R[12] = 0;
+        cpu.State.R[13] = 0x8C20_1000;
+        cpu.State.R[14] = 0x8C20_2000;
+        cpu.State.R[15] = stack;
+        cpu.State.Pr = 0x8C15_C56E;
+        cpu.State.T = true;
     }
 
     private static void InitializeSonicAdventure2AicaChannelSetupBridgeState(
