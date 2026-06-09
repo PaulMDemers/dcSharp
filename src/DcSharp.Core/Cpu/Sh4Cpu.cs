@@ -3433,6 +3433,7 @@ public sealed class Sh4Cpu
         var strideAddress = State.R[11];
         var skippedInstructionCount = 0UL;
         uint lastR0 = 0;
+        uint? lastR1 = null;
         uint lastR2 = 0;
         uint lastR3 = 0;
         while (index < State.R[9])
@@ -3468,7 +3469,16 @@ public sealed class Sh4Cpu
                 else
                 {
                     var mode = memory.ReadByte(entryAddress + 4);
-                    if (mode != 0)
+                    if (mode == 0xFF)
+                    {
+                        candidateR0 = mode;
+                        lastR0 = candidateR0;
+                        lastR1 = mode;
+                        lastR2 = candidateR2;
+                        lastR3 = candidateR3;
+                        skippedInstructionCount += 40;
+                    }
+                    else if (mode != 0)
                     {
                         if (skippedInstructionCount == 0 || skippedInstructionCount > maxInstructionsToSkip)
                         {
@@ -3476,6 +3486,11 @@ public sealed class Sh4Cpu
                         }
 
                         State.R[0] = lastR0;
+                        if (lastR1 is not null)
+                        {
+                            State.R[1] = lastR1.Value;
+                        }
+
                         State.R[2] = lastR2;
                         State.R[3] = lastR3;
                         State.R[11] = strideAddress;
@@ -3490,11 +3505,14 @@ public sealed class Sh4Cpu
                         return true;
                     }
 
-                    candidateR0 = mode;
-                    lastR0 = candidateR0;
-                    lastR2 = candidateR2;
-                    lastR3 = candidateR3;
-                    skippedInstructionCount += 37;
+                    else
+                    {
+                        candidateR0 = mode;
+                        lastR0 = candidateR0;
+                        lastR2 = candidateR2;
+                        lastR3 = candidateR3;
+                        skippedInstructionCount += 37;
+                    }
                 }
             }
 
@@ -3509,6 +3527,11 @@ public sealed class Sh4Cpu
         }
 
         State.R[0] = lastR0;
+        if (lastR1 is not null)
+        {
+            State.R[1] = lastR1.Value;
+        }
+
         State.R[2] = lastR2;
         State.R[3] = lastR3;
         State.R[11] = strideAddress;
