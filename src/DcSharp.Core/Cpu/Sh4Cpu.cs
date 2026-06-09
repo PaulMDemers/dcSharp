@@ -679,6 +679,52 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinSignedDivideQuotientHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong helperTailInstructions = 79;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_98CC
+            || step.Opcode != 0x2008
+            || State.Pc != 0x8C00_98CE
+            || State.T
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < helperTailInstructions)
+        {
+            return false;
+        }
+
+        if (!IsIpBinSignedDivideQuotientHelper())
+        {
+            return false;
+        }
+
+        var divisor = unchecked((int)State.R[0]);
+        var dividend = unchecked((int)State.R[1]);
+        var stack = State.R[15];
+        if (divisor <= 0
+            || dividend < 0
+            || stack is < 0x7E00_0008 or > 0x7E00_0FFC)
+        {
+            return false;
+        }
+
+        var quotient = unchecked((uint)(dividend / divisor));
+        memory.WriteUInt32(stack - 4, State.R[2]);
+        memory.WriteUInt32(stack - 8, State.R[3]);
+
+        State.R[0] = quotient;
+        State.R[1] = quotient;
+        State.T = false;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += helperTailInstructions;
+        skippedInstructions = helperTailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsIpBinGlyphDrawHelper()
     {
         return memory.ReadInstructionUInt16(0x8C00_8AD0) == 0x7FF0
@@ -713,6 +759,39 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0A) == 0x01DF
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
+    }
+
+    private bool IsIpBinSignedDivideQuotientHelper()
+    {
+        if (memory.ReadInstructionUInt16(0x8C00_98CC) != 0x2008
+            || memory.ReadInstructionUInt16(0x8C00_98CE) != 0x2F26
+            || memory.ReadInstructionUInt16(0x8C00_98D0) != 0x8D4C
+            || memory.ReadInstructionUInt16(0x8C00_98D2) != 0x0009
+            || memory.ReadInstructionUInt16(0x8C00_98D4) != 0x2F36
+            || memory.ReadInstructionUInt16(0x8C00_98D6) != 0xE200
+            || memory.ReadInstructionUInt16(0x8C00_98D8) != 0x2127
+            || memory.ReadInstructionUInt16(0x8C00_98DA) != 0x333A
+            || memory.ReadInstructionUInt16(0x8C00_98DC) != 0x312A
+            || memory.ReadInstructionUInt16(0x8C00_98DE) != 0x2307)
+        {
+            return false;
+        }
+
+        for (var address = 0x8C00_98E0u; address <= 0x8C00_995Cu; address += 4)
+        {
+            if (memory.ReadInstructionUInt16(address) != 0x4124
+                || memory.ReadInstructionUInt16(address + 2) != 0x3304)
+            {
+                return false;
+            }
+        }
+
+        return memory.ReadInstructionUInt16(0x8C00_9960) == 0x4124
+            && memory.ReadInstructionUInt16(0x8C00_9962) == 0x312E
+            && memory.ReadInstructionUInt16(0x8C00_9964) == 0x6013
+            && memory.ReadInstructionUInt16(0x8C00_9966) == 0x63F6
+            && memory.ReadInstructionUInt16(0x8C00_9968) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C00_996A) == 0x62F6;
     }
 
     internal bool TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)

@@ -557,6 +557,71 @@ public class Sh4CpuTests
         Assert.Equal(0u, memory.ReadUInt32(0x8CF8_9894));
     }
 
+    [Theory]
+    [InlineData(0u, 12u, 0u)]
+    [InlineData(17u, 12u, 1u)]
+    [InlineData(35u, 12u, 2u)]
+    public void FastForwardsIpBinSignedDivideQuotientHelper(uint dividend, uint divisor, uint quotient)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinSignedDivideQuotientHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinSignedDivideQuotientHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_98CC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_98CC);
+        InitializeIpBinSignedDivideQuotientHelperState(normal, dividend, divisor);
+        InitializeIpBinSignedDivideQuotientHelperState(fast, dividend, divisor);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinSignedDivideQuotientHelper(fastStart, 79, out var skippedInstructions));
+        Assert.Equal(79UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(quotient, fast.State.R[0]);
+        Assert.Equal(quotient, fast.State.R[1]);
+        Assert.Equal(0xAAAA_5555u, fastMemory.ReadUInt32(0x7E00_0F40));
+        Assert.Equal(0x8C00_98CCu, fastMemory.ReadUInt32(0x7E00_0F3C));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSignedDivideQuotientHelperWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSignedDivideQuotientHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_98CC);
+        InitializeIpBinSignedDivideQuotientHelperState(cpu, dividend: 17, divisor: 12);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSignedDivideQuotientHelper(start, 78, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_98CEu, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0x7E00_0F40));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSignedDivideQuotientHelperWhenDividendIsNegative()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSignedDivideQuotientHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_98CC);
+        InitializeIpBinSignedDivideQuotientHelperState(cpu, dividend: 0xFFFF_FFFF, divisor: 12);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSignedDivideQuotientHelper(start, 79, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_98CEu, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsSegaRally2WinceTimerDeltaHelperReturn()
     {
@@ -11786,6 +11851,42 @@ public class Sh4CpuTests
         cpu.State.R[6] = 0x00C0_C0C0;
         cpu.State.R[15] = 0x7E00_0F44;
         memory.WriteUInt16(0x7E00_0F6A, 0x0154);
+    }
+
+    private static void WriteIpBinSignedDivideQuotientHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_98CC, 0x2008);
+        WriteInstruction(memory, 0x8C00_98CE, 0x2F26);
+        WriteInstruction(memory, 0x8C00_98D0, 0x8D4C);
+        WriteInstruction(memory, 0x8C00_98D2, 0x0009);
+        WriteInstruction(memory, 0x8C00_98D4, 0x2F36);
+        WriteInstruction(memory, 0x8C00_98D6, 0xE200);
+        WriteInstruction(memory, 0x8C00_98D8, 0x2127);
+        WriteInstruction(memory, 0x8C00_98DA, 0x333A);
+        WriteInstruction(memory, 0x8C00_98DC, 0x312A);
+        WriteInstruction(memory, 0x8C00_98DE, 0x2307);
+        for (var address = 0x8C00_98E0u; address <= 0x8C00_995Cu; address += 4)
+        {
+            WriteInstruction(memory, address, 0x4124);
+            WriteInstruction(memory, address + 2, 0x3304);
+        }
+
+        WriteInstruction(memory, 0x8C00_9960, 0x4124);
+        WriteInstruction(memory, 0x8C00_9962, 0x312E);
+        WriteInstruction(memory, 0x8C00_9964, 0x6013);
+        WriteInstruction(memory, 0x8C00_9966, 0x63F6);
+        WriteInstruction(memory, 0x8C00_9968, 0x000B);
+        WriteInstruction(memory, 0x8C00_996A, 0x62F6);
+    }
+
+    private static void InitializeIpBinSignedDivideQuotientHelperState(Sh4Cpu cpu, uint dividend, uint divisor)
+    {
+        cpu.State.Pr = 0x8C00_8A2A;
+        cpu.State.R[0] = divisor;
+        cpu.State.R[1] = dividend;
+        cpu.State.R[2] = 0xAAAA_5555;
+        cpu.State.R[3] = 0x8C00_98CC;
+        cpu.State.R[15] = 0x7E00_0F44;
     }
 
     private static void WriteSegaRally2WinceTimerDeltaHelper(DreamcastMemory memory)
