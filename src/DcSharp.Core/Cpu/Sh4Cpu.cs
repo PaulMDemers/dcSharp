@@ -2873,6 +2873,105 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C15_C716) == 0x00FF
         && memory.ReadUInt16(0x8C15_C718) == 0x00E0;
 
+    internal bool TryFastForwardSonicAdventure2AicaPostSetupFlagTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C57C
+            || step.Opcode != 0x6503
+            || State.Pc != 0x8C15_C57E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2AicaPostSetupFlagTail()
+            || !memory.TryGetSystemRamOffset(State.R[14] + 7, 7, out _))
+        {
+            return false;
+        }
+
+        var slot = State.R[14];
+        var updateCallbackPointer = memory.ReadByte(slot + 7) != 0;
+        var skippedInstructionCount = updateCallbackPointer ? 23UL : 5UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        if (updateCallbackPointer)
+        {
+            if (!memory.TryGetSystemRamOffset(State.R[13], 4, out _)
+                || !memory.TryGetSystemRamOffset(State.R[15] + 8, 4, out _))
+            {
+                return false;
+            }
+
+            var workBase = memory.ReadUInt32(State.R[13]);
+            var modeAddress = workBase + memory.ReadUInt16(0x8C15_C60E);
+            if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _))
+            {
+                return false;
+            }
+
+            var mode = memory.ReadUInt32(modeAddress);
+            var pointerTableOffset = unchecked((1u - mode) * 96);
+            var channelOffset = memory.ReadUInt32(State.R[15] + 8);
+            var callbackPointerBase = workBase + memory.ReadUInt16(0x8C15_C610) + pointerTableOffset;
+            var callbackPointerAddress = callbackPointerBase + channelOffset;
+            if (!memory.TryGetSystemRamOffset(callbackPointerAddress, 4, out _)
+                || !memory.TryGetSystemRamOffset(slot + 16, 4, out _))
+            {
+                return false;
+            }
+
+            var callbackPointer = memory.ReadUInt32(callbackPointerAddress);
+            memory.WriteUInt32(slot + 16, callbackPointer);
+
+            State.R[1] = callbackPointerBase;
+            State.R[2] = callbackPointer;
+            State.R[3] = memory.ReadUInt16(0x8C15_C610);
+        }
+
+        State.R[0] = (uint)(sbyte)memory.ReadByte(slot + 13);
+        State.T = State.R[0] == 0;
+        State.Pc = 0x8C15_C5AC;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaPostSetupFlagTail() =>
+        memory.ReadInstructionUInt16(0x8C15_C57C) == 0x6503
+        && memory.ReadInstructionUInt16(0x8C15_C57E) == 0x84E7
+        && memory.ReadInstructionUInt16(0x8C15_C580) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C15_C582) == 0x8911
+        && memory.ReadInstructionUInt16(0x8C15_C584) == 0x62D2
+        && memory.ReadInstructionUInt16(0x8C15_C586) == 0x9042
+        && memory.ReadInstructionUInt16(0x8C15_C588) == 0x6323
+        && memory.ReadInstructionUInt16(0x8C15_C58A) == 0x013E
+        && memory.ReadInstructionUInt16(0x8C15_C58C) == 0x50F2
+        && memory.ReadInstructionUInt16(0x8C15_C58E) == 0x611B
+        && memory.ReadInstructionUInt16(0x8C15_C590) == 0x7101
+        && memory.ReadInstructionUInt16(0x8C15_C592) == 0x6313
+        && memory.ReadInstructionUInt16(0x8C15_C594) == 0x4100
+        && memory.ReadInstructionUInt16(0x8C15_C596) == 0x313C
+        && memory.ReadInstructionUInt16(0x8C15_C598) == 0x933A
+        && memory.ReadInstructionUInt16(0x8C15_C59A) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C15_C59C) == 0x4108
+        && memory.ReadInstructionUInt16(0x8C15_C59E) == 0x323C
+        && memory.ReadInstructionUInt16(0x8C15_C5A0) == 0x4100
+        && memory.ReadInstructionUInt16(0x8C15_C5A2) == 0x312C
+        && memory.ReadInstructionUInt16(0x8C15_C5A4) == 0x021E
+        && memory.ReadInstructionUInt16(0x8C15_C5A6) == 0x1E24
+        && memory.ReadInstructionUInt16(0x8C15_C5A8) == 0x84ED
+        && memory.ReadInstructionUInt16(0x8C15_C5AA) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C15_C5AC) == 0x8902
+        && memory.ReadUInt16(0x8C15_C60E) == 0x10B4
+        && memory.ReadUInt16(0x8C15_C610) == 0x0FE8;
+
     internal bool TryFastForwardSonicAdventure2AicaInactiveChannelTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
