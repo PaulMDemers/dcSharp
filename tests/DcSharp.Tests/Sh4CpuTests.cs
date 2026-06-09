@@ -488,6 +488,76 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsIpBinSetBitGlyphDrawTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawTail(normalMemory);
+        WriteIpBinGlyphDrawHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawTail(fastMemory);
+        WriteIpBinGlyphDrawHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_8A3E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_8A3E);
+        InitializeIpBinSetBitGlyphDrawTailState(normalMemory, normal);
+        InitializeIpBinSetBitGlyphDrawTailState(fastMemory, fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinSetBitGlyphDrawTail(fastStart, 35, out var skippedInstructions));
+        Assert.Equal(35UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        var expectedDestination = 0x8CED_4000u + ((((479u - 0xBDu) * 640u) + (639u - 0x15Au)) * 4u);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(expectedDestination));
+        Assert.Equal(expectedDestination, fastMemory.ReadUInt32(0x7E00_0F34));
+        Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(0x7E00_0F38));
+        Assert.Equal(0xBDu, fastMemory.ReadUInt32(0x7E00_0F3C));
+        Assert.Equal(0x15Au, fastMemory.ReadUInt32(0x7E00_0F40));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSetBitGlyphDrawTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawTail(memory);
+        WriteIpBinGlyphDrawHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8A3E);
+        InitializeIpBinSetBitGlyphDrawTailState(memory, cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSetBitGlyphDrawTail(start, 34, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_8A40u, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0x8CF8_9894));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSetBitGlyphDrawTailWhenCoordinateIsOutsideFramebuffer()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawTail(memory);
+        WriteIpBinGlyphDrawHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8A3E);
+        InitializeIpBinSetBitGlyphDrawTailState(memory, cpu);
+        cpu.State.R[0] = 400;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSetBitGlyphDrawTail(start, 35, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_8A40u, cpu.State.Pc);
+        Assert.Equal(0u, memory.ReadUInt32(0x8CF8_9894));
+    }
+
+    [Fact]
     public void FastForwardsSegaRally2WinceTimerDeltaHelperReturn()
     {
         var normalMemory = new DreamcastMemory();
@@ -11694,6 +11764,28 @@ public class Sh4CpuTests
         cpu.State.R[5] = 0xA5;
         cpu.State.R[6] = 0x0094_ADBD;
         cpu.State.R[15] = 0x7E00_0F70;
+    }
+
+    private static void WriteIpBinSetBitGlyphDrawTail(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_8A3E, 0x62F3);
+        WriteInstruction(memory, 0x8C00_8A40, 0x7226);
+        WriteInstruction(memory, 0x8C00_8A42, 0x6421);
+        WriteInstruction(memory, 0x8C00_8A44, 0x340C);
+        WriteInstruction(memory, 0x8C00_8A46, 0xD315);
+        WriteInstruction(memory, 0x8C00_8A48, 0x430B);
+        WriteInstruction(memory, 0x8C00_8A4A, 0x0009);
+        memory.WriteUInt32(0x8C00_8A9C, 0x8C00_8AD0);
+    }
+
+    private static void InitializeIpBinSetBitGlyphDrawTailState(DreamcastMemory memory, Sh4Cpu cpu)
+    {
+        cpu.State.Pr = 0x8C00_8A3E;
+        cpu.State.R[0] = 6;
+        cpu.State.R[5] = 0xBD;
+        cpu.State.R[6] = 0x00C0_C0C0;
+        cpu.State.R[15] = 0x7E00_0F44;
+        memory.WriteUInt16(0x7E00_0F6A, 0x0154);
     }
 
     private static void WriteSegaRally2WinceTimerDeltaHelper(DreamcastMemory memory)
