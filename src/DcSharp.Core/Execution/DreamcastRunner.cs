@@ -221,6 +221,13 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8A4C, 0x8C00_8A76)
+                        && cpu.TryFastForwardIpBinGlyphLoopTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var ipBinGlyphLoopTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(ipBinGlyphLoopTailSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_98CC, 0x8C00_996C)
                         && cpu.TryFastForwardIpBinSignedDivideQuotientHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var ipBinSignedDivideQuotientSkippedInstructions))
                     {

@@ -537,6 +537,89 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinGlyphLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8A4C
+            || step.Opcode != 0x52F2
+            || State.Pc != 0x8C00_8A4E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsIpBinGlyphLoopTail())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var geometry = memory.ReadUInt32(stack + 0x20);
+        if (geometry is < 0x7E00_0000 or > 0x7E00_0FF8)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var nextCellIndex = State.R[2] + 1;
+        if (cellLimit == 0 || nextCellIndex > cellLimit)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(stack + 0x08, nextCellIndex);
+        State.R[0] = cellLimit;
+        State.R[3] = (uint)width;
+        State.Macl = cellLimit;
+
+        if (nextCellIndex >= cellLimit)
+        {
+            skippedInstructions = 13;
+            if (maxInstructionsToSkip < skippedInstructions)
+            {
+                skippedInstructions = 0;
+                return false;
+            }
+
+            State.R[2] = nextCellIndex;
+            State.R[1] = geometry;
+            State.T = true;
+            State.Pc = 0x8C00_8A76;
+        }
+        else
+        {
+            skippedInstructions = 18;
+            if (maxInstructionsToSkip < skippedInstructions)
+            {
+                skippedInstructions = 0;
+                return false;
+            }
+
+            var stepValue = memory.ReadUInt32(stack + 0x0C);
+            var nextBitCountdown = memory.ReadUInt32(stack + 0x14) - stepValue;
+            memory.WriteUInt32(stack + 0x14, nextBitCountdown);
+            State.R[1] = nextBitCountdown;
+            State.R[2] = nextBitCountdown;
+            State.R[3] = stepValue;
+            State.T = unchecked((int)nextBitCountdown) >= 0;
+            State.Pc = State.T ? 0x8C00_89F6 : 0x8C00_8A76;
+        }
+
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinGlyphDrawHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         const ulong helperTailInstructions = 28;
@@ -963,6 +1046,29 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
     }
+
+    private bool IsIpBinGlyphLoopTail() =>
+        memory.ReadInstructionUInt16(0x8C00_8A4C) == 0x52F2
+        && memory.ReadInstructionUInt16(0x8C00_8A4E) == 0x7201
+        && memory.ReadInstructionUInt16(0x8C00_8A50) == 0x1F22
+        && memory.ReadInstructionUInt16(0x8C00_8A52) == 0x53F8
+        && memory.ReadInstructionUInt16(0x8C00_8A54) == 0x8532
+        && memory.ReadInstructionUInt16(0x8C00_8A56) == 0x6303
+        && memory.ReadInstructionUInt16(0x8C00_8A58) == 0x51F8
+        && memory.ReadInstructionUInt16(0x8C00_8A5A) == 0x8513
+        && memory.ReadInstructionUInt16(0x8C00_8A5C) == 0x230F
+        && memory.ReadInstructionUInt16(0x8C00_8A5E) == 0x001A
+        && memory.ReadInstructionUInt16(0x8C00_8A60) == 0x3203
+        && memory.ReadInstructionUInt16(0x8C00_8A62) == 0x8B01
+        && memory.ReadInstructionUInt16(0x8C00_8A64) == 0xA007
+        && memory.ReadInstructionUInt16(0x8C00_8A66) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_8A68) == 0x53F3
+        && memory.ReadInstructionUInt16(0x8C00_8A6A) == 0x52F5
+        && memory.ReadInstructionUInt16(0x8C00_8A6C) == 0x3238
+        && memory.ReadInstructionUInt16(0x8C00_8A6E) == 0x1F25
+        && memory.ReadInstructionUInt16(0x8C00_8A70) == 0x51F5
+        && memory.ReadInstructionUInt16(0x8C00_8A72) == 0x4111
+        && memory.ReadInstructionUInt16(0x8C00_8A74) == 0x89BF;
 
     private bool IsIpBinSetBitGlyphDrawPrefix() =>
         memory.ReadInstructionUInt16(0x8C00_8A14) == 0x50F8

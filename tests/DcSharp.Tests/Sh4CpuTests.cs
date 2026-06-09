@@ -421,6 +421,54 @@ public class Sh4CpuTests
         Assert.Equal(4u, memory.ReadUInt32(0x7E00_0F58));
     }
 
+    [Theory]
+    [InlineData(5u, 2u, 18ul)]
+    [InlineData(7u, 0u, 18ul)]
+    [InlineData(239u, 3u, 13ul)]
+    public void FastForwardsIpBinGlyphLoopTail(uint cellIndex, uint bitCountdown, ulong expectedSkippedInstructions)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_8A4C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_8A4C);
+        InitializeIpBinGlyphLoopTailState(normalMemory, normal, cellIndex, bitCountdown);
+        InitializeIpBinGlyphLoopTailState(fastMemory, fast, cellIndex, bitCountdown);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphLoopTail(fastStart, 18, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x7E00_0F4C), fastMemory.ReadUInt32(0x7E00_0F4C));
+        Assert.Equal(normalMemory.ReadUInt32(0x7E00_0F58), fastMemory.ReadUInt32(0x7E00_0F58));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinGlyphLoopTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8A4C);
+        InitializeIpBinGlyphLoopTailState(memory, cpu, cellIndex: 5, bitCountdown: 2);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinGlyphLoopTail(start, 17, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_8A4Eu, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsIpBinGlyphDrawHelper()
     {
@@ -11926,6 +11974,19 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x7E00_0F54, 0);
         memory.WriteUInt32(0x7E00_0F58, bitCountdown);
         memory.Write(0x7E00_0F63, [currentByte]);
+        memory.WriteUInt32(0x7E00_0F64, 0x7E00_0F80);
+        memory.WriteUInt16(0x7E00_0F84, 12);
+        memory.WriteUInt16(0x7E00_0F86, 20);
+    }
+
+    private static void InitializeIpBinGlyphLoopTailState(DreamcastMemory memory, Sh4Cpu cpu, uint cellIndex, uint bitCountdown)
+    {
+        cpu.State.R[15] = 0x7E00_0F44;
+        cpu.State.R[2] = cellIndex;
+        cpu.State.R[9] = 0xCAFE_BABE;
+        memory.WriteUInt32(0x7E00_0F4C, cellIndex);
+        memory.WriteUInt32(0x7E00_0F50, 1);
+        memory.WriteUInt32(0x7E00_0F58, bitCountdown);
         memory.WriteUInt32(0x7E00_0F64, 0x7E00_0F80);
         memory.WriteUInt16(0x7E00_0F84, 12);
         memory.WriteUInt16(0x7E00_0F86, 20);
