@@ -422,6 +422,51 @@ public class Sh4CpuTests
     }
 
     [Theory]
+    [InlineData(0x80, 7u, 1u, 0x8C00_8A14u)]
+    [InlineData(0x7F, 7u, 0u, 0x8C00_8A4Cu)]
+    public void FastForwardsIpBinGlyphBitDispatch(byte currentByte, uint bitCountdown, uint bitResult, uint expectedPc)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_89F6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_89F6);
+        InitializeIpBinZeroBitGlyphLoopState(normalMemory, normal, currentByte, bitCountdown, cellIndex: 27);
+        InitializeIpBinZeroBitGlyphLoopState(fastMemory, fast, currentByte, bitCountdown, cellIndex: 27);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphBitDispatch(fastStart, 14, out var skippedInstructions));
+        Assert.Equal(14UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(expectedPc, fast.State.Pc);
+        Assert.Equal(bitResult, fastMemory.ReadUInt32(0x7E00_0F54));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinGlyphBitDispatchWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_89F6);
+        InitializeIpBinZeroBitGlyphLoopState(memory, cpu, currentByte: 0x80, bitCountdown: 7, cellIndex: 27);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinGlyphBitDispatch(start, 13, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_89F8u, cpu.State.Pc);
+    }
+
+    [Theory]
     [InlineData(5u, 2u, 18ul)]
     [InlineData(7u, 0u, 18ul)]
     [InlineData(239u, 3u, 13ul)]

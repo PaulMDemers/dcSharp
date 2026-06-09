@@ -537,6 +537,53 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinGlyphBitDispatch(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong dispatchInstructions = 14;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_89F6
+            || step.Opcode != 0xE01F
+            || State.Pc != 0x8C00_89F8
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < dispatchInstructions
+            || !IsIpBinGlyphBitDispatch())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FE0)
+        {
+            return false;
+        }
+
+        var mode = memory.ReadUInt32(stack);
+        var mask = memory.ReadByte(stack + 0x07);
+        var bitCountdown = memory.ReadUInt32(stack + 0x14);
+        if (mode != 1 || bitCountdown > 7)
+        {
+            return false;
+        }
+
+        var currentByte = memory.ReadByte(stack + 0x1F);
+        var negatedCountdown = unchecked(0u - bitCountdown);
+        var shifted = (uint)currentByte >> (int)(bitCountdown & 0x1F);
+        var bitResult = shifted & mask;
+        memory.WriteUInt32(stack + 0x10, bitResult);
+
+        State.R[0] = mode;
+        State.R[2] = negatedCountdown;
+        State.R[3] = bitResult;
+        State.T = bitResult == 0;
+        State.Pc = State.T ? 0x8C00_8A4C : 0x8C00_8A14;
+        immediateBranchTarget = State.T ? 0x8C00_8A4C : null;
+        State.InstructionsExecuted += dispatchInstructions;
+        skippedInstructions = dispatchInstructions;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinGlyphLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1046,6 +1093,23 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
     }
+
+    private bool IsIpBinGlyphBitDispatch() =>
+        memory.ReadInstructionUInt16(0x8C00_89F6) == 0xE01F
+        && memory.ReadInstructionUInt16(0x8C00_89F8) == 0x03FC
+        && memory.ReadInstructionUInt16(0x8C00_89FA) == 0x633C
+        && memory.ReadInstructionUInt16(0x8C00_89FC) == 0x52F5
+        && memory.ReadInstructionUInt16(0x8C00_89FE) == 0x622B
+        && memory.ReadInstructionUInt16(0x8C00_8A00) == 0x432D
+        && memory.ReadInstructionUInt16(0x8C00_8A02) == 0x84F7
+        && memory.ReadInstructionUInt16(0x8C00_8A04) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C00_8A06) == 0x2309
+        && memory.ReadInstructionUInt16(0x8C00_8A08) == 0x1F34
+        && memory.ReadInstructionUInt16(0x8C00_8A0A) == 0x60F2
+        && memory.ReadInstructionUInt16(0x8C00_8A0C) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C00_8A0E) == 0x8B01
+        && memory.ReadInstructionUInt16(0x8C00_8A10) == 0x2338
+        && memory.ReadInstructionUInt16(0x8C00_8A12) == 0x891B;
 
     private bool IsIpBinGlyphLoopTail() =>
         memory.ReadInstructionUInt16(0x8C00_8A4C) == 0x52F2
