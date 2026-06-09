@@ -3523,6 +3523,87 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B604
+            || step.Opcode != 0x9368
+            || State.Pc != 0x8C15_B606
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNoWorkSlotScan()
+            || State.R[9] != 24
+            || State.R[14] >= State.R[9])
+        {
+            return false;
+        }
+
+        var basePointerAddress = State.R[10];
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var index = State.R[14];
+        var entryAddress = State.R[12];
+        var nameAddress = workBase + 0xF90 + index;
+        if (!memory.TryGetSystemRamOffset(nameAddress, 1, out _)
+            || !memory.TryGetSystemRamOffset(entryAddress, 7, out _))
+        {
+            return false;
+        }
+
+        var finalR0 = workBase;
+        var finalR3 = nameAddress;
+        var finalR2 = (uint)(sbyte)memory.ReadByte(nameAddress);
+        if (finalR2 == 0)
+        {
+            skippedInstructions = 11;
+        }
+        else
+        {
+            var entryFlag = (uint)(sbyte)memory.ReadByte(entryAddress + 6);
+            if (entryFlag != 0)
+            {
+                finalR0 = entryFlag;
+                skippedInstructions = 14;
+            }
+            else
+            {
+                var mode = memory.ReadByte(entryAddress + 4);
+                if (mode != 0)
+                {
+                    skippedInstructions = 0;
+                    return false;
+                }
+
+                finalR0 = mode;
+                skippedInstructions = 36;
+            }
+        }
+
+        if (maxInstructionsToSkip < skippedInstructions)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var nextIndex = index + 1;
+        State.R[0] = finalR0;
+        State.R[2] = finalR2;
+        State.R[3] = finalR3;
+        State.R[11] += 120;
+        State.R[12] += 44;
+        State.R[14] = nextIndex;
+        State.T = nextIndex >= State.R[9];
+        State.Pc = State.T ? 0x8C15_B690 : 0x8C15_B604;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = State.T ? null : 0x8C15_B604;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaNoWorkSlotScan()
     {
         return memory.ReadInstructionUInt16(0x8C15_B604) == 0x9368
