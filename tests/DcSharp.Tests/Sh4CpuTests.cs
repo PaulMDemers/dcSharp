@@ -2893,6 +2893,7 @@ public class Sh4CpuTests
 
         Assert.Equal(normal.State.Pc, fast.State.Pc);
         Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[1], fast.State.R[1]);
         Assert.Equal(normal.State.R[2], fast.State.R[2]);
         Assert.Equal(normal.State.R[3], fast.State.R[3]);
         Assert.Equal(normal.State.R[11], fast.State.R[11]);
@@ -3026,6 +3027,44 @@ public class Sh4CpuTests
         Assert.False(cpu.TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(step, 35, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C15_B606u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2AicaNoWorkSlotScanEntryWhenModeIsSentinel()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNoWorkSlotScan(normalMemory);
+        WriteSonicAdventure2AicaNoWorkSlotScan(fastMemory);
+        InitializeSonicAdventure2AicaSlotTables(normalMemory, 0x8C20_1000);
+        InitializeSonicAdventure2AicaSlotTables(fastMemory, 0x8C20_1000);
+        normalMemory.Write(0x8C20_1000 + 40 + 44 + 4, [0xFF]);
+        fastMemory.Write(0x8C20_1000 + 40 + 44 + 4, [0xFF]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_B604);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_B604);
+        InitializeSonicAdventure2AicaNoWorkSlotScanState(normalMemory, normal, 0x8C20_0000, 0x8C20_1000);
+        InitializeSonicAdventure2AicaNoWorkSlotScanState(fastMemory, fast, 0x8C20_0000, 0x8C20_1000);
+        SetSonicAdventure2AicaNoWorkSlotScanIndex(normal, 0x8C20_1000, 1);
+        SetSonicAdventure2AicaNoWorkSlotScanIndex(fast, 0x8C20_1000, 1);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(fastStart, 39, out var skippedInstructions));
+        Assert.Equal(39UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[1], fast.State.R[1]);
+        Assert.Equal(normal.State.R[2], fast.State.R[2]);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[11], fast.State.R[11]);
+        Assert.Equal(normal.State.R[12], fast.State.R[12]);
+        Assert.Equal(normal.State.R[14], fast.State.R[14]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
     }
 
     [Fact]
@@ -11663,12 +11702,16 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C15_B63E, 0x8922);
         WriteInstruction(memory, 0x8C15_B640, 0x8800);
         WriteInstruction(memory, 0x8C15_B642, 0x8920);
+        WriteInstruction(memory, 0x8C15_B644, 0x9149);
+        WriteInstruction(memory, 0x8C15_B646, 0x3010);
+        WriteInstruction(memory, 0x8C15_B648, 0x891D);
         WriteInstruction(memory, 0x8C15_B686, 0x7B78);
         WriteInstruction(memory, 0x8C15_B688, 0x7C2C);
         WriteInstruction(memory, 0x8C15_B68A, 0x7E01);
         WriteInstruction(memory, 0x8C15_B68C, 0x3E93);
         WriteInstruction(memory, 0x8C15_B68E, 0x8BB9);
         memory.WriteUInt16(0x8C15_B6D8, 0x0F90);
+        memory.WriteUInt16(0x8C15_B6DA, 0x00FF);
         memory.WriteUInt32(0x8C15_B6F0, 0x8C15_CE5C);
     }
 

@@ -3555,6 +3555,7 @@ public sealed class Sh4Cpu
         }
 
         var finalR0 = workBase;
+        uint? finalR1 = null;
         var finalR3 = nameAddress;
         var finalR2 = (uint)(sbyte)memory.ReadByte(nameAddress);
         if (finalR2 == 0)
@@ -3572,14 +3573,22 @@ public sealed class Sh4Cpu
             else
             {
                 var mode = memory.ReadByte(entryAddress + 4);
-                if (mode != 0)
+                if (mode == 0xFF)
+                {
+                    finalR0 = mode;
+                    finalR1 = mode;
+                    skippedInstructions = 39;
+                }
+                else if (mode != 0)
                 {
                     skippedInstructions = 0;
                     return false;
                 }
-
-                finalR0 = mode;
-                skippedInstructions = 36;
+                else
+                {
+                    finalR0 = mode;
+                    skippedInstructions = 36;
+                }
             }
         }
 
@@ -3591,6 +3600,11 @@ public sealed class Sh4Cpu
 
         var nextIndex = index + 1;
         State.R[0] = finalR0;
+        if (finalR1 is not null)
+        {
+            State.R[1] = finalR1.Value;
+        }
+
         State.R[2] = finalR2;
         State.R[3] = finalR3;
         State.R[11] += 120;
