@@ -571,6 +571,18 @@ public sealed class Sh4Cpu
         var negatedCountdown = unchecked(0u - bitCountdown);
         var shifted = (uint)currentByte >> (int)(bitCountdown & 0x1F);
         var bitResult = shifted & mask;
+        if (bitResult == 0
+            && TryFastForwardIpBinZeroBitGlyphLoopAfterDispatch(
+                stack,
+                mask,
+                currentByte,
+                bitCountdown,
+                maxInstructionsToSkip,
+                out skippedInstructions))
+        {
+            return true;
+        }
+
         memory.WriteUInt32(stack + 0x10, bitResult);
 
         State.R[0] = mode;
@@ -581,6 +593,93 @@ public sealed class Sh4Cpu
         immediateBranchTarget = State.T ? 0x8C00_8A4C : null;
         State.InstructionsExecuted += dispatchInstructions;
         skippedInstructions = dispatchInstructions;
+        return true;
+    }
+
+    private bool TryFastForwardIpBinZeroBitGlyphLoopAfterDispatch(
+        uint stack,
+        byte mask,
+        byte currentByte,
+        uint bitCountdown,
+        ulong maxInstructionsToSkip,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (!IsIpBinGlyphLoopTail()
+            || mask != 1)
+        {
+            return false;
+        }
+
+        var stepValue = memory.ReadUInt32(stack + 0x0C);
+        var geometry = memory.ReadUInt32(stack + 0x20);
+        if (stepValue != 1
+            || geometry is < 0x7E00_0000 or >= 0x7E00_0FF8)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var cellIndex = memory.ReadUInt32(stack + 0x08);
+        if (cellLimit == 0 || cellIndex >= cellLimit)
+        {
+            return false;
+        }
+
+        var zeroIterations = 0ul;
+        var finalCellIndex = cellIndex;
+        var finalBitCountdown = bitCountdown;
+        while (finalBitCountdown <= 7)
+        {
+            var shifted = (uint)currentByte >> (int)finalBitCountdown;
+            if ((shifted & mask) != 0)
+            {
+                break;
+            }
+
+            var nextCellIndex = finalCellIndex + 1;
+            if (nextCellIndex >= cellLimit)
+            {
+                break;
+            }
+
+            zeroIterations++;
+            finalCellIndex = nextCellIndex;
+            finalBitCountdown--;
+        }
+
+        if (zeroIterations == 0)
+        {
+            return false;
+        }
+
+        var totalSkippedInstructions = 14 + 19 + ((zeroIterations - 1) * 34);
+        if (totalSkippedInstructions > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(stack + 0x08, finalCellIndex);
+        memory.WriteUInt32(stack + 0x10, 0);
+        memory.WriteUInt32(stack + 0x14, finalBitCountdown);
+        State.R[0] = cellLimit;
+        State.R[1] = finalBitCountdown;
+        State.R[2] = finalBitCountdown;
+        State.R[3] = stepValue;
+        State.Macl = cellLimit;
+        State.T = finalBitCountdown <= 7;
+        State.Pc = State.T ? 0x8C00_89F6 : 0x8C00_8A76;
+        State.InstructionsExecuted += totalSkippedInstructions;
+        skippedInstructions = totalSkippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
         return true;
     }
 

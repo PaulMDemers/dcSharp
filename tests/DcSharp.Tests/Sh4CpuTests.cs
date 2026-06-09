@@ -451,6 +451,45 @@ public class Sh4CpuTests
         Assert.Equal(bitResult, fastMemory.ReadUInt32(0x7E00_0F54));
     }
 
+    [Theory]
+    [InlineData(0xE8, 4u, 33ul, 0x8C00_89F6u, 28u, 3u)]
+    [InlineData(0xE0, 4u, 169ul, 0x8C00_8A76u, 32u, 0xFFFF_FFFFu)]
+    public void FastForwardsIpBinGlyphBitDispatchAcrossZeroTail(
+        byte currentByte,
+        uint bitCountdown,
+        ulong expectedSkippedInstructions,
+        uint expectedPc,
+        uint expectedCellIndex,
+        uint expectedBitCountdown)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_89F6);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_89F6);
+        InitializeIpBinZeroBitGlyphLoopState(normalMemory, normal, currentByte, bitCountdown, cellIndex: 27);
+        InitializeIpBinZeroBitGlyphLoopState(fastMemory, fast, currentByte, bitCountdown, cellIndex: 27);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphBitDispatch(fastStart, expectedSkippedInstructions, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(expectedPc, fast.State.Pc);
+        Assert.Equal(expectedCellIndex, fastMemory.ReadUInt32(0x7E00_0F4C));
+        Assert.Equal(0u, fastMemory.ReadUInt32(0x7E00_0F54));
+        Assert.Equal(expectedBitCountdown, fastMemory.ReadUInt32(0x7E00_0F58));
+    }
+
     [Fact]
     public void DoesNotFastForwardIpBinGlyphBitDispatchWhenBudgetIsShort()
     {
