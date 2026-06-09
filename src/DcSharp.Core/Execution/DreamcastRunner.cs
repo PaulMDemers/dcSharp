@@ -210,6 +210,13 @@ public sealed class DreamcastRunner
                         scheduler.AdvanceAfterCpuFastForward(ipBinZeroBitGlyphSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
                     else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8AD0, 0x8C00_8B0A)
+                        && cpu.TryFastForwardIpBinGlyphDrawHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var ipBinGlyphDrawSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(ipBinGlyphDrawSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C02_DB34, 0x8C02_DB58)
                         && cpu.TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var segaRally2TimerDeltaSkippedInstructions))
                     {

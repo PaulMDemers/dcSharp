@@ -537,6 +537,102 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinGlyphDrawHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong helperTailInstructions = 28;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8AD0
+            || step.Opcode != 0x7FF0
+            || State.Pc != 0x8C00_8AD2
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < helperTailInstructions)
+        {
+            return false;
+        }
+
+        if (memory.ReadInstructionUInt16(0x8C00_8AD0) != 0x7FF0
+            || memory.ReadInstructionUInt16(0x8C00_8AD2) != 0x1F43
+            || memory.ReadInstructionUInt16(0x8C00_8AD4) != 0x1F52
+            || memory.ReadInstructionUInt16(0x8C00_8AD6) != 0x1F61
+            || memory.ReadInstructionUInt16(0x8C00_8AD8) != 0xD20D
+            || memory.ReadInstructionUInt16(0x8C00_8ADA) != 0x2F22
+            || memory.ReadInstructionUInt16(0x8C00_8ADC) != 0x53F2
+            || memory.ReadInstructionUInt16(0x8C00_8ADE) != 0x9114
+            || memory.ReadInstructionUInt16(0x8C00_8AE0) != 0x3138
+            || memory.ReadInstructionUInt16(0x8C00_8AE2) != 0x6213
+            || memory.ReadInstructionUInt16(0x8C00_8AE4) != 0x4108
+            || memory.ReadInstructionUInt16(0x8C00_8AE6) != 0x312C
+            || memory.ReadInstructionUInt16(0x8C00_8AE8) != 0x4108
+            || memory.ReadInstructionUInt16(0x8C00_8AEA) != 0x4108
+            || memory.ReadInstructionUInt16(0x8C00_8AEC) != 0x4108
+            || memory.ReadInstructionUInt16(0x8C00_8AEE) != 0x4100
+            || memory.ReadInstructionUInt16(0x8C00_8AF0) != 0x50F3
+            || memory.ReadInstructionUInt16(0x8C00_8AF2) != 0x3108
+            || memory.ReadInstructionUInt16(0x8C00_8AF4) != 0x920A
+            || memory.ReadInstructionUInt16(0x8C00_8AF6) != 0x312C
+            || memory.ReadInstructionUInt16(0x8C00_8AF8) != 0x4108
+            || memory.ReadInstructionUInt16(0x8C00_8AFA) != 0x63F2
+            || memory.ReadInstructionUInt16(0x8C00_8AFC) != 0x331C
+            || memory.ReadInstructionUInt16(0x8C00_8AFE) != 0x2F32
+            || memory.ReadInstructionUInt16(0x8C00_8B00) != 0x51F1
+            || memory.ReadInstructionUInt16(0x8C00_8B02) != 0x2312
+            || memory.ReadInstructionUInt16(0x8C00_8B04) != 0x7F10
+            || memory.ReadInstructionUInt16(0x8C00_8B06) != 0x000B
+            || memory.ReadInstructionUInt16(0x8C00_8B08) != 0x0009
+            || memory.ReadUInt16(0x8C00_8B0A) != 0x01DF
+            || memory.ReadUInt16(0x8C00_8B0C) != 0x027F
+            || memory.ReadUInt32(0x8C00_8B10) != 0x8CED_4000)
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FF0)
+        {
+            return false;
+        }
+
+        var x = State.R[4];
+        var y = State.R[5];
+        var color = State.R[6];
+        const uint maxY = 479;
+        const uint maxX = 639;
+        const uint width = maxX + 1;
+        const uint framebufferBase = 0x8CED_4000;
+        if (x > maxX || y > maxY)
+        {
+            return false;
+        }
+
+        var pixelIndex = ((maxY - y) * width) + (maxX - x);
+        var destination = framebufferBase + (pixelIndex * 4);
+        if (!memory.TryGetSystemRamOffset(destination, 4, out _))
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(stack + 12, x);
+        memory.WriteUInt32(stack + 8, y);
+        memory.WriteUInt32(stack + 4, color);
+        memory.WriteUInt32(stack, destination);
+        memory.WriteUInt32(destination, color);
+
+        State.R[0] = x;
+        State.R[1] = color;
+        State.R[2] = maxX;
+        State.R[3] = destination;
+        State.R[15] = stack + 16;
+        State.T = false;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += helperTailInstructions;
+        skippedInstructions = helperTailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         const ulong helperTailInstructions = 14;
