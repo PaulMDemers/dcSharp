@@ -602,6 +602,124 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinSetBitGlyphDrawPrefix(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong maxSkippedInstructionCount = 226;
+        const ulong prefixThroughRemainderTriggerInstructions = 101;
+        const ulong drawTailWithTriggerInstructions = 36;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8A14
+            || step.Opcode != 0x50F8
+            || State.Pc != 0x8C00_8A16
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || !IsIpBinSetBitGlyphDrawPrefix()
+            || !IsIpBinSignedDivideQuotientHelper()
+            || !IsIpBinSignedDivideRemainderHelper()
+            || !IsIpBinGlyphDrawHelper())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0010 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var geometry = State.R[0];
+        if (geometry is < 0x7E00_0000 or > 0x7E00_0FF0)
+        {
+            return false;
+        }
+
+        var colorIndex = memory.ReadUInt32(stack + 0x10);
+        if (colorIndex > 0x3FF)
+        {
+            return false;
+        }
+
+        var colorTable = memory.ReadUInt32(geometry + 0x08);
+        var colorAddress = colorTable + (colorIndex * 4);
+        if (colorTable is < 0x7E00_0000 or > 0x7E00_0FFC
+            || colorAddress < colorTable
+            || colorAddress > 0x7E00_0FFC)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var cellIndex = memory.ReadUInt32(stack + 0x08);
+        if (cellLimit == 0 || cellIndex >= cellLimit)
+        {
+            return false;
+        }
+
+        var divisor = (uint)width;
+        var quotient = cellIndex / divisor;
+        var y = (uint)(short)memory.ReadUInt16(stack + 36) + quotient;
+        var x = (uint)(short)memory.ReadUInt16(stack + 38) + (cellIndex % divisor);
+        var color = memory.ReadUInt32(colorAddress);
+        const uint maxY = 479;
+        const uint maxX = 639;
+        const uint framebufferWidth = maxX + 1;
+        const uint framebufferBase = 0x8CED_4000;
+        if (x > maxX || y > maxY)
+        {
+            return false;
+        }
+
+        var pixelIndex = ((maxY - y) * framebufferWidth) + (maxX - x);
+        var destination = framebufferBase + (pixelIndex * 4);
+        if (!memory.TryGetSystemRamOffset(destination, 4, out _))
+        {
+            return false;
+        }
+
+        var originalR4 = State.R[4];
+        State.R[0] = divisor;
+        State.R[1] = cellIndex;
+        State.R[2] = stack + 36;
+        State.R[3] = 0x8C00_9A28;
+        State.R[4] = originalR4;
+        State.R[15] = stack;
+        State.T = false;
+
+        var remainderTailInstructions = ExecuteIpBinSignedDivideRemainderTail();
+        var drawStack = stack - 16;
+        memory.WriteUInt32(drawStack + 12, x);
+        memory.WriteUInt32(drawStack + 8, y);
+        memory.WriteUInt32(drawStack + 4, color);
+        memory.WriteUInt32(drawStack, destination);
+        memory.WriteUInt32(destination, color);
+
+        State.R[0] = x;
+        State.R[1] = color;
+        State.R[2] = maxX;
+        State.R[3] = destination;
+        State.R[4] = x;
+        State.R[5] = y;
+        State.R[6] = color;
+        State.R[15] = stack;
+        State.Pr = 0x8C00_8A4C;
+        State.T = false;
+        State.Pc = 0x8C00_8A4C;
+        skippedInstructions = prefixThroughRemainderTriggerInstructions + remainderTailInstructions + drawTailWithTriggerInstructions;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinSetBitGlyphDrawTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         const ulong tailInstructions = 35;
@@ -679,6 +797,62 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    private ulong ExecuteIpBinSignedDivideRemainderTail()
+    {
+        ulong skippedInstructions = 0;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[2]);
+        skippedInstructions++;
+        skippedInstructions++;
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[3]);
+        skippedInstructions++;
+        State.R[2] = 0;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[4]);
+        ExecuteDiv0S(2, 1);
+        State.R[4] = State.T ? 1u : 0u;
+        ExecuteSubc(3, 3);
+        ExecuteSubc(2, 1);
+        ExecuteDiv0S(0, 3);
+        skippedInstructions += 8;
+
+        for (var index = 0; index < 32; index++)
+        {
+            ExecuteRotcl(1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 2;
+        }
+
+        ExecuteDiv0S(2, 3);
+        State.R[2] = State.T ? 1u : 0u;
+        State.R[2] ^= State.R[4];
+        ExecuteRotcr(2);
+        skippedInstructions += 4;
+
+        skippedInstructions++;
+        if (State.T)
+        {
+            ExecuteDiv0S(0, 3);
+            State.T = (State.R[3] & 0x1) != 0;
+            State.R[3] = (uint)(unchecked((int)State.R[3]) >> 1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 3;
+        }
+
+        State.R[3] += State.R[4];
+        State.R[0] = State.R[3];
+        State.R[4] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[3] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[2] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        skippedInstructions += 6;
+        return skippedInstructions;
+    }
+
     internal bool TryFastForwardIpBinSignedDivideQuotientHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         const ulong helperTailInstructions = 79;
@@ -746,57 +920,7 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.R[15] -= 4;
-        memory.WriteUInt32(State.R[15], State.R[2]);
-        skippedInstructions++;
-        skippedInstructions++;
-
-        State.R[15] -= 4;
-        memory.WriteUInt32(State.R[15], State.R[3]);
-        skippedInstructions++;
-        State.R[2] = 0;
-        State.R[15] -= 4;
-        memory.WriteUInt32(State.R[15], State.R[4]);
-        ExecuteDiv0S(2, 1);
-        State.R[4] = State.T ? 1u : 0u;
-        ExecuteSubc(3, 3);
-        ExecuteSubc(2, 1);
-        ExecuteDiv0S(0, 3);
-        skippedInstructions += 8;
-
-        for (var index = 0; index < 32; index++)
-        {
-            ExecuteRotcl(1);
-            ExecuteDiv1(0, 3);
-            skippedInstructions += 2;
-        }
-
-        ExecuteDiv0S(2, 3);
-        State.R[2] = State.T ? 1u : 0u;
-        State.R[2] ^= State.R[4];
-        ExecuteRotcr(2);
-        skippedInstructions += 4;
-
-        skippedInstructions++;
-        if (State.T)
-        {
-            ExecuteDiv0S(0, 3);
-            State.T = (State.R[3] & 0x1) != 0;
-            State.R[3] = (uint)(unchecked((int)State.R[3]) >> 1);
-            ExecuteDiv1(0, 3);
-            skippedInstructions += 3;
-        }
-
-        State.R[3] += State.R[4];
-        State.R[0] = State.R[3];
-        State.R[4] = memory.ReadUInt32(State.R[15]);
-        State.R[15] += 4;
-        State.R[3] = memory.ReadUInt32(State.R[15]);
-        State.R[15] += 4;
-        State.R[2] = memory.ReadUInt32(State.R[15]);
-        State.R[15] += 4;
-        skippedInstructions += 6;
-
+        skippedInstructions = ExecuteIpBinSignedDivideRemainderTail();
         State.Pc = State.Pr;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
@@ -839,6 +963,39 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
     }
+
+    private bool IsIpBinSetBitGlyphDrawPrefix() =>
+        memory.ReadInstructionUInt16(0x8C00_8A14) == 0x50F8
+        && memory.ReadInstructionUInt16(0x8C00_8A16) == 0x56F4
+        && memory.ReadInstructionUInt16(0x8C00_8A18) == 0x4608
+        && memory.ReadInstructionUInt16(0x8C00_8A1A) == 0x5002
+        && memory.ReadInstructionUInt16(0x8C00_8A1C) == 0x066E
+        && memory.ReadInstructionUInt16(0x8C00_8A1E) == 0x50F8
+        && memory.ReadInstructionUInt16(0x8C00_8A20) == 0x8502
+        && memory.ReadInstructionUInt16(0x8C00_8A22) == 0x51F2
+        && memory.ReadInstructionUInt16(0x8C00_8A24) == 0xD31B
+        && memory.ReadInstructionUInt16(0x8C00_8A26) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C00_8A28) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_8A2A) == 0x62F3
+        && memory.ReadInstructionUInt16(0x8C00_8A2C) == 0x7224
+        && memory.ReadInstructionUInt16(0x8C00_8A2E) == 0x6521
+        && memory.ReadInstructionUInt16(0x8C00_8A30) == 0x350C
+        && memory.ReadInstructionUInt16(0x8C00_8A32) == 0x50F8
+        && memory.ReadInstructionUInt16(0x8C00_8A34) == 0x8502
+        && memory.ReadInstructionUInt16(0x8C00_8A36) == 0x51F2
+        && memory.ReadInstructionUInt16(0x8C00_8A38) == 0xD317
+        && memory.ReadInstructionUInt16(0x8C00_8A3A) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C00_8A3C) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_8A3E) == 0x62F3
+        && memory.ReadInstructionUInt16(0x8C00_8A40) == 0x7226
+        && memory.ReadInstructionUInt16(0x8C00_8A42) == 0x6421
+        && memory.ReadInstructionUInt16(0x8C00_8A44) == 0x340C
+        && memory.ReadInstructionUInt16(0x8C00_8A46) == 0xD315
+        && memory.ReadInstructionUInt16(0x8C00_8A48) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C00_8A4A) == 0x0009
+        && memory.ReadUInt32(0x8C00_8A94) == 0x8C00_98CC
+        && memory.ReadUInt32(0x8C00_8A98) == 0x8C00_9A28
+        && memory.ReadUInt32(0x8C00_8A9C) == 0x8C00_8AD0;
 
     private bool IsIpBinSignedDivideQuotientHelper()
     {

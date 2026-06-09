@@ -558,6 +558,82 @@ public class Sh4CpuTests
     }
 
     [Theory]
+    [InlineData(0u, 226ul)]
+    [InlineData(17u, 223ul)]
+    [InlineData(35u, 226ul)]
+    public void FastForwardsIpBinSetBitGlyphDrawPrefix(uint cellIndex, ulong expectedSkippedInstructions)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawPrefix(normalMemory);
+        WriteIpBinSignedDivideQuotientHelper(normalMemory);
+        WriteIpBinSignedDivideRemainderHelper(normalMemory);
+        WriteIpBinGlyphDrawHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawPrefix(fastMemory);
+        WriteIpBinSignedDivideQuotientHelper(fastMemory);
+        WriteIpBinSignedDivideRemainderHelper(fastMemory);
+        WriteIpBinGlyphDrawHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_8A14);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_8A14);
+        InitializeIpBinSetBitGlyphDrawPrefixState(normalMemory, normal, cellIndex);
+        InitializeIpBinSetBitGlyphDrawPrefixState(fastMemory, fast, cellIndex);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinSetBitGlyphDrawPrefix(fastStart, 226, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(fast.State.R[3]));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSetBitGlyphDrawPrefixWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawPrefix(memory);
+        WriteIpBinSignedDivideQuotientHelper(memory);
+        WriteIpBinSignedDivideRemainderHelper(memory);
+        WriteIpBinGlyphDrawHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8A14);
+        InitializeIpBinSetBitGlyphDrawPrefixState(memory, cpu, cellIndex: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSetBitGlyphDrawPrefix(start, 225, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_8A16u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinSetBitGlyphDrawPrefixWhenCoordinateIsOutsideFramebuffer()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinSetBitGlyphDrawPrefix(memory);
+        WriteIpBinSignedDivideQuotientHelper(memory);
+        WriteIpBinSignedDivideRemainderHelper(memory);
+        WriteIpBinGlyphDrawHelper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8A14);
+        InitializeIpBinSetBitGlyphDrawPrefixState(memory, cpu, cellIndex: 35);
+        memory.WriteUInt16(0x7E00_0F6A, 0x0300);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinSetBitGlyphDrawPrefix(start, 226, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_8A16u, cpu.State.Pc);
+    }
+
+    [Theory]
     [InlineData(0u, 12u, 0u)]
     [InlineData(17u, 12u, 1u)]
     [InlineData(35u, 12u, 2u)]
@@ -11920,6 +11996,57 @@ public class Sh4CpuTests
         cpu.State.R[6] = 0x00C0_C0C0;
         cpu.State.R[15] = 0x7E00_0F44;
         memory.WriteUInt16(0x7E00_0F6A, 0x0154);
+    }
+
+    private static void WriteIpBinSetBitGlyphDrawPrefix(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_8A14, 0x50F8);
+        WriteInstruction(memory, 0x8C00_8A16, 0x56F4);
+        WriteInstruction(memory, 0x8C00_8A18, 0x4608);
+        WriteInstruction(memory, 0x8C00_8A1A, 0x5002);
+        WriteInstruction(memory, 0x8C00_8A1C, 0x066E);
+        WriteInstruction(memory, 0x8C00_8A1E, 0x50F8);
+        WriteInstruction(memory, 0x8C00_8A20, 0x8502);
+        WriteInstruction(memory, 0x8C00_8A22, 0x51F2);
+        WriteInstruction(memory, 0x8C00_8A24, 0xD31B);
+        WriteInstruction(memory, 0x8C00_8A26, 0x430B);
+        WriteInstruction(memory, 0x8C00_8A28, 0x0009);
+        WriteInstruction(memory, 0x8C00_8A2A, 0x62F3);
+        WriteInstruction(memory, 0x8C00_8A2C, 0x7224);
+        WriteInstruction(memory, 0x8C00_8A2E, 0x6521);
+        WriteInstruction(memory, 0x8C00_8A30, 0x350C);
+        WriteInstruction(memory, 0x8C00_8A32, 0x50F8);
+        WriteInstruction(memory, 0x8C00_8A34, 0x8502);
+        WriteInstruction(memory, 0x8C00_8A36, 0x51F2);
+        WriteInstruction(memory, 0x8C00_8A38, 0xD317);
+        WriteInstruction(memory, 0x8C00_8A3A, 0x430B);
+        WriteInstruction(memory, 0x8C00_8A3C, 0x0009);
+        WriteInstruction(memory, 0x8C00_8A3E, 0x62F3);
+        WriteInstruction(memory, 0x8C00_8A40, 0x7226);
+        WriteInstruction(memory, 0x8C00_8A42, 0x6421);
+        WriteInstruction(memory, 0x8C00_8A44, 0x340C);
+        WriteInstruction(memory, 0x8C00_8A46, 0xD315);
+        WriteInstruction(memory, 0x8C00_8A48, 0x430B);
+        WriteInstruction(memory, 0x8C00_8A4A, 0x0009);
+        memory.WriteUInt32(0x8C00_8A94, 0x8C00_98CC);
+        memory.WriteUInt32(0x8C00_8A98, 0x8C00_9A28);
+        memory.WriteUInt32(0x8C00_8A9C, 0x8C00_8AD0);
+    }
+
+    private static void InitializeIpBinSetBitGlyphDrawPrefixState(DreamcastMemory memory, Sh4Cpu cpu, uint cellIndex)
+    {
+        cpu.State.R[2] = 0xFEED_BEEF;
+        cpu.State.R[4] = 0x1234_5678;
+        cpu.State.R[15] = 0x7E00_0F44;
+        memory.WriteUInt32(0x7E00_0F4C, cellIndex);
+        memory.WriteUInt32(0x7E00_0F54, 1);
+        memory.WriteUInt32(0x7E00_0F64, 0x7E00_0F80);
+        memory.WriteUInt16(0x7E00_0F68, 0x00BD);
+        memory.WriteUInt16(0x7E00_0F6A, 0x0154);
+        memory.WriteUInt32(0x7E00_0F88, 0x7E00_0F74);
+        memory.WriteUInt16(0x7E00_0F84, 12);
+        memory.WriteUInt16(0x7E00_0F86, 20);
+        memory.WriteUInt32(0x7E00_0F78, 0x00C0_C0C0);
     }
 
     private static void WriteIpBinSignedDivideQuotientHelper(DreamcastMemory memory)
