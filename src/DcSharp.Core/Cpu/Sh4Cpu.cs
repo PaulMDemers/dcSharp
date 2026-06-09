@@ -1899,6 +1899,57 @@ public sealed class Sh4Cpu
     internal bool TryFastForwardSonicAdventure2ByteCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
+        if (step.Pc == 0x8C13_4CA8
+            && step.Opcode == 0x4615
+            && State.Pc == 0x8C13_4CAA
+            && delayedBranchTarget is null
+            && immediateBranchTarget is null)
+        {
+            if (!State.T
+                || !IsSonicAdventure2ByteCopyLoop()
+                || State.R[6] == 0)
+            {
+                return false;
+            }
+
+            var byteCount = State.R[6];
+            var source = State.R[4];
+            var entryDestination = State.R[5];
+            if (byteCount > int.MaxValue
+                || source > uint.MaxValue - (byteCount - 1)
+                || entryDestination > uint.MaxValue - (byteCount - 1)
+                || !memory.TryGetSystemRamOffset(source, (int)byteCount, out _)
+                || !memory.TryGetSystemRamOffset(entryDestination, (int)byteCount, out _))
+            {
+                return false;
+            }
+
+            var entrySkippedInstructionCount = 5UL + ((ulong)byteCount * 6UL);
+            if (maxInstructionsToSkip < entrySkippedInstructionCount)
+            {
+                return false;
+            }
+
+            byte entryLastValue = 0;
+            for (var offset = 0u; offset < byteCount; offset++)
+            {
+                entryLastValue = memory.ReadByte(source + offset);
+                memory.Write(entryDestination + offset, [entryLastValue]);
+            }
+
+            State.R[3] = (uint)(sbyte)entryLastValue;
+            State.R[4] = entryDestination + byteCount;
+            State.R[6] = 0;
+            State.R[7] = source + byteCount;
+            State.T = false;
+            State.Pc = State.Pr;
+            State.InstructionsExecuted += entrySkippedInstructionCount;
+            skippedInstructions = entrySkippedInstructionCount;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
+
         if (step.Pc != 0x8C13_4CB8
             || step.Opcode != 0x8DFA
             || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)

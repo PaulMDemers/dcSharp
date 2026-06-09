@@ -1895,6 +1895,81 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2ByteCopyFunctionEntry()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2ByteCopyLoop(normalMemory);
+        WriteSonicAdventure2ByteCopyLoop(fastMemory);
+        normalMemory.Write(0x8C20_2000, [0x11, 0x80, 0x33, 0xF0]);
+        fastMemory.Write(0x8C20_2000, [0x11, 0x80, 0x33, 0xF0]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_4CA8);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_4CA8);
+        normal.State.Pr = 0x8C13_4DD8;
+        fast.State.Pr = 0x8C13_4DD8;
+        normal.State.R[4] = 0x8C20_2000;
+        fast.State.R[4] = 0x8C20_2000;
+        normal.State.R[5] = 0x8C20_3000;
+        fast.State.R[5] = 0x8C20_3000;
+        normal.State.R[6] = 4;
+        fast.State.R[6] = 4;
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2ByteCopyLoop(fastStart, 29, out var skippedInstructions));
+        Assert.Equal(29UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_3000, 4), ReadBytes(fastMemory, 0x8C20_3000, 4));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[4], fast.State.R[4]);
+        Assert.Equal(normal.State.R[6], fast.State.R[6]);
+        Assert.Equal(normal.State.R[7], fast.State.R[7]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2ByteCopyFunctionEntryWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ByteCopyLoop(memory);
+        memory.Write(0x8C20_2000, [0x11, 0x22, 0x33, 0x44]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4CA8);
+        cpu.State.R[4] = 0x8C20_2000;
+        cpu.State.R[5] = 0x8C20_3000;
+        cpu.State.R[6] = 4;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2ByteCopyLoop(start, 28, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_4CAAu, cpu.State.Pc);
+        Assert.Equal(0, memory.ReadByte(0x8C20_3000));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2ByteCopyFunctionEntryWhenLengthIsNotPositive()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ByteCopyLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4CA8);
+        cpu.State.R[4] = 0x8C20_2000;
+        cpu.State.R[5] = 0x8C20_3000;
+        cpu.State.R[6] = 0;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2ByteCopyLoop(start, 10, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_4CAAu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2ByteCopyLoopWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
