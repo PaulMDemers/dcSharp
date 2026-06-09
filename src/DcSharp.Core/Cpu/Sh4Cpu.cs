@@ -725,6 +725,85 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinSignedDivideRemainderHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_9A28
+            || step.Opcode != 0x2008
+            || State.Pc != 0x8C00_9A2A
+            || State.T
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong maxSkippedInstructionCount = 89;
+        if (!IsIpBinSignedDivideRemainderHelper()
+            || maxInstructionsToSkip < maxSkippedInstructionCount
+            || State.R[15] is < 0x7E00_000C or > 0x7E00_0FFC)
+        {
+            return false;
+        }
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[2]);
+        skippedInstructions++;
+        skippedInstructions++;
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[3]);
+        skippedInstructions++;
+        State.R[2] = 0;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[4]);
+        ExecuteDiv0S(2, 1);
+        State.R[4] = State.T ? 1u : 0u;
+        ExecuteSubc(3, 3);
+        ExecuteSubc(2, 1);
+        ExecuteDiv0S(0, 3);
+        skippedInstructions += 8;
+
+        for (var index = 0; index < 32; index++)
+        {
+            ExecuteRotcl(1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 2;
+        }
+
+        ExecuteDiv0S(2, 3);
+        State.R[2] = State.T ? 1u : 0u;
+        State.R[2] ^= State.R[4];
+        ExecuteRotcr(2);
+        skippedInstructions += 4;
+
+        skippedInstructions++;
+        if (State.T)
+        {
+            ExecuteDiv0S(0, 3);
+            State.T = (State.R[3] & 0x1) != 0;
+            State.R[3] = (uint)(unchecked((int)State.R[3]) >> 1);
+            ExecuteDiv1(0, 3);
+            skippedInstructions += 3;
+        }
+
+        State.R[3] += State.R[4];
+        State.R[0] = State.R[3];
+        State.R[4] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[3] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.R[2] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        skippedInstructions += 6;
+
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsIpBinGlyphDrawHelper()
     {
         return memory.ReadInstructionUInt16(0x8C00_8AD0) == 0x7FF0
@@ -792,6 +871,49 @@ public sealed class Sh4Cpu
             && memory.ReadInstructionUInt16(0x8C00_9966) == 0x63F6
             && memory.ReadInstructionUInt16(0x8C00_9968) == 0x000B
             && memory.ReadInstructionUInt16(0x8C00_996A) == 0x62F6;
+    }
+
+    private bool IsIpBinSignedDivideRemainderHelper()
+    {
+        if (memory.ReadInstructionUInt16(0x8C00_9A28) != 0x2008
+            || memory.ReadInstructionUInt16(0x8C00_9A2A) != 0x2F26
+            || memory.ReadInstructionUInt16(0x8C00_9A2C) != 0x8D56
+            || memory.ReadInstructionUInt16(0x8C00_9A2E) != 0x0009
+            || memory.ReadInstructionUInt16(0x8C00_9A30) != 0x2F36
+            || memory.ReadInstructionUInt16(0x8C00_9A32) != 0xE200
+            || memory.ReadInstructionUInt16(0x8C00_9A34) != 0x2F46
+            || memory.ReadInstructionUInt16(0x8C00_9A36) != 0x2127
+            || memory.ReadInstructionUInt16(0x8C00_9A38) != 0x0429
+            || memory.ReadInstructionUInt16(0x8C00_9A3A) != 0x333A
+            || memory.ReadInstructionUInt16(0x8C00_9A3C) != 0x312A
+            || memory.ReadInstructionUInt16(0x8C00_9A3E) != 0x2307)
+        {
+            return false;
+        }
+
+        for (var address = 0x8C00_9A40u; address <= 0x8C00_9ABEu; address += 4)
+        {
+            if (memory.ReadInstructionUInt16(address) != 0x4124
+                || memory.ReadInstructionUInt16(address + 2) != 0x3304)
+            {
+                return false;
+            }
+        }
+
+        return memory.ReadInstructionUInt16(0x8C00_9AC0) == 0x2327
+            && memory.ReadInstructionUInt16(0x8C00_9AC2) == 0x0229
+            && memory.ReadInstructionUInt16(0x8C00_9AC4) == 0x224A
+            && memory.ReadInstructionUInt16(0x8C00_9AC6) == 0x4225
+            && memory.ReadInstructionUInt16(0x8C00_9AC8) == 0x8B02
+            && memory.ReadInstructionUInt16(0x8C00_9ACA) == 0x2307
+            && memory.ReadInstructionUInt16(0x8C00_9ACC) == 0x4321
+            && memory.ReadInstructionUInt16(0x8C00_9ACE) == 0x3304
+            && memory.ReadInstructionUInt16(0x8C00_9AD0) == 0x334C
+            && memory.ReadInstructionUInt16(0x8C00_9AD2) == 0x6033
+            && memory.ReadInstructionUInt16(0x8C00_9AD4) == 0x64F6
+            && memory.ReadInstructionUInt16(0x8C00_9AD6) == 0x63F6
+            && memory.ReadInstructionUInt16(0x8C00_9AD8) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C00_9ADA) == 0x62F6;
     }
 
     internal bool TryFastForwardSegaRally2WinceTimerDeltaHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
