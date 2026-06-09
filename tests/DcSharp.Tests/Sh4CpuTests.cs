@@ -2340,6 +2340,96 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaChannelSetupBridgeToZeroMaskPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(normalMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(fastMemory);
+        InitializeSonicAdventure2AicaChannelSetupBridgeState(normalMemory, 0x8C20_0000, 0x8C20_1000, 0x8C20_4000, 2, 1, 0, 0);
+        InitializeSonicAdventure2AicaChannelSetupBridgeState(fastMemory, 0x8C20_0000, 0x8C20_1000, 0x8C20_4000, 2, 1, 0, 0);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C4DC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C4DC);
+        InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(normal, 2, 1, 0x8C20_5000);
+        InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(fast, 2, 1, 0x8C20_5000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaChannelSetupBridge(fastStart, 64, out var skippedInstructions));
+        Assert.Equal(64UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_1000, 0x1200), ReadBytes(fastMemory, 0x8C20_1000, 0x1200));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FD0, 0x40), ReadBytes(fastMemory, 0x8C20_4FD0, 0x40));
+        Assert.Equal(0x8C15_C572u, fast.State.Pc);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        for (var index = 0; index < 15; index++)
+        {
+            Assert.Equal(normal.State.R[index], fast.State.R[index]);
+        }
+
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2AicaChannelSetupBridgeToActiveMaskPath()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(normalMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(fastMemory);
+        InitializeSonicAdventure2AicaChannelSetupBridgeState(normalMemory, 0x8C20_0000, 0x8C20_1000, 0x8C20_4000, 3, 2, 7, 0xDEAD_BEEF);
+        InitializeSonicAdventure2AicaChannelSetupBridgeState(fastMemory, 0x8C20_0000, 0x8C20_1000, 0x8C20_4000, 3, 2, 7, 0xDEAD_BEEF);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C4DC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C4DC);
+        InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(normal, 3, 2, 0x8C20_5000);
+        InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(fast, 3, 2, 0x8C20_5000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaChannelSetupBridge(fastStart, 67, out var skippedInstructions));
+        Assert.Equal(67UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_1000, 0x1200), ReadBytes(fastMemory, 0x8C20_1000, 0x1200));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FD0, 0x40), ReadBytes(fastMemory, 0x8C20_4FD0, 0x40));
+        Assert.Equal(0x8C15_C564u, fast.State.Pc);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        for (var index = 0; index < 15; index++)
+        {
+            Assert.Equal(normal.State.R[index], fast.State.R[index]);
+        }
+
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaChannelSetupBridgeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(memory);
+        InitializeSonicAdventure2AicaChannelSetupBridgeState(memory, 0x8C20_0000, 0x8C20_1000, 0x8C20_4000, 2, 1, 0, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C15_C4DC);
+        InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(cpu, 2, 1, 0x8C20_5000);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaChannelSetupBridge(start, 63, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_C4DEu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaInactiveChannelTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -10572,6 +10662,81 @@ public class Sh4CpuTests
         memory.WriteUInt16(0x8C15_B954, 0x0F90);
     }
 
+    private static void WriteSonicAdventure2AicaChannelSetupBridge(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_C4DC, 0x2FE6);
+        WriteInstruction(memory, 0x8C15_C4DE, 0x2FD6);
+        WriteInstruction(memory, 0x8C15_C4E0, 0x2FC6);
+        WriteInstruction(memory, 0x8C15_C4E2, 0x2FB6);
+        WriteInstruction(memory, 0x8C15_C4E4, 0x2FA6);
+        WriteInstruction(memory, 0x8C15_C4E6, 0x4F22);
+        WriteInstruction(memory, 0x8C15_C4E8, 0x7FF4);
+        WriteInstruction(memory, 0x8C15_C4EA, 0xDD4A);
+        WriteInstruction(memory, 0x8C15_C4EC, 0x6253);
+        WriteInstruction(memory, 0x8C15_C4EE, 0x4208);
+        WriteInstruction(memory, 0x8C15_C4F0, 0x918D);
+        WriteInstruction(memory, 0x8C15_C4F2, 0x4200);
+        WriteInstruction(memory, 0x8C15_C4F4, 0x2F52);
+        WriteInstruction(memory, 0x8C15_C4F6, 0x63D2);
+        WriteInstruction(memory, 0x8C15_C4F8, 0x7304);
+        WriteInstruction(memory, 0x8C15_C4FA, 0x323C);
+        WriteInstruction(memory, 0x8C15_C4FC, 0xE32C);
+        WriteInstruction(memory, 0x8C15_C4FE, 0x1F21);
+        WriteInstruction(memory, 0x8C15_C500, 0x0437);
+        WriteInstruction(memory, 0x8C15_C502, 0x6ED2);
+        WriteInstruction(memory, 0x8C15_C504, 0x9282);
+        WriteInstruction(memory, 0x8C15_C506, 0x7E28);
+        WriteInstruction(memory, 0x8C15_C508, 0x6AD2);
+        WriteInstruction(memory, 0x8C15_C50A, 0x031A);
+        WriteInstruction(memory, 0x8C15_C50C, 0x3A2C);
+        WriteInstruction(memory, 0x8C15_C50E, 0x60D2);
+        WriteInstruction(memory, 0x8C15_C510, 0x3E3C);
+        WriteInstruction(memory, 0x8C15_C512, 0xE378);
+        WriteInstruction(memory, 0x8C15_C514, 0x0437);
+        WriteInstruction(memory, 0x8C15_C516, 0x031A);
+        WriteInstruction(memory, 0x8C15_C518, 0x3A3C);
+        WriteInstruction(memory, 0x8C15_C51A, 0x6303);
+        WriteInstruction(memory, 0x8C15_C51C, 0x313C);
+        WriteInstruction(memory, 0x8C15_C51E, 0x6112);
+        WriteInstruction(memory, 0x8C15_C520, 0x611B);
+        WriteInstruction(memory, 0x8C15_C522, 0x7101);
+        WriteInstruction(memory, 0x8C15_C524, 0x6313);
+        WriteInstruction(memory, 0x8C15_C526, 0x4100);
+        WriteInstruction(memory, 0x8C15_C528, 0x313C);
+        WriteInstruction(memory, 0x8C15_C52A, 0x9371);
+        WriteInstruction(memory, 0x8C15_C52C, 0x4108);
+        WriteInstruction(memory, 0x8C15_C52E, 0x6B43);
+        WriteInstruction(memory, 0x8C15_C530, 0x4108);
+        WriteInstruction(memory, 0x8C15_C532, 0x4B08);
+        WriteInstruction(memory, 0x8C15_C534, 0x4100);
+        WriteInstruction(memory, 0x8C15_C536, 0x1FB2);
+        WriteInstruction(memory, 0x8C15_C538, 0x303C);
+        WriteInstruction(memory, 0x8C15_C53A, 0x301C);
+        WriteInstruction(memory, 0x8C15_C53C, 0x0BBE);
+        WriteInstruction(memory, 0x8C15_C53E, 0x60E0);
+        WriteInstruction(memory, 0x8C15_C540, 0x80E1);
+        WriteInstruction(memory, 0x8C15_C542, 0x84E4);
+        WriteInstruction(memory, 0x8C15_C544, 0x80E5);
+        WriteInstruction(memory, 0x8C15_C546, 0x51E7);
+        WriteInstruction(memory, 0x8C15_C548, 0x2118);
+        WriteInstruction(memory, 0x8C15_C54A, 0x8D03);
+        WriteInstruction(memory, 0x8C15_C54C, 0xEC00);
+        WriteInstruction(memory, 0x8C15_C54E, 0x51E7);
+        WriteInstruction(memory, 0x8C15_C550, 0x1E18);
+        WriteInstruction(memory, 0x8C15_C552, 0x1EC7);
+        WriteInstruction(memory, 0x8C15_C554, 0xD030);
+        WriteInstruction(memory, 0x8C15_C556, 0xE21F);
+        WriteInstruction(memory, 0x8C15_C558, 0x034C);
+        WriteInstruction(memory, 0x8C15_C55A, 0x2329);
+        WriteInstruction(memory, 0x8C15_C55C, 0x6433);
+        WriteInstruction(memory, 0x8C15_C55E, 0x614C);
+        WriteInstruction(memory, 0x8C15_C560, 0x2118);
+        WriteInstruction(memory, 0x8C15_C562, 0x8906);
+        memory.WriteUInt16(0x8C15_C60C, 0x044C);
+        memory.WriteUInt16(0x8C15_C60E, 0x10B4);
+        memory.WriteUInt16(0x8C15_C610, 0x0FE8);
+    }
+
     private static void WriteSonicAdventure2AicaInactiveChannelTail(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C15_C780, 0x8934);
@@ -10652,6 +10817,48 @@ public class Sh4CpuTests
         cpu.State.R[13] = 0;
         cpu.State.R[14] = basePointerAddress;
         memory.WriteUInt32(basePointerAddress, workBase);
+    }
+
+    private static void InitializeSonicAdventure2AicaChannelSetupBridgeRegisters(Sh4Cpu cpu, uint channel, uint group, uint stack)
+    {
+        cpu.State.Pr = 0x8C15_B92E;
+        cpu.State.R[4] = channel;
+        cpu.State.R[5] = group;
+        cpu.State.R[10] = 0x1010_1010;
+        cpu.State.R[11] = 0x1111_1111;
+        cpu.State.R[12] = 0x1212_1212;
+        cpu.State.R[13] = 0x1313_1313;
+        cpu.State.R[14] = 0x1414_1414;
+        cpu.State.R[15] = stack;
+    }
+
+    private static void InitializeSonicAdventure2AicaChannelSetupBridgeState(
+        DreamcastMemory memory,
+        uint basePointerAddress,
+        uint workBase,
+        uint maskTable,
+        uint channel,
+        uint group,
+        byte mask,
+        uint pendingWord)
+    {
+        memory.WriteUInt32(0x8C15_C614, basePointerAddress);
+        memory.WriteUInt32(0x8C15_C618, maskTable);
+        memory.WriteUInt32(basePointerAddress, workBase);
+        memory.WriteUInt32(workBase + 0x10B4, 1);
+        memory.WriteUInt32(workBase + 0xFE8 + (channel * 4), 0xAC19_1400 + (channel * 0x400));
+        memory.Write(maskTable + channel, [mask]);
+
+        var slot = workBase + 40 + (channel * 44);
+        memory.Write(slot, [0x22]);
+        memory.Write(slot + 4, [0x33]);
+        memory.WriteUInt32(slot + 28, pendingWord);
+        memory.WriteUInt32(slot + 32, 0);
+
+        var firstEntry = workBase + 4 + (group * 8);
+        memory.WriteUInt32(firstEntry, 0xFEED_FACE);
+        var channelWork = workBase + 0x44C + (channel * 120);
+        memory.Write(channelWork + 16, [0x99]);
     }
 
     private static void InitializeSonicAdventure2AicaInactiveChannelTailState(DreamcastMemory memory, Sh4Cpu cpu, uint slot, uint stack)
