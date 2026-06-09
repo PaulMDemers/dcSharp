@@ -3967,6 +3967,49 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C15_C60E) == 0x10B4
         && memory.ReadUInt16(0x8C15_C610) == 0x0FE8;
 
+    internal bool TryFastForwardSonicAdventure2AicaChannelSetupActiveBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C564
+            || step.Opcode != 0x66A3
+            || State.Pc != 0x8C15_C566
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 4;
+        var stackAfterPush = State.R[15] - 4;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaChannelSetupActiveBridge()
+            || !memory.TryGetSystemRamOffset(stackAfterPush, 12, out _))
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(stackAfterPush, State.R[11]);
+
+        State.R[5] = memory.ReadUInt32(stackAfterPush + 8);
+        State.R[7] = State.R[14];
+        State.R[15] = stackAfterPush;
+        State.Pr = 0x8C15_C56E;
+        State.Pc = 0x8C15_C724;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaChannelSetupActiveBridge() =>
+        memory.ReadInstructionUInt16(0x8C15_C564) == 0x66A3
+        && memory.ReadInstructionUInt16(0x8C15_C566) == 0x67E3
+        && memory.ReadInstructionUInt16(0x8C15_C568) == 0x2FB6
+        && memory.ReadInstructionUInt16(0x8C15_C56A) == 0xB0DB
+        && memory.ReadInstructionUInt16(0x8C15_C56C) == 0x55F2
+        && memory.ReadInstructionUInt16(0x8C15_C724) == 0x2FE6;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
