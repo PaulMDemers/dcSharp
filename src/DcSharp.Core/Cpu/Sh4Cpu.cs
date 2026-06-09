@@ -3444,28 +3444,56 @@ public sealed class Sh4Cpu
                 return false;
             }
 
-            lastR0 = workBase;
-            lastR3 = nameAddress;
-            lastR2 = (uint)(sbyte)memory.ReadByte(nameAddress);
-            if (lastR2 == 0)
+            var candidateR0 = workBase;
+            var candidateR3 = nameAddress;
+            var candidateR2 = (uint)(sbyte)memory.ReadByte(nameAddress);
+            if (candidateR2 == 0)
             {
+                lastR0 = candidateR0;
+                lastR2 = candidateR2;
+                lastR3 = candidateR3;
                 skippedInstructionCount += 12;
             }
             else
             {
-                lastR0 = (uint)(sbyte)memory.ReadByte(entryAddress + 6);
-                if (lastR0 != 0)
+                var entryFlag = (uint)(sbyte)memory.ReadByte(entryAddress + 6);
+                if (entryFlag != 0)
                 {
+                    candidateR0 = entryFlag;
+                    lastR0 = candidateR0;
+                    lastR2 = candidateR2;
+                    lastR3 = candidateR3;
                     skippedInstructionCount += 15;
                 }
                 else
                 {
-                    lastR0 = memory.ReadByte(entryAddress + 4);
-                    if (lastR0 != 0)
+                    var mode = memory.ReadByte(entryAddress + 4);
+                    if (mode != 0)
                     {
-                        return false;
+                        if (skippedInstructionCount == 0 || skippedInstructionCount > maxInstructionsToSkip)
+                        {
+                            return false;
+                        }
+
+                        State.R[0] = lastR0;
+                        State.R[2] = lastR2;
+                        State.R[3] = lastR3;
+                        State.R[11] = strideAddress;
+                        State.R[12] = entryAddress;
+                        State.R[14] = index;
+                        State.T = false;
+                        State.Pc = 0x8C15_B604;
+                        State.InstructionsExecuted += skippedInstructionCount;
+                        skippedInstructions = skippedInstructionCount;
+                        delayedBranchTarget = null;
+                        immediateBranchTarget = 0x8C15_B604;
+                        return true;
                     }
 
+                    candidateR0 = mode;
+                    lastR0 = candidateR0;
+                    lastR2 = candidateR2;
+                    lastR3 = candidateR3;
                     skippedInstructionCount += 37;
                 }
             }
