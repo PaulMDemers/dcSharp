@@ -942,7 +942,21 @@ public sealed class Sh4Cpu
         State.Pr = 0x8C00_8A4C;
         State.T = false;
         State.Pc = 0x8C00_8A4C;
-        skippedInstructions = prefixThroughRemainderTriggerInstructions + remainderTailInstructions + drawTailWithTriggerInstructions;
+        var prefixSkippedInstructions = prefixThroughRemainderTriggerInstructions + remainderTailInstructions + drawTailWithTriggerInstructions;
+        if (TryFastForwardIpBinGlyphLoopTailFromEntry(
+            stack,
+            cellIndex,
+            maxInstructionsToSkip - prefixSkippedInstructions,
+            out var loopTailSkippedInstructions))
+        {
+            skippedInstructions = prefixSkippedInstructions + loopTailSkippedInstructions;
+            State.InstructionsExecuted += skippedInstructions;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
+
+        skippedInstructions = prefixSkippedInstructions;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
@@ -1023,6 +1037,86 @@ public sealed class Sh4Cpu
         skippedInstructions = tailInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryFastForwardIpBinGlyphLoopTailFromEntry(
+        uint stack,
+        uint cellIndex,
+        ulong maxInstructionsToSkip,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (!IsIpBinGlyphLoopTail()
+            || stack is < 0x7E00_0000 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var geometry = memory.ReadUInt32(stack + 0x20);
+        if (geometry is < 0x7E00_0000 or > 0x7E00_0FF8)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var nextCellIndex = cellIndex + 1;
+        if (cellLimit == 0 || cellIndex >= cellLimit || nextCellIndex > cellLimit)
+        {
+            return false;
+        }
+
+        if (nextCellIndex >= cellLimit)
+        {
+            skippedInstructions = 14;
+            if (maxInstructionsToSkip < skippedInstructions)
+            {
+                skippedInstructions = 0;
+                return false;
+            }
+
+            memory.WriteUInt32(stack + 0x08, nextCellIndex);
+            State.R[0] = cellLimit;
+            State.R[3] = (uint)width;
+            State.Macl = cellLimit;
+            State.R[1] = geometry;
+            State.R[2] = nextCellIndex;
+            State.T = true;
+            State.Pc = 0x8C00_8A76;
+            return true;
+        }
+
+        skippedInstructions = 19;
+        if (maxInstructionsToSkip < skippedInstructions)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var stepValue = memory.ReadUInt32(stack + 0x0C);
+        if (stepValue == 0)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var nextBitCountdown = memory.ReadUInt32(stack + 0x14) - stepValue;
+        memory.WriteUInt32(stack + 0x08, nextCellIndex);
+        memory.WriteUInt32(stack + 0x14, nextBitCountdown);
+        State.R[0] = cellLimit;
+        State.R[1] = nextBitCountdown;
+        State.R[2] = nextBitCountdown;
+        State.R[3] = stepValue;
+        State.Macl = cellLimit;
+        State.T = unchecked((int)nextBitCountdown) >= 0;
+        State.Pc = State.T ? 0x8C00_89F6 : 0x8C00_8A76;
         return true;
     }
 
