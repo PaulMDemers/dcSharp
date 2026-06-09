@@ -621,10 +621,24 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C726, 0x8C15_C742)
+                        && cpu.TryFastForwardSonicAdventure2AicaActiveChannelHelperPrologue(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaActiveChannelHelperPrologueSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaActiveChannelHelperPrologueSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C624, 0x8C15_C680)
                         && cpu.TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaDescriptorCopySkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaDescriptorCopySkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C746, 0x8C15_C77E)
+                        && cpu.TryFastForwardSonicAdventure2AicaActiveChannelDescriptorTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaActiveChannelDescriptorTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaActiveChannelDescriptorTailSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
