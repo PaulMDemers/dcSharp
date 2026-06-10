@@ -2377,6 +2377,54 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaMirrorCopyLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMirrorCopyLoop(normalMemory);
+        WriteSonicAdventure2AicaMirrorCopyLoop(fastMemory);
+        InitializeSonicAdventure2AicaMirrorCopyLoopData(normalMemory);
+        InitializeSonicAdventure2AicaMirrorCopyLoopData(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_5DDC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_5DDC);
+        normal.State.Pr = 0x8C13_637A;
+        fast.State.Pr = 0x8C13_637A;
+
+        var normalStart = StepMany(normal, 30);
+        var fastStart = StepMany(fast, 30);
+        Assert.Equal(0x8C13_5E16u, fastStart.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaMirrorCopyLoop(fastStart, 576, out var skippedInstructions));
+        Assert.Equal(576UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        for (var offset = 0u; offset < 24u * 24u; offset++)
+        {
+            Assert.Equal(normalMemory.ReadByte(0x8C29_B9DC + offset), fastMemory.ReadByte(0x8C29_B9DC + offset));
+        }
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaMirrorCopyLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMirrorCopyLoop(memory);
+        InitializeSonicAdventure2AicaMirrorCopyLoopData(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_5DDC);
+
+        var start = StepMany(cpu, 30);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaMirrorCopyLoop(start, 575, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaEmptyWorkTableScan()
     {
         var memory = new DreamcastMemory();
@@ -13555,6 +13603,45 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C15_3AE8, 0x8C16_B4CC);
     }
 
+    private static void WriteSonicAdventure2AicaMirrorCopyLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_5DDC, 0xD317);
+        WriteInstruction(memory, 0x8C13_5DDE, 0xE600);
+        WriteInstruction(memory, 0x8C13_5DE0, 0xD51C);
+        WriteInstruction(memory, 0x8C13_5DE2, 0xE718);
+        WriteInstruction(memory, 0x8C13_5DE4, 0x6432);
+        WriteInstruction(memory, 0x8C13_5DE6, 0x7428);
+        WriteInstruction(memory, 0x8C13_5DE8, 0x6240);
+        WriteInstruction(memory, 0x8C13_5DEA, 0x7601);
+        WriteInstruction(memory, 0x8C13_5DEC, 0x3673);
+        WriteInstruction(memory, 0x8C13_5DEE, 0x2520);
+        WriteInstruction(memory, 0x8C13_5DF0, 0x8441);
+        WriteInstruction(memory, 0x8C13_5DF2, 0x8051);
+        WriteInstruction(memory, 0x8C13_5DF4, 0x8442);
+        WriteInstruction(memory, 0x8C13_5DF6, 0x8052);
+        WriteInstruction(memory, 0x8C13_5DF8, 0x8443);
+        WriteInstruction(memory, 0x8C13_5DFA, 0x8053);
+        WriteInstruction(memory, 0x8C13_5DFC, 0x5344);
+        WriteInstruction(memory, 0x8C13_5DFE, 0x1532);
+        WriteInstruction(memory, 0x8C13_5E00, 0x8448);
+        WriteInstruction(memory, 0x8C13_5E02, 0x8054);
+        WriteInstruction(memory, 0x8C13_5E04, 0x8449);
+        WriteInstruction(memory, 0x8C13_5E06, 0x8055);
+        WriteInstruction(memory, 0x8C13_5E08, 0x844A);
+        WriteInstruction(memory, 0x8C13_5E0A, 0x8056);
+        WriteInstruction(memory, 0x8C13_5E0C, 0x844B);
+        WriteInstruction(memory, 0x8C13_5E0E, 0x8057);
+        WriteInstruction(memory, 0x8C13_5E10, 0x5345);
+        WriteInstruction(memory, 0x8C13_5E12, 0x1533);
+        WriteInstruction(memory, 0x8C13_5E14, 0x7518);
+        WriteInstruction(memory, 0x8C13_5E16, 0x8FE7);
+        WriteInstruction(memory, 0x8C13_5E18, 0x742C);
+        WriteInstruction(memory, 0x8C13_5E1A, 0x000B);
+        WriteInstruction(memory, 0x8C13_5E1C, 0x0009);
+        memory.WriteUInt32(0x8C13_5E3C, 0x8C2A_34F8);
+        memory.WriteUInt32(0x8C13_5E54, 0x8C29_B9DC);
+    }
+
     private static void WriteSonicAdventure2AicaOuterWorkPollLoop(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C12_F7F2, 0x4C0B);
@@ -13627,6 +13714,25 @@ public class Sh4CpuTests
         cpu.State.R[14] = 0x8C2D_56C8;
         cpu.State.R[15] = frameAddress;
         cpu.State.T = false;
+    }
+
+    private static void InitializeSonicAdventure2AicaMirrorCopyLoopData(DreamcastMemory memory)
+    {
+        const uint sourceBase = 0x8C2A_23FC;
+        const uint sourceStart = sourceBase + 40;
+        const uint destinationStart = 0x8C29_B9DC;
+        memory.WriteUInt32(0x8C2A_34F8, sourceBase);
+
+        for (var entry = 0u; entry < 24u; entry++)
+        {
+            var source = sourceStart + (entry * 0x2C);
+            var destination = destinationStart + (entry * 0x18);
+            for (var offset = 0u; offset < 24u; offset++)
+            {
+                memory.Write(source + offset, [(byte)((entry * 17u) + offset + 1u)]);
+                memory.Write(destination + offset, [0xCC]);
+            }
+        }
     }
 
     private static void WriteSonicAdventure2AicaWorkTableScan(DreamcastMemory memory)
