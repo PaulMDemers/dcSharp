@@ -5366,6 +5366,38 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaChannelSetupActiveBridgeTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C568
+            || step.Opcode != 0x2FB6
+            || State.Pc != 0x8C15_C56A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 2;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaChannelSetupActiveBridge()
+            || !memory.TryGetSystemRamOffset(State.R[15], 12, out _)
+            || State.R[7] != State.R[14]
+            || memory.ReadUInt32(State.R[15]) != State.R[11])
+        {
+            return false;
+        }
+
+        State.R[5] = memory.ReadUInt32(State.R[15] + 8);
+        State.Pr = 0x8C15_C56E;
+        State.Pc = 0x8C15_C724;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaChannelSetupActiveBridge() =>
         memory.ReadInstructionUInt16(0x8C15_C564) == 0x66A3
         && memory.ReadInstructionUInt16(0x8C15_C566) == 0x67E3
