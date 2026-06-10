@@ -3307,6 +3307,42 @@ public sealed class Sh4Cpu
     internal bool TryFastForwardSonicAdventure2StringHashLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
+        if (step.Pc == 0x8C13_4D94
+            && step.Opcode == 0x9D81
+            && State.Pc == 0x8C13_4D96
+            && delayedBranchTarget is null
+            && immediateBranchTarget is null)
+        {
+            if (!IsSonicAdventure2StringHashLoop()
+                || State.R[13] != 0xDA
+                || !memory.TryGetSystemRamOffset(State.R[15], 12, out _)
+                || !TryReadSonicAdventure2StringHash(State.R[4], 0xDA, maxInstructionsToSkip, entryOverhead: 11, out var hash))
+            {
+                return false;
+            }
+
+            var entrySavedPr = memory.ReadUInt32(State.R[15]);
+            var entrySavedR13 = memory.ReadUInt32(State.R[15] + 4);
+            var entrySavedR14 = memory.ReadUInt32(State.R[15] + 8);
+
+            State.R[0] = hash.Result;
+            State.R[2] = 0;
+            State.R[3] = 97;
+            State.R[4] = hash.LastByte;
+            State.R[5] = hash.LastByte;
+            State.R[13] = entrySavedR13;
+            State.R[14] = entrySavedR14;
+            State.R[15] += 12;
+            State.Pr = entrySavedPr;
+            State.Pc = entrySavedPr;
+            State.T = true;
+            State.InstructionsExecuted += hash.SkippedInstructions;
+            skippedInstructions = hash.SkippedInstructions;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
+
         if (step.Pc != 0x8C13_4DA6
             || step.Opcode != 0x8BF8
             || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
@@ -3324,16 +3360,51 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        var address = State.R[14];
-        var firstByte = memory.ReadByte(address);
-        if (firstByte == 0
-            || State.R[2] != (uint)(sbyte)firstByte)
+        if (!TryReadSonicAdventure2StringHash(State.R[14], State.R[13], maxInstructionsToSkip, entryOverhead: 6, out var loopHash)
+            || State.R[2] != (uint)(sbyte)loopHash.FirstByte)
         {
             return false;
         }
 
-        var maxCharacters = (maxInstructionsToSkip - 6) / 13;
-        var accumulator = State.R[13];
+        var savedPr = memory.ReadUInt32(State.R[15]);
+        var savedR13 = memory.ReadUInt32(State.R[15] + 4);
+        var savedR14 = memory.ReadUInt32(State.R[15] + 8);
+
+        State.R[0] = loopHash.Result;
+        State.R[2] = 0;
+        State.R[3] = 97;
+        State.R[4] = loopHash.LastByte;
+        State.R[5] = loopHash.LastByte;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] += 12;
+        State.Pr = savedPr;
+        State.Pc = savedPr;
+        State.T = true;
+        State.InstructionsExecuted += loopHash.SkippedInstructions;
+        skippedInstructions = loopHash.SkippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryReadSonicAdventure2StringHash(
+        uint source,
+        uint initialAccumulator,
+        ulong maxInstructionsToSkip,
+        ulong entryOverhead,
+        out SonicAdventure2StringHashResult result)
+    {
+        result = default;
+        if (maxInstructionsToSkip < entryOverhead)
+        {
+            return false;
+        }
+
+        var address = source;
+        var maxCharacters = (maxInstructionsToSkip - entryOverhead) / 13;
+        var accumulator = initialAccumulator;
+        uint firstByte = 0;
         uint lastByte = 0;
         var characters = 0UL;
         while (characters < maxCharacters)
@@ -3354,6 +3425,7 @@ public sealed class Sh4Cpu
                 return false;
             }
 
+            firstByte = characters == 0 ? value : firstByte;
             accumulator = unchecked(accumulator + value);
             lastByte = value;
             address++;
@@ -3367,28 +3439,11 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        var skippedInstructionCount = (characters * 13) + 6;
-        var savedPr = memory.ReadUInt32(State.R[15]);
-        var savedR13 = memory.ReadUInt32(State.R[15] + 4);
-        var savedR14 = memory.ReadUInt32(State.R[15] + 8);
-
-        State.R[0] = (accumulator >> 2) & 0xFF;
-        State.R[2] = 0;
-        State.R[3] = 97;
-        State.R[4] = lastByte;
-        State.R[5] = lastByte;
-        State.R[13] = savedR13;
-        State.R[14] = savedR14;
-        State.R[15] += 12;
-        State.Pr = savedPr;
-        State.Pc = savedPr;
-        State.T = true;
-        State.InstructionsExecuted += skippedInstructionCount;
-        skippedInstructions = skippedInstructionCount;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
+        result = new SonicAdventure2StringHashResult(firstByte, lastByte, (accumulator >> 2) & 0xFF, (characters * 13) + entryOverhead);
         return true;
     }
+
+    private readonly record struct SonicAdventure2StringHashResult(uint FirstByte, uint LastByte, uint Result, ulong SkippedInstructions);
 
     internal bool TryFastForwardSonicAdventure2RecordHashScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {

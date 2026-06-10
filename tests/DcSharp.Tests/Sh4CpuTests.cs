@@ -2912,6 +2912,83 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2StringHashFunctionTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2StringHashLoop(normalMemory);
+        WriteSonicAdventure2StringHashLoop(fastMemory);
+        normalMemory.Write(0x8C20_1000, [0x30, 0x47, 0x44, 0x2E, 0x00]);
+        fastMemory.Write(0x8C20_1000, [0x30, 0x47, 0x44, 0x2E, 0x00]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_4D8E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_4D8E);
+        normal.State.Pr = 0x8C09_9998;
+        fast.State.Pr = 0x8C09_9998;
+        normal.State.R[4] = 0x8C20_1000;
+        fast.State.R[4] = 0x8C20_1000;
+        normal.State.R[13] = 0x1111_1111;
+        fast.State.R[13] = 0x1111_1111;
+        normal.State.R[14] = 0x2222_2222;
+        fast.State.R[14] = 0x2222_2222;
+        normal.State.R[15] = 0x8CFF_FF80;
+        fast.State.R[15] = 0x8CFF_FF80;
+
+        var normalStart = StepMany(normal, 4);
+        var fastStart = StepMany(fast, 4);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2StringHashLoop(fastStart, 63, out var skippedInstructions));
+        Assert.Equal(63UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[2], fast.State.R[2]);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[4], fast.State.R[4]);
+        Assert.Equal(normal.State.R[5], fast.State.R[5]);
+        Assert.Equal(normal.State.R[13], fast.State.R[13]);
+        Assert.Equal(normal.State.R[14], fast.State.R[14]);
+        Assert.Equal(normal.State.R[15], fast.State.R[15]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2StringHashFunctionTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2StringHashLoop(memory);
+        memory.Write(0x8C20_1000, [0x30, 0x47, 0x44, 0x2E, 0x00]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4D8E);
+        cpu.State.Pr = 0x8C09_9998;
+        cpu.State.R[4] = 0x8C20_1000;
+        cpu.State.R[15] = 0x8CFF_FF80;
+
+        var start = StepMany(cpu, 4);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2StringHashLoop(start, 62, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2StringHashFunctionTailWhenLowercasePathIsNeeded()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2StringHashLoop(memory);
+        memory.Write(0x8C20_1000, [(byte)'a', 0x00]);
+        var cpu = new Sh4Cpu(memory, 0x8C13_4D8E);
+        cpu.State.Pr = 0x8C09_9998;
+        cpu.State.R[4] = 0x8C20_1000;
+        cpu.State.R[15] = 0x8CFF_FF80;
+
+        var start = StepMany(cpu, 4);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2StringHashLoop(start, 24, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2StringHashLoopWhenLowercasePathIsNeeded()
     {
         var memory = new DreamcastMemory();
