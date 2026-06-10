@@ -1785,6 +1785,66 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2SparseWordClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_7DFA
+            || step.Opcode != 0x24E1
+            || State.Pc != 0x8C16_7DFC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint baseAddress = 0x8C2A_352C;
+        const uint byteLength = 0x0001_8000;
+        const uint limit = baseAddress + byteLength;
+        const uint stride = 24;
+        const ulong fullIterationInstructions = 4;
+        const ulong finalTailInstructions = 3;
+
+        var currentAddress = State.R[4];
+        if (!IsSonicAdventure2SparseWordClearLoop()
+            || State.R[5] != limit
+            || State.R[6] != baseAddress
+            || State.R[14] != 0
+            || currentAddress < baseAddress
+            || currentAddress >= limit
+            || ((currentAddress - baseAddress) % stride) != 0
+            || !memory.TryGetSystemRamOffset(currentAddress, 2, out _))
+        {
+            return false;
+        }
+
+        var remainingSparseBytes = limit - currentAddress - stride;
+        if (remainingSparseBytes > 0 && !memory.TryGetSystemRamOffset(currentAddress + stride, checked((int)remainingSparseBytes), out _))
+        {
+            return false;
+        }
+
+        var entriesIncludingCurrent = (limit - currentAddress) / stride;
+        var skippedInstructionCount = ((ulong)(entriesIncludingCurrent - 1) * fullIterationInstructions) + finalTailInstructions;
+        if (skippedInstructionCount > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        for (var address = currentAddress + stride; address < limit; address += stride)
+        {
+            memory.WriteUInt16(address, 0);
+        }
+
+        State.R[4] = limit;
+        State.T = true;
+        State.Pc = 0x8C16_7E02;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaByteReadHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -9511,6 +9571,19 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_055C) == 0x8BFA
         && memory.ReadUInt32(0x8C10_0654) == 0x8C17_9EC0
         && memory.ReadUInt32(0x8C10_0658) == 0x8C17_9EB4;
+
+    private bool IsSonicAdventure2SparseWordClearLoop() =>
+        memory.ReadInstructionUInt16(0x8C16_7DF0) == 0xD516
+        && memory.ReadInstructionUInt16(0x8C16_7DF2) == 0xEE00
+        && memory.ReadInstructionUInt16(0x8C16_7DF4) == 0xD614
+        && memory.ReadInstructionUInt16(0x8C16_7DF6) == 0x356C
+        && memory.ReadInstructionUInt16(0x8C16_7DF8) == 0x6463
+        && memory.ReadInstructionUInt16(0x8C16_7DFA) == 0x24E1
+        && memory.ReadInstructionUInt16(0x8C16_7DFC) == 0x7418
+        && memory.ReadInstructionUInt16(0x8C16_7DFE) == 0x3452
+        && memory.ReadInstructionUInt16(0x8C16_7E00) == 0x8BFB
+        && memory.ReadUInt32(0x8C16_7E48) == 0x8C2A_352C
+        && memory.ReadUInt32(0x8C16_7E4C) == 0x0001_8000;
 
     private bool IsSonicAdventure2AicaByteReadHelper() =>
         memory.ReadInstructionUInt16(0x8C16_BF10) == 0x4F22
