@@ -5355,6 +5355,69 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaChannelSetupBridgeMaskTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaChannelSetupBridge())
+        {
+            return false;
+        }
+
+        uint mask;
+        uint targetPc;
+        switch (step.Pc)
+        {
+            case 0x8C15_C55C when step.Opcode == 0x6433 && State.Pc == 0x8C15_C55E:
+                skippedInstructions = 3;
+                mask = State.R[4] & 0xFF;
+                if (State.R[2] != 31 || State.R[3] != State.R[4])
+                {
+                    skippedInstructions = 0;
+                    return false;
+                }
+
+                State.R[1] = mask;
+                State.T = mask == 0;
+                targetPc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
+                break;
+
+            case 0x8C15_C55E when step.Opcode == 0x614C && State.Pc == 0x8C15_C560:
+                skippedInstructions = 2;
+                mask = State.R[1];
+                if ((mask & 0xFFFF_FF00) != 0 || State.R[4] != mask)
+                {
+                    skippedInstructions = 0;
+                    return false;
+                }
+
+                State.T = mask == 0;
+                targetPc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
+                break;
+
+            case 0x8C15_C560 when step.Opcode == 0x2118 && State.Pc == 0x8C15_C562:
+                skippedInstructions = 1;
+                targetPc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
+                break;
+
+            default:
+                return false;
+        }
+
+        if (maxInstructionsToSkip < skippedInstructions)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        State.Pc = targetPc;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaChannelSetupBridge() =>
         memory.ReadInstructionUInt16(0x8C15_C4DC) == 0x2FE6
         && memory.ReadInstructionUInt16(0x8C15_C4DE) == 0x2FD6
