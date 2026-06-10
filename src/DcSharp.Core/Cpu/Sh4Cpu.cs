@@ -6809,6 +6809,173 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C15_C144) == 0x0FD8
         && memory.ReadUInt32(0x8C15_C148) == 0x7FFF_FFFF;
 
+    internal bool TryFastForwardSonicAdventure2AicaDescriptorHeadUpdate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C416
+            || step.Opcode != 0x7FFC
+            || State.Pc != 0x8C15_C418
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 69;
+        var stack = State.R[15];
+        var channel = State.R[4];
+        var basePointerAddress = memory.ReadUInt32(0x8C15_C4D4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaDescriptorHeadUpdate()
+            || !memory.TryGetSystemRamOffset(stack, 4, out _)
+            || !memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var modeAddress = workBase + 0x10B4;
+        var branchModeAddress = workBase + 0x10C4;
+        var descriptorIndexAddress = 0x8C17_D8DC + (channel << 2);
+        if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(branchModeAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(descriptorIndexAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var modeIndex = memory.ReadUInt32(modeAddress);
+        var pointerTableOffsetSeed = unchecked(1u - modeIndex);
+        var pointerTableOffset = unchecked((((pointerTableOffsetSeed << 1) + pointerTableOffsetSeed) << 5));
+        var descriptorIndex = memory.ReadUInt32(descriptorIndexAddress);
+        var pointerAddress = workBase + 0x0FE8 + pointerTableOffset + (descriptorIndex << 2);
+        if (!memory.TryGetSystemRamOffset(pointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var descriptorPointer = memory.ReadUInt32(pointerAddress);
+        var descriptorWord = memory.ReadUInt32(descriptorPointer);
+        var branchMode = memory.ReadUInt32(branchModeAddress);
+        if (descriptorWord == 0xFFFF_FFFF || descriptorWord == 0xFFFF_FF00 || branchMode == 1)
+        {
+            return false;
+        }
+
+        var slot = workBase + 4 + (channel << 3);
+        if (!memory.TryGetSystemRamOffset(slot, 8, out _))
+        {
+            return false;
+        }
+
+        var previousByte = memory.ReadByte(slot);
+        var newByte = (byte)(descriptorWord >> 16);
+        var risingBits = (byte)((previousByte ^ newByte) & newByte);
+        var fallingBits = (byte)((previousByte ^ newByte) & ~newByte);
+
+        memory.WriteUInt32(stack, descriptorWord);
+        memory.WriteUInt32(slot + 4, 0);
+        memory.Write(slot + 1, [previousByte]);
+        memory.Write(slot, [newByte]);
+        memory.Write(slot + 2, [risingBits]);
+        memory.Write(slot + 3, [fallingBits]);
+
+        State.R[0] = 0;
+        State.R[1] = 0x10C4;
+        State.R[2] = pointerAddress;
+        State.R[3] = unchecked((uint)(sbyte)~newByte);
+        State.R[4] = 0;
+        State.R[5] = slot;
+        State.R[6] = unchecked((uint)(sbyte)newByte);
+        State.R[7] = 0;
+        State.R[15] = stack + 4;
+        State.T = false;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaDescriptorHeadUpdate() =>
+        memory.ReadInstructionUInt16(0x8C15_C416) == 0x7FFC
+        && memory.ReadInstructionUInt16(0x8C15_C418) == 0xD62E
+        && memory.ReadInstructionUInt16(0x8C15_C41A) == 0x6343
+        && memory.ReadInstructionUInt16(0x8C15_C41C) == 0x4308
+        && memory.ReadInstructionUInt16(0x8C15_C41E) == 0x9254
+        && memory.ReadInstructionUInt16(0x8C15_C420) == 0x6562
+        && memory.ReadInstructionUInt16(0x8C15_C422) == 0x4300
+        && memory.ReadInstructionUInt16(0x8C15_C424) == 0x6062
+        && memory.ReadInstructionUInt16(0x8C15_C426) == 0x4408
+        && memory.ReadInstructionUInt16(0x8C15_C428) == 0x7504
+        && memory.ReadInstructionUInt16(0x8C15_C42A) == 0x914F
+        && memory.ReadInstructionUInt16(0x8C15_C42C) == 0x353C
+        && memory.ReadInstructionUInt16(0x8C15_C42E) == 0x6303
+        && memory.ReadInstructionUInt16(0x8C15_C430) == 0x323C
+        && memory.ReadInstructionUInt16(0x8C15_C432) == 0x6222
+        && memory.ReadInstructionUInt16(0x8C15_C434) == 0x301C
+        && memory.ReadInstructionUInt16(0x8C15_C436) == 0x622B
+        && memory.ReadInstructionUInt16(0x8C15_C438) == 0x7201
+        && memory.ReadInstructionUInt16(0x8C15_C43A) == 0x6323
+        && memory.ReadInstructionUInt16(0x8C15_C43C) == 0x4200
+        && memory.ReadInstructionUInt16(0x8C15_C43E) == 0x323C
+        && memory.ReadInstructionUInt16(0x8C15_C440) == 0x4208
+        && memory.ReadInstructionUInt16(0x8C15_C442) == 0x4208
+        && memory.ReadInstructionUInt16(0x8C15_C444) == 0x4200
+        && memory.ReadInstructionUInt16(0x8C15_C446) == 0x302C
+        && memory.ReadInstructionUInt16(0x8C15_C448) == 0x6203
+        && memory.ReadInstructionUInt16(0x8C15_C44A) == 0xD023
+        && memory.ReadInstructionUInt16(0x8C15_C44C) == 0x034E
+        && memory.ReadInstructionUInt16(0x8C15_C44E) == 0x4308
+        && memory.ReadInstructionUInt16(0x8C15_C450) == 0x323C
+        && memory.ReadInstructionUInt16(0x8C15_C452) == 0x6422
+        && memory.ReadInstructionUInt16(0x8C15_C454) == 0x6342
+        && memory.ReadInstructionUInt16(0x8C15_C456) == 0x2F32
+        && memory.ReadInstructionUInt16(0x8C15_C458) == 0x6033
+        && memory.ReadInstructionUInt16(0x8C15_C45A) == 0x88FF
+        && memory.ReadInstructionUInt16(0x8C15_C45C) == 0x8D05
+        && memory.ReadInstructionUInt16(0x8C15_C45E) == 0xE700
+        && memory.ReadInstructionUInt16(0x8C15_C460) == 0x9135
+        && memory.ReadInstructionUInt16(0x8C15_C462) == 0x3010
+        && memory.ReadInstructionUInt16(0x8C15_C464) == 0x8901
+        && memory.ReadInstructionUInt16(0x8C15_C466) == 0xA00F
+        && memory.ReadInstructionUInt16(0x8C15_C468) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C15_C488) == 0x9123
+        && memory.ReadInstructionUInt16(0x8C15_C48A) == 0x6062
+        && memory.ReadInstructionUInt16(0x8C15_C48C) == 0x001E
+        && memory.ReadInstructionUInt16(0x8C15_C48E) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C15_C490) == 0x8B02
+        && memory.ReadInstructionUInt16(0x8C15_C498) == 0x64F3
+        && memory.ReadInstructionUInt16(0x8C15_C49A) == 0x7402
+        && memory.ReadInstructionUInt16(0x8C15_C49C) == 0x6640
+        && memory.ReadInstructionUInt16(0x8C15_C49E) == 0x6473
+        && memory.ReadInstructionUInt16(0x8C15_C4A0) == 0x1571
+        && memory.ReadInstructionUInt16(0x8C15_C4A2) == 0x6050
+        && memory.ReadInstructionUInt16(0x8C15_C4A4) == 0x8051
+        && memory.ReadInstructionUInt16(0x8C15_C4A6) == 0x2560
+        && memory.ReadInstructionUInt16(0x8C15_C4A8) == 0x8451
+        && memory.ReadInstructionUInt16(0x8C15_C4AA) == 0x6650
+        && memory.ReadInstructionUInt16(0x8C15_C4AC) == 0x206A
+        && memory.ReadInstructionUInt16(0x8C15_C4AE) == 0x2069
+        && memory.ReadInstructionUInt16(0x8C15_C4B0) == 0x8052
+        && memory.ReadInstructionUInt16(0x8C15_C4B2) == 0x6650
+        && memory.ReadInstructionUInt16(0x8C15_C4B4) == 0x6067
+        && memory.ReadInstructionUInt16(0x8C15_C4B6) == 0x6303
+        && memory.ReadInstructionUInt16(0x8C15_C4B8) == 0x8451
+        && memory.ReadInstructionUInt16(0x8C15_C4BA) == 0x206A
+        && memory.ReadInstructionUInt16(0x8C15_C4BC) == 0x2039
+        && memory.ReadInstructionUInt16(0x8C15_C4BE) == 0x8053
+        && memory.ReadInstructionUInt16(0x8C15_C4C0) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C15_C4C2) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_C4C4) == 0x7F04
+        && memory.ReadUInt16(0x8C15_C4CA) == 0x10B4
+        && memory.ReadUInt16(0x8C15_C4CC) == 0x0FE8
+        && memory.ReadUInt16(0x8C15_C4CE) == 0xFF00
+        && memory.ReadUInt16(0x8C15_C4D2) == 0x10C4
+        && memory.ReadUInt32(0x8C15_C4D4) == 0x8C2A_34F8
+        && memory.ReadUInt32(0x8C15_C4D8) == 0x8C17_D8DC;
+
     internal bool TryFastForwardSonicAdventure2AicaPointerMaskHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
