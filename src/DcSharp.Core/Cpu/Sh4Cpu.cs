@@ -3551,6 +3551,70 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_F448) == 0xD207
         && memory.ReadUInt32(0x8C10_F468) == 0x8C10_F638;
 
+    internal bool TryFastForwardSonicAdventure2CacheWritebackLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_F8E0
+            || step.Opcode != 0x04B3
+            || State.Pc != 0x8C10_F8E2
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var remainingIterations = State.R[5];
+        if (remainingIterations == 0
+            || !IsSonicAdventure2CacheWritebackLoop()
+            || !TryGetSonicAdventure2CacheLineSpan(State.R[4], remainingIterations, out _))
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = ((ulong)remainingIterations - 1UL) * 4UL + 3UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        State.R[4] += remainingIterations * 32u;
+        State.R[5] = 0;
+        State.T = true;
+        State.Pc = 0x8C10_F8E8;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryGetSonicAdventure2CacheLineSpan(uint address, uint iterations, out int byteCount)
+    {
+        byteCount = 0;
+        var spanBytes = ((ulong)iterations - 1UL) * 32UL + 1UL;
+        if (spanBytes > int.MaxValue
+            || (ulong)address + ((ulong)iterations * 32UL) > uint.MaxValue
+            || address > uint.MaxValue - (uint)(spanBytes - 1UL))
+        {
+            return false;
+        }
+
+        byteCount = (int)spanBytes;
+        return memory.TryGetSystemRamOffset(address, byteCount, out _);
+    }
+
+    private bool IsSonicAdventure2CacheWritebackLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_F8D8) == 0x751F
+        && memory.ReadInstructionUInt16(0x8C10_F8DA) == 0x4509
+        && memory.ReadInstructionUInt16(0x8C10_F8DC) == 0x4509
+        && memory.ReadInstructionUInt16(0x8C10_F8DE) == 0x4501
+        && memory.ReadInstructionUInt16(0x8C10_F8E0) == 0x04B3
+        && memory.ReadInstructionUInt16(0x8C10_F8E2) == 0x4510
+        && memory.ReadInstructionUInt16(0x8C10_F8E4) == 0x8FFC
+        && memory.ReadInstructionUInt16(0x8C10_F8E6) == 0x7420
+        && memory.ReadInstructionUInt16(0x8C10_F8E8) == 0xD207
+        && memory.ReadUInt32(0x8C10_F908) == 0x8C10_FAD8;
+
     internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
