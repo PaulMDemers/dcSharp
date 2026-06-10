@@ -4079,6 +4079,108 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_C742) == 0x6473
         && memory.ReadInstructionUInt16(0x8C15_C622) == 0x7FFC;
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveChannelDescriptorAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C724
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C15_C726
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 65;
+        var stackAfterFirstPush = State.R[15];
+        var finalStack = stackAfterFirstPush - 24;
+        var descriptorLocalStack = finalStack - 4;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaActiveChannelHelperPrologue()
+            || !IsSonicAdventure2AicaDescriptorCopyHelper()
+            || !IsSonicAdventure2AicaActiveChannelDescriptorTail()
+            || !memory.TryGetSystemRamOffset(descriptorLocalStack, 36, out _))
+        {
+            return false;
+        }
+
+        var workBase = State.R[5];
+        var channelWork = State.R[6];
+        var slot = State.R[7];
+        var localMask = (uint)(byte)State.R[4];
+        var descriptorPointer = memory.ReadUInt32(finalStack + 28);
+        var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !memory.TryGetSystemRamOffset(slot + 2, 22, out _)
+            || !memory.TryGetSystemRamOffset(workBase, 4, out _))
+        {
+            return false;
+        }
+
+        var descriptorWorkBase = memory.ReadUInt32(basePointerAddress);
+        var modeAddress = descriptorWorkBase + memory.ReadUInt16(0x8C15_C714);
+        if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _)
+            || memory.ReadUInt32(modeAddress) == 1)
+        {
+            return false;
+        }
+
+        var descriptor = memory.ReadUInt32(descriptorPointer);
+        var firstByte = (byte)descriptor;
+        if (firstByte == 0xFF || firstByte >= 0xE0)
+        {
+            return false;
+        }
+
+        var workByte0 = (uint)memory.ReadByte(workBase);
+        var workByte2 = (uint)memory.ReadByte(workBase + 2);
+        var workByte3 = (uint)memory.ReadByte(workBase + 3);
+        if ((workByte2 & localMask) != 0
+            || (workByte3 & localMask) != 0
+            || (workByte0 & localMask) != 0)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(stackAfterFirstPush - 4, State.R[13]);
+        memory.WriteUInt32(stackAfterFirstPush - 8, State.R[12]);
+        memory.WriteUInt32(stackAfterFirstPush - 12, State.R[11]);
+        memory.WriteUInt32(stackAfterFirstPush - 16, State.R[10]);
+        memory.WriteUInt32(stackAfterFirstPush - 20, State.Pr);
+        memory.Write(finalStack, [(byte)State.R[4]]);
+        memory.WriteUInt32(descriptorLocalStack, descriptor);
+        memory.Write(slot + 8, [firstByte]);
+        memory.Write(slot + 9, [(byte)(descriptor >> 8)]);
+        memory.Write(slot + 10, [(byte)(descriptor >> 16)]);
+        memory.Write(slot + 11, [(byte)(descriptor >> 24)]);
+        memory.WriteUInt32(slot + 20, 0);
+        memory.Write(slot + 2, [0]);
+        memory.Write(slot + 3, [0]);
+
+        State.R[0] = workByte3;
+        State.R[1] = memory.ReadUInt16(0x8C15_C714);
+        State.R[2] = workByte0;
+        State.R[3] = memory.ReadUInt16(0x8C15_C716);
+        State.R[4] = 1;
+        State.R[5] = localMask;
+        State.R[6] = 0xFF;
+        State.R[10] = workBase;
+        State.R[11] = channelWork;
+        State.R[12] = descriptorPointer;
+        State.R[13] = 0;
+        State.R[14] = slot;
+        State.R[15] = finalStack;
+        State.Pr = 0x8C15_C744;
+        State.T = true;
+        State.Pc = 0x8C15_C780;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaActiveChannelDescriptorTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
