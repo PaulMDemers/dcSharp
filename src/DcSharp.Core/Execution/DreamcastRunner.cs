@@ -698,6 +698,13 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C526, 0x8C15_C564)
+                        && cpu.TryFastForwardSonicAdventure2AicaChannelSetupBridgeCallbackTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaChannelSetupCallbackTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaChannelSetupCallbackTailSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C55C, 0x8C15_C564)
                         && cpu.TryFastForwardSonicAdventure2AicaChannelSetupBridgeMaskTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaChannelSetupMaskTailSkippedInstructions))
                     {

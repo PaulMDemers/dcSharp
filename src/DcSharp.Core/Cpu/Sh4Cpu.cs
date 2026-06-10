@@ -5355,6 +5355,94 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaChannelSetupBridgeCallbackTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C524
+            || step.Opcode != 0x6313
+            || State.Pc != 0x8C15_C526
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var finalStack = State.R[15];
+        if (!IsSonicAdventure2AicaChannelSetupBridge()
+            || !memory.TryGetSystemRamOffset(finalStack, 36, out _)
+            || !memory.TryGetSystemRamOffset(0x8C15_C60C, 18, out _))
+        {
+            return false;
+        }
+
+        var channel = State.R[4];
+        var basePointerAddress = State.R[13];
+        var pointerTableIndex = State.R[3];
+        var maskTable = memory.ReadUInt32(0x8C15_C618);
+        if (State.R[1] != pointerTableIndex
+            || !memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(maskTable + channel, 1, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var slot = workBase + 40 + (channel * 44);
+        var channelWork = workBase + memory.ReadUInt16(0x8C15_C60C) + (channel * 120);
+        var callbackPointerAddress = workBase + memory.ReadUInt16(0x8C15_C610) + (pointerTableIndex * 96) + (channel * 4);
+        if (State.R[0] != workBase
+            || State.R[10] != channelWork
+            || State.R[14] != slot
+            || !memory.TryGetSystemRamOffset(slot, 36, out _)
+            || !memory.TryGetSystemRamOffset(channelWork, 17, out _)
+            || !memory.TryGetSystemRamOffset(callbackPointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var pendingWord = memory.ReadUInt32(slot + 28);
+        var skippedInstructionCount = pendingWord == 0 ? 28UL : 31UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var channelTimesFour = channel * 4;
+        var callbackPointer = memory.ReadUInt32(callbackPointerAddress);
+        var slot0 = memory.ReadByte(slot);
+        var slot4 = memory.ReadByte(slot + 4);
+        var mask = (uint)(memory.ReadByte(maskTable + channel) & 0x1F);
+
+        memory.WriteUInt32(finalStack + 8, channelTimesFour);
+        memory.Write(slot + 1, [slot0]);
+        memory.Write(slot + 5, [slot4]);
+        if (pendingWord != 0)
+        {
+            memory.WriteUInt32(slot + 32, pendingWord);
+            memory.WriteUInt32(slot + 28, 0);
+        }
+
+        State.R[0] = maskTable;
+        State.R[1] = mask;
+        State.R[2] = 31;
+        State.R[3] = mask;
+        State.R[4] = mask;
+        State.R[10] = channelWork;
+        State.R[11] = callbackPointer;
+        State.R[12] = 0;
+        State.R[13] = basePointerAddress;
+        State.R[14] = slot;
+        State.R[15] = finalStack;
+        State.Macl = channel * 120;
+        State.T = mask == 0;
+        State.Pc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaChannelSetupBridgeMaskTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
