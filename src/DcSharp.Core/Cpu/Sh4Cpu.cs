@@ -5878,6 +5878,46 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveChannelDescriptorMaskTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C768
+            || step.Opcode != 0x2058
+            || State.Pc != 0x8C15_C76A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 5;
+        var workBase = State.R[10];
+        var localMask = State.R[5];
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !State.T
+            || !IsSonicAdventure2AicaActiveChannelDescriptorTail()
+            || !memory.TryGetSystemRamOffset(workBase, 1, out _))
+        {
+            return false;
+        }
+
+        var workByte0 = (uint)memory.ReadByte(workBase);
+        if ((workByte0 & localMask) != 0)
+        {
+            return false;
+        }
+
+        State.R[2] = workByte0;
+        State.R[6] = memory.ReadUInt16(0x8C15_C7E4);
+        State.T = true;
+        State.Pc = 0x8C15_C780;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaActiveChannelDescriptorTail() =>
         memory.ReadInstructionUInt16(0x8C15_C744) == 0x60D3
         && memory.ReadInstructionUInt16(0x8C15_C746) == 0x80E2
