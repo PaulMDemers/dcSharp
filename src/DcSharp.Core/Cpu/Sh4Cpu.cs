@@ -1681,6 +1681,76 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2BootWorkSegaFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_04EE
+            || step.Opcode != 0x2462
+            || State.Pc != 0x8C10_04F0
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint baseAddress = 0x8C00_C000;
+        const uint limit = 0x8C00_F400;
+        const uint fillValue = 0x4147_4553; // "SEGA"
+        var currentAddress = State.R[4];
+        var nextAddress = currentAddress + 4;
+        if (!IsSonicAdventure2BootWorkSegaFillLoop()
+            || State.R[5] != limit
+            || State.R[6] != fillValue
+            || currentAddress < baseAddress
+            || currentAddress >= limit
+            || (currentAddress & 3) != 0
+            || nextAddress > limit
+            || !memory.TryGetSystemRamOffset(currentAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var remainingBytes = limit - nextAddress;
+        var skippedInstructionCount = 3UL + ((ulong)(remainingBytes / 4) * 4UL);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(nextAddress, (int)remainingBytes, out _))
+        {
+            return false;
+        }
+
+        for (var address = nextAddress; address < limit; address += 4)
+        {
+            memory.WriteUInt32(address, fillValue);
+        }
+
+        State.R[4] = limit;
+        State.T = true;
+        State.Pc = 0x8C10_04F6;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2BootWorkSegaFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_04E0) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C10_04E2) == 0x7FFC
+        && memory.ReadInstructionUInt16(0x8C10_04E4) == 0xD34E
+        && memory.ReadInstructionUInt16(0x8C10_04E6) == 0xD650
+        && memory.ReadInstructionUInt16(0x8C10_04E8) == 0xD550
+        && memory.ReadInstructionUInt16(0x8C10_04EA) == 0xD44E
+        && memory.ReadInstructionUInt16(0x8C10_04EC) == 0x2F32
+        && memory.ReadInstructionUInt16(0x8C10_04EE) == 0x2462
+        && memory.ReadInstructionUInt16(0x8C10_04F0) == 0x7404
+        && memory.ReadInstructionUInt16(0x8C10_04F2) == 0x3452
+        && memory.ReadInstructionUInt16(0x8C10_04F4) == 0x8BFB
+        && memory.ReadInstructionUInt16(0x8C10_04F6) == 0xB013
+        && memory.ReadUInt32(0x8C10_0620) == 0x8C17_A758
+        && memory.ReadUInt32(0x8C10_0624) == 0x8C00_C000
+        && memory.ReadUInt32(0x8C10_0628) == 0x4147_4553
+        && memory.ReadUInt32(0x8C10_062C) == 0x8C00_F400;
+
     internal bool TryFastForwardSonicAdventure2SystemRamWordClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

@@ -1203,6 +1203,71 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2BootWorkSegaFillLoop()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2BootWorkSegaFillLoop(normalMemory);
+        FillWords(normalMemory, 0x8C00_C000, 0xD00, 0xA5A5_5A5A);
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2BootWorkSegaFillLoop(fastMemory);
+        FillWords(fastMemory, 0x8C00_C000, 0xD00, 0xA5A5_5A5A);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_04EE);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_04EE);
+        InitializeSonicAdventure2BootWorkSegaFillState(normal);
+        InitializeSonicAdventure2BootWorkSegaFillState(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2BootWorkSegaFillLoop(fastStart, 13_311, out var skippedInstructions));
+        Assert.Equal(13_311UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C00_C000, 0x3400), ReadBytes(fastMemory, 0x8C00_C000, 0x3400));
+        Assert.Equal(0x4147_4553u, fastMemory.ReadUInt32(0x8C00_C000));
+        Assert.Equal(0x4147_4553u, fastMemory.ReadUInt32(0x8C00_F3FC));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(0x8C10_04F6u, fast.State.Pc);
+        Assert.Equal(0x8C00_F400u, fast.State.R[4]);
+        Assert.Equal(0x8C00_F400u, fast.State.R[5]);
+        Assert.Equal(0x4147_4553u, fast.State.R[6]);
+        Assert.True(fast.State.T);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2BootWorkSegaFillLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2BootWorkSegaFillLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_04EE);
+        InitializeSonicAdventure2BootWorkSegaFillState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2BootWorkSegaFillLoop(start, 13_310, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_04F0u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2BootWorkSegaFillLoopWhenLiteralDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2BootWorkSegaFillLoop(memory);
+        memory.WriteUInt32(0x8C10_0628, 0x1234_5678);
+        var cpu = new Sh4Cpu(memory, 0x8C10_04EE);
+        InitializeSonicAdventure2BootWorkSegaFillState(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2BootWorkSegaFillLoop(start, 13_311, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2SystemRamWordClearLoop()
     {
         var memory = new DreamcastMemory();
@@ -11584,6 +11649,34 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C14_BC98, 0x0020_0000);
         memory.WriteUInt32(0x8C14_BC9C, 0xA500_0000);
         memory.WriteUInt32(0x8CFF_FF80, 0);
+    }
+
+    private static void WriteSonicAdventure2BootWorkSegaFillLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_04E0, 0x4F22);
+        WriteInstruction(memory, 0x8C10_04E2, 0x7FFC);
+        WriteInstruction(memory, 0x8C10_04E4, 0xD34E);
+        WriteInstruction(memory, 0x8C10_04E6, 0xD650);
+        WriteInstruction(memory, 0x8C10_04E8, 0xD550);
+        WriteInstruction(memory, 0x8C10_04EA, 0xD44E);
+        WriteInstruction(memory, 0x8C10_04EC, 0x2F32);
+        WriteInstruction(memory, 0x8C10_04EE, 0x2462);
+        WriteInstruction(memory, 0x8C10_04F0, 0x7404);
+        WriteInstruction(memory, 0x8C10_04F2, 0x3452);
+        WriteInstruction(memory, 0x8C10_04F4, 0x8BFB);
+        WriteInstruction(memory, 0x8C10_04F6, 0xB013);
+        memory.WriteUInt32(0x8C10_0620, 0x8C17_A758);
+        memory.WriteUInt32(0x8C10_0624, 0x8C00_C000);
+        memory.WriteUInt32(0x8C10_0628, 0x4147_4553);
+        memory.WriteUInt32(0x8C10_062C, 0x8C00_F400);
+    }
+
+    private static void InitializeSonicAdventure2BootWorkSegaFillState(Sh4Cpu cpu)
+    {
+        cpu.State.R[4] = 0x8C00_C000;
+        cpu.State.R[5] = 0x8C00_F400;
+        cpu.State.R[6] = 0x4147_4553;
+        cpu.State.T = false;
     }
 
     private static void WriteSonicAdventure2SystemRamClearLoops(DreamcastMemory memory)
