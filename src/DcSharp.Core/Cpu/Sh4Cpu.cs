@@ -2642,7 +2642,7 @@ public sealed class Sh4Cpu
             || destinationBytes > int.MaxValue
             || source > uint.MaxValue - (uint)(sourceBytes - 1)
             || destination > uint.MaxValue - (uint)(destinationBytes - 1)
-            || !IsAicaRamAddress(source, (int)sourceBytes)
+            || !CanFastForwardG2PioReadWordSource(source, (int)sourceBytes)
             || !memory.TryGetSystemRamOffset(destination, (int)destinationBytes, out _))
         {
             return false;
@@ -11395,6 +11395,17 @@ public sealed class Sh4Cpu
         return physical >= 0x0080_0000
             && physical <= 0x00A0_0000 - (uint)length;
     }
+
+    private static bool IsAicaRegisterAddress(uint address, int length)
+    {
+        var physical = DreamcastMemory.NormalizePhysicalAddress(DreamcastMemory.TranslateAddress(address));
+        return physical >= 0x0070_0000
+            && physical <= 0x0071_000C - (uint)length;
+    }
+
+    private static bool CanFastForwardG2PioReadWordSource(uint address, int length) =>
+        IsAicaRamAddress(address, length)
+        || IsAicaRegisterAddress(address, length);
 
     private static bool IsExpansionProbeAddress(uint address, int length)
     {
