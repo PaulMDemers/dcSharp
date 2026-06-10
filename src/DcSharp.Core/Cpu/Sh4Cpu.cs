@@ -4390,6 +4390,103 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C15_C60E) == 0x10B4
         && memory.ReadUInt16(0x8C15_C610) == 0x0FE8;
 
+    internal bool TryFastForwardSonicAdventure2AicaPostSetupReturnAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C57C
+            || step.Opcode != 0x6503
+            || State.Pc != 0x8C15_C57E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2AicaPostSetupFlagTail()
+            || !IsSonicAdventure2AicaChannelFlagReturnTail()
+            || !memory.TryGetSystemRamOffset(State.R[14], 20, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 36, out _))
+        {
+            return false;
+        }
+
+        var slot = State.R[14];
+        var stack = State.R[15];
+        var updateCallbackPointer = memory.ReadByte(slot + 7) != 0;
+        var postSetupSkippedInstructionCount = updateCallbackPointer ? 23UL : 5UL;
+        const ulong branchInstructionCount = 1;
+        const ulong returnTailSkippedInstructionCount = 19;
+        var totalSkippedInstructionCount = postSetupSkippedInstructionCount + branchInstructionCount + returnTailSkippedInstructionCount;
+        var status = (uint)(sbyte)memory.ReadByte(slot + 13);
+        if (maxInstructionsToSkip < totalSkippedInstructionCount || status != 0)
+        {
+            return false;
+        }
+
+        if (updateCallbackPointer)
+        {
+            if (!memory.TryGetSystemRamOffset(State.R[13], 4, out _)
+                || !memory.TryGetSystemRamOffset(stack + 8, 4, out _))
+            {
+                return false;
+            }
+
+            var workBase = memory.ReadUInt32(State.R[13]);
+            var modeAddress = workBase + memory.ReadUInt16(0x8C15_C60E);
+            if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _))
+            {
+                return false;
+            }
+
+            var mode = memory.ReadUInt32(modeAddress);
+            var pointerTableOffset = unchecked((1u - mode) * 96);
+            var channelOffset = memory.ReadUInt32(stack + 8);
+            var callbackPointerBase = workBase + memory.ReadUInt16(0x8C15_C610) + pointerTableOffset;
+            var callbackPointerAddress = callbackPointerBase + channelOffset;
+            if (!memory.TryGetSystemRamOffset(callbackPointerAddress, 4, out _))
+            {
+                return false;
+            }
+
+            var callbackPointer = memory.ReadUInt32(callbackPointerAddress);
+            memory.WriteUInt32(slot + 16, callbackPointer);
+
+            State.R[1] = callbackPointerBase;
+            State.R[2] = callbackPointer;
+            State.R[3] = memory.ReadUInt16(0x8C15_C610);
+        }
+
+        var savedPr = memory.ReadUInt32(stack + 12);
+        var savedR10 = memory.ReadUInt32(stack + 16);
+        var savedR11 = memory.ReadUInt32(stack + 20);
+        var savedR12 = memory.ReadUInt32(stack + 24);
+        var savedR13 = memory.ReadUInt32(stack + 28);
+        var savedR14 = memory.ReadUInt32(stack + 32);
+        var flag2 = memory.ReadByte(slot + 2);
+        var flag3 = memory.ReadByte(slot + 3);
+        var combinedFlags = (byte)(memory.ReadByte(slot + 12) | flag2);
+        memory.Write(slot + 12, [combinedFlags]);
+        combinedFlags = (byte)(combinedFlags | flag3);
+        memory.Write(slot + 12, [combinedFlags]);
+
+        State.R[0] = State.R[5];
+        State.R[3] = (uint)(sbyte)flag3;
+        State.R[10] = savedR10;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = stack + 36;
+        State.Pr = savedPr;
+        State.T = true;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += totalSkippedInstructionCount;
+        skippedInstructions = totalSkippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaInactiveChannelTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
