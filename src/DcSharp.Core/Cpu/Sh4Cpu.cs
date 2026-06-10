@@ -3518,6 +3518,150 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2RecordNameParse(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_4DBE
+            || step.Opcode != 0x4F22
+            || State.Pc != 0x8C13_4DC0
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var source = State.R[13];
+        var destination = State.R[5];
+        if (!IsSonicAdventure2RecordNameParseHelper()
+            || !memory.TryGetSystemRamOffset(State.R[15], 16, out _)
+            || !memory.TryGetSystemRamOffset(source, 34, out _))
+        {
+            return false;
+        }
+
+        var firstByte = memory.ReadByte(source);
+        var flags = memory.ReadByte(source + 25);
+        var nameLength = memory.ReadByte(source + 32);
+        var flagsIncludeFullName = (flags & 0x02) != 0;
+        var copiedNameLength = flagsIncludeFullName ? nameLength : nameLength - 2u;
+        if (firstByte < 34
+            || (!flagsIncludeFullName && nameLength < 3)
+            || copiedNameLength == 0
+            || !memory.TryGetSystemRamOffset(source + 33, (int)copiedNameLength, out _))
+        {
+            return false;
+        }
+
+        var name = new byte[copiedNameLength];
+        for (var offset = 0u; offset < copiedNameLength; offset++)
+        {
+            name[offset] = memory.ReadByte(source + 33 + offset);
+        }
+
+        byte[] hashedName;
+        ulong skippedInstructionCount;
+        if (flagsIncludeFullName && name[0] == 0)
+        {
+            if (copiedNameLength != 1)
+            {
+                return false;
+            }
+
+            hashedName = [(byte)'.'];
+            skippedInstructionCount = 159;
+        }
+        else if (flagsIncludeFullName && name[0] == 1)
+        {
+            if (copiedNameLength != 1)
+            {
+                return false;
+            }
+
+            hashedName = [(byte)'.', (byte)'.'];
+            skippedInstructionCount = 176;
+        }
+        else
+        {
+            hashedName = name;
+            skippedInstructionCount = flagsIncludeFullName
+                ? 145UL + (13UL * copiedNameLength)
+                : 134UL + (19UL * copiedNameLength);
+        }
+
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !TryComputeSonicAdventure2StringHash(hashedName, out var hash)
+            || !memory.TryGetSystemRamOffset(destination, 10 + hashedName.Length + 1, out _))
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(State.R[15]);
+        var savedR12 = memory.ReadUInt32(State.R[15] + 4);
+        var savedR13 = memory.ReadUInt32(State.R[15] + 8);
+        var savedR14 = memory.ReadUInt32(State.R[15] + 12);
+
+        memory.Write(destination, [
+            memory.ReadByte(source + 2),
+            memory.ReadByte(source + 3),
+            memory.ReadByte(source + 4),
+            memory.ReadByte(source + 5)]);
+        memory.Write(destination + 4, [
+            memory.ReadByte(source + 10),
+            memory.ReadByte(source + 11),
+            memory.ReadByte(source + 12),
+            memory.ReadByte(source + 13)]);
+        memory.Write(destination + 8, [flags]);
+        memory.Write(destination + 10, name);
+        memory.Write(destination + 10 + copiedNameLength, [0]);
+        memory.Write(destination + 10, hashedName);
+        memory.Write(destination + 10 + (uint)hashedName.Length, [0]);
+        memory.Write(destination + 9, [(byte)hash.Result]);
+
+        State.R[0] = firstByte;
+        State.R[2] = 0;
+        State.R[3] = 97;
+        State.R[4] = hash.LastByte;
+        State.R[5] = hash.LastByte;
+        State.R[6] = 0;
+        State.R[7] = source + 33 + copiedNameLength;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] += 16;
+        State.Pr = savedPr;
+        State.Pc = savedPr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private static bool TryComputeSonicAdventure2StringHash(ReadOnlySpan<byte> source, out SonicAdventure2StringHashResult result)
+    {
+        result = default;
+        if (source.IsEmpty)
+        {
+            return false;
+        }
+
+        uint accumulator = 0xDA;
+        foreach (var value in source)
+        {
+            if (value == 0
+                || value >= (byte)'a')
+            {
+                return false;
+            }
+
+            accumulator = unchecked(accumulator + value);
+        }
+
+        result = new SonicAdventure2StringHashResult(source[0], source[^1], (accumulator >> 2) & 0xFF, 0);
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2RecordHashScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -10569,6 +10713,83 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_FF4E) == 0x0009
         && memory.ReadUInt16(0x8C10_FF8E) == 0x0A00
         && memory.ReadUInt16(0x8C10_FF90) == 0x0080;
+
+    private bool IsSonicAdventure2RecordNameParseHelper() =>
+        memory.ReadInstructionUInt16(0x8C13_4DB4) == 0x2FE6
+        && memory.ReadInstructionUInt16(0x8C13_4DB6) == 0xE222
+        && memory.ReadInstructionUInt16(0x8C13_4DB8) == 0x2FD6
+        && memory.ReadInstructionUInt16(0x8C13_4DBA) == 0x6D43
+        && memory.ReadInstructionUInt16(0x8C13_4DBC) == 0x2FC6
+        && memory.ReadInstructionUInt16(0x8C13_4DBE) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C13_4DC0) == 0x63D0
+        && memory.ReadInstructionUInt16(0x8C13_4DC2) == 0x633C
+        && memory.ReadInstructionUInt16(0x8C13_4DC4) == 0x3323
+        && memory.ReadInstructionUInt16(0x8C13_4DC6) == 0x8D02
+        && memory.ReadInstructionUInt16(0x8C13_4DC8) == 0x6E53
+        && memory.ReadInstructionUInt16(0x8C13_4DCE) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C13_4DD0) == 0x65E3
+        && memory.ReadInstructionUInt16(0x8C13_4DD2) == 0xE604
+        && memory.ReadInstructionUInt16(0x8C13_4DD4) == 0xBF68
+        && memory.ReadInstructionUInt16(0x8C13_4DD6) == 0x7402
+        && memory.ReadInstructionUInt16(0x8C13_4DD8) == 0x65E3
+        && memory.ReadInstructionUInt16(0x8C13_4DDA) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C13_4DDC) == 0x7504
+        && memory.ReadInstructionUInt16(0x8C13_4DDE) == 0xE604
+        && memory.ReadInstructionUInt16(0x8C13_4DE0) == 0xBF62
+        && memory.ReadInstructionUInt16(0x8C13_4DE2) == 0x740A
+        && memory.ReadInstructionUInt16(0x8C13_4DE4) == 0xE019
+        && memory.ReadInstructionUInt16(0x8C13_4DE6) == 0x00DC
+        && memory.ReadInstructionUInt16(0x8C13_4DE8) == 0x80E8
+        && memory.ReadInstructionUInt16(0x8C13_4DEA) == 0xE020
+        && memory.ReadInstructionUInt16(0x8C13_4DEC) == 0x0CDC
+        && memory.ReadInstructionUInt16(0x8C13_4DEE) == 0x84E8
+        && memory.ReadInstructionUInt16(0x8C13_4DF0) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C13_4DF2) == 0xC802
+        && memory.ReadInstructionUInt16(0x8C13_4DF4) == 0x8F01
+        && memory.ReadInstructionUInt16(0x8C13_4DF6) == 0x6CCC
+        && memory.ReadInstructionUInt16(0x8C13_4DF8) == 0x7CFE
+        && memory.ReadInstructionUInt16(0x8C13_4DFA) == 0x65E3
+        && memory.ReadInstructionUInt16(0x8C13_4DFC) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C13_4DFE) == 0x750A
+        && memory.ReadInstructionUInt16(0x8C13_4E00) == 0x66C3
+        && memory.ReadInstructionUInt16(0x8C13_4E02) == 0xBF51
+        && memory.ReadInstructionUInt16(0x8C13_4E04) == 0x7421
+        && memory.ReadInstructionUInt16(0x8C13_4E06) == 0x63E3
+        && memory.ReadInstructionUInt16(0x8C13_4E08) == 0x730A
+        && memory.ReadInstructionUInt16(0x8C13_4E0A) == 0xE400
+        && memory.ReadInstructionUInt16(0x8C13_4E0C) == 0x3C3C
+        && memory.ReadInstructionUInt16(0x8C13_4E0E) == 0x2C40
+        && memory.ReadInstructionUInt16(0x8C13_4E10) == 0x84E8
+        && memory.ReadInstructionUInt16(0x8C13_4E12) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C13_4E14) == 0xC802
+        && memory.ReadInstructionUInt16(0x8C13_4E16) == 0x890D
+        && memory.ReadInstructionUInt16(0x8C13_4E18) == 0x84EA
+        && memory.ReadInstructionUInt16(0x8C13_4E1A) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C13_4E1C) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C13_4E1E) == 0xE52E
+        && memory.ReadInstructionUInt16(0x8C13_4E20) == 0x6053
+        && memory.ReadInstructionUInt16(0x8C13_4E22) == 0xA007
+        && memory.ReadInstructionUInt16(0x8C13_4E24) == 0x80EA
+        && memory.ReadInstructionUInt16(0x8C13_4E26) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C13_4E28) == 0x8B04
+        && memory.ReadInstructionUInt16(0x8C13_4E2A) == 0x6053
+        && memory.ReadInstructionUInt16(0x8C13_4E2C) == 0x80EA
+        && memory.ReadInstructionUInt16(0x8C13_4E2E) == 0x80EB
+        && memory.ReadInstructionUInt16(0x8C13_4E30) == 0x6043
+        && memory.ReadInstructionUInt16(0x8C13_4E32) == 0x80EC
+        && memory.ReadInstructionUInt16(0x8C13_4E34) == 0x64E3
+        && memory.ReadInstructionUInt16(0x8C13_4E36) == 0xBFAA
+        && memory.ReadInstructionUInt16(0x8C13_4E38) == 0x740A
+        && memory.ReadInstructionUInt16(0x8C13_4E3A) == 0x80E9
+        && memory.ReadInstructionUInt16(0x8C13_4E3C) == 0x60D0
+        && memory.ReadInstructionUInt16(0x8C13_4E3E) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C13_4E40) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C13_4E42) == 0x6CF6
+        && memory.ReadInstructionUInt16(0x8C13_4E44) == 0x6DF6
+        && memory.ReadInstructionUInt16(0x8C13_4E46) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C13_4E48) == 0x6EF6
+        && IsSonicAdventure2ByteCopyLoop()
+        && IsSonicAdventure2StringHashLoop();
 
     private bool IsSonicAdventure2RecordHashScan() =>
         memory.ReadInstructionUInt16(0x8C13_4F3E) == 0x84E9
