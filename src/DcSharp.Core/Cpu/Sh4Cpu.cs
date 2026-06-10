@@ -5258,6 +5258,103 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaChannelSetupBridgeEntryTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C4FA
+            || step.Opcode != 0x323C
+            || State.Pc != 0x8C15_C4FC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var finalStack = State.R[15];
+        if (!IsSonicAdventure2AicaChannelSetupBridge()
+            || !memory.TryGetSystemRamOffset(finalStack, 36, out _)
+            || !memory.TryGetSystemRamOffset(0x8C15_C60C, 18, out _))
+        {
+            return false;
+        }
+
+        var group = memory.ReadUInt32(finalStack);
+        var channel = State.R[4];
+        var basePointerAddress = State.R[13];
+        var maskTable = memory.ReadUInt32(0x8C15_C618);
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(maskTable + channel, 1, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var firstEntry = workBase + 4 + (group * 8);
+        var slot = workBase + 40 + (channel * 44);
+        var channelWork = workBase + memory.ReadUInt16(0x8C15_C60C) + (channel * 120);
+        var modeAddress = workBase + memory.ReadUInt16(0x8C15_C60E);
+        if (State.R[2] != firstEntry
+            || State.R[3] != workBase + 4
+            || !memory.TryGetSystemRamOffset(modeAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var pointerTableIndex = unchecked(1u - memory.ReadUInt32(modeAddress));
+        var pointerTableOffset = pointerTableIndex * 96;
+        var callbackPointerAddress = workBase + memory.ReadUInt16(0x8C15_C610) + pointerTableOffset + (channel * 4);
+        if (!memory.TryGetSystemRamOffset(firstEntry, 4, out _)
+            || !memory.TryGetSystemRamOffset(slot, 36, out _)
+            || !memory.TryGetSystemRamOffset(channelWork, 17, out _)
+            || !memory.TryGetSystemRamOffset(callbackPointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var pendingWord = memory.ReadUInt32(slot + 28);
+        var skippedInstructionCount = pendingWord == 0 ? 49UL : 52UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var channelTimesFour = channel * 4;
+        var callbackPointer = memory.ReadUInt32(callbackPointerAddress);
+        var slot0 = memory.ReadByte(slot);
+        var slot4 = memory.ReadByte(slot + 4);
+        var mask = (uint)(memory.ReadByte(maskTable + channel) & 0x1F);
+
+        memory.WriteUInt32(finalStack + 4, firstEntry);
+        memory.WriteUInt32(finalStack + 8, channelTimesFour);
+        memory.Write(slot + 1, [slot0]);
+        memory.Write(slot + 5, [slot4]);
+        if (pendingWord != 0)
+        {
+            memory.WriteUInt32(slot + 32, pendingWord);
+            memory.WriteUInt32(slot + 28, 0);
+        }
+
+        State.R[0] = maskTable;
+        State.R[1] = mask;
+        State.R[2] = 31;
+        State.R[3] = mask;
+        State.R[4] = mask;
+        State.R[10] = channelWork;
+        State.R[11] = callbackPointer;
+        State.R[12] = 0;
+        State.R[13] = basePointerAddress;
+        State.R[14] = slot;
+        State.R[15] = finalStack;
+        State.Macl = channel * 120;
+        State.T = mask == 0;
+        State.Pc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaChannelSetupBridge() =>
         memory.ReadInstructionUInt16(0x8C15_C4DC) == 0x2FE6
         && memory.ReadInstructionUInt16(0x8C15_C4DE) == 0x2FD6
