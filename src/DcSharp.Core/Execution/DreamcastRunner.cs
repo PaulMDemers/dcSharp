@@ -559,6 +559,13 @@ public sealed class DreamcastRunner
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_C6F8, 0x8C16_C858)
+                        && cpu.TryFastForwardSonicAdventure2AicaEmptyWorkTableScanSetupTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaEmptyWorkTableScanSetupTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaEmptyWorkTableScanSetupTailSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_C6F8, 0x8C16_C858)
                         && cpu.TryFastForwardSonicAdventure2AicaEmptyWorkTableScan(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaEmptyWorkTableScanSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaEmptyWorkTableScanSkippedInstructions, cpu.State.InstructionsExecuted);

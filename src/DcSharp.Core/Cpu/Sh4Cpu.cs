@@ -2290,6 +2290,87 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaEmptyWorkTableScanSetupTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_C6FA
+            || step.Opcode != 0xE16C
+            || State.Pc != 0x8C16_C6FC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint stride = 0x70;
+        const uint tableOffset = 0x460;
+        const uint statusOffset = 0x6C;
+        const uint limit = 0x1C00;
+        const uint exitPc = 0x8C16_C838;
+        const ulong instructionsPerEntry = 19;
+        const ulong skippedSetupInstructions = 4;
+        var currentOffset = State.R[10];
+        if (!IsSonicAdventure2AicaWorkTableScan()
+            || currentOffset >= limit
+            || (currentOffset % stride) != 0
+            || State.R[1] != statusOffset
+            || State.R[3] != 0x8C18_33A4)
+        {
+            return false;
+        }
+
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        if (workGlobal == 0 || !memory.TryGetSystemRamOffset(workGlobal, 4, out _))
+        {
+            return false;
+        }
+
+        var tableBase = memory.ReadUInt32(workGlobal);
+        if (tableBase == 0)
+        {
+            return false;
+        }
+
+        var entriesToSkip = (limit - currentOffset) / stride;
+        var skippedInstructionCount = (entriesToSkip * instructionsPerEntry) - skippedSetupInstructions;
+        if (skippedInstructionCount > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        uint lastStatus = 0;
+        for (var offset = currentOffset; offset < limit; offset += stride)
+        {
+            var statusAddress = tableBase + tableOffset + offset + statusOffset;
+            if (!memory.TryGetSystemRamOffset(statusAddress, 4, out _))
+            {
+                return false;
+            }
+
+            lastStatus = memory.ReadUInt32(statusAddress);
+            if (lastStatus == 1)
+            {
+                return false;
+            }
+        }
+
+        var advancedOffset = limit - currentOffset;
+        State.R[0] = lastStatus;
+        State.R[1] = statusOffset;
+        State.R[2] = limit;
+        State.R[3] = 0x8C18_33A4;
+        State.R[4] = workGlobal;
+        State.R[9] += advancedOffset;
+        State.R[10] = limit;
+        State.T = true;
+        State.Pc = exitPc;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaWorkEntryStatusScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
