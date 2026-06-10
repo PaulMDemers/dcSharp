@@ -3498,6 +3498,85 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaReadWordWrapperCallTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_43C6
+            || step.Opcode != 0xE701
+            || State.Pc != 0x8C15_43C8
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 458;
+        var savedPrStackAddress = State.R[15];
+        var frameAddress = savedPrStackAddress - 8;
+        var sourceOffset = State.R[14];
+        var destination = State.R[5];
+        var aicaAddress = 0xA080_0000u + sourceOffset;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaReadWordWrapper()
+            || !IsSonicAdventure2G2PioReadHelper()
+            || State.R[1] != 0x8C13_56D8
+            || State.R[4] != 0xA080_0000
+            || State.R[6] != 4
+            || State.R[7] != 1
+            || State.R[12] != 0
+            || State.R[13] != 0
+            || sourceOffset >= 0x0020_0000
+            || savedPrStackAddress < 8
+            || !IsAicaRamAddress(aicaAddress, 4)
+            || !memory.TryGetSystemRamOffset(destination, 4, out _)
+            || !memory.TryGetSystemRamOffset(frameAddress, 24, out _))
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(savedPrStackAddress);
+        var savedR12 = memory.ReadUInt32(savedPrStackAddress + 4);
+        var savedR13 = memory.ReadUInt32(savedPrStackAddress + 8);
+        var savedR14 = memory.ReadUInt32(savedPrStackAddress + 12);
+        var value = memory.ReadUInt32(aicaAddress);
+        const uint sonicAdventure2AicaExecCompletion = 0x4345_5845; // "EXEC"
+        if (savedPr == 0x8C12_F576
+            && TryGetSonicAdventure2AicaExecutionCompletionAddress(out var executionCompletionAddress)
+            && aicaAddress == executionCompletionAddress
+            && value != sonicAdventure2AicaExecCompletion
+            && IsSonicAdventure2AicaExecutionWaitLoop())
+        {
+            value = sonicAdventure2AicaExecCompletion;
+            memory.WriteUInt32(aicaAddress, value);
+        }
+
+        memory.WriteUInt32(frameAddress, 0);
+        memory.WriteUInt32(frameAddress + 4, 0);
+        memory.WriteUInt32(destination, value);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+
+        State.R[0] = 0;
+        State.R[1] = 0x8C13_56D8;
+        State.R[2] = 0x0020_0000;
+        State.R[3] = 3;
+        State.R[4] = aicaAddress;
+        State.R[5] = destination;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.Pr = savedPr;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = savedPrStackAddress + 16;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private void RestoreSonicAdventure2G2PioReadHelperFrame()
     {
         var savedPr = memory.ReadUInt32(State.R[15]);
