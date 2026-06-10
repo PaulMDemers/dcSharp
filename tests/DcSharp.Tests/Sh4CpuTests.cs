@@ -2486,6 +2486,42 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2G2DmaStatusClearHelperTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaStatusClearLoop(normalMemory);
+        WriteSonicAdventure2G2DmaStatusClearLoop(fastMemory);
+        InitializeSonicAdventure2G2DmaStatusTable(normalMemory);
+        InitializeSonicAdventure2G2DmaStatusTable(fastMemory);
+        normalMemory.WriteUInt32(0xA05F_783C, 1);
+        fastMemory.WriteUInt32(0xA05F_783C, 1);
+        var normal = new Sh4Cpu(normalMemory, 0x8C17_09E0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C17_09E0);
+        InitializeSonicAdventure2G2DmaStatusClearHelperState(normal);
+        InitializeSonicAdventure2G2DmaStatusClearHelperState(fast);
+
+        var normalStart = StepMany(normal, 5);
+        var fastStart = StepMany(fast, 5);
+        Assert.Equal(0x8C17_09E8u, fastStart.Pc);
+        Assert.Equal(0x8C17_09EAu, fast.State.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2G2DmaStatusClearHelperTail(fastStart, 8, out var skippedInstructions));
+        Assert.Equal(8UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0xA05F_783C), fastMemory.ReadUInt32(0xA05F_783C));
+        Assert.Equal(0x8C15_B172u, fast.State.Pc);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2G2DmaStatusClearLoopForInvalidChannel()
     {
         var memory = new DreamcastMemory();
@@ -2503,6 +2539,39 @@ public class Sh4CpuTests
         var branch = cpu.Step();
 
         Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaStatusClearLoop(branch, 60, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2G2DmaStatusClearHelperTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaStatusClearLoop(memory);
+        InitializeSonicAdventure2G2DmaStatusTable(memory);
+        memory.WriteUInt32(0xA05F_783C, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C17_09E0);
+        InitializeSonicAdventure2G2DmaStatusClearHelperState(cpu);
+
+        var start = StepMany(cpu, 5);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaStatusClearHelperTail(start, 7, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(1u, memory.ReadUInt32(0xA05F_783C));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2G2DmaStatusClearHelperTailForInvalidChannel()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaStatusClearLoop(memory);
+        InitializeSonicAdventure2G2DmaStatusTable(memory);
+        memory.WriteUInt32(0x8C2A_2218, 4);
+        var cpu = new Sh4Cpu(memory, 0x8C17_09E0);
+        InitializeSonicAdventure2G2DmaStatusClearHelperState(cpu);
+
+        var start = StepMany(cpu, 5);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaStatusClearHelperTail(start, 8, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
     }
 
@@ -13841,6 +13910,16 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C2A_2218, 1);
         memory.WriteUInt32(0x8C2A_224C, 2);
         memory.WriteUInt32(0x8C2A_2280, 3);
+    }
+
+    private static void InitializeSonicAdventure2G2DmaStatusClearHelperState(Sh4Cpu cpu)
+    {
+        cpu.State.Pr = 0x8C15_B172;
+        cpu.State.R[4] = 0x8C2A_2218;
+        cpu.State.R[11] = 0x8C17_09E0;
+        cpu.State.R[12] = 0x8C18_3544;
+        cpu.State.R[13] = 0xD0;
+        cpu.State.R[14] = 0x34;
     }
 
     private static void InitializeSonicAdventure2G2DmaStatusSetHelperState(Sh4Cpu cpu)
