@@ -2988,6 +2988,79 @@ public class Sh4CpuTests
         Assert.Equal(0UL, skippedInstructions);
     }
 
+    [Theory]
+    [InlineData(0u, 0x01u, 58UL)]
+    [InlineData(2u, 0x07u, 40UL)]
+    public void FastForwardsSonicAdventure2InterruptSourceEmptyScanTail(uint indexBeforeIncrement, uint pendingMask, ulong expectedSkippedInstructions)
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptSourceBitScan(normalMemory);
+        WriteSonicAdventure2InterruptSourceBitScan(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_FF42);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_FF42);
+        InitializeSonicAdventure2InterruptSourceEmptyScanTailState(normal, indexBeforeIncrement, pendingMask);
+        InitializeSonicAdventure2InterruptSourceEmptyScanTailState(fast, indexBeforeIncrement, pendingMask);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(fastStart, expectedSkippedInstructions, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C10_FF4Cu, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2InterruptSourceEmptyScanTailWhenRemainingBitIsPending()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptSourceBitScan(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FF42);
+        InitializeSonicAdventure2InterruptSourceEmptyScanTailState(cpu, 0, 0x02);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(start, 58, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2InterruptSourceEmptyScanTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptSourceBitScan(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FF42);
+        InitializeSonicAdventure2InterruptSourceEmptyScanTailState(cpu, 0, 0x01);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(start, 57, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2InterruptSourceEmptyScanTailWhenSignatureDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptSourceBitScan(memory);
+        WriteInstruction(memory, 0x8C10_FF44, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FF42);
+        InitializeSonicAdventure2InterruptSourceEmptyScanTailState(cpu, 0, 0x01);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(start, 58, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
     [Fact]
     public void DoesNotFastForwardSonicAdventure2StringHashLoopWhenLowercasePathIsNeeded()
     {
@@ -12729,6 +12802,36 @@ public class Sh4CpuTests
         memory.WriteUInt16(0x8C13_4E9A, 0x00DA);
     }
 
+    private static void WriteSonicAdventure2InterruptSourceBitScan(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C10_FF20, 0x2CC8);
+        WriteInstruction(memory, 0x8C10_FF22, 0x8D15);
+        WriteInstruction(memory, 0x8C10_FF24, 0xEE01);
+        WriteInstruction(memory, 0x8C10_FF26, 0x9B33);
+        WriteInstruction(memory, 0x8C10_FF28, 0x9A31);
+        WriteInstruction(memory, 0x8C10_FF2A, 0xA00B);
+        WriteInstruction(memory, 0x8C10_FF2C, 0x6D43);
+        WriteInstruction(memory, 0x8C10_FF2E, 0x63E3);
+        WriteInstruction(memory, 0x8C10_FF30, 0x43DC);
+        WriteInstruction(memory, 0x8C10_FF32, 0x23C8);
+        WriteInstruction(memory, 0x8C10_FF34, 0x8905);
+        WriteInstruction(memory, 0x8C10_FF36, 0x64D3);
+        WriteInstruction(memory, 0x8C10_FF38, 0x4408);
+        WriteInstruction(memory, 0x8C10_FF3A, 0x4408);
+        WriteInstruction(memory, 0x8C10_FF3C, 0x4400);
+        WriteInstruction(memory, 0x8C10_FF3E, 0xBF86);
+        WriteInstruction(memory, 0x8C10_FF40, 0x34AC);
+        WriteInstruction(memory, 0x8C10_FF42, 0x7D01);
+        WriteInstruction(memory, 0x8C10_FF44, 0x62E3);
+        WriteInstruction(memory, 0x8C10_FF46, 0x42DC);
+        WriteInstruction(memory, 0x8C10_FF48, 0x32B0);
+        WriteInstruction(memory, 0x8C10_FF4A, 0x8BF0);
+        WriteInstruction(memory, 0x8C10_FF4C, 0xA017);
+        WriteInstruction(memory, 0x8C10_FF4E, 0x0009);
+        memory.WriteUInt16(0x8C10_FF8E, 0x0A00);
+        memory.WriteUInt16(0x8C10_FF90, 0x0080);
+    }
+
     private static void WriteSonicAdventure2RecordHashScan(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C13_4F3E, 0x84E9);
@@ -13328,6 +13431,17 @@ public class Sh4CpuTests
         cpu.State.R[13] = 0xD0;
         cpu.State.R[14] = currentOffset;
         cpu.State.R[15] = 0x8CFF_FF38;
+    }
+
+    private static void InitializeSonicAdventure2InterruptSourceEmptyScanTailState(Sh4Cpu cpu, uint indexBeforeIncrement, uint pendingMask)
+    {
+        cpu.State.Pr = 0x8C10_FF42;
+        cpu.State.R[10] = 0xA00;
+        cpu.State.R[11] = 0x80;
+        cpu.State.R[12] = pendingMask;
+        cpu.State.R[13] = indexBeforeIncrement;
+        cpu.State.R[14] = 1;
+        cpu.State.R[15] = 0x8CFF_FF94;
     }
 
     private static void InitializeSonicAdventure2AicaSlotCleanupLoopState(DreamcastMemory memory, Sh4Cpu cpu, uint basePointerAddress, uint workBase)

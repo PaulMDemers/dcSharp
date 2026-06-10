@@ -3445,6 +3445,79 @@ public sealed class Sh4Cpu
 
     private readonly record struct SonicAdventure2StringHashResult(uint FirstByte, uint LastByte, uint Result, ulong SkippedInstructions);
 
+    internal bool TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FF42
+            || step.Opcode != 0x7D01
+            || State.Pc != 0x8C10_FF44
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2InterruptSourceBitScan()
+            || State.R[10] != 0xA00
+            || State.R[11] != 0x80
+            || State.R[13] == 0
+            || State.R[13] > 7
+            || State.R[14] != 1)
+        {
+            return false;
+        }
+
+        var index = State.R[13];
+        var mask = State.R[12];
+        var r2 = State.R[2];
+        var r3 = State.R[3];
+        var estimatedInstructions = 0UL;
+        while (true)
+        {
+            r2 = 1;
+            estimatedInstructions++;
+            r2 <<= (int)index;
+            estimatedInstructions++;
+            var terminal = r2 == State.R[11];
+            estimatedInstructions++;
+            estimatedInstructions++;
+            if (terminal)
+            {
+                break;
+            }
+
+            r3 = 1;
+            estimatedInstructions++;
+            r3 <<= (int)index;
+            estimatedInstructions++;
+            if ((mask & r3) != 0)
+            {
+                return false;
+            }
+
+            estimatedInstructions++;
+            estimatedInstructions++;
+            index++;
+            estimatedInstructions++;
+        }
+
+        if (estimatedInstructions > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        State.R[2] = r2;
+        State.R[3] = r3;
+        State.R[13] = index;
+        State.T = true;
+        State.Pc = 0x8C10_FF4C;
+        State.InstructionsExecuted += estimatedInstructions;
+        skippedInstructions = estimatedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2RecordHashScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -10468,6 +10541,34 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C13_4DB0) == 0x000B
         && memory.ReadInstructionUInt16(0x8C13_4DB2) == 0x6EF6
         && memory.ReadUInt16(0x8C13_4E9A) == 0x00DA;
+
+    private bool IsSonicAdventure2InterruptSourceBitScan() =>
+        memory.ReadInstructionUInt16(0x8C10_FF20) == 0x2CC8
+        && memory.ReadInstructionUInt16(0x8C10_FF22) == 0x8D15
+        && memory.ReadInstructionUInt16(0x8C10_FF24) == 0xEE01
+        && memory.ReadInstructionUInt16(0x8C10_FF26) == 0x9B33
+        && memory.ReadInstructionUInt16(0x8C10_FF28) == 0x9A31
+        && memory.ReadInstructionUInt16(0x8C10_FF2A) == 0xA00B
+        && memory.ReadInstructionUInt16(0x8C10_FF2C) == 0x6D43
+        && memory.ReadInstructionUInt16(0x8C10_FF2E) == 0x63E3
+        && memory.ReadInstructionUInt16(0x8C10_FF30) == 0x43DC
+        && memory.ReadInstructionUInt16(0x8C10_FF32) == 0x23C8
+        && memory.ReadInstructionUInt16(0x8C10_FF34) == 0x8905
+        && memory.ReadInstructionUInt16(0x8C10_FF36) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C10_FF38) == 0x4408
+        && memory.ReadInstructionUInt16(0x8C10_FF3A) == 0x4408
+        && memory.ReadInstructionUInt16(0x8C10_FF3C) == 0x4400
+        && memory.ReadInstructionUInt16(0x8C10_FF3E) == 0xBF86
+        && memory.ReadInstructionUInt16(0x8C10_FF40) == 0x34AC
+        && memory.ReadInstructionUInt16(0x8C10_FF42) == 0x7D01
+        && memory.ReadInstructionUInt16(0x8C10_FF44) == 0x62E3
+        && memory.ReadInstructionUInt16(0x8C10_FF46) == 0x42DC
+        && memory.ReadInstructionUInt16(0x8C10_FF48) == 0x32B0
+        && memory.ReadInstructionUInt16(0x8C10_FF4A) == 0x8BF0
+        && memory.ReadInstructionUInt16(0x8C10_FF4C) == 0xA017
+        && memory.ReadInstructionUInt16(0x8C10_FF4E) == 0x0009
+        && memory.ReadUInt16(0x8C10_FF8E) == 0x0A00
+        && memory.ReadUInt16(0x8C10_FF90) == 0x0080;
 
     private bool IsSonicAdventure2RecordHashScan() =>
         memory.ReadInstructionUInt16(0x8C13_4F3E) == 0x84E9
