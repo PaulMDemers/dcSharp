@@ -6237,6 +6237,42 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_C570) == 0x7F04
         && memory.ReadInstructionUInt16(0x8C15_C57C) == 0x6503;
 
+    internal bool TryFastForwardSonicAdventure2AicaPointerMaskHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CE86
+            || step.Opcode != 0xD00B
+            || State.Pc != 0x8C15_CE88
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 2;
+        const uint mask = 0x0FFF_FFFF;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaPointerMaskHelper()
+            || State.R[0] != mask)
+        {
+            return false;
+        }
+
+        State.R[0] &= State.R[4];
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaPointerMaskHelper() =>
+        memory.ReadInstructionUInt16(0x8C15_CE86) == 0xD00B
+        && memory.ReadInstructionUInt16(0x8C15_CE88) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_CE8A) == 0x2049
+        && memory.ReadUInt32(0x8C15_CEB4) == 0x0FFF_FFFF;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
