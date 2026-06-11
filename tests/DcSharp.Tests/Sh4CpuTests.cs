@@ -4531,6 +4531,111 @@ public class Sh4CpuTests
         Assert.Equal(0x8C15_B91Au, cpu.State.Pc);
     }
 
+    [Fact]
+    public void FastForwardsSonicAdventure2AicaNameGroupDescriptorHeadAggregate()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameGroupDescriptorHeadAggregate(normalMemory);
+        WriteSonicAdventure2AicaNameGroupDescriptorHeadAggregate(fastMemory);
+        WriteSonicAdventure2AicaDescriptorHeadUpdate(normalMemory);
+        WriteSonicAdventure2AicaDescriptorHeadUpdate(fastMemory);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateState(
+            normalMemory,
+            normalStack: 0x8C20_5000,
+            workBase: 0x8C20_1000,
+            basePointerAddress: 0x8C20_0000,
+            descriptorPointer: 0x8C20_4000,
+            group: 2,
+            descriptorIndex: 12,
+            descriptorWord: 0x1C20_0005,
+            nameByte: 0x52);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateState(
+            fastMemory,
+            normalStack: 0x8C20_5000,
+            workBase: 0x8C20_1000,
+            basePointerAddress: 0x8C20_0000,
+            descriptorPointer: 0x8C20_4000,
+            group: 2,
+            descriptorIndex: 12,
+            descriptorWord: 0x1C20_0005,
+            nameByte: 0x52);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_B8EC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_B8EC);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateRegisters(normal, 0x8C20_0000, 0x8C20_5000, group: 2);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateRegisters(fast, 0x8C20_0000, 0x8C20_5000, group: 2);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregate(fastStart, 91, out var skippedInstructions));
+        Assert.Equal(91UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_1000, 0x1100), ReadBytes(fastMemory, 0x8C20_1000, 0x1100));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FF8, 0x10), ReadBytes(fastMemory, 0x8C20_4FF8, 0x10));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameGroupDescriptorHeadAggregate(memory);
+        WriteSonicAdventure2AicaDescriptorHeadUpdate(memory);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateState(
+            memory,
+            normalStack: 0x8C20_5000,
+            workBase: 0x8C20_1000,
+            basePointerAddress: 0x8C20_0000,
+            descriptorPointer: 0x8C20_4000,
+            group: 2,
+            descriptorIndex: 12,
+            descriptorWord: 0x1C20_0005,
+            nameByte: 0x52);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B8EC);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateRegisters(cpu, 0x8C20_0000, 0x8C20_5000, group: 2);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregate(start, 90, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B8EEu, cpu.State.Pc);
+    }
+
+    [Theory]
+    [InlineData(0u, 0x52)]
+    [InlineData(0x1C20_0005u, 0)]
+    public void DoesNotFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateWhenPreludeWouldBranch(uint descriptorWord, byte nameByte)
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameGroupDescriptorHeadAggregate(memory);
+        WriteSonicAdventure2AicaDescriptorHeadUpdate(memory);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateState(
+            memory,
+            normalStack: 0x8C20_5000,
+            workBase: 0x8C20_1000,
+            basePointerAddress: 0x8C20_0000,
+            descriptorPointer: 0x8C20_4000,
+            group: 2,
+            descriptorIndex: 12,
+            descriptorWord: descriptorWord == 0 ? 0xFFFF_FFFF : descriptorWord,
+            nameByte: nameByte);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B8EC);
+        InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateRegisters(cpu, 0x8C20_0000, 0x8C20_5000, group: 2);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregate(start, 91, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B8EEu, cpu.State.Pc);
+    }
+
     [Theory]
     [InlineData(0u, 75UL)]
     [InlineData(0xDEAD_BEEFu, 78UL)]
@@ -15324,6 +15429,35 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C15_B970, 0x8C15_C4DC);
     }
 
+    private static void WriteSonicAdventure2AicaNameGroupDescriptorHeadAggregate(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_B8EC, 0xD01E);
+        WriteInstruction(memory, 0x8C15_B8EE, 0x63E3);
+        WriteInstruction(memory, 0x8C15_B8F0, 0x4308);
+        WriteInstruction(memory, 0x8C15_B8F2, 0x912F);
+        WriteInstruction(memory, 0x8C15_B8F4, 0x023E);
+        WriteInstruction(memory, 0x8C15_B8F6, 0x60A2);
+        WriteInstruction(memory, 0x8C15_B8F8, 0x310C);
+        WriteInstruction(memory, 0x8C15_B8FA, 0x321C);
+        WriteInstruction(memory, 0x8C15_B8FC, 0x6320);
+        WriteInstruction(memory, 0x8C15_B8FE, 0x2338);
+        WriteInstruction(memory, 0x8C15_B900, 0x891A);
+        WriteInstruction(memory, 0x8C15_B902, 0xD21A);
+        WriteInstruction(memory, 0x8C15_B904, 0x420B);
+        WriteInstruction(memory, 0x8C15_B906, 0x64E3);
+        WriteInstruction(memory, 0x8C15_B908, 0x63E3);
+        WriteInstruction(memory, 0x8C15_B90A, 0x64E3);
+        WriteInstruction(memory, 0x8C15_B90C, 0x4308);
+        WriteInstruction(memory, 0x8C15_B90E, 0x6B83);
+        WriteInstruction(memory, 0x8C15_B910, 0x4400);
+        WriteInstruction(memory, 0x8C15_B912, 0x343C);
+        WriteInstruction(memory, 0x8C15_B914, 0x6C43);
+        WriteInstruction(memory, 0x8C15_B916, 0x6D43);
+        memory.WriteUInt16(0x8C15_B954, 0x0F90);
+        memory.WriteUInt32(0x8C15_B968, 0x8C17_D8DC);
+        memory.WriteUInt32(0x8C15_B96C, 0x8C15_C416);
+    }
+
     private static void WriteSonicAdventure2AicaNameLoopTail(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C15_B92E, 0x7B01);
@@ -16099,6 +16233,58 @@ public class Sh4CpuTests
         cpu.State.R[14] = group;
         memory.WriteUInt32(basePointerAddress, workBase);
         memory.Write(workBase + 0xF90 + nameIndex, [nameByte]);
+    }
+
+    private static void InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateState(
+        DreamcastMemory memory,
+        uint normalStack,
+        uint workBase,
+        uint basePointerAddress,
+        uint descriptorPointer,
+        uint group,
+        uint descriptorIndex,
+        uint descriptorWord,
+        byte nameByte)
+    {
+        var modeIndex = 1u;
+        var pointerTableOffsetSeed = 1u - modeIndex;
+        var pointerTableOffset = (((pointerTableOffsetSeed << 1) + pointerTableOffsetSeed) << 5);
+        memory.WriteUInt32(basePointerAddress, workBase);
+        memory.WriteUInt32(0x8C2A_34F8, workBase);
+        memory.WriteUInt32(workBase + 0x10B4, modeIndex);
+        memory.WriteUInt32(workBase + 0x10C4, 0);
+        memory.WriteUInt32(0x8C17_D8DC + (group * 4), descriptorIndex);
+        memory.WriteUInt32(workBase + 0x0FE8 + pointerTableOffset + (descriptorIndex * 4), descriptorPointer);
+        memory.WriteUInt32(descriptorPointer, descriptorWord);
+        memory.WriteUInt32(normalStack - 4, 0xDEAD_BEEF);
+        memory.Write(workBase + 0xF90 + descriptorIndex, [nameByte]);
+        memory.Write(workBase + 4 + (group * 8), [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]);
+    }
+
+    private static void InitializeSonicAdventure2AicaNameGroupDescriptorHeadAggregateRegisters(
+        Sh4Cpu cpu,
+        uint basePointerAddress,
+        uint stack,
+        uint group)
+    {
+        cpu.State.R[0] = 0x0000_0009;
+        cpu.State.R[1] = 0x1111_1111;
+        cpu.State.R[2] = 0x2222_2222;
+        cpu.State.R[3] = 0x3333_3333;
+        cpu.State.R[4] = 0x4444_4444;
+        cpu.State.R[5] = 0x5555_5555;
+        cpu.State.R[6] = 0x6666_6666;
+        cpu.State.R[7] = 0x7777_7777;
+        cpu.State.R[8] = 0;
+        cpu.State.R[9] = 6;
+        cpu.State.R[10] = basePointerAddress;
+        cpu.State.R[11] = 0xBBBB_BBBB;
+        cpu.State.R[12] = 0xCCCC_CCCC;
+        cpu.State.R[13] = 0xDDDD_DDDD;
+        cpu.State.R[14] = group;
+        cpu.State.R[15] = stack;
+        cpu.State.Pr = 0x8C15_CAFE;
+        cpu.State.T = true;
     }
 
     private static void InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
