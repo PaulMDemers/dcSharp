@@ -5519,6 +5519,41 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C15_B968) == 0x8C17_D8DC
         && memory.ReadUInt32(0x8C15_B96C) == 0x8C15_C416;
 
+    internal bool TryFastForwardSonicAdventure2AicaNameGroupTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B938
+            || step.Opcode != 0x7E01
+            || State.Pc != 0x8C15_B93A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 3;
+        if (maxInstructionsToSkip < skippedInstructionCount || !IsSonicAdventure2AicaNameGroupTail())
+        {
+            return false;
+        }
+
+        var compareResult = (int)State.R[14] >= 4;
+        State.R[3] = 4;
+        State.T = compareResult;
+        State.Pc = compareResult ? 0x8C15_B940u : 0x8C15_B8ECu;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaNameGroupTail() =>
+        memory.ReadInstructionUInt16(0x8C15_B938) == 0x7E01
+        && memory.ReadInstructionUInt16(0x8C15_B93A) == 0xE304
+        && memory.ReadInstructionUInt16(0x8C15_B93C) == 0x3E33
+        && memory.ReadInstructionUInt16(0x8C15_B93E) == 0x8BD5;
+
     internal bool TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

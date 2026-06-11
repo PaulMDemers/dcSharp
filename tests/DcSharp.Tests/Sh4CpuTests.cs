@@ -4637,6 +4637,51 @@ public class Sh4CpuTests
     }
 
     [Theory]
+    [InlineData(1u, 0x8C15_B8ECu)]
+    [InlineData(4u, 0x8C15_B940u)]
+    public void FastForwardsSonicAdventure2AicaNameGroupTail(uint groupAfterIncrement, uint expectedPc)
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameGroupTail(normalMemory);
+        WriteSonicAdventure2AicaNameGroupTail(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_B938);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_B938);
+        InitializeSonicAdventure2AicaNameGroupTailState(normal, groupAfterIncrement - 1);
+        InitializeSonicAdventure2AicaNameGroupTailState(fast, groupAfterIncrement - 1);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaNameGroupTail(fastStart, 3, out var skippedInstructions));
+        Assert.Equal(3UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(expectedPc, fast.State.Pc);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[14], fast.State.R[14]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaNameGroupTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameGroupTail(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B938);
+        InitializeSonicAdventure2AicaNameGroupTailState(cpu, group: 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaNameGroupTail(start, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B93Au, cpu.State.Pc);
+    }
+
+    [Theory]
     [InlineData(0u, 75UL)]
     [InlineData(0xDEAD_BEEFu, 78UL)]
     public void FastForwardsSonicAdventure2AicaNameCallActiveSetupAggregate(uint pendingWord, ulong expectedSkippedInstructions)
@@ -15458,6 +15503,14 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C15_B96C, 0x8C15_C416);
     }
 
+    private static void WriteSonicAdventure2AicaNameGroupTail(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_B938, 0x7E01);
+        WriteInstruction(memory, 0x8C15_B93A, 0xE304);
+        WriteInstruction(memory, 0x8C15_B93C, 0x3E33);
+        WriteInstruction(memory, 0x8C15_B93E, 0x8BD5);
+    }
+
     private static void WriteSonicAdventure2AicaNameLoopTail(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C15_B92E, 0x7B01);
@@ -16284,6 +16337,13 @@ public class Sh4CpuTests
         cpu.State.R[14] = group;
         cpu.State.R[15] = stack;
         cpu.State.Pr = 0x8C15_CAFE;
+        cpu.State.T = true;
+    }
+
+    private static void InitializeSonicAdventure2AicaNameGroupTailState(Sh4Cpu cpu, uint group)
+    {
+        cpu.State.R[3] = 0x3333_3333;
+        cpu.State.R[14] = group;
         cpu.State.T = true;
     }
 
