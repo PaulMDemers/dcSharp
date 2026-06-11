@@ -42,3 +42,9 @@ The same hot AICA/name-channel cluster dominates all checkpoints:
 - `0x8C15B68C-0x8C15B68E`
 
 The current same-runner baseline does not reach game GD-ROM reads within 1B instructions. The next implementation pass should therefore stay focused on the AICA work/name/channel setup loop and the mailbox/driver-completion model rather than jumping to PVR TA rendering yet.
+
+## AICA Mailbox Step
+
+The first mailbox-shaped implementation now services valid KOS-style SH4-to-AICA command queues in AICA RAM. It is dirty-gated on writes to the command queue or clock word, consumes bounded packets, honors timestamp-delayed commands, mirrors channel start/update/stop state into the KOS channel status area, and resets the AICA clock for `AICA_CMD_SYNC_CLOCK`.
+
+The SA2 50M checkpoint remained at `PC=0x8C15C7F4` with no GD-ROM reads after this change, and the dirty gate restored the 50M probe runtime to roughly the pre-mailbox baseline.

@@ -887,6 +887,58 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AdvanceHardwareProcessesAicaCommandQueueChannelStart()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 24 * 4);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 24, command: 2, timestamp: 0, commandId: 3);
+
+        var channelData = 0x0081_0018u + (8 * 4);
+        memory.WriteUInt32(channelData, 1);
+        memory.WriteUInt32(channelData + 4, 0x0003_0000);
+        memory.WriteUInt32(channelData + 8, 0);
+        memory.WriteUInt32(channelData + 12, 0x1234);
+        memory.WriteUInt32(channelData + 16, 1);
+        memory.WriteUInt32(channelData + 20, 0x10);
+        memory.WriteUInt32(channelData + 24, 0x40);
+        memory.WriteUInt32(channelData + 28, 44100);
+        memory.WriteUInt32(channelData + 32, 0x80);
+        memory.WriteUInt32(channelData + 36, 0x40);
+        memory.WriteUInt32(channelData + 40, 0x55);
+
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(24u * 4, memory.ReadUInt32(0x0081_0004));
+
+        var channel = 0x0082_0000u + (3 * 16u * 4u);
+        Assert.Equal(1u, memory.ReadUInt32(channel));
+        Assert.Equal(0x0003_0000u, memory.ReadUInt32(channel + 4));
+        Assert.Equal(0x1234u, memory.ReadUInt32(channel + 12));
+        Assert.Equal(44100u, memory.ReadUInt32(channel + 28));
+        Assert.Equal(0x80u, memory.ReadUInt32(channel + 32));
+        Assert.Equal(0x40u, memory.ReadUInt32(channel + 36));
+        Assert.Equal(0u, memory.ReadUInt32(channel + 40));
+    }
+
+    [Fact]
+    public void AdvanceHardwareDefersAicaCommandQueueTimestampUntilClockPasses()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 8 * 4);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 8, command: 3, timestamp: 10, commandId: 0);
+
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(0u, memory.ReadUInt32(0x0081_0004));
+
+        memory.WriteUInt32(0x0082_1000, 11);
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_0004));
+        Assert.Equal(0u, memory.ReadUInt32(0x0082_1000));
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();
@@ -2268,6 +2320,31 @@ public class DreamcastMemoryTests
         1 => 0xFFD8_001C,
         _ => 0xFFD8_0028
     };
+
+    private static void InitializeAicaCommandQueue(DreamcastMemory memory, uint head)
+    {
+        memory.WriteUInt32(0x0081_0000, head);
+        memory.WriteUInt32(0x0081_0004, 0);
+        memory.WriteUInt32(0x0081_0008, 0x100);
+        memory.WriteUInt32(0x0081_000C, 1);
+        memory.WriteUInt32(0x0081_0010, 1);
+        memory.WriteUInt32(0x0081_0014, 0x0001_0018);
+    }
+
+    private static void WriteAicaCommandHeader(
+        DreamcastMemory memory,
+        uint queueOffset,
+        uint sizeDwords,
+        uint command,
+        uint timestamp,
+        uint commandId)
+    {
+        var address = 0x0081_0018 + queueOffset;
+        memory.WriteUInt32(address, sizeDwords);
+        memory.WriteUInt32(address + 4, command);
+        memory.WriteUInt32(address + 8, timestamp);
+        memory.WriteUInt32(address + 12, commandId);
+    }
 
     private static byte[] CreateMediaData(int sectors)
     {
