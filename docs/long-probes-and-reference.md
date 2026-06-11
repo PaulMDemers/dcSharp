@@ -84,6 +84,8 @@ Keep reference screenshots and videos under `artifacts\reference-frames\`. The u
 
 On June 11, 2026, Flycast v2.6 with the root BIOS files synced into `data` produced valid 8-second BIOS swirl captures for SA1, SA2, and Sonic Shuffle. A 35-second capture reached useful intro references for all three: SA2 was at the title-logo fade, SA1 was in its opening city video, and Sonic Shuffle was in its opening video.
 
+See `docs\sonic-reference-baseline-2026-06-11.md` for the matching reference-frame names and normalized SA2 long-probe checkpoint table.
+
 ## AICA Mailbox Direction
 
 KallistiOS documents the SH4/AICA interface as a pair of queues in AICA RAM. `aica_queue_t` has `head`, `tail`, `size`, `valid`, `process_ok`, and `data`; `aica_cmd_t` packets carry `size`, `cmd`, `timestamp`, `cmd_id`, and payload data. The stock ARM driver initializes command and response queues, then repeatedly updates channel positions and processes pending SH4-to-AICA commands when `process_ok` is set.
