@@ -5879,6 +5879,113 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C564
+            || step.Opcode != 0x66A3
+            || State.Pc != 0x8C15_C566
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 92;
+        var bridgeStack = unchecked(State.R[15] - 4);
+        var activeStackAfterFirstPush = unchecked(bridgeStack - 4);
+        var activeFinalStack = unchecked(activeStackAfterFirstPush - 24);
+        var descriptorLocalStack = unchecked(activeFinalStack - 4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaChannelSetupActiveBridge()
+            || !IsSonicAdventure2AicaActiveChannelHelperPrologue()
+            || !IsSonicAdventure2AicaDescriptorCopyHelper()
+            || !IsSonicAdventure2AicaActiveChannelDescriptorTail()
+            || !IsSonicAdventure2AicaInactiveChannelTail()
+            || !memory.TryGetSystemRamOffset(descriptorLocalStack, 40, out _)
+            || !memory.TryGetSystemRamOffset(bridgeStack + 8, 4, out _))
+        {
+            return false;
+        }
+
+        var localMask = (uint)(byte)State.R[4];
+        var workBase = memory.ReadUInt32(bridgeStack + 8);
+        var channelWork = State.R[6];
+        var slot = State.R[14];
+        var descriptorPointer = State.R[11];
+        var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !memory.TryGetSystemRamOffset(slot, 24, out _)
+            || !memory.TryGetSystemRamOffset(workBase, 4, out _))
+        {
+            return false;
+        }
+
+        var descriptorWorkBase = memory.ReadUInt32(basePointerAddress);
+        var modeAddress = descriptorWorkBase + memory.ReadUInt16(0x8C15_C714);
+        if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _)
+            || memory.ReadUInt32(modeAddress) == 1)
+        {
+            return false;
+        }
+
+        var descriptor = memory.ReadUInt32(descriptorPointer);
+        var firstByte = (byte)descriptor;
+        if (firstByte == 0xFF || firstByte >= 0xE0)
+        {
+            return false;
+        }
+
+        var workByte0 = (uint)memory.ReadByte(workBase);
+        var workByte2 = (uint)memory.ReadByte(workBase + 2);
+        var workByte3 = (uint)memory.ReadByte(workBase + 3);
+        if ((workByte2 & localMask) != 0
+            || (workByte3 & localMask) != 0
+            || (workByte0 & localMask) != 0)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(bridgeStack, State.R[11]);
+        memory.WriteUInt32(activeStackAfterFirstPush, State.R[14]);
+        memory.WriteUInt32(activeStackAfterFirstPush - 4, State.R[13]);
+        memory.WriteUInt32(activeStackAfterFirstPush - 8, State.R[12]);
+        memory.WriteUInt32(activeStackAfterFirstPush - 12, State.R[11]);
+        memory.WriteUInt32(activeStackAfterFirstPush - 16, State.R[10]);
+        memory.WriteUInt32(activeStackAfterFirstPush - 20, 0x8C15_C56E);
+        memory.Write(activeFinalStack, [(byte)State.R[4]]);
+        memory.WriteUInt32(descriptorLocalStack, descriptor);
+        memory.Write(slot + 8, [firstByte]);
+        memory.Write(slot + 9, [(byte)(descriptor >> 8)]);
+        memory.Write(slot + 10, [(byte)(descriptor >> 16)]);
+        memory.Write(slot + 11, [(byte)(descriptor >> 24)]);
+        memory.WriteUInt32(slot + 20, 0);
+        memory.Write(slot + 2, [0]);
+        memory.Write(slot + 3, [0]);
+        memory.Write(slot + 4, [0xFF]);
+        memory.Write(slot, [0]);
+
+        State.R[0] = 0;
+        State.R[1] = memory.ReadUInt16(0x8C15_C714);
+        State.R[2] = workByte0;
+        State.R[3] = 0;
+        State.R[4] = 1;
+        State.R[5] = localMask;
+        State.R[6] = 0xFF;
+        State.R[7] = slot;
+        State.R[14] = slot;
+        State.R[15] = bridgeStack;
+        State.Pr = 0x8C15_C56E;
+        State.T = true;
+        State.Pc = 0x8C15_C56E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaChannelSetupActiveBridgeTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
