@@ -44,6 +44,12 @@ Download the current Windows x64 Flycast release into the ignored `dreamcast-dow
 powershell -ExecutionPolicy Bypass -File tools\setup-flycast-reference.ps1
 ```
 
+If `bios\dc_boot.bin` and `bios\dc_flash.bin` exist at the repo root, the setup script also copies them into Flycast's standalone `data` directory. Override either path when needed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\setup-flycast-reference.ps1 -BiosRoot D:\Dreamcast\bios
+```
+
 The script writes the resolved executable path to:
 
 ```text

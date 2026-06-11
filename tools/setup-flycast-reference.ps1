@@ -1,5 +1,6 @@
 param(
     [string]$DestinationRoot = '',
+    [string]$BiosRoot = '',
     [switch]$Force
 )
 
@@ -9,6 +10,10 @@ Set-StrictMode -Version Latest
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 if ([string]::IsNullOrWhiteSpace($DestinationRoot)) {
     $DestinationRoot = Join-Path $repoRoot 'dreamcast-downloads\flycast'
+}
+
+if ([string]::IsNullOrWhiteSpace($BiosRoot)) {
+    $BiosRoot = Join-Path $repoRoot 'bios'
 }
 
 $headers = @{
@@ -52,6 +57,19 @@ $flycastExe = Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter 'flycast*
 
 if (-not $flycastExe) {
     throw "Flycast extracted, but no flycast executable was found under $extractRoot"
+}
+
+$flycastDataRoot = Join-Path (Split-Path -Parent $flycastExe.FullName) 'data'
+$bootSource = Join-Path $BiosRoot 'dc_boot.bin'
+$flashSource = Join-Path $BiosRoot 'dc_flash.bin'
+if ((Test-Path -LiteralPath $bootSource) -and (Test-Path -LiteralPath $flashSource)) {
+    New-Item -ItemType Directory -Force -Path $flycastDataRoot | Out-Null
+    Copy-Item -LiteralPath $bootSource -Destination (Join-Path $flycastDataRoot 'dc_boot.bin') -Force
+    Copy-Item -LiteralPath $flashSource -Destination (Join-Path $flycastDataRoot 'dc_flash.bin') -Force
+    Write-Host "BIOS synced: $flycastDataRoot"
+}
+else {
+    Write-Warning "Dreamcast BIOS files were not found under $BiosRoot. Expected dc_boot.bin and dc_flash.bin."
 }
 
 $currentPath = Join-Path $DestinationRoot 'current.txt'
