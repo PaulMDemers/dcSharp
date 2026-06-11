@@ -6232,6 +6232,32 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveChannelPostSetupReturnAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C56E
+            || step.Opcode != 0xA005
+            || State.Pc != 0x8C15_C570
+            || delayedBranchTarget != 0x8C15_C57C
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2AicaActiveChannelReturnBridge())
+        {
+            return false;
+        }
+
+        var postDelaySlotStack = unchecked(State.R[15] + 4);
+        return TryFastForwardSonicAdventure2AicaPostSetupReturnAggregateCore(
+            maxInstructionsToSkip,
+            postDelaySlotStack,
+            State.R[0],
+            2,
+            out skippedInstructions);
+    }
+
     private bool IsSonicAdventure2AicaActiveChannelReturnBridge() =>
         memory.ReadInstructionUInt16(0x8C15_C56E) == 0xA005
         && memory.ReadInstructionUInt16(0x8C15_C570) == 0x7F04
@@ -7228,21 +7254,36 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        return TryFastForwardSonicAdventure2AicaPostSetupReturnAggregateCore(
+            maxInstructionsToSkip,
+            State.R[15],
+            State.R[5],
+            0,
+            out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaPostSetupReturnAggregateCore(
+        ulong maxInstructionsToSkip,
+        uint stack,
+        uint r5AfterPostSetupEntry,
+        ulong entrySkippedInstructionCount,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         if (!IsSonicAdventure2AicaPostSetupFlagTail()
             || !IsSonicAdventure2AicaChannelFlagReturnTail()
             || !memory.TryGetSystemRamOffset(State.R[14], 20, out _)
-            || !memory.TryGetSystemRamOffset(State.R[15], 36, out _))
+            || !memory.TryGetSystemRamOffset(stack, 36, out _))
         {
             return false;
         }
 
         var slot = State.R[14];
-        var stack = State.R[15];
         var updateCallbackPointer = memory.ReadByte(slot + 7) != 0;
         var postSetupSkippedInstructionCount = updateCallbackPointer ? 23UL : 5UL;
         const ulong branchInstructionCount = 1;
         const ulong returnTailSkippedInstructionCount = 19;
-        var totalSkippedInstructionCount = postSetupSkippedInstructionCount + branchInstructionCount + returnTailSkippedInstructionCount;
+        var totalSkippedInstructionCount = entrySkippedInstructionCount + postSetupSkippedInstructionCount + branchInstructionCount + returnTailSkippedInstructionCount;
         var status = (uint)(sbyte)memory.ReadByte(slot + 13);
         if (maxInstructionsToSkip < totalSkippedInstructionCount || status != 0)
         {
@@ -7295,8 +7336,9 @@ public sealed class Sh4Cpu
         combinedFlags = (byte)(combinedFlags | flag3);
         memory.Write(slot + 12, [combinedFlags]);
 
-        State.R[0] = State.R[5];
+        State.R[0] = r5AfterPostSetupEntry;
         State.R[3] = (uint)(sbyte)flag3;
+        State.R[5] = r5AfterPostSetupEntry;
         State.R[10] = savedR10;
         State.R[11] = savedR11;
         State.R[12] = savedR12;
