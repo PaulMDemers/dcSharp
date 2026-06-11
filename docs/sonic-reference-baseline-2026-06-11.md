@@ -54,3 +54,9 @@ The SA2 50M checkpoint remained at `PC=0x8C15C7F4` with no GD-ROM reads after th
 The active-channel descriptor-return aggregate now opportunistically folds the return bridge and post-setup return tail when the live code and stack frame match the known SA2 shape. The legacy 92-instruction partial aggregate is still preserved when the post-setup tail is not safe to consume.
 
 The 50M probe `sa2-c564-post-50m-20260611-174756` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. Its profile moved `0x8C15C56E` out of the top hotspots; the next visible AICA pressure is the remaining `0x8C15C57C` / `0x8C15C5DA` / status-update chain.
+
+## AICA Zero-Mask Descriptor/Status Fold
+
+The zero-mask descriptor-copy path now folds the `0x8C15C680` prologue through descriptor copy, status bridge, and status helper, stopping at `0x8C15C69A` when the slot byte transition requires the event epilogue to run normally. It still consumes the no-event epilogue when that path is proven safe.
+
+The 50M probe `sa2-zeromask-dispatch-50m-20260611-182503` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. The scheduler reported fewer CPU fast-forward batches (`69,207` vs `71,658` in the earlier same-day checkpoint), and `0x8C15C5DA`, `0x8C15C622`, and `0x8C15C694` dropped out of the top profile. `0x8C15C680` remains as the aggregate entry point.

@@ -6153,6 +6153,102 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregate()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue(fastMemory);
+        WriteSonicAdventure2AicaDescriptorCopyHelper(normalMemory);
+        WriteSonicAdventure2AicaDescriptorCopyHelper(fastMemory);
+        WriteSonicAdventure2AicaZeroMaskStatusUpdateCallBridge(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskStatusUpdateCallBridge(fastMemory);
+        WriteSonicAdventure2AicaStatusUpdateHelper(normalMemory);
+        WriteSonicAdventure2AicaStatusUpdateHelper(fastMemory);
+        WriteSonicAdventure2AicaZeroMaskNoEventEpilogue(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskNoEventEpilogue(fastMemory);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateState(
+            normalMemory,
+            normalSlot: 0x8C20_2000,
+            descriptorAddress: 0x8C20_3000,
+            descriptor: 0x1C20_0504);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateState(
+            fastMemory,
+            normalSlot: 0x8C20_2000,
+            descriptorAddress: 0x8C20_3000,
+            descriptor: 0x1C20_0504);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C680);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C680);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologueState(normal, 0x8C20_5000);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologueState(fast, 0x8C20_5000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregate(fastStart, 101, out var skippedInstructions));
+        Assert.Equal(101UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_2000, 24), ReadBytes(fastMemory, 0x8C20_2000, 24));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FE0, 0x30), ReadBytes(fastMemory, 0x8C20_4FE0, 0x30));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2AicaZeroMaskDescriptorCopyAggregateToEventEpilogue()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue(fastMemory);
+        WriteSonicAdventure2AicaDescriptorCopyHelper(normalMemory);
+        WriteSonicAdventure2AicaDescriptorCopyHelper(fastMemory);
+        WriteSonicAdventure2AicaZeroMaskStatusUpdateCallBridge(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskStatusUpdateCallBridge(fastMemory);
+        WriteSonicAdventure2AicaStatusUpdateHelper(normalMemory);
+        WriteSonicAdventure2AicaStatusUpdateHelper(fastMemory);
+        WriteSonicAdventure2AicaZeroMaskNoEventEpilogue(normalMemory);
+        WriteSonicAdventure2AicaZeroMaskNoEventEpilogue(fastMemory);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateState(
+            normalMemory,
+            normalSlot: 0x8C20_2000,
+            descriptorAddress: 0x8C20_3000,
+            descriptor: 0x1C20_0504);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateState(
+            fastMemory,
+            normalSlot: 0x8C20_2000,
+            descriptorAddress: 0x8C20_3000,
+            descriptor: 0x1C20_0504);
+        normalMemory.Write(0x8C20_2000 + 1, [0]);
+        fastMemory.Write(0x8C20_2000 + 1, [0]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C680);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C680);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologueState(normal, 0x8C20_5000);
+        InitializeSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologueState(fast, 0x8C20_5000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregate(fastStart, 101, out var skippedInstructions));
+        Assert.Equal(62UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_2000, 24), ReadBytes(fastMemory, 0x8C20_2000, 24));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FE0, 0x30), ReadBytes(fastMemory, 0x8C20_4FE0, 0x30));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologueWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
@@ -17811,6 +17907,21 @@ public class Sh4CpuTests
         cpu.State.R[14] = 0xEEEE_EEEE;
         cpu.State.R[15] = stack;
         cpu.State.Pr = 0x8C15_CAFE;
+    }
+
+    private static void InitializeSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateState(
+        DreamcastMemory memory,
+        uint normalSlot,
+        uint descriptorAddress,
+        uint descriptor)
+    {
+        memory.WriteUInt32(0x8C2A_34F8, 0x8C20_1000);
+        memory.WriteUInt32(0x8C20_1000 + 0x10C4, 0);
+        memory.WriteUInt32(descriptorAddress, descriptor);
+        memory.Write(normalSlot + 1, [1]);
+        memory.Write(normalSlot + 7, [9]);
+        memory.WriteUInt32(normalSlot + 8, 0xAAAA_AAAA);
+        memory.WriteUInt32(normalSlot + 20, 0xBBBB_BBBB);
     }
 
     private static void InitializeSonicAdventure2AicaZeroMaskStatusUpdateCallBridgeState(Sh4Cpu cpu)

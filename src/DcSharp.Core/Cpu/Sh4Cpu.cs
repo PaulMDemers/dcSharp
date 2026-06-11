@@ -6992,6 +6992,165 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C680
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C15_C682
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong prologueSkippedInstructionCount = 9;
+        const ulong descriptorEntryInstructionCount = 1;
+        const ulong descriptorSkippedInstructionCount = 31;
+        const ulong statusBridgeEntryInstructionCount = 1;
+        const ulong statusBridgeSkippedInstructionCount = 2;
+        const ulong statusEntryInstructionCount = 1;
+        const ulong epilogueEntryInstructionCount = 1;
+
+        var stackAfterFirstPush = State.R[15];
+        var finalStack = unchecked(stackAfterFirstPush - 12);
+        var descriptorLocalStack = unchecked(finalStack - 4);
+        var descriptorSlot = State.R[6];
+        var descriptorWorkPointer = State.R[5];
+        var descriptorPointer = State.R[7];
+        if (!IsSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue()
+            || !IsSonicAdventure2AicaDescriptorCopyHelper()
+            || !IsSonicAdventure2AicaZeroMaskStatusUpdateCallBridge()
+            || !IsSonicAdventure2AicaStatusUpdateHelper()
+            || !memory.TryGetSystemRamOffset(finalStack, 16, out _)
+            || !memory.TryGetSystemRamOffset(descriptorLocalStack, 4, out _)
+            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !memory.TryGetSystemRamOffset(descriptorSlot, 24, out _))
+        {
+            return false;
+        }
+
+        var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var modeOffset = memory.ReadUInt16(0x8C15_C714);
+        var modeAddress = workBase + modeOffset;
+        if (!memory.TryGetSystemRamOffset(modeAddress, 4, out _)
+            || memory.ReadUInt32(modeAddress) == 1)
+        {
+            return false;
+        }
+
+        var descriptor = memory.ReadUInt32(descriptorPointer);
+        var firstByte = (byte)descriptor;
+        if (firstByte == 0xFF || firstByte >= 0xE0)
+        {
+            return false;
+        }
+
+        var control = memory.ReadByte(descriptorSlot + 7);
+        var statusMode = firstByte;
+        if (control != 1 && (statusMode == 0 || statusMode == 0xFF))
+        {
+            return false;
+        }
+
+        var statusSkippedInstructionCount = control == 1 ? 13UL : 17UL;
+        var slotValue = (byte)(control == 1
+            ? (statusMode == 5 ? 1 : 0)
+            : 1);
+        var skippedInstructionCount =
+            prologueSkippedInstructionCount
+            + descriptorEntryInstructionCount
+            + descriptorSkippedInstructionCount
+            + statusBridgeEntryInstructionCount
+            + statusBridgeSkippedInstructionCount
+            + statusEntryInstructionCount
+            + statusSkippedInstructionCount;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var oldR13 = State.R[13];
+        var oldR12 = State.R[12];
+        var oldPr = State.Pr;
+        memory.WriteUInt32(stackAfterFirstPush - 4, oldR13);
+        memory.WriteUInt32(stackAfterFirstPush - 8, oldR12);
+        memory.WriteUInt32(finalStack, oldPr);
+
+        memory.WriteUInt32(descriptorLocalStack, descriptor);
+        memory.Write(descriptorSlot + 8, [firstByte]);
+        memory.Write(descriptorSlot + 9, [(byte)(descriptor >> 8)]);
+        memory.Write(descriptorSlot + 10, [(byte)(descriptor >> 16)]);
+        memory.Write(descriptorSlot + 11, [(byte)(descriptor >> 24)]);
+        memory.WriteUInt32(descriptorSlot + 20, 0);
+        memory.Write(descriptorSlot, [slotValue]);
+
+        State.R[0] = 0;
+        State.R[1] = control == 1 ? State.R[1] : memory.ReadUInt16(0x8C15_C612);
+        State.R[2] = memory.ReadUInt16(0x8C15_C718);
+        State.R[3] = memory.ReadUInt16(0x8C15_C716);
+        State.R[4] = descriptorSlot;
+        State.R[5] = 0;
+        State.R[6] = 1;
+        State.R[12] = descriptorWorkPointer;
+        State.R[13] = descriptorPointer;
+        State.R[14] = descriptorSlot;
+        State.R[15] = finalStack;
+        State.Pr = 0x8C15_C69A;
+        State.T = control == 1 && statusMode == 5;
+        State.Pc = 0x8C15_C69A;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        if (IsSonicAdventure2AicaZeroMaskNoEventEpilogue()
+            && maxInstructionsToSkip > skippedInstructions)
+        {
+            var previousByte = memory.ReadByte(descriptorSlot + 1);
+            var risingFlags = (byte)((previousByte ^ slotValue) & slotValue);
+            var fallingFlags = (byte)((previousByte ^ slotValue) & ~slotValue);
+            var epilogueSkippedInstructionCount = slotValue == 0 ? 37UL : 38UL;
+            var epilogueTotalSkippedInstructionCount = epilogueEntryInstructionCount + epilogueSkippedInstructionCount;
+            if (maxInstructionsToSkip - skippedInstructions >= epilogueTotalSkippedInstructionCount
+                && risingFlags == 0
+                && fallingFlags == 0)
+            {
+                var savedPr = memory.ReadUInt32(finalStack);
+                var savedR12 = memory.ReadUInt32(finalStack + 4);
+                var savedR13 = memory.ReadUInt32(finalStack + 8);
+                var savedR14 = memory.ReadUInt32(finalStack + 12);
+
+                memory.Write(descriptorSlot + 2, [0]);
+                memory.Write(descriptorSlot + 3, [0]);
+                memory.Write(descriptorSlot + 4, [slotValue == 0 ? (byte)1 : (byte)9]);
+
+                State.R[0] = 0;
+                State.R[1] = modeOffset;
+                State.R[2] = unchecked((uint)(sbyte)slotValue);
+                State.R[3] = basePointerAddress;
+                State.R[4] = 1;
+                State.R[12] = savedR12;
+                State.R[13] = savedR13;
+                State.R[14] = savedR14;
+                State.R[15] = finalStack + 16;
+                State.Pr = savedPr;
+                State.T = true;
+                State.Pc = savedPr;
+                State.InstructionsExecuted += epilogueTotalSkippedInstructionCount;
+                skippedInstructions += epilogueTotalSkippedInstructionCount;
+            }
+        }
+
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue() =>
         memory.ReadInstructionUInt16(0x8C15_C680) == 0x2FE6
         && memory.ReadInstructionUInt16(0x8C15_C682) == 0x6E63
