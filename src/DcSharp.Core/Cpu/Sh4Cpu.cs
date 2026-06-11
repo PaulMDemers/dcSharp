@@ -6716,6 +6716,66 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_C578) == 0xB082
         && memory.ReadInstructionUInt16(0x8C15_C57A) == 0x64F2;
 
+    internal bool TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C680
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C15_C682
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 9;
+        var stackAfterFirstPush = State.R[15];
+        var finalStack = unchecked(stackAfterFirstPush - 12);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue()
+            || !memory.TryGetSystemRamOffset(finalStack, 16, out _))
+        {
+            return false;
+        }
+
+        var oldR13 = State.R[13];
+        var oldR12 = State.R[12];
+        var oldPr = State.Pr;
+        var descriptorSlot = State.R[6];
+        var descriptor = State.R[7];
+        var descriptorPointer = State.R[5];
+
+        memory.WriteUInt32(stackAfterFirstPush - 4, oldR13);
+        memory.WriteUInt32(stackAfterFirstPush - 8, oldR12);
+        memory.WriteUInt32(finalStack, oldPr);
+
+        State.R[4] = descriptorSlot;
+        State.R[5] = descriptor;
+        State.R[12] = descriptorPointer;
+        State.R[13] = descriptor;
+        State.R[14] = descriptorSlot;
+        State.R[15] = finalStack;
+        State.Pr = 0x8C15_C694;
+        State.Pc = 0x8C15_C622;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue() =>
+        memory.ReadInstructionUInt16(0x8C15_C680) == 0x2FE6
+        && memory.ReadInstructionUInt16(0x8C15_C682) == 0x6E63
+        && memory.ReadInstructionUInt16(0x8C15_C684) == 0x2FD6
+        && memory.ReadInstructionUInt16(0x8C15_C686) == 0x6D73
+        && memory.ReadInstructionUInt16(0x8C15_C688) == 0x2FC6
+        && memory.ReadInstructionUInt16(0x8C15_C68A) == 0x6C53
+        && memory.ReadInstructionUInt16(0x8C15_C68C) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C15_C68E) == 0x6573
+        && memory.ReadInstructionUInt16(0x8C15_C690) == 0xBFC7
+        && memory.ReadInstructionUInt16(0x8C15_C692) == 0x6463;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorUpdatePrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
