@@ -5832,6 +5832,62 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNameLoopTailNextCallBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B92E
+            || step.Opcode != 0x7B01
+            || State.Pc != 0x8C15_B930
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || !IsSonicAdventure2AicaNameCallBridge()
+            || State.R[13] == uint.MaxValue
+            || State.R[12] == uint.MaxValue)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 15;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || (int)State.R[11] >= (int)State.R[9]
+            || !memory.TryGetSystemRamOffset(State.R[10], 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(State.R[10]);
+        var nextNameIndex = State.R[12] + 1;
+        var nextChannel = State.R[13] + 1;
+        var nameAddress = workBase + memory.ReadUInt16(0x8C15_B954) + nextNameIndex;
+        if (!memory.TryGetSystemRamOffset(nameAddress, 1, out _))
+        {
+            return false;
+        }
+
+        var nameByte = memory.ReadByte(nameAddress);
+        if (nameByte == 0)
+        {
+            return false;
+        }
+
+        State.R[0] = workBase;
+        State.R[2] = (uint)(sbyte)nameByte;
+        State.R[3] = memory.ReadUInt32(0x8C15_B970);
+        State.R[4] = nextChannel;
+        State.R[5] = State.R[14];
+        State.R[12] = nextNameIndex;
+        State.R[13] = nextChannel;
+        State.Pr = 0x8C15_B92E;
+        State.T = false;
+        State.Pc = State.R[3];
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaNameLoopTail() =>
         memory.ReadInstructionUInt16(0x8C15_B92E) == 0x7B01
         && memory.ReadInstructionUInt16(0x8C15_B930) == 0x3B93
