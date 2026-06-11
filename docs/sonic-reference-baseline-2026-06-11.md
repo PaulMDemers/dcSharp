@@ -48,3 +48,9 @@ The current same-runner baseline does not reach game GD-ROM reads within 1B inst
 The first mailbox-shaped implementation now services valid KOS-style SH4-to-AICA command queues in AICA RAM. It is dirty-gated on writes to the command queue or clock word, consumes bounded packets, honors timestamp-delayed commands, mirrors channel start/update/stop state into the KOS channel status area, and resets the AICA clock for `AICA_CMD_SYNC_CLOCK`.
 
 The SA2 50M checkpoint remained at `PC=0x8C15C7F4` with no GD-ROM reads after this change, and the dirty gate restored the 50M probe runtime to roughly the pre-mailbox baseline.
+
+## AICA Bridge/Post-Setup Fold
+
+The active-channel descriptor-return aggregate now opportunistically folds the return bridge and post-setup return tail when the live code and stack frame match the known SA2 shape. The legacy 92-instruction partial aggregate is still preserved when the post-setup tail is not safe to consume.
+
+The 50M probe `sa2-c564-post-50m-20260611-174756` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. Its profile moved `0x8C15C56E` out of the top hotspots; the next visible AICA pressure is the remaining `0x8C15C57C` / `0x8C15C5DA` / status-update chain.

@@ -6504,6 +6504,19 @@ public sealed class Sh4Cpu
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+
+        if (IsSonicAdventure2AicaActiveChannelReturnBridge()
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardSonicAdventure2AicaPostSetupReturnAggregateCore(
+                maxInstructionsToSkip - skippedInstructions,
+                unchecked(State.R[15] + 4),
+                State.R[0],
+                3,
+                out var postSetupSkippedInstructions))
+        {
+            skippedInstructions += postSetupSkippedInstructions;
+        }
+
         return true;
     }
 

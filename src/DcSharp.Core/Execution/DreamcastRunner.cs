@@ -754,6 +754,8 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C566, 0x8C15_C724)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C724, 0x8C15_C780)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C780, 0x8C15_C856)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C56E, 0x8C15_C570)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C57C, 0x8C15_C5D8)
                         && cpu.TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaActiveChannelDescriptorReturnAggregateSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaActiveChannelDescriptorReturnAggregateSkippedInstructions, cpu.State.InstructionsExecuted);
