@@ -69,12 +69,20 @@ powershell -ExecutionPolicy Bypass -File tools\run-flycast-reference.ps1 -Game S
 powershell -ExecutionPolicy Bypass -File tools\run-flycast-reference.ps1 -Game SA1 -PrintOnly
 ```
 
+Capture a timed reference screenshot from the Flycast window:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\capture-flycast-frame.ps1 -Game SA2 -DelaySeconds 12
+```
+
 Keep reference screenshots and videos under `artifacts\reference-frames\`. The useful comparison set for the current milestone is:
 
 - First visible license/BIOS transition frame.
 - Sonic Adventure 2 first title/movie-intro frame.
 - Sonic Adventure first title/movie-intro frame.
 - Sonic Shuffle first title/movie-intro frame.
+
+On June 11, 2026, Flycast v2.6 with the root BIOS files synced into `data` produced valid 8-second BIOS swirl captures for SA1, SA2, and Sonic Shuffle. A 35-second capture reached useful intro references for all three: SA2 was at the title-logo fade, SA1 was in its opening city video, and Sonic Shuffle was in its opening video.
 
 ## AICA Mailbox Direction
 

@@ -40,6 +40,21 @@ foreach ($entry in $Config) {
 $arguments += $mediaPath
 $workingDirectory = Split-Path -Parent $flycastExe
 
+function Join-CommandArguments {
+    param([Parameter(Mandatory = $true)][string[]]$ArgumentList)
+
+    return ($ArgumentList | ForEach-Object {
+        if ($_ -match '[\s"]') {
+            '"' + ($_ -replace '"', '\"') + '"'
+        }
+        else {
+            $_
+        }
+    }) -join ' '
+}
+
+$argumentText = Join-CommandArguments $arguments
+
 Write-Host "Flycast: $flycastExe"
 Write-Host "Game: $Game"
 Write-Host "Media: $mediaPath"
@@ -48,9 +63,8 @@ if ($Config.Count -gt 0) {
 }
 
 if ($PrintOnly) {
-    $quotedArgs = ($arguments | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ' '
-    Write-Host "Command: `"$flycastExe`" $quotedArgs"
+    Write-Host "Command: `"$flycastExe`" $argumentText"
     return
 }
 
-Start-Process -FilePath $flycastExe -ArgumentList $arguments -WorkingDirectory $workingDirectory -Wait:$Wait
+Start-Process -FilePath $flycastExe -ArgumentList $argumentText -WorkingDirectory $workingDirectory -Wait:$Wait
