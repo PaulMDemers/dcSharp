@@ -710,6 +710,11 @@ public sealed class DreamcastRunner
                         && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B91A, 0x8C15_B92E)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C4DC, 0x8C15_C564)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C566, 0x8C15_C724)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C724, 0x8C15_C780)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C780, 0x8C15_C856)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C56E, 0x8C15_C570)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C57C, 0x8C15_C5D8)
                         && cpu.TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaNameCallActiveSetupAggregateSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaNameCallActiveSetupAggregateSkippedInstructions, cpu.State.InstructionsExecuted);
@@ -959,6 +964,11 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B930, 0x8C15_B938)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B918, 0x8C15_B92E)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C4DC, 0x8C15_C564)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C566, 0x8C15_C724)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C724, 0x8C15_C780)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C780, 0x8C15_C856)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C56E, 0x8C15_C570)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C57C, 0x8C15_C5D8)
                         && cpu.TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaNameLoopTailNextActiveSetupAggregateSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaNameLoopTailNextActiveSetupAggregateSkippedInstructions, cpu.State.InstructionsExecuted);

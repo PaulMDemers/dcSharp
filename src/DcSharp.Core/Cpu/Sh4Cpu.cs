@@ -5811,6 +5811,17 @@ public sealed class Sh4Cpu
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+
+        if (memory.ReadInstructionUInt16(0x8C15_C564) == 0x66A3
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregateCore(
+                maxInstructionsToSkip - skippedInstructions,
+                entrySkippedInstructionCount: 1,
+                out var descriptorSkippedInstructions))
+        {
+            skippedInstructions += descriptorSkippedInstructions;
+        }
+
         return true;
     }
 
@@ -6412,7 +6423,20 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        const ulong skippedInstructionCount = 92;
+        return TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregateCore(
+            maxInstructionsToSkip,
+            entrySkippedInstructionCount: 0,
+            out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregateCore(
+        ulong maxInstructionsToSkip,
+        ulong entrySkippedInstructionCount,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        const ulong bodySkippedInstructionCount = 92;
+        var skippedInstructionCount = entrySkippedInstructionCount + bodySkippedInstructionCount;
         var bridgeStack = unchecked(State.R[15] - 4);
         var activeStackAfterFirstPush = unchecked(bridgeStack - 4);
         var activeFinalStack = unchecked(activeStackAfterFirstPush - 24);
@@ -6431,7 +6455,6 @@ public sealed class Sh4Cpu
 
         var localMask = (uint)(byte)State.R[4];
         var workBase = memory.ReadUInt32(bridgeStack + 8);
-        var channelWork = State.R[6];
         var slot = State.R[14];
         var descriptorPointer = State.R[11];
         var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);

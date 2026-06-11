@@ -60,3 +60,9 @@ The 50M probe `sa2-c564-post-50m-20260611-174756` stayed at `PC=0x8C15C7F4`, kep
 The zero-mask descriptor-copy path now folds the `0x8C15C680` prologue through descriptor copy, status bridge, and status helper, stopping at `0x8C15C69A` when the slot byte transition requires the event epilogue to run normally. It still consumes the no-event epilogue when that path is proven safe.
 
 The 50M probe `sa2-zeromask-dispatch-50m-20260611-182503` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. The scheduler reported fewer CPU fast-forward batches (`69,207` vs `71,658` in the earlier same-day checkpoint), and `0x8C15C5DA`, `0x8C15C622`, and `0x8C15C694` dropped out of the top profile. `0x8C15C680` remains as the aggregate entry point.
+
+## AICA Name-Call Active Descriptor Fold
+
+The name-call/channel-setup aggregate now reuses the active-channel descriptor-return core when the next instruction is the `0x8C15C564` active setup entry. Exact-budget callers still stop at `0x8C15C564`; larger budgets can continue through descriptor copy and post-setup return.
+
+The 50M probe `sa2-name-active-descriptor-50m-20260611-184714` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `60,021`, and `0x8C15C564` dropped out of the top profile. The dominant remaining SA2 AICA pressure is now the outer name loop entry at `0x8C15B92E` plus group/slot scan entries around `0x8C15B8EC`, `0x8C15B938`, and `0x8C15B604`.
