@@ -28,7 +28,7 @@ Outputs are written to `artifacts\long-probes\<run>\`:
 - `<game>-profile.txt`: hot PC profile from `--pc-profile-log`.
 - `<game>-summary.json`: only when `-Json` is supplied.
 
-The current Release runner has been moving 300M SA2 probes in minutes on this machine, so 1B instructions should be a several-minute probe, not an overnight job. Use the artifact output instead of terminal scrollback as the source of truth when comparing long runs.
+The current Release runner has been moving 300M SA2 probes in minutes on this machine, so 1B instructions should be a minutes-scale probe, not an overnight job. A June 11, 2026 SA2 Release run reached 1B instructions in 12m21s and wrote its output under `artifacts\long-probes\sa2-1b-20260611-130319\`. Use the artifact output instead of terminal scrollback as the source of truth when comparing long runs.
 
 Useful extra diagnostics:
 
@@ -54,6 +54,13 @@ Launch the target game manually or from PowerShell with the media path:
 
 ```powershell
 & (Get-Content dreamcast-downloads\flycast\current.txt) "retail_discs\Sonic Adventure 2 (USA) (EnJaFrDeEs)\Sonic Adventure 2 (USA) (En,Ja,Fr,De,Es).cue"
+```
+
+Or use the target-game launcher:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\run-flycast-reference.ps1 -Game SA2
+powershell -ExecutionPolicy Bypass -File tools\run-flycast-reference.ps1 -Game SA1 -PrintOnly
 ```
 
 Keep reference screenshots and videos under `artifacts\reference-frames\`. The useful comparison set for the current milestone is:
