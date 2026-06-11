@@ -6776,6 +6776,119 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_C690) == 0xBFC7
         && memory.ReadInstructionUInt16(0x8C15_C692) == 0x6463;
 
+    internal bool TryFastForwardSonicAdventure2AicaZeroMaskStatusUpdateCallBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C694
+            || step.Opcode != 0x65D3
+            || State.Pc != 0x8C15_C696
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 2;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaZeroMaskStatusUpdateCallBridge())
+        {
+            return false;
+        }
+
+        State.R[4] = State.R[14];
+        State.Pr = 0x8C15_C69A;
+        State.Pc = 0x8C15_C5DA;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaZeroMaskStatusUpdateCallBridge() =>
+        memory.ReadInstructionUInt16(0x8C15_C694) == 0x65D3
+        && memory.ReadInstructionUInt16(0x8C15_C696) == 0xBFA0
+        && memory.ReadInstructionUInt16(0x8C15_C698) == 0x64E3;
+
+    internal bool TryFastForwardSonicAdventure2AicaStatusUpdateHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C5DA
+            || step.Opcode != 0x8447
+            || State.Pc != 0x8C15_C5DC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var slot = State.R[4];
+        if (!IsSonicAdventure2AicaStatusUpdateHelper()
+            || !memory.TryGetSystemRamOffset(slot, 9, out _))
+        {
+            return false;
+        }
+
+        var control = memory.ReadByte(slot + 7);
+        var mode = memory.ReadByte(slot + 8);
+        var slotValue = (byte)(control == 1
+            ? (mode == 5 ? 1 : 0)
+            : 1);
+        var skippedInstructionCount = control == 1 ? 13UL : 17UL;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || (control != 1 && (mode == 0 || mode == 0xFF)))
+        {
+            return false;
+        }
+
+        memory.Write(slot, [slotValue]);
+
+        State.R[0] = 0;
+        State.R[5] = 0;
+        State.R[6] = 1;
+        if (control != 1)
+        {
+            State.R[1] = memory.ReadUInt16(0x8C15_C612);
+        }
+
+        State.T = control == 1 && mode == 5;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaStatusUpdateHelper() =>
+        memory.ReadInstructionUInt16(0x8C15_C5DA) == 0x8447
+        && memory.ReadInstructionUInt16(0x8C15_C5DC) == 0xE601
+        && memory.ReadInstructionUInt16(0x8C15_C5DE) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C15_C5E0) == 0x8801
+        && memory.ReadInstructionUInt16(0x8C15_C5E2) == 0x8F08
+        && memory.ReadInstructionUInt16(0x8C15_C5E4) == 0xE500
+        && memory.ReadInstructionUInt16(0x8C15_C5E6) == 0x8448
+        && memory.ReadInstructionUInt16(0x8C15_C5E8) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C15_C5EA) == 0x8805
+        && memory.ReadInstructionUInt16(0x8C15_C5EC) == 0x8B01
+        && memory.ReadInstructionUInt16(0x8C15_C5EE) == 0xA016
+        && memory.ReadInstructionUInt16(0x8C15_C5F0) == 0x2460
+        && memory.ReadInstructionUInt16(0x8C15_C5F2) == 0xA014
+        && memory.ReadInstructionUInt16(0x8C15_C5F4) == 0x2450
+        && memory.ReadInstructionUInt16(0x8C15_C5F6) == 0x8448
+        && memory.ReadInstructionUInt16(0x8C15_C5F8) == 0x910B
+        && memory.ReadInstructionUInt16(0x8C15_C5FA) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C15_C5FC) == 0x3010
+        && memory.ReadInstructionUInt16(0x8C15_C5FE) == 0x8903
+        && memory.ReadInstructionUInt16(0x8C15_C600) == 0x8800
+        && memory.ReadInstructionUInt16(0x8C15_C602) == 0x8901
+        && memory.ReadInstructionUInt16(0x8C15_C604) == 0xA00A
+        && memory.ReadInstructionUInt16(0x8C15_C606) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C15_C61C) == 0x2460
+        && memory.ReadInstructionUInt16(0x8C15_C61E) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_C620) == 0xE000
+        && memory.ReadUInt16(0x8C15_C612) == 0x00FF;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorUpdatePrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
