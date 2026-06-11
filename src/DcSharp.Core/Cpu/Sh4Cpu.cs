@@ -5683,6 +5683,24 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        return TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+            maxInstructionsToSkip,
+            preSetupSkippedInstructionCount: 10,
+            nameIndex: State.R[12],
+            channel: State.R[13],
+            group: State.R[14],
+            out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+        ulong maxInstructionsToSkip,
+        ulong preSetupSkippedInstructionCount,
+        uint nameIndex,
+        uint channel,
+        uint group,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         var stackAfterFirstPush = unchecked(State.R[15] - 4);
         var finalStack = unchecked(State.R[15] - 36);
         if (!IsSonicAdventure2AicaNameCallBridge()
@@ -5695,7 +5713,7 @@ public sealed class Sh4Cpu
         }
 
         var nameWorkBase = memory.ReadUInt32(State.R[10]);
-        var nameAddress = nameWorkBase + memory.ReadUInt16(0x8C15_B954) + State.R[12];
+        var nameAddress = nameWorkBase + memory.ReadUInt16(0x8C15_B954) + nameIndex;
         if (!memory.TryGetSystemRamOffset(nameAddress, 1, out _))
         {
             return false;
@@ -5707,8 +5725,6 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        var channel = State.R[13];
-        var group = State.R[14];
         var basePointerAddress = memory.ReadUInt32(0x8C15_C614);
         var maskTable = memory.ReadUInt32(0x8C15_C618);
         if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
@@ -5740,9 +5756,8 @@ public sealed class Sh4Cpu
 
         var pendingWord = memory.ReadUInt32(slot + 28);
         var setupSkippedInstructionCount = pendingWord == 0 ? 64UL : 67UL;
-        const ulong nameCallSkippedInstructionCount = 10;
         const ulong setupEntryInstructionCount = 1;
-        var skippedInstructionCount = nameCallSkippedInstructionCount + setupEntryInstructionCount + setupSkippedInstructionCount;
+        var skippedInstructionCount = preSetupSkippedInstructionCount + setupEntryInstructionCount + setupSkippedInstructionCount;
         if (maxInstructionsToSkip < skippedInstructionCount)
         {
             return false;
@@ -5761,7 +5776,7 @@ public sealed class Sh4Cpu
 
         memory.WriteUInt32(stackAfterFirstPush, group);
         memory.WriteUInt32(stackAfterFirstPush - 4, channel);
-        memory.WriteUInt32(stackAfterFirstPush - 8, State.R[12]);
+        memory.WriteUInt32(stackAfterFirstPush - 8, nameIndex);
         memory.WriteUInt32(stackAfterFirstPush - 12, State.R[11]);
         memory.WriteUInt32(stackAfterFirstPush - 16, State.R[10]);
         memory.WriteUInt32(stackAfterFirstPush - 20, 0x8C15_B92E);
@@ -5886,6 +5901,33 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B92E
+            || step.Opcode != 0x7B01
+            || State.Pc != 0x8C15_B930
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || !IsSonicAdventure2AicaNameCallBridge()
+            || !IsSonicAdventure2AicaChannelSetupBridge()
+            || State.R[13] == uint.MaxValue
+            || State.R[12] == uint.MaxValue
+            || (int)State.R[11] >= (int)State.R[9])
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+            maxInstructionsToSkip,
+            preSetupSkippedInstructionCount: 15,
+            nameIndex: State.R[12] + 1,
+            channel: State.R[13] + 1,
+            group: State.R[14],
+            out skippedInstructions);
     }
 
     private bool IsSonicAdventure2AicaNameLoopTail() =>

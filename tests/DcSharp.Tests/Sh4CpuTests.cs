@@ -5044,6 +5044,128 @@ public class Sh4CpuTests
         Assert.Equal(0x8C15_B930u, cpu.State.Pc);
     }
 
+    [Theory]
+    [InlineData(0u, 80UL)]
+    [InlineData(0xDEAD_BEEFu, 83UL)]
+    public void FastForwardsSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(uint pendingWord, ulong expectedSkippedInstructions)
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameLoopTail(normalMemory);
+        WriteSonicAdventure2AicaNameLoopTail(fastMemory);
+        WriteSonicAdventure2AicaNameCallBridge(normalMemory);
+        WriteSonicAdventure2AicaNameCallBridge(fastMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(normalMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_B92E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_B92E);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            normalMemory,
+            normal,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 3,
+            channel: 8,
+            group: 2,
+            mask: 7,
+            pendingWord: pendingWord,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            fastMemory,
+            fast,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 3,
+            channel: 8,
+            group: 2,
+            mask: 7,
+            pendingWord: pendingWord,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaNameLoopTailState(normal, r9: 6, r11: 0, r12: 2, r13: 7);
+        InitializeSonicAdventure2AicaNameLoopTailState(fast, r9: 6, r11: 0, r12: 2, r13: 7);
+        normal.State.R[14] = 2;
+        fast.State.R[14] = 2;
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(fastStart, expectedSkippedInstructions, out var skippedInstructions));
+        Assert.Equal(expectedSkippedInstructions, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_1000, 0x1200), ReadBytes(fastMemory, 0x8C20_1000, 0x1200));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4FC0, 0x50), ReadBytes(fastMemory, 0x8C20_4FC0, 0x50));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameLoopTail(memory);
+        WriteSonicAdventure2AicaNameCallBridge(memory);
+        WriteSonicAdventure2AicaChannelSetupBridge(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B92E);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            memory,
+            cpu,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 3,
+            channel: 8,
+            group: 2,
+            mask: 7,
+            pendingWord: 0xDEAD_BEEF,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaNameLoopTailState(cpu, r9: 6, r11: 0, r12: 2, r13: 7);
+        cpu.State.R[14] = 2;
+
+        var step = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(step, 82, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B930u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateWhenMaskIsZero()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaNameLoopTail(memory);
+        WriteSonicAdventure2AicaNameCallBridge(memory);
+        WriteSonicAdventure2AicaChannelSetupBridge(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B92E);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            memory,
+            cpu,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 3,
+            channel: 8,
+            group: 2,
+            mask: 0,
+            pendingWord: 0,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaNameLoopTailState(cpu, r9: 6, r11: 0, r12: 2, r13: 7);
+        cpu.State.R[14] = 2;
+
+        var step = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregate(step, 80, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B930u, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsSonicAdventure2AicaChannelSetupBridgeToZeroMaskPath()
     {
