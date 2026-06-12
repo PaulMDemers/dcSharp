@@ -6723,6 +6723,7 @@ public sealed class Sh4Cpu
                 unchecked(State.R[15] + 4),
                 State.R[0],
                 3,
+                continueNameLoop: false,
                 out var postSetupSkippedInstructions))
         {
             skippedInstructions += postSetupSkippedInstructions;
@@ -7117,6 +7118,7 @@ public sealed class Sh4Cpu
             postDelaySlotStack,
             State.R[0],
             2,
+            continueNameLoop: false,
             out skippedInstructions);
     }
 
@@ -8671,6 +8673,7 @@ public sealed class Sh4Cpu
             State.R[15],
             State.R[5],
             0,
+            continueNameLoop: true,
             out skippedInstructions);
     }
 
@@ -8679,6 +8682,7 @@ public sealed class Sh4Cpu
         uint stack,
         uint r5AfterPostSetupEntry,
         ulong entrySkippedInstructionCount,
+        bool continueNameLoop,
         out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -8764,6 +8768,16 @@ public sealed class Sh4Cpu
         skippedInstructions = totalSkippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        if (continueNameLoop
+            && State.Pc == 0x8C15_B92E
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(
+                maxInstructionsToSkip - skippedInstructions,
+                out var loopSkippedInstructions))
+        {
+            skippedInstructions += loopSkippedInstructions;
+        }
+
         return true;
     }
 
