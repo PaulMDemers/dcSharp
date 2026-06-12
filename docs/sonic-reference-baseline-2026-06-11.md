@@ -72,3 +72,9 @@ The 50M probe `sa2-name-active-descriptor-50m-20260611-184714` stayed at `PC=0x8
 The active descriptor/post-setup return core now opportunistically consumes one following `0x8C15B92E` name-loop tail and next active setup. The nested setup deliberately stops after its descriptor return so the chain stays bounded and easy to reason about.
 
 The 50M probe `sa2-b92e-chain-50m-20260611-222052` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped again to `56,346`, and `0x8C15B92E` dropped from `11,024` to `7,349` profile hits.
+
+## AICA Group Tail To Descriptor Chain
+
+The `0x8C15B938` group-tail loop-back can now consume the following `0x8C15B8EC` descriptor-head aggregate and opportunistically continue into the name/setup path when the state supports it. The exit case still uses the narrow group-tail fast-forward.
+
+The 50M probe `sa2-group-tail-chain-50m-20260611-222702` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `55,121`, and `0x8C15B8EC` dropped out of the top 40 profile entries. The next exposed fold is the `0x8C15B92E` name-loop exit into the same group-tail continuation, which should reduce `0x8C15B938`.

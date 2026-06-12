@@ -702,6 +702,22 @@ public sealed class DreamcastRunner
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B93A, 0x8C15_B940)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B8EC, 0x8C15_B918)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C416, 0x8C15_C4C6)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B918, 0x8C15_B92E)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C4DC, 0x8C15_C564)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C566, 0x8C15_C724)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C724, 0x8C15_C780)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C780, 0x8C15_C856)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C56E, 0x8C15_C570)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C57C, 0x8C15_C5D8)
+                        && cpu.TryFastForwardSonicAdventure2AicaNameGroupTailNextActiveSetupAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaNameGroupTailNextActiveSetupAggregateSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaNameGroupTailNextActiveSetupAggregateSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B93A, 0x8C15_B940)
                         && cpu.TryFastForwardSonicAdventure2AicaNameGroupTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaNameGroupTailSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaNameGroupTailSkippedInstructions, cpu.State.InstructionsExecuted);

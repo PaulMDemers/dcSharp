@@ -5505,8 +5505,22 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        const ulong skippedInstructionCount = 91;
-        var group = State.R[14];
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            skippedInstructionCount: 91,
+            group: State.R[14],
+            continueToNameSetup: false,
+            out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+        ulong maxInstructionsToSkip,
+        ulong skippedInstructionCount,
+        uint group,
+        bool continueToNameSetup,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         var descriptorLocalStack = unchecked(State.R[15] - 4);
         if (maxInstructionsToSkip < skippedInstructionCount
             || group >= 4
@@ -5600,6 +5614,7 @@ public sealed class Sh4Cpu
         State.R[11] = State.R[8];
         State.R[12] = groupTimesSix;
         State.R[13] = groupTimesSix;
+        State.R[14] = group;
         State.Pr = 0x8C15_B908;
         State.T = (group & 0x8000_0000) != 0;
         State.Pc = 0x8C15_B918;
@@ -5607,6 +5622,20 @@ public sealed class Sh4Cpu
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        if (continueToNameSetup
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+                maxInstructionsToSkip - skippedInstructions,
+                preSetupSkippedInstructionCount: 11,
+                nameIndex: State.R[12],
+                channel: State.R[13],
+                group: State.R[14],
+                continueAfterDescriptorReturn: true,
+                out var setupSkippedInstructions))
+        {
+            skippedInstructions += setupSkippedInstructions;
+        }
+
         return true;
     }
 
@@ -5663,6 +5692,34 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameGroupTailNextActiveSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B938
+            || step.Opcode != 0x7E01
+            || State.Pc != 0x8C15_B93A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameGroupTail())
+        {
+            return false;
+        }
+
+        var groupAfterIncrement = State.R[14];
+        if ((int)groupAfterIncrement >= 4)
+        {
+            return false;
+        }
+
+        const ulong tailAndDescriptorSkippedInstructionCount = 95;
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            tailAndDescriptorSkippedInstructionCount,
+            groupAfterIncrement,
+            continueToNameSetup: true,
+            out skippedInstructions);
     }
 
     private bool IsSonicAdventure2AicaNameGroupTail() =>
