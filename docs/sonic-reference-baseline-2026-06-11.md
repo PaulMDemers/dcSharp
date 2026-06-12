@@ -126,3 +126,9 @@ The 50M probe `sa2-ipbin-bytefetch-chain-50m-20260612-015122` stayed at `PC=0x8C
 The byte-exhausted glyph tail at `0x8C008A76-0x8C008A88` now fast-forwards the geometry limit compare and branch back to the byte-fetch prefix when the current glyph cell index is still inside the `width * height` limit. With enough budget it can continue through the next byte-fetch and dispatch chain, while exact-budget callers still stop at the next byte-fetch trigger.
 
 The 50M probe `sa2-ipbin-byteexit-chain-50m-20260612-015550` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,784,454` to `48,799,284`; `0x8C008A78-0x8C008A88` and `0x8C0089DC` dropped out of the top profile, leaving `0x8C008A76` as the single byte-exit trigger at `1,530` hits.
+
+## AICA Descriptor No-Event Chain
+
+The `0x8C15BED8` descriptor-update prologue can now opportunistically continue through the setup, pointer advance, second/third descriptor word, and counter-return helpers on the observed no-event path. The aggregate ratchets forward: if a later descriptor guard does not match, it returns the already-applied safe prefix and lets normal execution resume at the next instruction boundary.
+
+The 50M probe `sa2-aica-descriptor-aggregate-50m-20260612-114807` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,799,284` to `48,802,350`, and CPU fast-forward batches dropped from `43,455` to `42,227`; the middle descriptor triggers `0x8C15BF1C`, `0x8C15BF72`, and `0x8C15BFC2` dropped out of the top profile. The remaining exposed descriptor pressure is the `0x8C15BED8` aggregate trigger plus `0x8C15C08C` for paths that reach the counter-return helper directly.
