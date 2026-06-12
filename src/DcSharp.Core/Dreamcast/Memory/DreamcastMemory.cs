@@ -1480,6 +1480,7 @@ public sealed class DreamcastMemory
             aicaRegisterAccesses.ToArray(),
             CreateAicaChannelSnapshots(),
             aicaCommandQueueActivities.ToArray(),
+            CreateAicaCommandQueueSnapshots(),
             (byte[])aicaRam.Clone());
     }
 
@@ -2157,6 +2158,51 @@ public sealed class DreamcastMemory
 
         queue = new AicaQueue(head, tail, size, valid, processOk, data);
         return true;
+    }
+
+    private IReadOnlyList<DreamcastAicaCommandQueueSnapshot> CreateAicaCommandQueueSnapshots()
+    {
+        const int maxQueues = 64;
+        var queues = new List<DreamcastAicaCommandQueueSnapshot>();
+        for (var offset = 0; offset <= aicaRam.Length - AicaQueueHeaderBytes && queues.Count < maxQueues; offset += 4)
+        {
+            if (!TryReadAicaQueue(offset, out var queue)
+                || !LooksLikeAicaCommandQueue(queue))
+            {
+                continue;
+            }
+
+            queues.Add(new DreamcastAicaCommandQueueSnapshot(
+                (uint)offset,
+                $"0x{offset:X6}",
+                queue.Head,
+                $"0x{queue.Head:X8}",
+                queue.Tail,
+                $"0x{queue.Tail:X8}",
+                queue.Size,
+                $"0x{queue.Size:X8}",
+                queue.Valid,
+                queue.ProcessOk,
+                queue.Head != queue.Tail,
+                queue.Data,
+                $"0x{queue.Data:X8}"));
+        }
+
+        return queues;
+    }
+
+    private static bool LooksLikeAicaCommandQueue(AicaQueue queue)
+    {
+        if (!queue.Valid
+            || queue.Size < AicaQueueHeaderBytes
+            || queue.Size > 0x1_0000
+            || (queue.Size & 3) != 0
+            || (queue.Data & 3) != 0)
+        {
+            return false;
+        }
+
+        return queue.ProcessOk || queue.Head != queue.Tail || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes;
     }
 
     private bool TryReadAicaQueuedCommand(AicaQueue queue, uint tail, out AicaQueuedCommand packet, out uint packetBytes)

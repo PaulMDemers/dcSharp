@@ -975,6 +975,45 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsAicaCommandQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 0x20);
+
+        var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
+        Assert.Equal(0x0001_0000u, queue.Offset);
+        Assert.Equal(0x0001_0018u, queue.Data);
+        Assert.Equal(0x100u, queue.Size);
+        Assert.Equal(0x20u, queue.Head);
+        Assert.Equal(0u, queue.Tail);
+        Assert.True(queue.Valid);
+        Assert.True(queue.ProcessOk);
+        Assert.True(queue.Pending);
+    }
+
+    [Fact]
+    public void AudioSnapshotReportsNonstandardAicaCommandQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaQueue(memory, offset: 0x0001_2000, head: 0x20, tail: 0, size: 0x80, valid: 1, processOk: 1, data: 0x0001_3000);
+
+        var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
+        Assert.Equal(0x0001_2000u, queue.Offset);
+        Assert.Equal(0x0001_3000u, queue.Data);
+        Assert.Equal(0x80u, queue.Size);
+        Assert.True(queue.Pending);
+    }
+
+    [Fact]
+    public void AudioSnapshotIgnoresInvalidAicaCommandQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaQueue(memory, offset: 0x0001_2000, head: 0x20, tail: 0, size: 0x80, valid: 1, processOk: 1, data: 0x0020_0000);
+
+        Assert.Empty(memory.CreateAudioSnapshot().CommandQueues);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();
@@ -2365,6 +2404,24 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0x0081_000C, 1);
         memory.WriteUInt32(0x0081_0010, 1);
         memory.WriteUInt32(0x0081_0014, 0x0001_0018);
+    }
+
+    private static void WriteAicaQueue(
+        DreamcastMemory memory,
+        uint offset,
+        uint head,
+        uint tail,
+        uint size,
+        uint valid,
+        uint processOk,
+        uint data)
+    {
+        memory.WriteUInt32(0x0080_0000 + offset, head);
+        memory.WriteUInt32(0x0080_0000 + offset + 4, tail);
+        memory.WriteUInt32(0x0080_0000 + offset + 8, size);
+        memory.WriteUInt32(0x0080_0000 + offset + 12, valid);
+        memory.WriteUInt32(0x0080_0000 + offset + 16, processOk);
+        memory.WriteUInt32(0x0080_0000 + offset + 20, data);
     }
 
     private static void WriteAicaCommandHeader(

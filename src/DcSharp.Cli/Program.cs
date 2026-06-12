@@ -629,7 +629,12 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
 
 static void PrintAudioActivity(DreamcastAudioSummary audio)
 {
-    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}");
+    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}, queues={audio.CommandQueues.Count}");
+    foreach (var queue in audio.CommandQueues.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA queue: offset={queue.OffsetHex}, data={queue.DataHex}, size={queue.SizeHex}, head={queue.HeadHex}, tail={queue.TailHex}, valid={queue.Valid}, processOk={queue.ProcessOk}, pending={queue.Pending}");
+    }
+
     foreach (var activity in audio.RecentCommandQueueActivities.TakeLast(8))
     {
         Console.WriteLine($"  AICA mailbox {activity.Result}: cmd={activity.CommandName}/{activity.CommandHex}, id={activity.CommandIdHex}, timestamp={activity.TimestampHex}, size={activity.SizeDwords}dw, tail={activity.TailHex}->{activity.NextTailHex}");
@@ -1092,7 +1097,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR current: {string.Join(", ", currentPvrRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
-    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}");
+    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}, queues={result.Audio.CommandQueues.Count}");
     var currentAicaRegisters = result.Audio.Registers.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentAicaRegisters.Length > 0)
     {
@@ -1160,6 +1165,11 @@ static void RunElf(string path, string[] args)
     {
         var channel = access.Channel is { } index ? $", channel={index}" : string.Empty;
         Console.WriteLine($"  AICA {access.Kind} {access.Name}: addr={access.AddressHex}{channel}, value={access.ValueHex}");
+    }
+
+    foreach (var queue in result.Audio.CommandQueues.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA queue: offset={queue.OffsetHex}, data={queue.DataHex}, size={queue.SizeHex}, head={queue.HeadHex}, tail={queue.TailHex}, valid={queue.Valid}, processOk={queue.ProcessOk}, pending={queue.Pending}");
     }
 
     foreach (var activity in result.Audio.CommandQueueActivities.TakeLast(8))

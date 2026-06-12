@@ -1723,7 +1723,8 @@ public sealed record DreamcastAudioSummary(
     IReadOnlyList<DreamcastAicaChannelSummary> Channels,
     int ActiveChannelCount,
     int CommandQueueActivityCount,
-    IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities)
+    IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities,
+    IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -1737,7 +1738,8 @@ public sealed record DreamcastAudioSummary(
             snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray(),
             snapshot.Channels.Count(channel => channel.Active),
             snapshot.CommandQueueActivities.Count,
-            snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray());
+            snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray(),
+            snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray());
 }
 
 public sealed record DreamcastAicaRegisterValueSummary(
@@ -1808,6 +1810,38 @@ public sealed record DreamcastAicaCommandQueueActivitySummary(
             activity.Timestamp,
             activity.TimestampHex,
             activity.Result);
+}
+
+public sealed record DreamcastAicaCommandQueueSummary(
+    uint Offset,
+    string OffsetHex,
+    uint Head,
+    string HeadHex,
+    uint Tail,
+    string TailHex,
+    uint Size,
+    string SizeHex,
+    bool Valid,
+    bool ProcessOk,
+    bool Pending,
+    uint Data,
+    string DataHex)
+{
+    public static DreamcastAicaCommandQueueSummary FromQueue(DreamcastAicaCommandQueueSnapshot queue) =>
+        new(
+            queue.Offset,
+            queue.OffsetHex,
+            queue.Head,
+            queue.HeadHex,
+            queue.Tail,
+            queue.TailHex,
+            queue.Size,
+            queue.SizeHex,
+            queue.Valid,
+            queue.ProcessOk,
+            queue.Pending,
+            queue.Data,
+            queue.DataHex);
 }
 
 public sealed record DreamcastAicaChannelSummary(
