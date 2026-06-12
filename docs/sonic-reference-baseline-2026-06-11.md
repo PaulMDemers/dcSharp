@@ -132,3 +132,9 @@ The 50M probe `sa2-ipbin-byteexit-chain-50m-20260612-015550` stayed at `PC=0x8C1
 The `0x8C15BED8` descriptor-update prologue can now opportunistically continue through the setup, pointer advance, second/third descriptor word, and counter-return helpers on the observed no-event path. The aggregate ratchets forward: if a later descriptor guard does not match, it returns the already-applied safe prefix and lets normal execution resume at the next instruction boundary.
 
 The 50M probe `sa2-aica-descriptor-aggregate-50m-20260612-114807` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,799,284` to `48,802,350`, and CPU fast-forward batches dropped from `43,455` to `42,227`; the middle descriptor triggers `0x8C15BF1C`, `0x8C15BF72`, and `0x8C15BFC2` dropped out of the top profile. The remaining exposed descriptor pressure is the `0x8C15BED8` aggregate trigger plus `0x8C15C08C` for paths that reach the counter-return helper directly.
+
+## G2 PIO Read Helper Prologue Coverage
+
+The `0x8C1356D8` G2 PIO read helper prologue can now bridge directly into the existing read-word or external-read helper fast-forwards when the body is fully eligible. It refuses ineligible bodies rather than consuming only the prologue, preserving the larger helper batches.
+
+The 50M probe `sa2-g2-pio-read-prologue-tight-50m-20260612-115530` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose slightly from `48,802,350` to `48,802,386`, while CPU fast-forward batches stayed flat at `42,227`; this is narrow guarded coverage rather than a visible compatibility frontier move.

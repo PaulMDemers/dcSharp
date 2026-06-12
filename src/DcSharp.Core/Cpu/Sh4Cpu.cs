@@ -3212,6 +3212,74 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2PioReadHelperPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_56D8
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C13_56DA
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong prologueTailInstructions = 6;
+        if (maxInstructionsToSkip < prologueTailInstructions
+            || !IsSonicAdventure2G2PioReadHelper()
+            || State.R[15] < 24
+            || !memory.TryGetSystemRamOffset(State.R[15] - 24, 28, out _))
+        {
+            return false;
+        }
+
+        var helperSkippedInstructions = State.R[6] switch
+        {
+            4 when State.R[7] == 1
+                && IsAicaRamAddress(State.R[4], 4)
+                && memory.TryGetSystemRamOffset(State.R[5], 4, out _) => 439UL,
+            4 when State.R[7] == 1
+                && IsExpansionProbeAddress(State.R[4], 4)
+                && memory.TryGetSystemRamOffset(State.R[5], 4, out _) => 408UL,
+            1 when State.R[7] == 1
+                && IsExpansionProbeAddress(State.R[4], 1)
+                && memory.TryGetSystemRamOffset(State.R[5], 1, out _) => 396UL,
+            _ => 0UL
+        };
+        if (helperSkippedInstructions == 0
+            || maxInstructionsToSkip < prologueTailInstructions + helperSkippedInstructions)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(State.R[15] - 4, State.R[13]);
+        memory.WriteUInt32(State.R[15] - 8, State.R[12]);
+        memory.WriteUInt32(State.R[15] - 12, State.R[11]);
+        memory.WriteUInt32(State.R[15] - 16, State.R[10]);
+        memory.WriteUInt32(State.R[15] - 20, State.R[9]);
+        memory.WriteUInt32(State.R[15] - 24, State.Pr);
+        State.R[15] -= 24;
+        State.Pc = 0x8C13_56E6;
+        State.InstructionsExecuted += prologueTailInstructions;
+        skippedInstructions = prologueTailInstructions;
+
+        var helperStep = new Sh4StepResult(0x8C13_56E4, 0x4F22, string.Empty);
+        var remainingBudget = maxInstructionsToSkip - skippedInstructions;
+        if (TryFastForwardSonicAdventure2G2PioExternalReadHelper(helperStep, remainingBudget, out var chainedSkippedInstructions)
+            || TryFastForwardSonicAdventure2G2PioReadWordHelper(helperStep, remainingBudget, out chainedSkippedInstructions))
+        {
+            skippedInstructions += chainedSkippedInstructions;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
+
+        skippedInstructions = 0;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return false;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioReadWordCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
