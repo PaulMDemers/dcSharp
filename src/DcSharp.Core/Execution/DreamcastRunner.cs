@@ -204,6 +204,18 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8A76, 0x8C00_8A8A)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_89DC, 0x8C00_8A76)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8A14, 0x8C00_8A4C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_98CC, 0x8C00_996C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_9A28, 0x8C00_9ADC)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8AD0, 0x8C00_8B0A)
+                        && cpu.TryFastForwardIpBinGlyphByteExitTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var ipBinGlyphByteExitSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(ipBinGlyphByteExitSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_89DC, 0x8C00_8A76)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8A14, 0x8C00_8A4C)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_98CC, 0x8C00_996C)

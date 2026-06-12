@@ -120,3 +120,9 @@ The 50M probe `sa2-ipbin-dispatch-setbit-chain-50m-20260612-001016` stayed at `P
 The glyph byte-fetch prefix at `0x8C0089DC-0x8C0089F4` now fast-forwards through the pointer increment, source-byte cache update, bit-count reset, and loop-tail branch back into the existing dispatch aggregate. The dispatch helper also has an entry-mode path so the prefix can continue through set-bit and zero-bit chains without interpreting the next `0x8C0089F6` trigger.
 
 The 50M probe `sa2-ipbin-bytefetch-chain-50m-20260612-015122` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,760,250` to `48,784,454`; `0x8C0089F6` profile hits fell from `5,732` to `4,249`, and the byte-fetch body `0x8C0089DE-0x8C0089F4` plus the loop-tail redispatch `0x8C008A70-0x8C008A74` dropped out of the top profile. The remaining `0x8C0089DC` count is the single trigger instruction for each fetched glyph byte.
+
+## IP.BIN Byte-Exit To Fetch Chain
+
+The byte-exhausted glyph tail at `0x8C008A76-0x8C008A88` now fast-forwards the geometry limit compare and branch back to the byte-fetch prefix when the current glyph cell index is still inside the `width * height` limit. With enough budget it can continue through the next byte-fetch and dispatch chain, while exact-budget callers still stop at the next byte-fetch trigger.
+
+The 50M probe `sa2-ipbin-byteexit-chain-50m-20260612-015550` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,784,454` to `48,799,284`; `0x8C008A78-0x8C008A88` and `0x8C0089DC` dropped out of the top profile, leaving `0x8C008A76` as the single byte-exit trigger at `1,530` hits.

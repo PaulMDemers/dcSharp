@@ -555,17 +555,60 @@ public sealed class Sh4Cpu
 
     internal bool TryFastForwardIpBinGlyphByteFetchPrefix(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
-        const ulong byteFetchToDispatchInstructions = 15;
-
         skippedInstructions = 0;
         if (step.Pc != 0x8C00_89DC
             || step.Opcode != 0x51F6
             || State.Pc != 0x8C00_89DE
             || delayedBranchTarget is not null
             || immediateBranchTarget is not null
-            || maxInstructionsToSkip < byteFetchToDispatchInstructions
             || !IsIpBinGlyphByteFetchPrefix()
             || !IsIpBinGlyphLoopTail())
+        {
+            return false;
+        }
+
+        return TryFastForwardIpBinGlyphByteFetchPrefixCore(maxInstructionsToSkip, 15, out skippedInstructions);
+    }
+
+    private bool TryFastForwardIpBinGlyphByteFetchPrefixFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (State.Pc != 0x8C00_89DC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsIpBinGlyphByteFetchPrefix()
+            || !IsIpBinGlyphLoopTail())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var savedR1 = State.R[1];
+        var savedPc = State.Pc;
+        State.R[1] = memory.ReadUInt32(stack + 0x18);
+        State.Pc = 0x8C00_89DE;
+        if (!TryFastForwardIpBinGlyphByteFetchPrefixCore(maxInstructionsToSkip, 16, out skippedInstructions))
+        {
+            State.R[1] = savedR1;
+            State.Pc = savedPc;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryFastForwardIpBinGlyphByteFetchPrefixCore(
+        ulong maxInstructionsToSkip,
+        ulong byteFetchToDispatchInstructions,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (maxInstructionsToSkip < byteFetchToDispatchInstructions)
         {
             return false;
         }
@@ -614,6 +657,72 @@ public sealed class Sh4Cpu
                 out var dispatchSkippedInstructions))
         {
             skippedInstructions += dispatchSkippedInstructions;
+        }
+
+        return true;
+    }
+
+    internal bool TryFastForwardIpBinGlyphByteExitTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        const ulong byteExitTailInstructions = 9;
+
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8A76
+            || step.Opcode != 0x52F8
+            || State.Pc != 0x8C00_8A78
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < byteExitTailInstructions
+            || !IsIpBinGlyphByteExitTail()
+            || !IsIpBinGlyphByteFetchPrefix())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var geometry = State.R[2];
+        if (geometry != memory.ReadUInt32(stack + 0x20)
+            || geometry is < 0x7E00_0000 or > 0x7E00_0FF8)
+        {
+            return false;
+        }
+
+        var width = (short)memory.ReadUInt16(geometry + 0x04);
+        var height = (short)memory.ReadUInt16(geometry + 0x06);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var cellLimit = (uint)(width * height);
+        var cellIndex = memory.ReadUInt32(stack + 0x08);
+        if (cellLimit == 0 || cellIndex >= cellLimit)
+        {
+            return false;
+        }
+
+        State.R[0] = cellLimit;
+        State.R[2] = (uint)width;
+        State.R[3] = cellIndex;
+        State.Macl = cellLimit;
+        State.T = false;
+        State.Pc = 0x8C00_89DC;
+        State.InstructionsExecuted += byteExitTailInstructions;
+        skippedInstructions = byteExitTailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        if (maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardIpBinGlyphByteFetchPrefixFromEntry(
+                maxInstructionsToSkip - skippedInstructions,
+                out var byteFetchSkippedInstructions))
+        {
+            skippedInstructions += byteFetchSkippedInstructions;
         }
 
         return true;
@@ -1529,6 +1638,18 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C00_89F0) == 0x1F25
         && memory.ReadInstructionUInt16(0x8C00_89F2) == 0xA03D
         && memory.ReadInstructionUInt16(0x8C00_89F4) == 0x0009;
+
+    private bool IsIpBinGlyphByteExitTail() =>
+        memory.ReadInstructionUInt16(0x8C00_8A76) == 0x52F8
+        && memory.ReadInstructionUInt16(0x8C00_8A78) == 0x8522
+        && memory.ReadInstructionUInt16(0x8C00_8A7A) == 0x6203
+        && memory.ReadInstructionUInt16(0x8C00_8A7C) == 0x53F8
+        && memory.ReadInstructionUInt16(0x8C00_8A7E) == 0x8533
+        && memory.ReadInstructionUInt16(0x8C00_8A80) == 0x220F
+        && memory.ReadInstructionUInt16(0x8C00_8A82) == 0x001A
+        && memory.ReadInstructionUInt16(0x8C00_8A84) == 0x53F2
+        && memory.ReadInstructionUInt16(0x8C00_8A86) == 0x3303
+        && memory.ReadInstructionUInt16(0x8C00_8A88) == 0x8BA8;
 
     private bool IsIpBinGlyphLoopTail() =>
         memory.ReadInstructionUInt16(0x8C00_8A4C) == 0x52F2
