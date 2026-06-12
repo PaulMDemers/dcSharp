@@ -3072,6 +3072,82 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaMirrorCopyFunction(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5DDC
+            || step.Opcode != 0xD317
+            || State.Pc != 0x8C13_5DDE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint sourceStride = 0x2C;
+        const uint destinationStride = 0x18;
+        const uint entryLimit = 24;
+        const ulong skippedInstructionCount = 607;
+        var sourceBasePointer = memory.ReadUInt32(0x8C13_5E3C);
+        var destination = memory.ReadUInt32(0x8C13_5E54);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaMirrorCopyLoop()
+            || !memory.TryGetSystemRamOffset(sourceBasePointer, 4, out _))
+        {
+            return false;
+        }
+
+        var tableBase = memory.ReadUInt32(sourceBasePointer);
+        var source = tableBase + 0x28;
+        var sourceBytes = ((entryLimit - 1) * sourceStride) + 24;
+        var destinationBytes = ((entryLimit - 1) * destinationStride) + 16;
+        if (tableBase > uint.MaxValue - 0x28
+            || source > uint.MaxValue - (sourceBytes - 1)
+            || destination > uint.MaxValue - (destinationBytes - 1)
+            || !memory.TryGetSystemRamOffset(source, checked((int)sourceBytes), out _)
+            || !memory.TryGetSystemRamOffset(destination, checked((int)destinationBytes), out _))
+        {
+            return false;
+        }
+
+        byte lastByte0 = 0;
+        byte lastByte11 = 0;
+        uint lastWord20 = 0;
+        for (var entry = 0u; entry < entryLimit; entry++)
+        {
+            var sourceEntry = source + (entry * sourceStride);
+            var destinationEntry = destination + (entry * destinationStride);
+            lastByte0 = memory.ReadByte(sourceEntry);
+            memory.Write(destinationEntry, [lastByte0]);
+            memory.Write(destinationEntry + 1, [memory.ReadByte(sourceEntry + 1)]);
+            memory.Write(destinationEntry + 2, [memory.ReadByte(sourceEntry + 2)]);
+            memory.Write(destinationEntry + 3, [memory.ReadByte(sourceEntry + 3)]);
+            memory.WriteUInt32(destinationEntry + 8, memory.ReadUInt32(sourceEntry + 16));
+            memory.Write(destinationEntry + 4, [memory.ReadByte(sourceEntry + 8)]);
+            memory.Write(destinationEntry + 5, [memory.ReadByte(sourceEntry + 9)]);
+            memory.Write(destinationEntry + 6, [memory.ReadByte(sourceEntry + 10)]);
+            lastByte11 = memory.ReadByte(sourceEntry + 11);
+            memory.Write(destinationEntry + 7, [lastByte11]);
+            lastWord20 = memory.ReadUInt32(sourceEntry + 20);
+            memory.WriteUInt32(destinationEntry + 12, lastWord20);
+        }
+
+        State.R[0] = unchecked((uint)(sbyte)lastByte11);
+        State.R[2] = unchecked((uint)(sbyte)lastByte0);
+        State.R[3] = lastWord20;
+        State.R[4] = source + (entryLimit * sourceStride);
+        State.R[5] = destination + (entryLimit * destinationStride);
+        State.R[6] = entryLimit;
+        State.R[7] = entryLimit;
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaWorkPollNoWorkInterrupt(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
