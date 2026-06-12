@@ -108,3 +108,9 @@ The 50M probe `sa2-postsetup-zeromask-chain-50m-20260611-233257` stayed at `PC=0
 The set-bit glyph draw prefix now uses extra budget to continue from the post-draw loop tail back into the following zero-bit dispatch when the remaining byte bits are clear. Exact-budget callers still stop at the old loop-tail boundary, while larger budgets can consume the trailing zero-bit span and land at the byte-exhausted path.
 
 The 50M probe `sa2-ipbin-setbit-zero-chain-50m-20260611-233836` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped from `48,995` to `48,288`, and `0x8C0089F6` profile hits fell from `6,439` to `5,732`; `0x8C008A14` remains at `4,833` hits and is now the main IP.BIN glyph trigger left to fold.
+
+## IP.BIN Dispatch To Set-Bit Chain
+
+The glyph bit-dispatch aggregate now uses extra budget to consume the following set-bit draw prefix directly when the current bit is set. The shared set-bit core still preserves the exact-budget standalone `0x8C008A14` behavior, but dispatch callers can now draw the set pixel, run the loop tail, and consume a following zero-tail span in one bounded aggregate.
+
+The 50M probe `sa2-ipbin-dispatch-setbit-chain-50m-20260612-001016` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped from `48,288` to `43,455`, and `0x8C008A14` dropped out of the top profile entirely. The leading IP.BIN glyph trigger is now `0x8C0089F6` at `5,732` hits, followed by the SA2 AICA name-loop and slot-scan clusters.

@@ -593,6 +593,15 @@ public sealed class Sh4Cpu
         immediateBranchTarget = State.T ? 0x8C00_8A4C : null;
         State.InstructionsExecuted += dispatchInstructions;
         skippedInstructions = dispatchInstructions;
+        if (!State.T
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardIpBinSetBitGlyphDrawPrefixFromEntry(
+                maxInstructionsToSkip - skippedInstructions,
+                out var setBitSkippedInstructions))
+        {
+            skippedInstructions += setBitSkippedInstructions;
+        }
+
         return true;
     }
 
@@ -833,21 +842,68 @@ public sealed class Sh4Cpu
 
     internal bool TryFastForwardIpBinSetBitGlyphDrawPrefix(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
-        const ulong maxSkippedInstructionCount = 226;
-        const ulong prefixThroughRemainderTriggerInstructions = 101;
-        const ulong drawTailWithTriggerInstructions = 36;
-
         skippedInstructions = 0;
         if (step.Pc != 0x8C00_8A14
             || step.Opcode != 0x50F8
             || State.Pc != 0x8C00_8A16
             || delayedBranchTarget is not null
             || immediateBranchTarget is not null
-            || maxInstructionsToSkip < maxSkippedInstructionCount
             || !IsIpBinSetBitGlyphDrawPrefix()
             || !IsIpBinSignedDivideQuotientHelper()
             || !IsIpBinSignedDivideRemainderHelper()
             || !IsIpBinGlyphDrawHelper())
+        {
+            return false;
+        }
+
+        return TryFastForwardIpBinSetBitGlyphDrawPrefixCore(maxInstructionsToSkip, 0, out skippedInstructions);
+    }
+
+    private bool TryFastForwardIpBinSetBitGlyphDrawPrefixFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (State.Pc != 0x8C00_8A14
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsIpBinSetBitGlyphDrawPrefix()
+            || !IsIpBinSignedDivideQuotientHelper()
+            || !IsIpBinSignedDivideRemainderHelper()
+            || !IsIpBinGlyphDrawHelper())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0010 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var savedR0 = State.R[0];
+        var savedPc = State.Pc;
+        State.R[0] = memory.ReadUInt32(stack + 0x20);
+        State.Pc = 0x8C00_8A16;
+        if (!TryFastForwardIpBinSetBitGlyphDrawPrefixCore(maxInstructionsToSkip, 1, out skippedInstructions))
+        {
+            State.R[0] = savedR0;
+            State.Pc = savedPc;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryFastForwardIpBinSetBitGlyphDrawPrefixCore(
+        ulong maxInstructionsToSkip,
+        ulong entrySkippedInstructionCount,
+        out ulong skippedInstructions)
+    {
+        const ulong maxSkippedInstructionCount = 226;
+        const ulong prefixThroughRemainderTriggerInstructions = 101;
+        const ulong drawTailWithTriggerInstructions = 36;
+
+        skippedInstructions = 0;
+        if (maxInstructionsToSkip < entrySkippedInstructionCount + maxSkippedInstructionCount)
         {
             return false;
         }
@@ -942,7 +998,7 @@ public sealed class Sh4Cpu
         State.Pr = 0x8C00_8A4C;
         State.T = false;
         State.Pc = 0x8C00_8A4C;
-        var prefixSkippedInstructions = prefixThroughRemainderTriggerInstructions + remainderTailInstructions + drawTailWithTriggerInstructions;
+        var prefixSkippedInstructions = entrySkippedInstructionCount + prefixThroughRemainderTriggerInstructions + remainderTailInstructions + drawTailWithTriggerInstructions;
         if (TryFastForwardIpBinGlyphLoopTailFromEntry(
             stack,
             cellIndex,
