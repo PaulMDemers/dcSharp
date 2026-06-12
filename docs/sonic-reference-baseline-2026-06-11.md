@@ -144,3 +144,9 @@ The 50M probe `sa2-g2-pio-read-prologue-tight-50m-20260612-115530` stayed at `PC
 The `0x8C110A08` wrapper now folds its two-word AICA register read through the G2 PIO helper, combines the high half of `0xA0710000` with the low half of `0xA0710004`, and restores directly to the caller. The shortcut is signature-gated against the wrapper and G2 helper bodies and is disabled under memory watches.
 
 The 50M probe `sa2-aica-register-pair-wrapper-50m-20260612-123310` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,802,386` to `49,080,818`, and CPU fast-forward batches dropped from `42,227` to `39,763`. The aggregate entry `0x8C110A08` remains visible as the call trigger, while the body now collapses enough to expose the next clusters around `0x8C110938`, `0x8C10FE8E`, `0x8C14D15A`, and the remaining AICA name/descriptor triggers.
+
+## AICA Register Pair Pointer Loop
+
+The `0x8C11092A` pointer loop now fast-forwards repeated calls into the AICA register-pair wrapper when the output pointer span is contiguous and the retail wrapper/helper signatures match. Each folded iteration writes the combined AICA register value and preserves the helper counters, then exits at the existing post-loop compare boundary.
+
+The 50M probe `sa2-aica-register-pointer-loop-50m-20260612-124750` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `49,080,818` to `49,091,870`, and CPU fast-forward batches dropped from `39,763` to `39,149`. The `0x8C110938/0x8C11093A` pointer-loop compare/branch cluster dropped out of the top profile; the next exposed clusters remain the interrupt callback scan around `0x8C14D15A`, the SR-protected callback dispatch around `0x8C10FE8E`, and the AICA name/slot/descriptor triggers.
