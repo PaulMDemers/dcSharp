@@ -12,6 +12,7 @@ public sealed record DreamcastAudioSnapshot(
     IReadOnlyList<DreamcastAicaChannelSnapshot> Channels,
     IReadOnlyList<DreamcastAicaCommandQueueActivity> CommandQueueActivities,
     IReadOnlyList<DreamcastAicaCommandQueueSnapshot> CommandQueues,
+    IReadOnlyList<DreamcastAicaRamTextMarker> TextMarkers,
     byte[] AudioRam);
 
 public sealed record DreamcastAicaRegisterValue(
@@ -104,3 +105,9 @@ public sealed record DreamcastAicaCommandQueueSnapshot(
     bool Pending,
     uint Data,
     string DataHex);
+
+public sealed record DreamcastAicaRamTextMarker(
+    uint Offset,
+    string OffsetHex,
+    int Length,
+    string Text);

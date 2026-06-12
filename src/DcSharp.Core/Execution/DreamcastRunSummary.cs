@@ -1724,7 +1724,8 @@ public sealed record DreamcastAudioSummary(
     int ActiveChannelCount,
     int CommandQueueActivityCount,
     IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities,
-    IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues)
+    IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues,
+    IReadOnlyList<DreamcastAicaRamTextMarkerSummary> TextMarkers)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -1739,7 +1740,8 @@ public sealed record DreamcastAudioSummary(
             snapshot.Channels.Count(channel => channel.Active),
             snapshot.CommandQueueActivities.Count,
             snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray(),
-            snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray());
+            snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray(),
+            snapshot.TextMarkers.Select(DreamcastAicaRamTextMarkerSummary.FromMarker).ToArray());
 }
 
 public sealed record DreamcastAicaRegisterValueSummary(
@@ -1842,6 +1844,16 @@ public sealed record DreamcastAicaCommandQueueSummary(
             queue.Pending,
             queue.Data,
             queue.DataHex);
+}
+
+public sealed record DreamcastAicaRamTextMarkerSummary(
+    uint Offset,
+    string OffsetHex,
+    int Length,
+    string Text)
+{
+    public static DreamcastAicaRamTextMarkerSummary FromMarker(DreamcastAicaRamTextMarker marker) =>
+        new(marker.Offset, marker.OffsetHex, marker.Length, marker.Text);
 }
 
 public sealed record DreamcastAicaChannelSummary(

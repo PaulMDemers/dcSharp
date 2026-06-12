@@ -1481,6 +1481,7 @@ public sealed class DreamcastMemory
             CreateAicaChannelSnapshots(),
             aicaCommandQueueActivities.ToArray(),
             CreateAicaCommandQueueSnapshots(),
+            CreateAicaTextMarkers(),
             (byte[])aicaRam.Clone());
     }
 
@@ -2204,6 +2205,52 @@ public sealed class DreamcastMemory
 
         return queue.ProcessOk || queue.Head != queue.Tail || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes;
     }
+
+    private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()
+    {
+        const int minLength = 8;
+        const int maxMarkers = 32;
+        const int maxTextBytes = 96;
+        var markers = new List<DreamcastAicaRamTextMarker>();
+        var offset = 0;
+
+        while (offset < aicaRam.Length && markers.Count < maxMarkers)
+        {
+            if (!IsAicaTextByte(aicaRam[offset]))
+            {
+                offset++;
+                continue;
+            }
+
+            var start = offset;
+            var hasLetter = false;
+            while (offset < aicaRam.Length && IsAicaTextByte(aicaRam[offset]))
+            {
+                hasLetter |= IsAsciiLetter(aicaRam[offset]);
+                offset++;
+            }
+
+            var length = offset - start;
+            if (length >= minLength && hasLetter)
+            {
+                var textLength = Math.Min(length, maxTextBytes);
+                var text = Encoding.ASCII.GetString(aicaRam, start, textLength);
+                markers.Add(new DreamcastAicaRamTextMarker(
+                    (uint)start,
+                    $"0x{start:X6}",
+                    length,
+                    length > maxTextBytes ? $"{text}..." : text));
+            }
+        }
+
+        return markers;
+    }
+
+    private static bool IsAicaTextByte(byte value) =>
+        value is >= 0x20 and <= 0x7E;
+
+    private static bool IsAsciiLetter(byte value) =>
+        value is (>= (byte)'A' and <= (byte)'Z') or (>= (byte)'a' and <= (byte)'z');
 
     private bool TryReadAicaQueuedCommand(AicaQueue queue, uint tail, out AicaQueuedCommand packet, out uint packetBytes)
     {

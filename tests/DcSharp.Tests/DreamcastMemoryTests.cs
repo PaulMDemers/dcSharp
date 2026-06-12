@@ -1014,6 +1014,29 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsAicaRamTextMarkers()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaText(memory, 0x0000_0400, "AM2/AICA soundDrv 990902/Ver1.76");
+
+        var marker = Assert.Single(memory.CreateAudioSnapshot().TextMarkers);
+        Assert.Equal(0x0000_0400u, marker.Offset);
+        Assert.Equal("0x000400", marker.OffsetHex);
+        Assert.Equal(32, marker.Length);
+        Assert.Equal("AM2/AICA soundDrv 990902/Ver1.76", marker.Text);
+    }
+
+    [Fact]
+    public void AudioSnapshotIgnoresShortAicaRamTextRuns()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaText(memory, 0x0000_0400, "AICA");
+        WriteAicaText(memory, 0x0000_0500, "12345678");
+
+        Assert.Empty(memory.CreateAudioSnapshot().TextMarkers);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();
@@ -2422,6 +2445,21 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0x0080_0000 + offset + 12, valid);
         memory.WriteUInt32(0x0080_0000 + offset + 16, processOk);
         memory.WriteUInt32(0x0080_0000 + offset + 20, data);
+    }
+
+    private static void WriteAicaText(DreamcastMemory memory, uint offset, string text)
+    {
+        var index = 0;
+        for (; index + 1 < text.Length; index += 2)
+        {
+            var value = (ushort)(text[index] | (text[index + 1] << 8));
+            memory.WriteUInt16(0x0080_0000 + offset + (uint)index, value);
+        }
+
+        if (index < text.Length)
+        {
+            memory.WriteUInt16(0x0080_0000 + offset + (uint)index, text[index]);
+        }
     }
 
     private static void WriteAicaCommandHeader(
