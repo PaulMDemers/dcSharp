@@ -5247,6 +5247,62 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaInactiveCallbackHelperReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5D4E
+            || step.Opcode != 0x892B
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C13_5DA8
+            || delayedBranchTarget is not null
+            || immediateBranchTarget != 0x8C13_5DA8
+            || !State.T)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 5;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaInactiveCallbackHelper()
+            || !memory.TryGetSystemRamOffset(State.R[15], 16, out _))
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(State.R[15] + 4);
+        var savedR13 = memory.ReadUInt32(State.R[15] + 8);
+        var savedR14 = memory.ReadUInt32(State.R[15] + 12);
+
+        State.Pr = savedPr;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] += 16;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaInactiveCallbackHelper()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_5D40) == 0x2FE6
+            && memory.ReadInstructionUInt16(0x8C13_5D42) == 0x2FD6
+            && memory.ReadInstructionUInt16(0x8C13_5D44) == 0x4F22
+            && memory.ReadInstructionUInt16(0x8C13_5D46) == 0x7FFC
+            && memory.ReadInstructionUInt16(0x8C13_5D48) == 0xD336
+            && memory.ReadInstructionUInt16(0x8C13_5D4A) == 0x6432
+            && memory.ReadInstructionUInt16(0x8C13_5D4C) == 0x2448
+            && memory.ReadInstructionUInt16(0x8C13_5D4E) == 0x892B
+            && memory.ReadInstructionUInt16(0x8C13_5DA8) == 0x7F04
+            && memory.ReadInstructionUInt16(0x8C13_5DAA) == 0x4F26
+            && memory.ReadInstructionUInt16(0x8C13_5DAC) == 0x6DF6
+            && memory.ReadInstructionUInt16(0x8C13_5DAE) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C13_5DB0) == 0x6EF6
+            && memory.ReadUInt32(0x8C13_5E24) == 0x8C29_BEAC;
+    }
+
     private bool IsSonicAdventure2EmptyPointerTableScan()
     {
         return memory.ReadInstructionUInt16(0x8C13_5CD8) == 0x63E2
