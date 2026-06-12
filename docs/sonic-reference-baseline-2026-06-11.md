@@ -114,3 +114,9 @@ The 50M probe `sa2-ipbin-setbit-zero-chain-50m-20260611-233836` stayed at `PC=0x
 The glyph bit-dispatch aggregate now uses extra budget to consume the following set-bit draw prefix directly when the current bit is set. The shared set-bit core still preserves the exact-budget standalone `0x8C008A14` behavior, but dispatch callers can now draw the set pixel, run the loop tail, and consume a following zero-tail span in one bounded aggregate.
 
 The 50M probe `sa2-ipbin-dispatch-setbit-chain-50m-20260612-001016` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped from `48,288` to `43,455`, and `0x8C008A14` dropped out of the top profile entirely. The leading IP.BIN glyph trigger is now `0x8C0089F6` at `5,732` hits, followed by the SA2 AICA name-loop and slot-scan clusters.
+
+## IP.BIN Byte-Fetch To Dispatch Chain
+
+The glyph byte-fetch prefix at `0x8C0089DC-0x8C0089F4` now fast-forwards through the pointer increment, source-byte cache update, bit-count reset, and loop-tail branch back into the existing dispatch aggregate. The dispatch helper also has an entry-mode path so the prefix can continue through set-bit and zero-bit chains without interpreting the next `0x8C0089F6` trigger.
+
+The 50M probe `sa2-ipbin-bytefetch-chain-50m-20260612-015122` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,760,250` to `48,784,454`; `0x8C0089F6` profile hits fell from `5,732` to `4,249`, and the byte-fetch body `0x8C0089DE-0x8C0089F4` plus the loop-tail redispatch `0x8C008A70-0x8C008A74` dropped out of the top profile. The remaining `0x8C0089DC` count is the single trigger instruction for each fetched glyph byte.

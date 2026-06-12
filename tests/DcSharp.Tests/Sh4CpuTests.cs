@@ -539,6 +539,69 @@ public class Sh4CpuTests
         Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(destination));
     }
 
+    [Theory]
+    [InlineData(0x80, 400ul, 0x8C00_89F6u)]
+    [InlineData(0x00, 400ul, 0x8C00_8A76u)]
+    public void FastForwardsIpBinGlyphByteFetchPrefixAcrossDispatchChain(byte sourceByte, ulong budget, uint expectedPc)
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinGlyphByteFetchPrefix(normalMemory);
+        WriteIpBinZeroBitGlyphLoop(normalMemory);
+        WriteIpBinSetBitGlyphDrawPrefix(normalMemory);
+        WriteIpBinSignedDivideQuotientHelper(normalMemory);
+        WriteIpBinSignedDivideRemainderHelper(normalMemory);
+        WriteIpBinGlyphDrawHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinGlyphByteFetchPrefix(fastMemory);
+        WriteIpBinZeroBitGlyphLoop(fastMemory);
+        WriteIpBinSetBitGlyphDrawPrefix(fastMemory);
+        WriteIpBinSignedDivideQuotientHelper(fastMemory);
+        WriteIpBinSignedDivideRemainderHelper(fastMemory);
+        WriteIpBinGlyphDrawHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_89DC);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_89DC);
+        InitializeIpBinGlyphByteFetchPrefixState(normalMemory, normal, sourceByte);
+        InitializeIpBinGlyphByteFetchPrefixState(fastMemory, fast, sourceByte);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphByteFetchPrefix(fastStart, budget, out var skippedInstructions));
+        Assert.True(skippedInstructions >= 15);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(ReadBytes(normalMemory, 0x7E00_0F34, 0x60), ReadBytes(fastMemory, 0x7E00_0F34, 0x60));
+        Assert.Equal(0xAC00_B639u, fastMemory.ReadUInt32(0x7E00_0F5C));
+        Assert.Equal(sourceByte, fastMemory.ReadByte(0x7E00_0F63));
+        Assert.Equal(expectedPc, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinGlyphByteFetchPrefixWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinGlyphByteFetchPrefix(memory);
+        WriteIpBinZeroBitGlyphLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_89DC);
+        InitializeIpBinGlyphByteFetchPrefixState(memory, cpu, 0x80);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardIpBinGlyphByteFetchPrefix(start, 14, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_89DEu, cpu.State.Pc);
+        Assert.Equal(0xAC00_B638u, memory.ReadUInt32(0x7E00_0F5C));
+    }
+
     [Fact]
     public void DoesNotFastForwardIpBinGlyphBitDispatchWhenBudgetIsShort()
     {
@@ -18918,6 +18981,23 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C00_8A9C, 0x8C00_8AD0);
     }
 
+    private static void WriteIpBinGlyphByteFetchPrefix(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_89DC, 0x51F6);
+        WriteInstruction(memory, 0x8C00_89DE, 0x7101);
+        WriteInstruction(memory, 0x8C00_89E0, 0x1F16);
+        WriteInstruction(memory, 0x8C00_89E2, 0x71FF);
+        WriteInstruction(memory, 0x8C00_89E4, 0x6310);
+        WriteInstruction(memory, 0x8C00_89E6, 0xE01F);
+        WriteInstruction(memory, 0x8C00_89E8, 0x0F34);
+        WriteInstruction(memory, 0x8C00_89EA, 0x53F3);
+        WriteInstruction(memory, 0x8C00_89EC, 0xE208);
+        WriteInstruction(memory, 0x8C00_89EE, 0x3238);
+        WriteInstruction(memory, 0x8C00_89F0, 0x1F25);
+        WriteInstruction(memory, 0x8C00_89F2, 0xA03D);
+        WriteInstruction(memory, 0x8C00_89F4, 0x0009);
+    }
+
     private static void InitializeIpBinZeroBitGlyphLoopState(DreamcastMemory memory, Sh4Cpu cpu, byte currentByte, uint bitCountdown, uint cellIndex)
     {
         cpu.State.R[15] = 0x7E00_0F44;
@@ -18933,6 +19013,16 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x7E00_0F64, 0x7E00_0F80);
         memory.WriteUInt16(0x7E00_0F84, 12);
         memory.WriteUInt16(0x7E00_0F86, 20);
+    }
+
+    private static void InitializeIpBinGlyphByteFetchPrefixState(DreamcastMemory memory, Sh4Cpu cpu, byte sourceByte)
+    {
+        InitializeIpBinSetBitGlyphDrawPrefixState(memory, cpu, cellIndex: 0);
+        cpu.State.R[15] = 0x7E00_0F44;
+        memory.WriteUInt32(0x7E00_0F44, 1);
+        memory.Write(0x7E00_0F4B, [1]);
+        memory.WriteUInt32(0x7E00_0F5C, 0xAC00_B638);
+        memory.Write(0xAC00_B638, [sourceByte]);
     }
 
     private static void InitializeIpBinGlyphLoopTailState(DreamcastMemory memory, Sh4Cpu cpu, uint cellIndex, uint bitCountdown)
