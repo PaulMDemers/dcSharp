@@ -96,3 +96,9 @@ The 50M probe `sa2-name-zeromask-setup-50m-20260611-225538` stayed at `PC=0x8C15
 The standalone `0x8C15C57C` post-setup return aggregate now opportunistically continues through one following `0x8C15B92E` name-loop tail and next active setup when the restored frame matches the existing bounded name-loop chain.
 
 The 50M probe `sa2-postsetup-name-chain-50m-20260611-232357` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `48,995`; `0x8C15B92E` fell from `7,349` to `5,512` profile hits. `0x8C15C57C` remains exposed for paths that cannot safely enter the next name-loop setup.
+
+## AICA Name Loop Zero-Mask Tail Coverage
+
+The zero-mask setup aggregate now explicitly requires a zero channel mask, so active masks fall through to the active setup aggregate and keep the deeper active descriptor/name-loop continuation. The `0x8C15B92E` name-loop tail also has a zero-mask continuation, including the post-setup return path that restores directly to the loop tail.
+
+The 50M probe `sa2-postsetup-zeromask-chain-50m-20260611-233257` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches and the top profile were unchanged at this checkpoint (`48,995` batches, `0x8C15B92E` still at `5,512` hits), so this is guarded coverage for paths not reached by the current 50M frontier rather than a visible speedup.

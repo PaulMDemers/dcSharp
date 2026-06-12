@@ -1009,6 +1009,19 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B930, 0x8C15_B938)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B918, 0x8C15_B92E)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C4DC, 0x8C15_C564)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C572, 0x8C15_C57C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C622, 0x8C15_C680)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C680, 0x8C15_C69C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C57C, 0x8C15_C5D8)
+                        && cpu.TryFastForwardSonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregate(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregateSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregateSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B930, 0x8C15_B938)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B918, 0x8C15_B92E)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C4DC, 0x8C15_C564)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C566, 0x8C15_C724)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C724, 0x8C15_C780)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C780, 0x8C15_C856)

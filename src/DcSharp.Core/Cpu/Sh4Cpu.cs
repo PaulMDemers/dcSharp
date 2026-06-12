@@ -5631,6 +5631,7 @@ public sealed class Sh4Cpu
                 channel: State.R[13],
                 group: State.R[14],
                 allowZeroMask: false,
+                requireZeroMask: false,
                 continueAfterZeroMask: false,
                 continueAfterDescriptorReturn: true,
                 out var setupSkippedInstructions))
@@ -5749,6 +5750,7 @@ public sealed class Sh4Cpu
             channel: State.R[13],
             group: State.R[14],
             allowZeroMask: false,
+            requireZeroMask: false,
             continueAfterZeroMask: false,
             continueAfterDescriptorReturn: true,
             out skippedInstructions);
@@ -5761,6 +5763,7 @@ public sealed class Sh4Cpu
         uint channel,
         uint group,
         bool allowZeroMask,
+        bool requireZeroMask,
         bool continueAfterZeroMask,
         bool continueAfterDescriptorReturn,
         out ulong skippedInstructions)
@@ -5829,6 +5832,11 @@ public sealed class Sh4Cpu
         }
 
         var mask = (uint)(memory.ReadByte(maskTable + channel) & 0x1F);
+        if (requireZeroMask && mask != 0)
+        {
+            return false;
+        }
+
         if (mask == 0 && !allowZeroMask)
         {
             return false;
@@ -5928,6 +5936,7 @@ public sealed class Sh4Cpu
             channel: State.R[13],
             group: State.R[14],
             allowZeroMask: true,
+            requireZeroMask: true,
             continueAfterZeroMask: true,
             continueAfterDescriptorReturn: false,
             out skippedInstructions);
@@ -6047,8 +6056,40 @@ public sealed class Sh4Cpu
             channel: State.R[13] + 1,
             group: State.R[14],
             allowZeroMask: false,
+            requireZeroMask: false,
             continueAfterZeroMask: false,
             continueAfterDescriptorReturn: true,
+            out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B92E
+            || step.Opcode != 0x7B01
+            || State.Pc != 0x8C15_B930
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || !IsSonicAdventure2AicaNameCallBridge()
+            || !IsSonicAdventure2AicaChannelSetupBridge()
+            || State.R[13] == uint.MaxValue
+            || State.R[12] == uint.MaxValue
+            || (int)State.R[11] >= (int)State.R[9])
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+            maxInstructionsToSkip,
+            preSetupSkippedInstructionCount: 15,
+            nameIndex: State.R[12] + 1,
+            channel: State.R[13] + 1,
+            group: State.R[14],
+            allowZeroMask: true,
+            requireZeroMask: true,
+            continueAfterZeroMask: true,
+            continueAfterDescriptorReturn: false,
             out skippedInstructions);
     }
 
@@ -6085,7 +6126,41 @@ public sealed class Sh4Cpu
             out skippedInstructions);
     }
 
-    private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        if (TryFastForwardSonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregateFromEntry(maxInstructionsToSkip, out skippedInstructions))
+        {
+            return true;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(maxInstructionsToSkip, out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions) =>
+        TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntryCore(
+            maxInstructionsToSkip,
+            allowZeroMask: false,
+            requireZeroMask: false,
+            continueAfterZeroMask: false,
+            continueAfterDescriptorReturn: false,
+            out skippedInstructions);
+
+    private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions) =>
+        TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntryCore(
+            maxInstructionsToSkip,
+            allowZeroMask: true,
+            requireZeroMask: true,
+            continueAfterZeroMask: true,
+            continueAfterDescriptorReturn: false,
+            out skippedInstructions);
+
+    private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntryCore(
+        ulong maxInstructionsToSkip,
+        bool allowZeroMask,
+        bool requireZeroMask,
+        bool continueAfterZeroMask,
+        bool continueAfterDescriptorReturn,
+        out ulong skippedInstructions)
     {
         skippedInstructions = 0;
         if (State.Pc != 0x8C15_B92E
@@ -6115,9 +6190,10 @@ public sealed class Sh4Cpu
             nameIndex: State.R[12] + 1,
             channel: State.R[13] + 1,
             group: State.R[14],
-            allowZeroMask: false,
-            continueAfterZeroMask: false,
-            continueAfterDescriptorReturn: false,
+            allowZeroMask: allowZeroMask,
+            requireZeroMask: requireZeroMask,
+            continueAfterZeroMask: continueAfterZeroMask,
+            continueAfterDescriptorReturn: continueAfterDescriptorReturn,
             out skippedInstructions))
         {
             State.R[11] = originalR11;
@@ -6732,7 +6808,7 @@ public sealed class Sh4Cpu
         if (continueNameLoop
             && State.Pc == 0x8C15_B92E
             && maxInstructionsToSkip > skippedInstructions
-            && TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(
+            && TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntry(
                 maxInstructionsToSkip - skippedInstructions,
                 out var loopSkippedInstructions))
         {
@@ -8771,7 +8847,7 @@ public sealed class Sh4Cpu
         if (continueNameLoop
             && State.Pc == 0x8C15_B92E
             && maxInstructionsToSkip > skippedInstructions
-            && TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(
+            && TryFastForwardSonicAdventure2AicaNameLoopTailNextSetupAggregateFromEntry(
                 maxInstructionsToSkip - skippedInstructions,
                 out var loopSkippedInstructions))
         {
