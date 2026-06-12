@@ -6002,6 +6002,39 @@ public sealed class Sh4Cpu
             out skippedInstructions);
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNameLoopTailExitNextGroupTailAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B92E
+            || step.Opcode != 0x7B01
+            || State.Pc != 0x8C15_B930
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || !IsSonicAdventure2AicaNameGroupTail()
+            || State.R[12] == uint.MaxValue
+            || State.R[13] == uint.MaxValue
+            || State.R[14] == uint.MaxValue
+            || (int)State.R[11] < (int)State.R[9])
+        {
+            return false;
+        }
+
+        var nextGroup = State.R[14] + 1;
+        if ((int)nextGroup >= 4)
+        {
+            return false;
+        }
+
+        const ulong nameLoopExitGroupTailAndDescriptorSkippedInstructionCount = 100;
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            nameLoopExitGroupTailAndDescriptorSkippedInstructionCount,
+            nextGroup,
+            continueToNameSetup: true,
+            out skippedInstructions);
+    }
+
     private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

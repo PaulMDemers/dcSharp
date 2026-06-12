@@ -78,3 +78,9 @@ The 50M probe `sa2-b92e-chain-50m-20260611-222052` stayed at `PC=0x8C15C7F4`, ke
 The `0x8C15B938` group-tail loop-back can now consume the following `0x8C15B8EC` descriptor-head aggregate and opportunistically continue into the name/setup path when the state supports it. The exit case still uses the narrow group-tail fast-forward.
 
 The 50M probe `sa2-group-tail-chain-50m-20260611-222702` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `55,121`, and `0x8C15B8EC` dropped out of the top 40 profile entries. The next exposed fold is the `0x8C15B92E` name-loop exit into the same group-tail continuation, which should reduce `0x8C15B938`.
+
+## AICA Name Loop Exit To Group Tail Chain
+
+The `0x8C15B92E` name-loop exit path now consumes the following `0x8C15B938` group-tail loop-back, descriptor-head aggregate, and opportunistic name/setup continuation. The non-exit name-loop path remains separate so its trace gates stay narrow.
+
+The 50M probe `sa2-b92e-exit-group-chain-50m-20260611-223058` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `53,896`, and `0x8C15B938` dropped out of the top 40 profile entries. The next exposed SA2 AICA pressure is the slot-scan tail around `0x8C15B68C/0x8C15B68E` and the remaining setup triggers around `0x8C15B918`/`0x8C15C4DC`.
