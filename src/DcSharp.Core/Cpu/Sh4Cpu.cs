@@ -5630,6 +5630,8 @@ public sealed class Sh4Cpu
                 nameIndex: State.R[12],
                 channel: State.R[13],
                 group: State.R[14],
+                allowZeroMask: false,
+                continueAfterZeroMask: false,
                 continueAfterDescriptorReturn: true,
                 out var setupSkippedInstructions))
         {
@@ -5746,6 +5748,8 @@ public sealed class Sh4Cpu
             nameIndex: State.R[12],
             channel: State.R[13],
             group: State.R[14],
+            allowZeroMask: false,
+            continueAfterZeroMask: false,
             continueAfterDescriptorReturn: true,
             out skippedInstructions);
     }
@@ -5756,6 +5760,8 @@ public sealed class Sh4Cpu
         uint nameIndex,
         uint channel,
         uint group,
+        bool allowZeroMask,
+        bool continueAfterZeroMask,
         bool continueAfterDescriptorReturn,
         out ulong skippedInstructions)
     {
@@ -5823,7 +5829,7 @@ public sealed class Sh4Cpu
         }
 
         var mask = (uint)(memory.ReadByte(maskTable + channel) & 0x1F);
-        if (mask == 0)
+        if (mask == 0 && !allowZeroMask)
         {
             return false;
         }
@@ -5832,6 +5838,13 @@ public sealed class Sh4Cpu
         var callbackPointer = memory.ReadUInt32(callbackPointerAddress);
         var slot0 = memory.ReadByte(slot);
         var slot4 = memory.ReadByte(slot + 4);
+        const ulong zeroMaskContinuationSkippedInstructionCount = 107;
+        if (mask == 0
+            && continueAfterZeroMask
+            && maxInstructionsToSkip < skippedInstructionCount + zeroMaskContinuationSkippedInstructionCount)
+        {
+            return false;
+        }
 
         memory.WriteUInt32(stackAfterFirstPush, group);
         memory.WriteUInt32(stackAfterFirstPush - 4, channel);
@@ -5864,14 +5877,15 @@ public sealed class Sh4Cpu
         State.R[15] = finalStack;
         State.Pr = 0x8C15_B92E;
         State.Macl = channel * 120;
-        State.T = false;
-        State.Pc = 0x8C15_C564;
+        State.T = mask == 0;
+        State.Pc = State.T ? 0x8C15_C572u : 0x8C15_C564u;
         State.InstructionsExecuted += skippedInstructionCount;
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
 
-        if (memory.ReadInstructionUInt16(0x8C15_C564) == 0x66A3
+        if (State.Pc == 0x8C15_C564
+            && memory.ReadInstructionUInt16(0x8C15_C564) == 0x66A3
             && maxInstructionsToSkip > skippedInstructions
             && TryFastForwardSonicAdventure2AicaActiveChannelDescriptorReturnAggregateCore(
                 maxInstructionsToSkip - skippedInstructions,
@@ -5881,8 +5895,42 @@ public sealed class Sh4Cpu
         {
             skippedInstructions += descriptorSkippedInstructions;
         }
+        else if (continueAfterZeroMask && State.Pc == 0x8C15_C572)
+        {
+            if (maxInstructionsToSkip > skippedInstructions
+                && TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateFromCallBridgeEntry(
+                    maxInstructionsToSkip - skippedInstructions,
+                    out var zeroMaskSkippedInstructions))
+            {
+                skippedInstructions += zeroMaskSkippedInstructions;
+            }
+        }
 
         return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameCallZeroMaskSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B918
+            || step.Opcode != 0x931C
+            || State.Pc != 0x8C15_B91A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameCallActiveSetupAggregateCore(
+            maxInstructionsToSkip,
+            preSetupSkippedInstructionCount: 10,
+            nameIndex: State.R[12],
+            channel: State.R[13],
+            group: State.R[14],
+            allowZeroMask: true,
+            continueAfterZeroMask: true,
+            continueAfterDescriptorReturn: false,
+            out skippedInstructions);
     }
 
     internal bool TryFastForwardSonicAdventure2AicaNameLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
@@ -5998,6 +6046,8 @@ public sealed class Sh4Cpu
             nameIndex: State.R[12] + 1,
             channel: State.R[13] + 1,
             group: State.R[14],
+            allowZeroMask: false,
+            continueAfterZeroMask: false,
             continueAfterDescriptorReturn: true,
             out skippedInstructions);
     }
@@ -6065,6 +6115,8 @@ public sealed class Sh4Cpu
             nameIndex: State.R[12] + 1,
             channel: State.R[13] + 1,
             group: State.R[14],
+            allowZeroMask: false,
+            continueAfterZeroMask: false,
             continueAfterDescriptorReturn: false,
             out skippedInstructions))
         {
@@ -7173,6 +7225,69 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        return TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateCore(maxInstructionsToSkip, out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateFromCallBridgeEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        const ulong bridgeAndPrologueEntryInstructionCount = 6;
+        if (State.Pc != 0x8C15_C572
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip <= bridgeAndPrologueEntryInstructionCount
+            || !IsSonicAdventure2AicaZeroMaskDescriptorCopyCallBridge()
+            || !IsSonicAdventure2AicaZeroMaskDescriptorCopyHelperPrologue()
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 4, out _))
+        {
+            return false;
+        }
+
+        var savedR4 = State.R[4];
+        var savedR5 = State.R[5];
+        var savedR6 = State.R[6];
+        var savedR7 = State.R[7];
+        var savedR15 = State.R[15];
+        var savedPr = State.Pr;
+        var savedPc = State.Pc;
+        var savedInstructionsExecuted = State.InstructionsExecuted;
+        var savedStackWord = memory.ReadUInt32(savedR15 - 4);
+        var savedR14 = State.R[14];
+
+        State.R[5] = State.R[10];
+        State.R[6] = State.R[14];
+        State.R[7] = State.R[11];
+        State.R[4] = memory.ReadUInt32(State.R[15]);
+        State.Pr = 0x8C15_C57C;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], savedR14);
+        State.Pc = 0x8C15_C682;
+        State.InstructionsExecuted += bridgeAndPrologueEntryInstructionCount;
+
+        if (TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateCore(
+            maxInstructionsToSkip - bridgeAndPrologueEntryInstructionCount,
+            out var aggregateSkippedInstructions))
+        {
+            skippedInstructions = bridgeAndPrologueEntryInstructionCount + aggregateSkippedInstructions;
+            return true;
+        }
+
+        State.R[4] = savedR4;
+        State.R[5] = savedR5;
+        State.R[6] = savedR6;
+        State.R[7] = savedR7;
+        State.R[15] = savedR15;
+        State.Pr = savedPr;
+        State.Pc = savedPc;
+        State.InstructionsExecuted = savedInstructionsExecuted;
+        memory.WriteUInt32(savedR15 - 4, savedStackWord);
+        return false;
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaZeroMaskDescriptorCopyNoEventAggregateCore(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         const ulong prologueSkippedInstructionCount = 9;
         const ulong descriptorEntryInstructionCount = 1;
         const ulong descriptorSkippedInstructionCount = 31;

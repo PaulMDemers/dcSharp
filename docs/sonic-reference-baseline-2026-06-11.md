@@ -84,3 +84,9 @@ The 50M probe `sa2-group-tail-chain-50m-20260611-222702` stayed at `PC=0x8C15C7F
 The `0x8C15B92E` name-loop exit path now consumes the following `0x8C15B938` group-tail loop-back, descriptor-head aggregate, and opportunistic name/setup continuation. The non-exit name-loop path remains separate so its trace gates stay narrow.
 
 The 50M probe `sa2-b92e-exit-group-chain-50m-20260611-223058` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `53,896`, and `0x8C15B938` dropped out of the top 40 profile entries. The next exposed SA2 AICA pressure is the slot-scan tail around `0x8C15B68C/0x8C15B68E` and the remaining setup triggers around `0x8C15B918`/`0x8C15C4DC`.
+
+## AICA Name Zero-Mask Setup Chain
+
+The `0x8C15B918` name-call path now has a zero-mask aggregate that continues through channel setup, the `0x8C15C572` descriptor-copy bridge, the `0x8C15C680` descriptor-copy helper, and the no-event epilogue when the retail global base pointer and slot transition match the existing zero-mask guards.
+
+The 50M probe `sa2-name-zeromask-setup-50m-20260611-225538` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward batches dropped to `49,607`; `0x8C15C4DC`, `0x8C15C572`, and `0x8C15C680` dropped out of the top profile. The remaining exposed triggers in this cluster are `0x8C15B918` and `0x8C15C57C`, plus the older slot tail around `0x8C15B68C/0x8C15B68E`.
