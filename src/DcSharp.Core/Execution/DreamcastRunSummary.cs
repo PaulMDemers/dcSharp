@@ -1721,7 +1721,9 @@ public sealed record DreamcastAudioSummary(
     int RegisterAccessCount,
     IReadOnlyList<DreamcastAicaRegisterAccessSummary> RecentRegisterAccesses,
     IReadOnlyList<DreamcastAicaChannelSummary> Channels,
-    int ActiveChannelCount)
+    int ActiveChannelCount,
+    int CommandQueueActivityCount,
+    IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
         new(
@@ -1733,7 +1735,9 @@ public sealed record DreamcastAudioSummary(
             snapshot.RegisterAccesses.Count,
             snapshot.RegisterAccesses.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaRegisterAccessSummary.FromAccess).ToArray(),
             snapshot.Channels.Select(DreamcastAicaChannelSummary.FromChannel).ToArray(),
-            snapshot.Channels.Count(channel => channel.Active));
+            snapshot.Channels.Count(channel => channel.Active),
+            snapshot.CommandQueueActivities.Count,
+            snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray());
 }
 
 public sealed record DreamcastAicaRegisterValueSummary(
@@ -1762,6 +1766,48 @@ public sealed record DreamcastAicaRegisterAccessSummary(
 {
     public static DreamcastAicaRegisterAccessSummary FromAccess(DreamcastAicaRegisterAccess access) =>
         new(access.Kind, access.Address, access.AddressHex, access.Offset, access.OffsetHex, access.Name, access.Channel, access.Size, access.Value, access.ValueHex);
+}
+
+public sealed record DreamcastAicaCommandQueueActivitySummary(
+    uint QueueOffset,
+    string QueueOffsetHex,
+    uint Head,
+    string HeadHex,
+    uint Tail,
+    string TailHex,
+    uint NextTail,
+    string NextTailHex,
+    uint SizeDwords,
+    uint SizeBytes,
+    uint Command,
+    string CommandHex,
+    string CommandName,
+    uint CommandId,
+    string CommandIdHex,
+    uint Timestamp,
+    string TimestampHex,
+    string Result)
+{
+    public static DreamcastAicaCommandQueueActivitySummary FromActivity(DreamcastAicaCommandQueueActivity activity) =>
+        new(
+            activity.QueueOffset,
+            activity.QueueOffsetHex,
+            activity.Head,
+            activity.HeadHex,
+            activity.Tail,
+            activity.TailHex,
+            activity.NextTail,
+            activity.NextTailHex,
+            activity.SizeDwords,
+            activity.SizeBytes,
+            activity.Command,
+            activity.CommandHex,
+            activity.CommandName,
+            activity.CommandId,
+            activity.CommandIdHex,
+            activity.Timestamp,
+            activity.TimestampHex,
+            activity.Result);
 }
 
 public sealed record DreamcastAicaChannelSummary(

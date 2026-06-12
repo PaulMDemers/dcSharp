@@ -558,6 +558,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Watched memory reads: {result.WatchedMemoryReads.Count}");
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     PrintVideoActivity(summary.Video);
+    PrintAudioActivity(summary.Audio);
     PrintRuntimeScheduling(summary);
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
@@ -623,6 +624,15 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
         Console.WriteLine($"PVR TA sprite sources: {FormatPvrTaSpriteSourceGroups(video.PvrTaSpriteSourceGroups)}");
         Console.WriteLine($"PVR TA sprite shapes: {FormatPvrTaSpriteShapeGroups(video.PvrTaSpriteShapeGroups)}");
         Console.WriteLine($"PVR TA sprites: {FormatPvrTaSprites(video.PvrTaSprites.TakeLast(8).ToArray())}");
+    }
+}
+
+static void PrintAudioActivity(DreamcastAudioSummary audio)
+{
+    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}");
+    foreach (var activity in audio.RecentCommandQueueActivities.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA mailbox {activity.Result}: cmd={activity.CommandName}/{activity.CommandHex}, id={activity.CommandIdHex}, timestamp={activity.TimestampHex}, size={activity.SizeDwords}dw, tail={activity.TailHex}->{activity.NextTailHex}");
     }
 }
 
@@ -1082,7 +1092,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR current: {string.Join(", ", currentPvrRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
-    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}");
+    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}");
     var currentAicaRegisters = result.Audio.Registers.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentAicaRegisters.Length > 0)
     {
@@ -1150,6 +1160,11 @@ static void RunElf(string path, string[] args)
     {
         var channel = access.Channel is { } index ? $", channel={index}" : string.Empty;
         Console.WriteLine($"  AICA {access.Kind} {access.Name}: addr={access.AddressHex}{channel}, value={access.ValueHex}");
+    }
+
+    foreach (var activity in result.Audio.CommandQueueActivities.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA mailbox {activity.Result}: cmd={activity.CommandName}/{activity.CommandHex}, id={activity.CommandIdHex}, timestamp={activity.TimestampHex}, size={activity.SizeDwords}dw, tail={activity.TailHex}->{activity.NextTailHex}");
     }
 
     foreach (var transfer in result.Maple.Transfers.TakeLast(8))

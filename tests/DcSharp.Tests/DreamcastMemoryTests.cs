@@ -918,6 +918,14 @@ public class DreamcastMemoryTests
         Assert.Equal(0x80u, memory.ReadUInt32(channel + 32));
         Assert.Equal(0x40u, memory.ReadUInt32(channel + 36));
         Assert.Equal(0u, memory.ReadUInt32(channel + 40));
+
+        var activity = Assert.Single(memory.CreateAudioSnapshot().CommandQueueActivities);
+        Assert.Equal("ChannelStart", activity.Result);
+        Assert.Equal("Channel", activity.CommandName);
+        Assert.Equal(3u, activity.CommandId);
+        Assert.Equal(24u, activity.SizeDwords);
+        Assert.Equal(0u, activity.Tail);
+        Assert.Equal(24u * 4, activity.NextTail);
     }
 
     [Fact]
@@ -930,12 +938,40 @@ public class DreamcastMemoryTests
         memory.AdvanceHardware(1);
 
         Assert.Equal(0u, memory.ReadUInt32(0x0081_0004));
+        var deferred = Assert.Single(memory.CreateAudioSnapshot().CommandQueueActivities);
+        Assert.Equal("DeferredTimestamp", deferred.Result);
+        Assert.Equal("SyncClock", deferred.CommandName);
+        Assert.Equal(0u, deferred.Tail);
+        Assert.Equal(0u, deferred.NextTail);
 
         memory.WriteUInt32(0x0082_1000, 11);
         memory.AdvanceHardware(1);
 
         Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_0004));
         Assert.Equal(0u, memory.ReadUInt32(0x0082_1000));
+        var activities = memory.CreateAudioSnapshot().CommandQueueActivities;
+        Assert.Equal(2, activities.Count);
+        Assert.Equal("SyncClock", activities[1].Result);
+        Assert.Equal(8u * 4, activities[1].NextTail);
+    }
+
+    [Fact]
+    public void AdvanceHardwareReportsUnknownAicaCommandQueuePackets()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 8 * 4);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 8, command: 0xAA55_0001, timestamp: 0, commandId: 0x1234);
+
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_0004));
+        var activity = Assert.Single(memory.CreateAudioSnapshot().CommandQueueActivities);
+        Assert.Equal("UnknownCommand", activity.Result);
+        Assert.Equal("Command_AA550001", activity.CommandName);
+        Assert.Equal(0xAA55_0001u, activity.Command);
+        Assert.Equal(0x1234u, activity.CommandId);
+        Assert.Equal(8u, activity.SizeDwords);
+        Assert.Equal(8u * 4, activity.SizeBytes);
     }
 
     [Fact]

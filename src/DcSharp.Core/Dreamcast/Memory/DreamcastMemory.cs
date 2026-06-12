@@ -191,6 +191,7 @@ public sealed class DreamcastMemory
     private DreamcastPvrPreviewRenderStats pvrPreviewRenderStats = DreamcastPvrPreviewRenderStats.Empty;
     private readonly HashSet<int> pvrPreviewWrittenPixelIndices = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
+    private readonly List<DreamcastAicaCommandQueueActivity> aicaCommandQueueActivities = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
@@ -1478,6 +1479,7 @@ public sealed class DreamcastMemory
             CreateAicaRegisterValues(),
             aicaRegisterAccesses.ToArray(),
             CreateAicaChannelSnapshots(),
+            aicaCommandQueueActivities.ToArray(),
             (byte[])aicaRam.Clone());
     }
 
@@ -2099,20 +2101,22 @@ public sealed class DreamcastMemory
                 return;
             }
 
-            var clock = ReadUInt32From(aicaRam, (int)AicaClockOffset);
-            if (packet.Timestamp > 0 && packet.Timestamp >= clock)
-            {
-                aicaCommandQueueServicePending = true;
-                return;
-            }
-
-            ProcessAicaQueuedCommand(packet);
-
             var nextTail = queue.Tail + packetBytes;
             if (nextTail >= queue.Size)
             {
                 nextTail -= queue.Size;
             }
+
+            var clock = ReadUInt32From(aicaRam, (int)AicaClockOffset);
+            if (packet.Timestamp > 0 && packet.Timestamp >= clock)
+            {
+                LogAicaCommandQueueActivity(queueOffset, queue, packet, packetBytes, queue.Tail, "DeferredTimestamp");
+                aicaCommandQueueServicePending = true;
+                return;
+            }
+
+            var result = ProcessAicaQueuedCommand(packet);
+            LogAicaCommandQueueActivity(queueOffset, queue, packet, packetBytes, nextTail, result);
 
             WriteUInt32To(aicaRam, queueOffset + 4, nextTail);
             queue = queue with { Tail = nextTail };
@@ -2200,27 +2204,29 @@ public sealed class DreamcastMemory
         return ReadUInt32From(aicaRam, (int)offset);
     }
 
-    private void ProcessAicaQueuedCommand(AicaQueuedCommand packet)
+    private string ProcessAicaQueuedCommand(AicaQueuedCommand packet)
     {
         switch (packet.Command)
         {
             case AicaCommandNone:
+                return "None";
             case AicaCommandPing:
-                return;
+                return "Ping";
             case AicaCommandChannel:
-                ProcessAicaChannelCommand(packet);
-                return;
+                return ProcessAicaChannelCommand(packet);
             case AicaCommandSyncClock:
                 WriteUInt32To(aicaRam, (int)AicaClockOffset, 0);
-                return;
+                return "SyncClock";
         }
+
+        return "UnknownCommand";
     }
 
-    private void ProcessAicaChannelCommand(AicaQueuedCommand packet)
+    private string ProcessAicaChannelCommand(AicaQueuedCommand packet)
     {
         if (packet.CommandId >= 64 || packet.Words.Length < AicaCommandHeaderDwords + AicaChannelDwords)
         {
-            return;
+            return "InvalidChannelPacket";
         }
 
         var channel = (int)packet.CommandId;
@@ -2228,13 +2234,13 @@ public sealed class DreamcastMemory
         var channelStatusOffset = (int)(AicaChannelStatusOffset + (packet.CommandId * AicaChannelDwords * 4));
         if (channelStatusOffset < 0 || channelStatusOffset + (AicaChannelDwords * 4) > aicaRam.Length)
         {
-            return;
+            return "InvalidChannelStatus";
         }
 
         switch (channelCommand & AicaChannelCommandMask)
         {
             case AicaChannelCommandNone:
-                return;
+                return "ChannelNone";
             case AicaChannelCommandStart:
                 for (var index = 0; index < AicaChannelDwords; index++)
                 {
@@ -2242,7 +2248,7 @@ public sealed class DreamcastMemory
                 }
 
                 WriteUInt32To(aicaRam, channelStatusOffset + 40, 0);
-                return;
+                return "ChannelStart";
             case AicaChannelCommandStop:
                 WriteUInt32To(aicaRam, channelStatusOffset, channelCommand);
                 WriteUInt32To(aicaRam, channelStatusOffset + 40, 0);
@@ -2252,7 +2258,7 @@ public sealed class DreamcastMemory
                     aicaPlayback[channel].Position = 0;
                 }
 
-                return;
+                return "ChannelStop";
             case AicaChannelCommandUpdate:
                 WriteUInt32To(aicaRam, channelStatusOffset, channelCommand);
                 if ((channelCommand & AicaChannelUpdateSetFrequency) != 0)
@@ -2270,8 +2276,33 @@ public sealed class DreamcastMemory
                     WriteUInt32To(aicaRam, channelStatusOffset + 36, packet.Words[AicaCommandHeaderDwords + 9]);
                 }
 
-                return;
+                return "ChannelUpdate";
         }
+
+        return "UnknownChannelCommand";
+    }
+
+    private void LogAicaCommandQueueActivity(int queueOffset, AicaQueue queue, AicaQueuedCommand packet, uint packetBytes, uint nextTail, string result)
+    {
+        aicaCommandQueueActivities.Add(new DreamcastAicaCommandQueueActivity(
+            (uint)queueOffset,
+            $"0x{queueOffset:X6}",
+            queue.Head,
+            $"0x{queue.Head:X8}",
+            queue.Tail,
+            $"0x{queue.Tail:X8}",
+            nextTail,
+            $"0x{nextTail:X8}",
+            packet.SizeDwords,
+            packetBytes,
+            packet.Command,
+            $"0x{packet.Command:X8}",
+            AicaCommandName(packet.Command),
+            packet.CommandId,
+            $"0x{packet.CommandId:X8}",
+            packet.Timestamp,
+            $"0x{packet.Timestamp:X8}",
+            result));
     }
 
     private void CompleteG2AicaDma()
@@ -3362,6 +3393,15 @@ public sealed class DreamcastMemory
         _ => "Unknown"
     };
 
+    private static string AicaCommandName(uint command) => command switch
+    {
+        AicaCommandNone => "None",
+        AicaCommandPing => "Ping",
+        AicaCommandChannel => "Channel",
+        AicaCommandSyncClock => "SyncClock",
+        _ => $"Command_{command:X8}"
+    };
+
     private static int AicaSampleStrideBytes(uint mode) => mode switch
     {
         0 => 2,
@@ -3504,6 +3544,7 @@ public sealed class DreamcastMemory
 
     private readonly record struct AicaQueuedCommand(uint[] Words)
     {
+        public uint SizeDwords => Words.Length == 0 ? 0 : Words[0];
         public uint Command => Words.Length > 1 ? Words[1] : 0;
         public uint Timestamp => Words.Length > 2 ? Words[2] : 0;
         public uint CommandId => Words.Length > 3 ? Words[3] : 0;
