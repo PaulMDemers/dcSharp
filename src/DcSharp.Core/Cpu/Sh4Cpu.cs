@@ -951,6 +951,15 @@ public sealed class Sh4Cpu
         {
             skippedInstructions = prefixSkippedInstructions + loopTailSkippedInstructions;
             State.InstructionsExecuted += skippedInstructions;
+            if (State.Pc == 0x8C00_89F6
+                && maxInstructionsToSkip > skippedInstructions
+                && TryFastForwardIpBinZeroBitGlyphDispatchFromEntry(
+                    maxInstructionsToSkip - skippedInstructions,
+                    out var zeroBitDispatchSkippedInstructions))
+            {
+                skippedInstructions += zeroBitDispatchSkippedInstructions;
+            }
+
             delayedBranchTarget = null;
             immediateBranchTarget = null;
             return true;
@@ -960,6 +969,56 @@ public sealed class Sh4Cpu
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryFastForwardIpBinZeroBitGlyphDispatchFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (State.Pc != 0x8C00_89F6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < 1
+            || !IsIpBinGlyphBitDispatch())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FE0)
+        {
+            return false;
+        }
+
+        var mode = memory.ReadUInt32(stack);
+        var mask = memory.ReadByte(stack + 0x07);
+        var bitCountdown = memory.ReadUInt32(stack + 0x14);
+        if (mode != 1 || bitCountdown > 7)
+        {
+            return false;
+        }
+
+        var currentByte = memory.ReadByte(stack + 0x1F);
+        var shifted = (uint)currentByte >> (int)(bitCountdown & 0x1F);
+        if ((shifted & mask) != 0)
+        {
+            return false;
+        }
+
+        State.R[0] = 31;
+        if (!TryFastForwardIpBinZeroBitGlyphLoopAfterDispatch(
+            stack,
+            mask,
+            currentByte,
+            bitCountdown,
+            maxInstructionsToSkip - 1,
+            out var afterDispatchSkippedInstructions))
+        {
+            return false;
+        }
+
+        State.InstructionsExecuted++;
+        skippedInstructions = afterDispatchSkippedInstructions + 1;
         return true;
     }
 

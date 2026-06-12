@@ -747,6 +747,10 @@ public class Sh4CpuTests
         var fast = new Sh4Cpu(fastMemory, 0x8C00_8A14);
         InitializeIpBinSetBitGlyphDrawPrefixState(normalMemory, normal, cellIndex: 0);
         InitializeIpBinSetBitGlyphDrawPrefixState(fastMemory, fast, cellIndex: 0);
+        normalMemory.WriteUInt32(0x7E00_0F44, 1);
+        fastMemory.WriteUInt32(0x7E00_0F44, 1);
+        normalMemory.Write(0x7E00_0F4B, [1]);
+        fastMemory.Write(0x7E00_0F4B, [1]);
 
         var normalStart = normal.Step();
         var fastStart = fast.Step();
@@ -767,6 +771,53 @@ public class Sh4CpuTests
         Assert.Equal(0x8C00_89F6u, fast.State.Pc);
         Assert.Equal(1u, fastMemory.ReadUInt32(0x7E00_0F4C));
         Assert.Equal(2u, fastMemory.ReadUInt32(0x7E00_0F58));
+        var destination = fastMemory.ReadUInt32(0x7E00_0F34);
+        Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(destination));
+    }
+
+    [Fact]
+    public void FastForwardsIpBinSetBitGlyphDrawPrefixAcrossFollowingZeroTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(normalMemory);
+        WriteIpBinSetBitGlyphDrawPrefix(normalMemory);
+        WriteIpBinSignedDivideQuotientHelper(normalMemory);
+        WriteIpBinSignedDivideRemainderHelper(normalMemory);
+        WriteIpBinGlyphDrawHelper(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinZeroBitGlyphLoop(fastMemory);
+        WriteIpBinSetBitGlyphDrawPrefix(fastMemory);
+        WriteIpBinSignedDivideQuotientHelper(fastMemory);
+        WriteIpBinSignedDivideRemainderHelper(fastMemory);
+        WriteIpBinGlyphDrawHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_8A14);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_8A14);
+        InitializeIpBinSetBitGlyphDrawPrefixState(normalMemory, normal, cellIndex: 0);
+        InitializeIpBinSetBitGlyphDrawPrefixState(fastMemory, fast, cellIndex: 0);
+        normalMemory.WriteUInt32(0x7E00_0F44, 1);
+        fastMemory.WriteUInt32(0x7E00_0F44, 1);
+        normalMemory.Write(0x7E00_0F4B, [1]);
+        fastMemory.Write(0x7E00_0F4B, [1]);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinSetBitGlyphDrawPrefix(fastStart, 347, out var skippedInstructions));
+        Assert.Equal(347UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.M, fast.State.M);
+        Assert.Equal(normal.State.Q, fast.State.Q);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C00_8A76u, fast.State.Pc);
+        Assert.Equal(4u, fastMemory.ReadUInt32(0x7E00_0F4C));
+        Assert.Equal(uint.MaxValue, fastMemory.ReadUInt32(0x7E00_0F58));
         var destination = fastMemory.ReadUInt32(0x7E00_0F34);
         Assert.Equal(0x00C0_C0C0u, fastMemory.ReadUInt32(destination));
     }
