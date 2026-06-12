@@ -138,3 +138,9 @@ The 50M probe `sa2-aica-descriptor-aggregate-50m-20260612-114807` stayed at `PC=
 The `0x8C1356D8` G2 PIO read helper prologue can now bridge directly into the existing read-word or external-read helper fast-forwards when the body is fully eligible. It refuses ineligible bodies rather than consuming only the prologue, preserving the larger helper batches.
 
 The 50M probe `sa2-g2-pio-read-prologue-tight-50m-20260612-115530` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose slightly from `48,802,350` to `48,802,386`, while CPU fast-forward batches stayed flat at `42,227`; this is narrow guarded coverage rather than a visible compatibility frontier move.
+
+## AICA Register Pair Read Wrapper
+
+The `0x8C110A08` wrapper now folds its two-word AICA register read through the G2 PIO helper, combines the high half of `0xA0710000` with the low half of `0xA0710004`, and restores directly to the caller. The shortcut is signature-gated against the wrapper and G2 helper bodies and is disabled under memory watches.
+
+The 50M probe `sa2-aica-register-pair-wrapper-50m-20260612-123310` stayed at `PC=0x8C15C7F4`, kept `PVR registers=2255`, and still had no GD-ROM reads. CPU fast-forward rose from `48,802,386` to `49,080,818`, and CPU fast-forward batches dropped from `42,227` to `39,763`. The aggregate entry `0x8C110A08` remains visible as the call trigger, while the body now collapses enough to expose the next clusters around `0x8C110938`, `0x8C10FE8E`, `0x8C14D15A`, and the remaining AICA name/descriptor triggers.
