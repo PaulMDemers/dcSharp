@@ -5570,6 +5570,35 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2SrCallbackListNextActiveTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FE8C
+            || step.Opcode != 0x5EE1
+            || State.Pc != 0x8C10_FE8E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.R[14] == 0)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 2;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2SrCallbackListDispatch())
+        {
+            return false;
+        }
+
+        State.T = false;
+        State.Pc = 0x8C10_FE86;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2SrCallbackListDispatch() =>
         memory.ReadInstructionUInt16(0x8C10_FE72) == 0x0002
         && memory.ReadInstructionUInt16(0x8C10_FE74) == 0x9312

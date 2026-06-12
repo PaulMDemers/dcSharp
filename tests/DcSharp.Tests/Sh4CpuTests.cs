@@ -9338,6 +9338,79 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2SrCallbackListNextActiveTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2SrCallbackListDispatch(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2SrCallbackListDispatch(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C10_FE8C);
+        var fast = new Sh4Cpu(fastMemory, 0x8C10_FE8C);
+        InitializeSonicAdventure2SrCallbackListNextActiveTailState(normalMemory, normal);
+        InitializeSonicAdventure2SrCallbackListNextActiveTailState(fastMemory, fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2SrCallbackListNextActiveTail(fastStart, 2, out var skippedInstructions));
+        Assert.Equal(2UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(0x8C10_FE86u, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2SrCallbackListNextActiveTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2SrCallbackListDispatch(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FE8C);
+        InitializeSonicAdventure2SrCallbackListNextActiveTailState(memory, cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2SrCallbackListNextActiveTail(start, 1, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C10_FE8Eu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2SrCallbackListNextActiveTailWhenListEnds()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2SrCallbackListDispatch(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FE8C);
+        InitializeSonicAdventure2SrCallbackListNextActiveTailState(memory, cpu);
+        memory.WriteUInt32(0x8C28_C590, 0);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2SrCallbackListNextActiveTail(start, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2SrCallbackListNextActiveTailWhenSignatureDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2SrCallbackListDispatch(memory);
+        memory.WriteUInt32(0x8C10_FEB8, 0x8C20_0000);
+        var cpu = new Sh4Cpu(memory, 0x8C10_FE8C);
+        InitializeSonicAdventure2SrCallbackListNextActiveTailState(memory, cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2SrCallbackListNextActiveTail(start, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2InterruptCallbackStatusInactiveTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -20750,6 +20823,15 @@ public class Sh4CpuTests
         cpu.State.R[15] = stack;
         cpu.State.Pr = 0x8C10_FE8C;
         cpu.State.Sr = 0x7000_0160;
+    }
+
+    private static void InitializeSonicAdventure2SrCallbackListNextActiveTailState(DreamcastMemory memory, Sh4Cpu cpu)
+    {
+        memory.WriteUInt32(0x8C28_C590, 0x8C28_C5CC);
+        cpu.State.R[14] = 0x8C28_C58C;
+        cpu.State.Pr = 0x8C10_FE8C;
+        cpu.State.Sr = 0x7000_0160;
+        cpu.State.T = false;
     }
 
     private static void WriteSonicAdventure2InterruptCallbackStatusScan(DreamcastMemory memory)
