@@ -126,7 +126,8 @@ foreach ($key in $selectedGames) {
     $summaryPatterns = @(
         '^(Instructions|PC|SR|Stopped|Detail|Serial|GD-ROM|PVR|PVR TA diag|AICA|Maple|Scheduler):',
         '^  GD-ROM (command|read|read sectors|status|TOC):',
-        '^  AICA (read|write|channel|active channels|recent register accesses):'
+        '^  AICA (read|write|channel|active channels|recent register accesses|text|queue|mailbox):',
+        '^  Maple (DMA|DeviceInfo|GetCondition):'
     )
 
     foreach ($pattern in $summaryPatterns) {

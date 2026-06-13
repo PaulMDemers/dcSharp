@@ -559,6 +559,7 @@ static void BootSmoke(string path, string[] args)
     Console.WriteLine($"Serial bytes: {result.SerialOutput.Count}");
     PrintVideoActivity(summary.Video);
     PrintAudioActivity(summary.Audio);
+    PrintMapleActivity(summary.Maple);
     PrintRuntimeScheduling(summary);
     var gdrom = result.Gdrom ?? DreamcastGdromSnapshot.Empty;
     Console.WriteLine($"GD-ROM: media={gdrom.HasMedia}, reads={gdrom.ReadCommands.Count}, ok={gdrom.ReadCommands.Count(command => command.Success)}, failed={gdrom.ReadCommands.Count(command => !command.Success)}, tocs={gdrom.TocCommands.Count}");
@@ -643,6 +644,21 @@ static void PrintAudioActivity(DreamcastAudioSummary audio)
     foreach (var activity in audio.RecentCommandQueueActivities.TakeLast(8))
     {
         Console.WriteLine($"  AICA mailbox {activity.Result}: cmd={activity.CommandName}/{activity.CommandHex}, id={activity.CommandIdHex}, timestamp={activity.TimestampHex}, size={activity.SizeDwords}dw, tail={activity.TailHex}->{activity.NextTailHex}");
+    }
+}
+
+static void PrintMapleActivity(DreamcastMapleSummary maple)
+{
+    Console.WriteLine($"Maple: transfers={maple.TransferCount}, deviceInfo={maple.DeviceInfoCount}, getCondition={maple.GetConditionCount}, dmaBatches={maple.DmaBatchCount}, descriptorLimitHits={maple.DescriptorLimitHitCount}");
+    foreach (var transfer in maple.RecentTransfers.TakeLast(8))
+    {
+        var state = transfer.ControllerState is { } controller ? $", state={FormatControllerSummary(controller)}" : string.Empty;
+        Console.WriteLine($"  Maple {transfer.CommandName}: dest={transfer.DestinationName} ({transfer.DestinationHex}), recv={transfer.ReceiveBufferAddressHex}, response={transfer.ResponseName}, bytes={transfer.ResponseBytes}{state}");
+    }
+
+    foreach (var batch in maple.RecentDmaBatches.TakeLast(4))
+    {
+        Console.WriteLine($"  Maple DMA: descriptors={batch.DescriptorsScanned}, transfers={batch.TransferCount}, completed={batch.Completed}, limit={batch.HitDescriptorLimit}, descriptor={batch.DescriptorAddressHex}, last={batch.LastDescriptorAddressHex}");
     }
 }
 
@@ -3258,6 +3274,9 @@ static string ParsePvrTaSpriteStatus(string text)
 
 static string FormatController(DreamcastControllerState state) =>
     $"buttons={state.Buttons}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
+
+static string FormatControllerSummary(DreamcastControllerSummary state) =>
+    $"buttons={state.ButtonsText}, ltrig={state.LeftTrigger}, rtrig={state.RightTrigger}, joy=({state.JoyX},{state.JoyY}), joy2=({state.Joy2X},{state.Joy2Y})";
 
 static string FormatPvrTaLists(IReadOnlyList<DreamcastPvrTaListSummary> lists) =>
     string.Join(", ", lists.Select(list => $"{list.Region}:{list.ListTypeName ?? "none"} commands={list.CommandCount} headers={list.PolygonHeaderCount} vertices={list.VertexCount} ends={list.VertexEndOfStripCount}"));
