@@ -8080,6 +8080,105 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaModeNineDescriptorUpdateWrapperToExtraWordPath()
+    {
+        const uint workBase = 0x8C20_1000;
+        const uint initialStack = 0x8C20_5000;
+        const uint descriptorFinalStack = initialStack - 76;
+        const uint channel = 0;
+        const uint descriptorPointer = 0xAC19_D4C0;
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaModeNineDescriptorUpdateWrapper(normalMemory);
+        WriteSonicAdventure2AicaModeNineDescriptorUpdateWrapper(fastMemory);
+        WriteSonicAdventure2AicaDescriptorUpdatePrologue(normalMemory);
+        WriteSonicAdventure2AicaDescriptorUpdatePrologue(fastMemory);
+        WriteSonicAdventure2AicaDescriptorSetupToPointerAdvance(normalMemory);
+        WriteSonicAdventure2AicaDescriptorSetupToPointerAdvance(fastMemory);
+        WriteSonicAdventure2AicaDescriptorPointerAndFirstWord(normalMemory);
+        WriteSonicAdventure2AicaDescriptorPointerAndFirstWord(fastMemory);
+        WriteSonicAdventure2AicaDescriptorSecondAndThirdWordTakenPath(normalMemory);
+        WriteSonicAdventure2AicaDescriptorSecondAndThirdWordTakenPath(fastMemory);
+        InitializeSonicAdventure2AicaDescriptorUpdatePrologueState(normalMemory, workBase, channel, slotActive: false);
+        InitializeSonicAdventure2AicaDescriptorUpdatePrologueState(fastMemory, workBase, channel, slotActive: false);
+        InitializeSonicAdventure2AicaDescriptorSetupToPointerAdvanceState(
+            normalMemory,
+            workBase,
+            workBase + 40 + (channel * 44),
+            descriptorFinalStack,
+            channel,
+            descriptorByte: 0x60,
+            pointerAdvanceCount: 0);
+        InitializeSonicAdventure2AicaDescriptorSetupToPointerAdvanceState(
+            fastMemory,
+            workBase,
+            workBase + 40 + (channel * 44),
+            descriptorFinalStack,
+            channel,
+            descriptorByte: 0x60,
+            pointerAdvanceCount: 0);
+        InitializeSonicAdventure2AicaDescriptorPointerAndFirstWordState(
+            normalMemory,
+            workBase,
+            descriptorFinalStack,
+            channel,
+            modeIndex: 0,
+            descriptorPointer,
+            pointerAdvanceCount: 0,
+            loadedPointer: 0xAC19_2CA0);
+        InitializeSonicAdventure2AicaDescriptorPointerAndFirstWordState(
+            fastMemory,
+            workBase,
+            descriptorFinalStack,
+            channel,
+            modeIndex: 0,
+            descriptorPointer,
+            pointerAdvanceCount: 0,
+            loadedPointer: 0xAC19_2CA0);
+        InitializeSonicAdventure2AicaDescriptorSecondAndThirdWordTakenPathState(
+            normalMemory,
+            workBase,
+            descriptorFinalStack,
+            descriptorPointer + 4,
+            descriptorPointer + 8,
+            modeWord: 0);
+        InitializeSonicAdventure2AicaDescriptorSecondAndThirdWordTakenPathState(
+            fastMemory,
+            workBase,
+            descriptorFinalStack,
+            descriptorPointer + 4,
+            descriptorPointer + 8,
+            modeWord: 0);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_CA16);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_CA16);
+        InitializeSonicAdventure2AicaDescriptorUpdatePrologueRegisters(normal, channel, initialStack);
+        InitializeSonicAdventure2AicaDescriptorUpdatePrologueRegisters(fast, channel, initialStack);
+        normal.State.R[5] = 1;
+        fast.State.R[5] = 1;
+        normal.State.Pr = 0x8C15_B686;
+        fast.State.Pr = 0x8C15_B686;
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaModeNineDescriptorUpdateWrapper(fastStart, 112, out var skippedInstructions));
+        Assert.Equal(112UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, descriptorFinalStack - 4, 88), ReadBytes(fastMemory, descriptorFinalStack - 4, 88));
+        Assert.Equal(ReadBytes(normalMemory, workBase + 0x0FCC, 0x118), ReadBytes(fastMemory, workBase + 0x0FCC, 0x118));
+        Assert.Equal(ReadBytes(normalMemory, workBase + 40 + (channel * 44), 32), ReadBytes(fastMemory, workBase + 40 + (channel * 44), 32));
+        Assert.Equal(ReadBytes(normalMemory, descriptorPointer, 12), ReadBytes(fastMemory, descriptorPointer, 12));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void PartiallyFastForwardsSonicAdventure2AicaDescriptorUpdateAggregateWhenLaterPathDiffers()
     {
         var memory = new DreamcastMemory();
@@ -18875,6 +18974,25 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C15_CA8A, 0x4F26);
         WriteInstruction(memory, 0x8C15_CA8C, 0x000B);
         WriteInstruction(memory, 0x8C15_CA8E, 0x0009);
+    }
+
+    private static void WriteSonicAdventure2AicaModeNineDescriptorUpdateWrapper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_CA16, 0x4F22);
+        WriteInstruction(memory, 0x8C15_CA18, 0x7FFC);
+        WriteInstruction(memory, 0x8C15_CA1A, 0xE300);
+        WriteInstruction(memory, 0x8C15_CA1C, 0x2F52);
+        WriteInstruction(memory, 0x8C15_CA1E, 0x2F36);
+        WriteInstruction(memory, 0x8C15_CA20, 0xE701);
+        WriteInstruction(memory, 0x8C15_CA22, 0x2F36);
+        WriteInstruction(memory, 0x8C15_CA24, 0x66F3);
+        WriteInstruction(memory, 0x8C15_CA26, 0x7608);
+        WriteInstruction(memory, 0x8C15_CA28, 0xBA56);
+        WriteInstruction(memory, 0x8C15_CA2A, 0xE509);
+        WriteInstruction(memory, 0x8C15_CA2C, 0x7F0C);
+        WriteInstruction(memory, 0x8C15_CA2E, 0x4F26);
+        WriteInstruction(memory, 0x8C15_CA30, 0x000B);
+        WriteInstruction(memory, 0x8C15_CA32, 0x0009);
     }
 
     private static void WriteSonicAdventure2AicaDescriptorSetupToPointerAdvance(DreamcastMemory memory)

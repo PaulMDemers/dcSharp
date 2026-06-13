@@ -9001,6 +9001,95 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_CA8C) == 0x000B
         && memory.ReadInstructionUInt16(0x8C15_CA8E) == 0x0009;
 
+    internal bool TryFastForwardSonicAdventure2AicaModeNineDescriptorUpdateWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CA16
+            || step.Opcode != 0x4F22
+            || State.Pc != 0x8C15_CA18
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong wrapperSetupAndDescriptorEntryInstructionCount = 11;
+        const ulong wrapperEpilogueInstructionCount = 4;
+        if (maxInstructionsToSkip < wrapperSetupAndDescriptorEntryInstructionCount
+            || !IsSonicAdventure2AicaModeNineDescriptorUpdateWrapper()
+            || !IsSonicAdventure2AicaDescriptorUpdatePrologue()
+            || !memory.TryGetSystemRamOffset(State.R[15] - 16, 20, out _))
+        {
+            return false;
+        }
+
+        var savedCallerPr = memory.ReadUInt32(State.R[15]);
+
+        State.R[15] -= 4;
+        State.R[3] = 0;
+        memory.WriteUInt32(State.R[15], State.R[5]);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], 0);
+        State.R[7] = 1;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], 0);
+        State.R[6] = State.R[15] + 8;
+        State.Pr = 0x8C15_CA2C;
+        State.R[5] = 9;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[14]);
+        State.Pc = 0x8C15_BEDA;
+        State.InstructionsExecuted += wrapperSetupAndDescriptorEntryInstructionCount;
+        skippedInstructions = wrapperSetupAndDescriptorEntryInstructionCount;
+
+        if (!TryFastForwardSonicAdventure2AicaDescriptorUpdateNoEventAggregate(
+                new Sh4StepResult(0x8C15_BED8, 0x2FE6, string.Empty),
+                maxInstructionsToSkip - skippedInstructions,
+                out var descriptorSkippedInstructions))
+        {
+            return true;
+        }
+
+        skippedInstructions += descriptorSkippedInstructions;
+        if (State.Pc != 0x8C15_CA2C)
+        {
+            return true;
+        }
+
+        if (maxInstructionsToSkip - skippedInstructions < wrapperEpilogueInstructionCount
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return true;
+        }
+
+        State.R[15] += 12;
+        State.Pr = savedCallerPr;
+        State.R[15] += 4;
+        State.Pc = savedCallerPr;
+        State.InstructionsExecuted += wrapperEpilogueInstructionCount;
+        skippedInstructions += wrapperEpilogueInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaModeNineDescriptorUpdateWrapper() =>
+        memory.ReadInstructionUInt16(0x8C15_CA16) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C15_CA18) == 0x7FFC
+        && memory.ReadInstructionUInt16(0x8C15_CA1A) == 0xE300
+        && memory.ReadInstructionUInt16(0x8C15_CA1C) == 0x2F52
+        && memory.ReadInstructionUInt16(0x8C15_CA1E) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C15_CA20) == 0xE701
+        && memory.ReadInstructionUInt16(0x8C15_CA22) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C15_CA24) == 0x66F3
+        && memory.ReadInstructionUInt16(0x8C15_CA26) == 0x7608
+        && memory.ReadInstructionUInt16(0x8C15_CA28) == 0xBA56
+        && memory.ReadInstructionUInt16(0x8C15_CA2A) == 0xE509
+        && memory.ReadInstructionUInt16(0x8C15_CA2C) == 0x7F0C
+        && memory.ReadInstructionUInt16(0x8C15_CA2E) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C15_CA30) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_CA32) == 0x0009;
+
     private bool TryApplySonicAdventure2AicaDescriptorSetupHead(ulong maxInstructionsToSkip, ref ulong skippedInstructions)
     {
         if (State.Pc != 0x8C15_BF1C
