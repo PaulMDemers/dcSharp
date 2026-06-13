@@ -8969,7 +8969,7 @@ public sealed class Sh4Cpu
             allowZeroMask: false,
             requireZeroMask: false,
             continueAfterZeroMask: false,
-            continueAfterDescriptorReturn: false,
+            continueAfterDescriptorReturn: true,
             out skippedInstructions);
 
     private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextZeroMaskSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions) =>
