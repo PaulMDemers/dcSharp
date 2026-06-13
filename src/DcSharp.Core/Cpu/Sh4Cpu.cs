@@ -5907,6 +5907,75 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaServiceHelperFlaggedPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_6042
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C13_6044
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 10;
+        var finalStack = unchecked(State.R[15] - 24);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || State.R[15] < 24
+            || !IsSonicAdventure2AicaServiceHelperFlaggedPrologue()
+            || !memory.TryGetSystemRamOffset(finalStack, 28, out _))
+        {
+            return false;
+        }
+
+        var flagAddress = memory.ReadUInt32(0x8C13_606C);
+        if (!memory.TryGetSystemRamOffset(flagAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var flag = memory.ReadUInt32(flagAddress);
+        if (flag == 0)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(State.R[15] - 4, State.R[13]);
+        memory.WriteUInt32(State.R[15] - 8, State.R[12]);
+        memory.WriteUInt32(State.R[15] - 12, State.R[11]);
+        memory.WriteUInt32(State.R[15] - 16, State.R[10]);
+        memory.WriteUInt32(State.R[15] - 20, State.R[9]);
+        memory.WriteUInt32(finalStack, State.Pr);
+
+        State.R[2] = flagAddress;
+        State.R[3] = flag;
+        State.R[15] = finalStack;
+        State.T = false;
+        State.Pc = 0x8C13_6070;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaServiceHelperFlaggedPrologue()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_6042) == 0x2FE6
+            && memory.ReadInstructionUInt16(0x8C13_6044) == 0x2FD6
+            && memory.ReadInstructionUInt16(0x8C13_6046) == 0x2FC6
+            && memory.ReadInstructionUInt16(0x8C13_6048) == 0x2FB6
+            && memory.ReadInstructionUInt16(0x8C13_604A) == 0xD208
+            && memory.ReadInstructionUInt16(0x8C13_604C) == 0x2FA6
+            && memory.ReadInstructionUInt16(0x8C13_604E) == 0x2F96
+            && memory.ReadInstructionUInt16(0x8C13_6050) == 0x4F22
+            && memory.ReadInstructionUInt16(0x8C13_6052) == 0x6322
+            && memory.ReadInstructionUInt16(0x8C13_6054) == 0x2338
+            && memory.ReadInstructionUInt16(0x8C13_6056) == 0x8B0B
+            && memory.ReadUInt32(0x8C13_606C) == 0x8C29_BE9C;
+    }
+
     private bool IsSonicAdventure2AicaCallbackServicePrologue()
     {
         return memory.ReadInstructionUInt16(0x8C13_62FC) == 0x2FE6
