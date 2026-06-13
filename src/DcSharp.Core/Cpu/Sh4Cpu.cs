@@ -5812,9 +5812,34 @@ public sealed class Sh4Cpu
         }
 
         var workBase = memory.ReadUInt32(basePointerAddress);
-        var index = State.R[14];
-        var entryAddress = State.R[12];
-        var strideAddress = State.R[11];
+        if (!TryComputeSonicAdventure2AicaNoWorkSlotScan(
+            workBase,
+            State.R[14],
+            State.R[12],
+            State.R[11],
+            maxInstructionsToSkip,
+            out var result))
+        {
+            return false;
+        }
+
+        ApplySonicAdventure2AicaNoWorkSlotScanResult(result);
+        skippedInstructions = result.SkippedInstructions;
+        return true;
+    }
+
+    private bool TryComputeSonicAdventure2AicaNoWorkSlotScan(
+        uint workBase,
+        uint startIndex,
+        uint startEntryAddress,
+        uint startStrideAddress,
+        ulong maxInstructionsToSkip,
+        out SonicAdventure2AicaNoWorkSlotScanResult result)
+    {
+        result = default;
+        var index = startIndex;
+        var entryAddress = startEntryAddress;
+        var strideAddress = startStrideAddress;
         var skippedInstructionCount = 0UL;
         uint lastR0 = 0;
         uint? lastR1 = null;
@@ -5869,23 +5894,18 @@ public sealed class Sh4Cpu
                             return false;
                         }
 
-                        State.R[0] = lastR0;
-                        if (lastR1 is not null)
-                        {
-                            State.R[1] = lastR1.Value;
-                        }
-
-                        State.R[2] = lastR2;
-                        State.R[3] = lastR3;
-                        State.R[11] = strideAddress;
-                        State.R[12] = entryAddress;
-                        State.R[14] = index;
-                        State.T = false;
-                        State.Pc = 0x8C15_B604;
-                        State.InstructionsExecuted += skippedInstructionCount;
-                        skippedInstructions = skippedInstructionCount;
-                        delayedBranchTarget = null;
-                        immediateBranchTarget = 0x8C15_B604;
+                        result = new SonicAdventure2AicaNoWorkSlotScanResult(
+                            lastR0,
+                            lastR1,
+                            lastR2,
+                            lastR3,
+                            strideAddress,
+                            entryAddress,
+                            index,
+                            false,
+                            0x8C15_B604,
+                            0x8C15_B604,
+                            skippedInstructionCount);
                         return true;
                     }
 
@@ -5910,23 +5930,18 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.R[0] = lastR0;
-        if (lastR1 is not null)
-        {
-            State.R[1] = lastR1.Value;
-        }
-
-        State.R[2] = lastR2;
-        State.R[3] = lastR3;
-        State.R[11] = strideAddress;
-        State.R[12] = entryAddress;
-        State.R[14] = index;
-        State.T = true;
-        State.Pc = 0x8C15_B690;
-        State.InstructionsExecuted += skippedInstructionCount;
-        skippedInstructions = skippedInstructionCount;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
+        result = new SonicAdventure2AicaNoWorkSlotScanResult(
+            lastR0,
+            lastR1,
+            lastR2,
+            lastR3,
+            strideAddress,
+            entryAddress,
+            index,
+            true,
+            0x8C15_B690,
+            null,
+            skippedInstructionCount);
         return true;
     }
 
@@ -5946,16 +5961,69 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        State.R[12] += 44;
-        State.R[14]++;
-        State.T = (int)State.R[14] >= (int)State.R[9];
-        State.Pc = State.T ? 0x8C15_B690 : 0x8C15_B604;
-        State.InstructionsExecuted += 4;
-        skippedInstructions = 4;
+        const ulong tailInstructionCount = 4;
+        var nextEntryAddress = State.R[12] + 44;
+        var nextIndex = State.R[14] + 1;
+        var tailT = (int)nextIndex >= (int)State.R[9];
+        var basePointerAddress = State.R[10];
+        if (!tailT
+            && memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
+            && TryComputeSonicAdventure2AicaNoWorkSlotScan(
+                memory.ReadUInt32(basePointerAddress),
+                nextIndex,
+                nextEntryAddress,
+                State.R[11],
+                maxInstructionsToSkip - tailInstructionCount,
+                out var result))
+        {
+            ApplySonicAdventure2AicaNoWorkSlotScanResult(result, tailInstructionCount);
+            skippedInstructions = tailInstructionCount + result.SkippedInstructions;
+            return true;
+        }
+
+        State.R[12] = nextEntryAddress;
+        State.R[14] = nextIndex;
+        State.T = tailT;
+        State.Pc = tailT ? 0x8C15_B690 : 0x8C15_B604;
+        State.InstructionsExecuted += tailInstructionCount;
+        skippedInstructions = tailInstructionCount;
         delayedBranchTarget = null;
-        immediateBranchTarget = State.T ? null : 0x8C15_B604;
+        immediateBranchTarget = tailT ? null : 0x8C15_B604;
         return true;
     }
+
+    private void ApplySonicAdventure2AicaNoWorkSlotScanResult(SonicAdventure2AicaNoWorkSlotScanResult result, ulong additionalSkippedInstructions = 0)
+    {
+        State.R[0] = result.R0;
+        if (result.R1 is not null)
+        {
+            State.R[1] = result.R1.Value;
+        }
+
+        State.R[2] = result.R2;
+        State.R[3] = result.R3;
+        State.R[11] = result.R11;
+        State.R[12] = result.R12;
+        State.R[14] = result.R14;
+        State.T = result.T;
+        State.Pc = result.Pc;
+        State.InstructionsExecuted += additionalSkippedInstructions + result.SkippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = result.ImmediateBranchTarget;
+    }
+
+    private readonly record struct SonicAdventure2AicaNoWorkSlotScanResult(
+        uint R0,
+        uint? R1,
+        uint R2,
+        uint R3,
+        uint R11,
+        uint R12,
+        uint R14,
+        bool T,
+        uint Pc,
+        uint? ImmediateBranchTarget,
+        ulong SkippedInstructions);
 
     internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
