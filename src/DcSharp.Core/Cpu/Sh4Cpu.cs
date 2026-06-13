@@ -3559,6 +3559,109 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaRegisterPairPollWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C11_05F0
+            || step.Opcode != 0x4F22
+            || State.Pc != 0x8C11_05F2
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 1_074;
+        const uint valueLatchAddress = 0x8C28_D870;
+        const uint statusAddress = 0x8C28_D874;
+        var savedPrStackAddress = State.R[15];
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaRegisterPairPollWrapper()
+            || !IsSonicAdventure2AicaStableRegisterPairReadHelper()
+            || !IsSonicAdventure2AicaRegisterPairReadWrapper()
+            || !IsSonicAdventure2G2PioReadHelper()
+            || savedPrStackAddress < 40
+            || !memory.TryGetSystemRamOffset(savedPrStackAddress - 40, 44, out _)
+            || !memory.TryGetSystemRamOffset(valueLatchAddress, 8, out _)
+            || !IsAicaRegisterAddress(0xA071_0000, 8))
+        {
+            return false;
+        }
+
+        var status = memory.ReadUInt32(statusAddress);
+        if ((status & 1) != 0)
+        {
+            return false;
+        }
+
+        var firstHighWord = memory.ReadUInt32(0xA071_0000);
+        var firstLowWord = memory.ReadUInt32(0xA071_0004);
+        var firstValue = ((firstHighWord << 16) & 0xFFFF_0000) | (firstLowWord & 0x0000_FFFF);
+        var secondHighWord = memory.ReadUInt32(0xA071_0000);
+        var secondLowWord = memory.ReadUInt32(0xA071_0004);
+        var secondValue = ((secondHighWord << 16) & 0xFFFF_0000) | (secondLowWord & 0x0000_FFFF);
+        if (firstValue != secondValue)
+        {
+            return false;
+        }
+
+        status = memory.ReadUInt32(statusAddress);
+        if ((status & 2) != 0)
+        {
+            return false;
+        }
+
+        var helperSavedR14StackAddress = savedPrStackAddress - 4;
+        var frameAddress = helperSavedR14StackAddress - 36;
+        var savedR9 = State.R[9];
+        var savedR10 = State.R[10];
+        var savedR11 = State.R[11];
+        var savedR12 = State.R[12];
+        var savedR13 = State.R[13];
+        var savedR14 = State.R[14];
+        var savedPr = memory.ReadUInt32(savedPrStackAddress);
+
+        memory.WriteUInt32(helperSavedR14StackAddress, savedR14);
+        memory.WriteUInt32(helperSavedR14StackAddress - 4, savedR13);
+        memory.WriteUInt32(helperSavedR14StackAddress - 8, savedR12);
+        memory.WriteUInt32(helperSavedR14StackAddress - 12, savedR11);
+        memory.WriteUInt32(helperSavedR14StackAddress - 16, savedR10);
+        memory.WriteUInt32(helperSavedR14StackAddress - 20, savedR9);
+        memory.WriteUInt32(helperSavedR14StackAddress - 24, 0x8C11_0600);
+        memory.WriteUInt32(frameAddress, frameAddress + 4);
+        memory.WriteUInt32(frameAddress + 4, firstValue);
+        memory.WriteUInt32(frameAddress + 8, secondValue);
+        memory.WriteUInt32(valueLatchAddress, firstValue);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+
+        State.R[0] = status;
+        State.R[1] = 0xFFFF_0000;
+        State.R[2] = statusAddress;
+        State.R[3] = valueLatchAddress;
+        State.R[4] = frameAddress + 8;
+        State.R[5] = frameAddress + 12;
+        State.R[6] = 0;
+        State.R[7] = 1;
+        State.R[9] = savedR9;
+        State.R[10] = savedR10;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = savedPrStackAddress + 4;
+        State.Pr = savedPr;
+        State.Pc = savedPr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaRegisterPairReadPointerLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -15689,6 +15792,27 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_0976) == 0x6DF6
         && memory.ReadInstructionUInt16(0x8C11_0978) == 0x000B
         && memory.ReadInstructionUInt16(0x8C11_097A) == 0x6EF6;
+
+    private bool IsSonicAdventure2AicaRegisterPairPollWrapper() =>
+        memory.ReadInstructionUInt16(0x8C11_05F0) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C11_05F2) == 0xD31E
+        && memory.ReadInstructionUInt16(0x8C11_05F4) == 0x6032
+        && memory.ReadInstructionUInt16(0x8C11_05F6) == 0xC801
+        && memory.ReadInstructionUInt16(0x8C11_05F8) == 0x8B04
+        && memory.ReadInstructionUInt16(0x8C11_05FA) == 0xD11B
+        && memory.ReadInstructionUInt16(0x8C11_05FC) == 0xB183
+        && memory.ReadInstructionUInt16(0x8C11_05FE) == 0x6412
+        && memory.ReadInstructionUInt16(0x8C11_0600) == 0xD319
+        && memory.ReadInstructionUInt16(0x8C11_0602) == 0x2302
+        && memory.ReadInstructionUInt16(0x8C11_0604) == 0xD219
+        && memory.ReadInstructionUInt16(0x8C11_0606) == 0x6022
+        && memory.ReadInstructionUInt16(0x8C11_0608) == 0xC802
+        && memory.ReadInstructionUInt16(0x8C11_060A) == 0x8903
+        && memory.ReadInstructionUInt16(0x8C11_0614) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C11_0616) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C11_0618) == 0x0009
+        && memory.ReadUInt32(0x8C11_0668) == 0x8C28_D870
+        && memory.ReadUInt32(0x8C11_066C) == 0x8C28_D874;
 
     private bool IsSonicAdventure2AicaRegisterPairReadPointerLoop() =>
         IsSonicAdventure2AicaRegisterPairReadWrapper()
