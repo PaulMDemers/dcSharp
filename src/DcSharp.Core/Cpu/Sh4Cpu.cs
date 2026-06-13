@@ -3084,10 +3084,35 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        return TryFastForwardSonicAdventure2AicaMirrorCopyFunctionCore(maxInstructionsToSkip, 607, State.Pr, out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaMirrorCopyCallFromInactiveService(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_61EC
+            || step.Opcode != 0xBDF6
+            || State.Pc != 0x8C13_61EE
+            || State.Pr != 0x8C13_61F0
+            || delayedBranchTarget != 0x8C13_5DDC
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaMirrorCopyFunctionCore(maxInstructionsToSkip, 609, 0x8C13_61F0, out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaMirrorCopyFunctionCore(
+        ulong maxInstructionsToSkip,
+        ulong skippedInstructionCount,
+        uint returnPc,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         const uint sourceStride = 0x2C;
         const uint destinationStride = 0x18;
         const uint entryLimit = 24;
-        const ulong skippedInstructionCount = 607;
         var sourceBasePointer = memory.ReadUInt32(0x8C13_5E3C);
         var destination = memory.ReadUInt32(0x8C13_5E54);
         if (maxInstructionsToSkip < skippedInstructionCount
@@ -3140,7 +3165,7 @@ public sealed class Sh4Cpu
         State.R[6] = entryLimit;
         State.R[7] = entryLimit;
         State.T = true;
-        State.Pc = State.Pr;
+        State.Pc = returnPc;
         State.InstructionsExecuted += skippedInstructionCount;
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
