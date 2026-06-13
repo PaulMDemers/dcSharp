@@ -1359,6 +1359,23 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_0906, 0x8C11_097C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_0A08, 0x8C11_0A52)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B158, 0x8C15_B18A)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B200, 0x8C15_B234)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B244, 0x8C15_B262)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_08B4, 0x8C17_08D4)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_09E0, 0x8C17_09FA)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_0A98, 0x8C17_0AD8)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_0BBC, 0x8C17_0BDC)
+                        && cpu.TryFastForwardSonicAdventure2AicaStableRegisterPairReadHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaStableRegisterPairReadSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaStableRegisterPairReadSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_092A, 0x8C11_093C)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C11_0A08, 0x8C11_0A52)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
