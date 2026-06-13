@@ -10189,6 +10189,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWordFillPositivePrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CE70
+            || step.Opcode != 0x4615
+            || State.Pc != 0x8C15_CE72
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !State.T
+            || !IsSonicAdventure2AicaWordFillPositivePrologue())
+        {
+            return false;
+        }
+
+        var count = (int)State.R[6];
+        if (count <= 0)
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = (ulong)((5 * count) + 5);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || count > int.MaxValue / 4
+            || !memory.TryGetSystemRamOffset(State.R[4], count * 4, out _))
+        {
+            return false;
+        }
+
+        var address = State.R[4];
+        for (var index = 0; index < count; index++)
+        {
+            memory.WriteUInt32(address + ((uint)index * 4), State.R[5]);
+        }
+
+        State.R[0] = State.R[6];
+        State.R[7] = State.R[6];
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaWordFillLoop() =>
         memory.ReadInstructionUInt16(0x8C15_CE78) == 0x7701
         && memory.ReadInstructionUInt16(0x8C15_CE7A) == 0x2052
@@ -10197,6 +10242,13 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_CE80) == 0x7004
         && memory.ReadInstructionUInt16(0x8C15_CE82) == 0x000B
         && memory.ReadInstructionUInt16(0x8C15_CE84) == 0x6063;
+
+    private bool IsSonicAdventure2AicaWordFillPositivePrologue() =>
+        IsSonicAdventure2AicaWordFillLoop()
+        && memory.ReadInstructionUInt16(0x8C15_CE70) == 0x4615
+        && memory.ReadInstructionUInt16(0x8C15_CE72) == 0xE700
+        && memory.ReadInstructionUInt16(0x8C15_CE74) == 0x8F05
+        && memory.ReadInstructionUInt16(0x8C15_CE76) == 0x6043;
 
     internal bool TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
