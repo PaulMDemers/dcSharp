@@ -5086,6 +5086,45 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2InterruptSourceFirstIrqbDispatchPrefix(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FF20
+            || step.Opcode != 0x2CC8
+            || State.Pc != 0x8C10_FF22
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 20;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2InterruptSourceBitScan()
+            || State.T
+            || State.R[4] != 0
+            || State.R[12] != 1)
+        {
+            return false;
+        }
+
+        State.R[2] = 1;
+        State.R[3] = 1;
+        State.R[4] = 0xA00;
+        State.R[10] = 0xA00;
+        State.R[11] = 0x80;
+        State.R[13] = 0;
+        State.R[14] = 1;
+        State.Pr = 0x8C10_FF42;
+        State.T = false;
+        State.Pc = 0x8C10_FE4E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
