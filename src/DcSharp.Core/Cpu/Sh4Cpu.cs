@@ -5472,6 +5472,46 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaAsicAckCallback(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5DB2
+            || step.Opcode != 0xD325
+            || State.Pc != 0x8C13_5DB4
+            || State.R[3] != 0xA05F_6900
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 3;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaAsicAckCallback())
+        {
+            return false;
+        }
+
+        State.R[0] = 0x1000;
+        memory.WriteUInt32(0xA05F_6900, State.R[0]);
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaAsicAckCallback()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_5DB2) == 0xD325
+            && memory.ReadInstructionUInt16(0x8C13_5DB4) == 0x9034
+            && memory.ReadInstructionUInt16(0x8C13_5DB6) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C13_5DB8) == 0x2302
+            && memory.ReadUInt16(0x8C13_5E20) == 0x1000
+            && memory.ReadUInt32(0x8C13_5E48) == 0xA05F_6900;
+    }
+
     private bool IsSonicAdventure2AicaInactiveCallbackHelper()
     {
         return memory.ReadInstructionUInt16(0x8C13_5D40) == 0x2FE6
