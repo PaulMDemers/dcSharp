@@ -6007,6 +6007,58 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaServiceHelperSecondResetBlock(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_609C
+            || step.Opcode != 0xD439
+            || State.Pc != 0x8C13_609E
+            || State.R[4] != 0x8C29_BEA8
+            || State.R[6] != 0x8C29_BEAC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 4;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaServiceHelperSecondResetBlock()
+            || State.R[11] != 0
+            || !memory.TryGetSystemRamOffset(0x8C29_BEAC, 4, out _)
+            || !memory.TryGetSystemRamOffset(0x8C29_BEA8, 4, out _))
+        {
+            return false;
+        }
+
+        var secondFlag = memory.ReadUInt32(0x8C29_BEA8);
+        if (secondFlag != 0)
+        {
+            return false;
+        }
+
+        memory.WriteUInt32(0x8C29_BEAC, 0);
+
+        State.R[2] = secondFlag;
+        State.T = true;
+        State.Pc = 0x8C13_60BA;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaServiceHelperSecondResetBlock()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_609C) == 0xD439
+            && memory.ReadInstructionUInt16(0x8C13_609E) == 0x26B2
+            && memory.ReadInstructionUInt16(0x8C13_60A0) == 0x6242
+            && memory.ReadInstructionUInt16(0x8C13_60A2) == 0x2228
+            && memory.ReadInstructionUInt16(0x8C13_60A4) == 0x8909
+            && memory.ReadUInt32(0x8C13_6184) == 0x8C29_BEA8;
+    }
+
     private bool IsSonicAdventure2AicaServiceHelperFirstResetBlock()
     {
         return memory.ReadInstructionUInt16(0x8C13_6070) == 0xD43F
