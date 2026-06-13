@@ -8225,7 +8225,7 @@ public sealed class Sh4Cpu
             postDelaySlotStack,
             State.R[0],
             2,
-            continueNameLoop: false,
+            continueNameLoop: true,
             out skippedInstructions);
     }
 

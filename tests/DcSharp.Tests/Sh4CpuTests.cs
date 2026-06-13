@@ -7253,6 +7253,94 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaActiveChannelPostSetupReturnAggregateThroughNextActiveSetup()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaChannelSetupBridge(normalMemory);
+        WriteSonicAdventure2AicaChannelSetupBridge(fastMemory);
+        WriteSonicAdventure2AicaPostSetupFlagTail(normalMemory);
+        WriteSonicAdventure2AicaPostSetupFlagTail(fastMemory);
+        WriteSonicAdventure2AicaChannelFlagReturnTail(normalMemory);
+        WriteSonicAdventure2AicaChannelFlagReturnTail(fastMemory);
+        WriteSonicAdventure2AicaNameLoopTail(normalMemory);
+        WriteSonicAdventure2AicaNameLoopTail(fastMemory);
+        WriteSonicAdventure2AicaNameCallBridge(normalMemory);
+        WriteSonicAdventure2AicaNameCallBridge(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C56E);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C56E);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            normalMemory,
+            normal,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 2,
+            channel: 2,
+            group: 0,
+            mask: 7,
+            pendingWord: 0,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaNameCallActiveSetupAggregateState(
+            fastMemory,
+            fast,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_4000,
+            nameIndex: 2,
+            channel: 2,
+            group: 0,
+            mask: 7,
+            pendingWord: 0,
+            stack: 0x8C20_5000);
+        InitializeSonicAdventure2AicaActiveChannelPostSetupReturnAggregateState(
+            normalMemory,
+            normal,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_2000,
+            0x8C20_2FFC,
+            updateCallbackPointer: false);
+        InitializeSonicAdventure2AicaActiveChannelPostSetupReturnAggregateState(
+            fastMemory,
+            fast,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_2000,
+            0x8C20_2FFC,
+            updateCallbackPointer: false);
+        normal.State.R[9] = 6;
+        fast.State.R[9] = 6;
+        normalMemory.WriteUInt32(0x8C20_3000 + 16, 0x8C20_0000);
+        fastMemory.WriteUInt32(0x8C20_3000 + 16, 0x8C20_0000);
+        normalMemory.WriteUInt32(0x8C20_3000 + 20, 1);
+        fastMemory.WriteUInt32(0x8C20_3000 + 20, 1);
+        normalMemory.WriteUInt32(0x8C20_3000 + 24, 1);
+        fastMemory.WriteUInt32(0x8C20_3000 + 24, 1);
+        normalMemory.WriteUInt32(0x8C20_3000 + 28, 1);
+        fastMemory.WriteUInt32(0x8C20_3000 + 28, 1);
+        normalMemory.WriteUInt32(0x8C20_3000 + 32, 0);
+        fastMemory.WriteUInt32(0x8C20_3000 + 32, 0);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaActiveChannelPostSetupReturnAggregate(fastStart, 108, out var skippedInstructions));
+        Assert.Equal(108UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_1000, 0x1200), ReadBytes(fastMemory, 0x8C20_1000, 0x1200));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_2FC0, 0x80), ReadBytes(fastMemory, 0x8C20_2FC0, 0x80));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Macl, fast.State.Macl);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaActiveChannelPostSetupReturnAggregateWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
