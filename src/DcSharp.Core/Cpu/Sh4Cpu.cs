@@ -8915,6 +8915,92 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaModeOneDescriptorUpdateWrapper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CA78
+            || step.Opcode != 0x4F22
+            || State.Pc != 0x8C15_CA7A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong wrapperSetupAndDescriptorEntryInstructionCount = 8;
+        const ulong wrapperEpilogueInstructionCount = 4;
+        const ulong expectedSkippedInstructionCount = 199;
+        if (maxInstructionsToSkip < expectedSkippedInstructionCount
+            || !IsSonicAdventure2AicaModeOneDescriptorUpdateWrapper()
+            || !IsSonicAdventure2AicaDescriptorUpdatePrologue()
+            || !memory.TryGetSystemRamOffset(State.R[15] - 12, 16, out _))
+        {
+            return false;
+        }
+
+        var savedR15 = State.R[15];
+        var savedCallerPr = memory.ReadUInt32(savedR15);
+
+        State.R[3] = 0;
+        State.R[6] = 0;
+        State.R[7] = 0;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], 0);
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], 0);
+        State.Pr = 0x8C15_CA88;
+        State.R[5] = 1;
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.R[14]);
+        State.Pc = 0x8C15_BEDA;
+        State.InstructionsExecuted += wrapperSetupAndDescriptorEntryInstructionCount;
+        skippedInstructions = wrapperSetupAndDescriptorEntryInstructionCount;
+
+        if (!TryFastForwardSonicAdventure2AicaDescriptorUpdateNoEventAggregate(
+                new Sh4StepResult(0x8C15_BED8, 0x2FE6, string.Empty),
+                maxInstructionsToSkip - skippedInstructions,
+                out var descriptorSkippedInstructions))
+        {
+            return true;
+        }
+
+        skippedInstructions += descriptorSkippedInstructions;
+        if (State.Pc != 0x8C15_CA88)
+        {
+            return true;
+        }
+
+        if (maxInstructionsToSkip - skippedInstructions < wrapperEpilogueInstructionCount
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return true;
+        }
+
+        State.R[15] += 8;
+        State.Pr = savedCallerPr;
+        State.R[15] += 4;
+        State.Pc = savedCallerPr;
+        State.InstructionsExecuted += wrapperEpilogueInstructionCount;
+        skippedInstructions += wrapperEpilogueInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaModeOneDescriptorUpdateWrapper() =>
+        memory.ReadInstructionUInt16(0x8C15_CA78) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C15_CA7A) == 0xE300
+        && memory.ReadInstructionUInt16(0x8C15_CA7C) == 0x6633
+        && memory.ReadInstructionUInt16(0x8C15_CA7E) == 0x6733
+        && memory.ReadInstructionUInt16(0x8C15_CA80) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C15_CA82) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C15_CA84) == 0xBA28
+        && memory.ReadInstructionUInt16(0x8C15_CA86) == 0xE501
+        && memory.ReadInstructionUInt16(0x8C15_CA88) == 0x7F08
+        && memory.ReadInstructionUInt16(0x8C15_CA8A) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C15_CA8C) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_CA8E) == 0x0009;
+
     private bool TryApplySonicAdventure2AicaDescriptorSetupHead(ulong maxInstructionsToSkip, ref ulong skippedInstructions)
     {
         if (State.Pc != 0x8C15_BF1C

@@ -956,6 +956,23 @@ public sealed class DreamcastRunner
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_CA7A, 0x8C15_CA8E)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BEDA, 0x8C15_BF1C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BF1E, 0x8C15_BF72)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BF74, 0x8C15_BFC2)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_CE86, 0x8C15_CE8C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BFC4, 0x8C15_BFE4)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C038, 0x8C15_C08C)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C08E, 0x8C15_C096)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C0CE, 0x8C15_C0D6)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C0E2, 0x8C15_C11E)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_C126, 0x8C15_C142)
+                        && cpu.TryFastForwardSonicAdventure2AicaModeOneDescriptorUpdateWrapper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaModeOneDescriptorUpdateSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaModeOneDescriptorUpdateSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BEDA, 0x8C15_BF1C)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BF1E, 0x8C15_BF72)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_BF74, 0x8C15_BFC2)
