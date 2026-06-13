@@ -6416,6 +6416,51 @@ public sealed class Sh4Cpu
         uint? ImmediateBranchTarget,
         ulong SkippedInstructions);
 
+    internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntryRun(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B604
+            || step.Opcode != 0x9368
+            || State.Pc != 0x8C15_B606
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNoWorkSlotScan()
+            || State.R[9] != 24
+            || State.R[14] >= State.R[9])
+        {
+            return false;
+        }
+
+        var basePointerAddress = State.R[10];
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var budgetFromEntry = maxInstructionsToSkip == ulong.MaxValue ? ulong.MaxValue : maxInstructionsToSkip + 1;
+        if (!TryComputeSonicAdventure2AicaNoWorkSlotScan(
+                memory.ReadUInt32(basePointerAddress),
+                State.R[14],
+                State.R[12],
+                State.R[11],
+                budgetFromEntry,
+                out var result)
+            || result.SkippedInstructions == 0)
+        {
+            return false;
+        }
+
+        var adjustedSkippedInstructions = result.SkippedInstructions - 1;
+        if (adjustedSkippedInstructions > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        ApplySonicAdventure2AicaNoWorkSlotScanResult(result with { SkippedInstructions = adjustedSkippedInstructions });
+        skippedInstructions = adjustedSkippedInstructions;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
