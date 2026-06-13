@@ -5750,6 +5750,50 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2SrCallbackListDispatchPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FE72
+            || step.Opcode != 0x0002
+            || State.Pc != 0x8C10_FE74
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 9;
+        const uint statusMask = 0xFFFF_FF0F;
+        var finalStack = unchecked(State.R[15] - 8);
+        var headPointerAddress = memory.ReadUInt32(0x8C10_FEB8);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2SrCallbackListDispatch()
+            || !memory.TryGetSystemRamOffset(finalStack, 8, out _)
+            || !memory.TryGetSystemRamOffset(headPointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var originalR14 = State.R[14];
+        var originalPr = State.Pr;
+        var finalSr = (State.R[0] & statusMask) | 0x60u;
+        var listHead = memory.ReadUInt32(headPointerAddress);
+        memory.WriteUInt32(State.R[15] - 4, originalR14);
+        memory.WriteUInt32(finalStack, originalPr);
+
+        State.R[0] = finalSr;
+        State.R[3] = statusMask;
+        State.R[14] = listHead;
+        State.R[15] = finalStack;
+        State.Sr = finalSr;
+        State.Pc = 0x8C10_FE8E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2SrCallbackListDispatch() =>
         memory.ReadInstructionUInt16(0x8C10_FE72) == 0x0002
         && memory.ReadInstructionUInt16(0x8C10_FE74) == 0x9312
