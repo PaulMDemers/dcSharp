@@ -5767,6 +5767,52 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaCallbackCounterIncrementCall(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5CBC
+            || step.Opcode != 0xD31D
+            || State.Pc != 0x8C13_5CBE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 5;
+        var counterAddress = State.R[3];
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaCallbackCounterIncrementCall()
+            || counterAddress != 0x8C29_BC28
+            || !memory.TryGetSystemRamOffset(counterAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var counter = unchecked(memory.ReadUInt32(counterAddress) + 1);
+        memory.WriteUInt32(counterAddress, counter);
+
+        State.R[2] = counter;
+        State.Pr = 0x8C13_5CC8;
+        State.Pc = 0x8C13_62FC;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaCallbackCounterIncrementCall()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_5CBC) == 0xD31D
+            && memory.ReadInstructionUInt16(0x8C13_5CBE) == 0x6232
+            && memory.ReadInstructionUInt16(0x8C13_5CC0) == 0x7201
+            && memory.ReadInstructionUInt16(0x8C13_5CC2) == 0x2322
+            && memory.ReadInstructionUInt16(0x8C13_5CC4) == 0xB31A
+            && memory.ReadInstructionUInt16(0x8C13_5CC6) == 0x0009
+            && memory.ReadUInt32(0x8C13_5D34) == 0x8C29_BC28;
+    }
+
     private bool IsSonicAdventure2AicaCallbackMaskedPrologue()
     {
         return memory.ReadInstructionUInt16(0x8C13_5CA0) == 0x2FE6
