@@ -8684,6 +8684,18 @@ public sealed class Sh4Cpu
                     out var zeroMaskSkippedInstructions))
             {
                 skippedInstructions += zeroMaskSkippedInstructions;
+                if (State.Pc == 0x8C15_C57C
+                    && maxInstructionsToSkip > skippedInstructions
+                    && TryFastForwardSonicAdventure2AicaPostSetupReturnAggregateCore(
+                        maxInstructionsToSkip - skippedInstructions,
+                        State.R[15],
+                        State.R[0],
+                        entrySkippedInstructionCount: 1,
+                        continueNameLoop: true,
+                        out var postSetupSkippedInstructions))
+                {
+                    skippedInstructions += postSetupSkippedInstructions;
+                }
             }
         }
 
