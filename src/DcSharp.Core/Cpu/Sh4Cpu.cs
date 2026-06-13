@@ -664,17 +664,60 @@ public sealed class Sh4Cpu
 
     internal bool TryFastForwardIpBinGlyphByteExitTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
-        const ulong byteExitTailInstructions = 9;
-
         skippedInstructions = 0;
         if (step.Pc != 0x8C00_8A76
             || step.Opcode != 0x52F8
             || State.Pc != 0x8C00_8A78
             || delayedBranchTarget is not null
             || immediateBranchTarget is not null
-            || maxInstructionsToSkip < byteExitTailInstructions
             || !IsIpBinGlyphByteExitTail()
             || !IsIpBinGlyphByteFetchPrefix())
+        {
+            return false;
+        }
+
+        return TryFastForwardIpBinGlyphByteExitTailCore(maxInstructionsToSkip, 9, out skippedInstructions);
+    }
+
+    private bool TryFastForwardIpBinGlyphByteExitTailFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (State.Pc != 0x8C00_8A76
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsIpBinGlyphByteExitTail()
+            || !IsIpBinGlyphByteFetchPrefix())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FD8)
+        {
+            return false;
+        }
+
+        var savedR2 = State.R[2];
+        var savedPc = State.Pc;
+        State.R[2] = memory.ReadUInt32(stack + 0x20);
+        State.Pc = 0x8C00_8A78;
+        if (!TryFastForwardIpBinGlyphByteExitTailCore(maxInstructionsToSkip, 10, out skippedInstructions))
+        {
+            State.R[2] = savedR2;
+            State.Pc = savedPc;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryFastForwardIpBinGlyphByteExitTailCore(
+        ulong maxInstructionsToSkip,
+        ulong byteExitTailInstructions,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (maxInstructionsToSkip < byteExitTailInstructions)
         {
             return false;
         }
@@ -898,6 +941,15 @@ public sealed class Sh4Cpu
                 out var dispatchSkippedInstructions))
         {
             skippedInstructions += dispatchSkippedInstructions;
+        }
+
+        if (State.Pc == 0x8C00_8A76
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardIpBinGlyphByteExitTailFromEntry(
+                maxInstructionsToSkip - skippedInstructions,
+                out var byteExitSkippedInstructions))
+        {
+            skippedInstructions += byteExitSkippedInstructions;
         }
 
         return true;
