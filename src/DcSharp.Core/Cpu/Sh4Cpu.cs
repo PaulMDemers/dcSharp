@@ -7078,7 +7078,49 @@ public sealed class Sh4Cpu
             return true;
         }
 
-        return TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(maxInstructionsToSkip, out skippedInstructions);
+        if (TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(maxInstructionsToSkip, out skippedInstructions))
+        {
+            return true;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameLoopTailExitNextGroupTailAggregateFromEntry(maxInstructionsToSkip, out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaNameLoopTailExitNextGroupTailAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (State.Pc != 0x8C15_B92E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameLoopTail()
+            || !IsSonicAdventure2AicaNameGroupTail()
+            || State.R[11] == uint.MaxValue
+            || State.R[12] == uint.MaxValue
+            || State.R[13] == uint.MaxValue
+            || State.R[14] == uint.MaxValue)
+        {
+            return false;
+        }
+
+        var incrementedR11 = State.R[11] + 1;
+        if ((int)incrementedR11 < (int)State.R[9])
+        {
+            return false;
+        }
+
+        var nextGroup = State.R[14] + 1;
+        if ((int)nextGroup >= 4)
+        {
+            return false;
+        }
+
+        const ulong nameLoopExitGroupTailAndDescriptorSkippedInstructionCount = 101;
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            nameLoopExitGroupTailAndDescriptorSkippedInstructionCount,
+            nextGroup,
+            continueToNameSetup: true,
+            out skippedInstructions);
     }
 
     private bool TryFastForwardSonicAdventure2AicaNameLoopTailNextActiveSetupAggregateFromEntry(ulong maxInstructionsToSkip, out ulong skippedInstructions) =>
