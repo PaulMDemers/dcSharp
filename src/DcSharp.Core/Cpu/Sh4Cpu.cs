@@ -10448,6 +10448,73 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_CE8A) == 0x2049
         && memory.ReadUInt32(0x8C15_CEB4) == 0x0FFF_FFFF;
 
+    internal bool TryFastForwardSonicAdventure2AicaDmaDescriptorCompleteMarker(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CE5C
+            || step.Opcode != 0xD313
+            || State.Pc != 0x8C15_CE5E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 9;
+        const uint basePointerAddress = 0x8C2A_34F8;
+        const uint descriptorPointerOffset = 0x0FCC;
+        const uint completeMask = 0x8000_0000;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaDmaDescriptorCompleteMarker()
+            || !memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var basePointer = memory.ReadUInt32(basePointerAddress);
+        var descriptorPointerAddress = unchecked(basePointer + descriptorPointerOffset);
+        if (!memory.TryGetSystemRamOffset(descriptorPointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var descriptorPointer = memory.ReadUInt32(descriptorPointerAddress);
+        if (!memory.TryGetSystemRamOffset(descriptorPointer, 4, out _))
+        {
+            return false;
+        }
+
+        var descriptorValue = memory.ReadUInt32(descriptorPointer) | completeMask;
+        memory.WriteUInt32(descriptorPointer, descriptorValue);
+
+        State.R[0] = 0;
+        State.R[1] = descriptorValue;
+        State.R[2] = completeMask;
+        State.R[3] = basePointerAddress;
+        State.R[4] = descriptorPointer;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaDmaDescriptorCompleteMarker() =>
+        memory.ReadInstructionUInt16(0x8C15_CE5C) == 0xD313
+        && memory.ReadInstructionUInt16(0x8C15_CE5E) == 0x901D
+        && memory.ReadInstructionUInt16(0x8C15_CE60) == 0x6432
+        && memory.ReadInstructionUInt16(0x8C15_CE62) == 0xD213
+        && memory.ReadInstructionUInt16(0x8C15_CE64) == 0x044E
+        && memory.ReadInstructionUInt16(0x8C15_CE66) == 0x6142
+        && memory.ReadInstructionUInt16(0x8C15_CE68) == 0x212B
+        && memory.ReadInstructionUInt16(0x8C15_CE6A) == 0x2412
+        && memory.ReadInstructionUInt16(0x8C15_CE6C) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_CE6E) == 0xE000
+        && memory.ReadUInt16(0x8C15_CE9C) == 0x0FCC
+        && memory.ReadUInt32(0x8C15_CEAC) == 0x8C2A_34F8
+        && memory.ReadUInt32(0x8C15_CEB0) == 0x8000_0000;
+
     internal bool TryFastForwardSonicAdventure2AicaWordFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
