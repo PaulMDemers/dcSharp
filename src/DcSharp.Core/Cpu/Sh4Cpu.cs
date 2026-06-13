@@ -6656,6 +6656,85 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveSlotModeOneDescriptorUpdate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        const ulong dispatchSkippedInstructionCount = 15;
+        const ulong wrapperEntryInstructionCount = 1;
+        const ulong wrapperSkippedInstructionCount = 199;
+        const ulong expectedSkippedInstructionCount = dispatchSkippedInstructionCount + wrapperEntryInstructionCount + wrapperSkippedInstructionCount;
+        if (step.Pc != 0x8C15_B604
+            || step.Opcode != 0x9368
+            || State.Pc != 0x8C15_B606
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < expectedSkippedInstructionCount
+            || !IsSonicAdventure2AicaActiveSlotModeDispatch()
+            || !IsSonicAdventure2AicaModeOneDescriptorUpdateWrapper()
+            || !IsSonicAdventure2AicaDescriptorUpdatePrologue()
+            || State.R[9] != 24
+            || State.R[14] >= State.R[9]
+            || State.R[8] != 0x8C15_CA78
+            || State.R[15] < 16
+            || !memory.TryGetSystemRamOffset(State.R[15] - 16, 16, out _))
+        {
+            return false;
+        }
+
+        var basePointerAddress = State.R[10];
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var index = State.R[14];
+        var entryAddress = State.R[12];
+        var nameAddress = workBase + 0xF90 + index;
+        if (!memory.TryGetSystemRamOffset(nameAddress, 1, out _)
+            || !memory.TryGetSystemRamOffset(entryAddress, 7, out _))
+        {
+            return false;
+        }
+
+        var nameByte = (uint)(sbyte)memory.ReadByte(nameAddress);
+        if (nameByte == 0
+            || memory.ReadByte(entryAddress + 6) != 0
+            || memory.ReadByte(entryAddress + 4) != 1)
+        {
+            return false;
+        }
+
+        State.R[0] = 1;
+        State.R[2] = nameByte;
+        State.R[3] = nameAddress;
+        State.R[4] = State.R[14];
+        State.Pr = 0x8C15_B652;
+        State.T = true;
+        State.Pc = 0x8C15_CA78;
+        State.InstructionsExecuted += dispatchSkippedInstructionCount;
+        skippedInstructions = dispatchSkippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        State.R[15] -= 4;
+        memory.WriteUInt32(State.R[15], State.Pr);
+        State.Pc = 0x8C15_CA7A;
+        State.InstructionsExecuted += wrapperEntryInstructionCount;
+        skippedInstructions += wrapperEntryInstructionCount;
+
+        if (!TryFastForwardSonicAdventure2AicaModeOneDescriptorUpdateWrapper(
+                new Sh4StepResult(0x8C15_CA78, 0x4F22, string.Empty),
+                maxInstructionsToSkip - skippedInstructions,
+                out var descriptorSkippedInstructions))
+        {
+            return true;
+        }
+
+        skippedInstructions += descriptorSkippedInstructions;
+        return true;
+    }
+
     private bool IsSonicAdventure2AicaNoWorkSlotScan()
     {
         return memory.ReadInstructionUInt16(0x8C15_B604) == 0x9368
