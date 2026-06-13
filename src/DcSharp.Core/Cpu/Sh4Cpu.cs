@@ -9968,10 +9968,10 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        const ulong skippedInstructionCount = 31;
+        const ulong normalSkippedInstructionCount = 31;
+        const ulong inactiveDescriptorSkippedInstructionCount = 28;
         var localStack = State.R[15];
-        if (maxInstructionsToSkip < skippedInstructionCount
-            || !IsSonicAdventure2AicaDescriptorCopyHelper()
+        if (!IsSonicAdventure2AicaDescriptorCopyHelper()
             || !memory.TryGetSystemRamOffset(localStack, 4, out _)
             || !memory.TryGetSystemRamOffset(State.R[5], 4, out _)
             || !memory.TryGetSystemRamOffset(State.R[4] + 8, 16, out _))
@@ -9995,7 +9995,13 @@ public sealed class Sh4Cpu
 
         var descriptor = memory.ReadUInt32(State.R[5]);
         var firstByte = (byte)descriptor;
-        if (firstByte == 0xFF || firstByte >= 0xE0)
+        if (firstByte != 0xFF && firstByte >= 0xE0)
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = firstByte == 0xFF ? inactiveDescriptorSkippedInstructionCount : normalSkippedInstructionCount;
+        if (maxInstructionsToSkip < skippedInstructionCount)
         {
             return false;
         }
@@ -10006,16 +10012,16 @@ public sealed class Sh4Cpu
         memory.Write(slot + 9, [(byte)(descriptor >> 8)]);
         memory.Write(slot + 10, [(byte)(descriptor >> 16)]);
         memory.Write(slot + 11, [(byte)(descriptor >> 24)]);
-        memory.WriteUInt32(slot + 20, 0);
+        memory.WriteUInt32(slot + 20, firstByte == 0xFF ? 0xFFFF_FFFFu : 0);
 
         State.R[0] = 0;
-        State.R[1] = memory.ReadUInt16(0x8C15_C714);
-        State.R[2] = memory.ReadUInt16(0x8C15_C718);
+        State.R[1] = firstByte == 0xFF ? 0xFFFF_FFFFu : memory.ReadUInt16(0x8C15_C714);
+        State.R[2] = firstByte == 0xFF ? basePointerAddress : memory.ReadUInt16(0x8C15_C718);
         State.R[3] = memory.ReadUInt16(0x8C15_C716);
         State.R[5] += 4;
         State.R[6] = localStack + 3;
         State.R[15] = localStack + 4;
-        State.T = false;
+        State.T = firstByte == 0xFF;
         State.Pc = State.Pr;
         State.InstructionsExecuted += skippedInstructionCount;
         skippedInstructions = skippedInstructionCount;

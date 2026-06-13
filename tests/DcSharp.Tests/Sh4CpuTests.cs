@@ -8848,6 +8848,58 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaDescriptorCopyHelperForInactiveDescriptor()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaDescriptorCopyHelper(normalMemory);
+        WriteSonicAdventure2AicaDescriptorCopyHelper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_C622);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_C622);
+        InitializeSonicAdventure2AicaDescriptorCopyHelperState(
+            normalMemory,
+            normal,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_3000,
+            0x8C20_4000,
+            0x8C20_5000,
+            0x1C20_05FF);
+        InitializeSonicAdventure2AicaDescriptorCopyHelperState(
+            fastMemory,
+            fast,
+            0x8C20_0000,
+            0x8C20_1000,
+            0x8C20_3000,
+            0x8C20_4000,
+            0x8C20_5000,
+            0x1C20_05FF);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(fastStart, 28, out var skippedInstructions));
+        Assert.Equal(28UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_4000 + 8, 16), ReadBytes(fastMemory, 0x8C20_4000 + 8, 16));
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_5000, 4), ReadBytes(fastMemory, 0x8C20_5000, 4));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[1], fast.State.R[1]);
+        Assert.Equal(normal.State.R[2], fast.State.R[2]);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[4], fast.State.R[4]);
+        Assert.Equal(normal.State.R[5], fast.State.R[5]);
+        Assert.Equal(normal.State.R[6], fast.State.R[6]);
+        Assert.Equal(normal.State.R[15], fast.State.R[15]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaDescriptorCopyHelperWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
@@ -18929,6 +18981,9 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C15_C65E, 0x600C);
         WriteInstruction(memory, 0x8C15_C660, 0x3030);
         WriteInstruction(memory, 0x8C15_C662, 0x8B02);
+        WriteInstruction(memory, 0x8C15_C664, 0xE1FF);
+        WriteInstruction(memory, 0x8C15_C666, 0xA008);
+        WriteInstruction(memory, 0x8C15_C668, 0x1415);
         WriteInstruction(memory, 0x8C15_C66A, 0x9255);
         WriteInstruction(memory, 0x8C15_C66C, 0x3023);
         WriteInstruction(memory, 0x8C15_C66E, 0x8902);
