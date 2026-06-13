@@ -891,6 +891,15 @@ public sealed class Sh4Cpu
         skippedInstructions = totalSkippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
+        if (State.Pc == 0x8C00_89F6
+            && maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardIpBinGlyphBitDispatchFromEntry(
+                maxInstructionsToSkip - skippedInstructions,
+                out var dispatchSkippedInstructions))
+        {
+            skippedInstructions += dispatchSkippedInstructions;
+        }
+
         return true;
     }
 
