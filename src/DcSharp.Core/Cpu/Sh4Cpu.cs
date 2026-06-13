@@ -9538,7 +9538,7 @@ public sealed class Sh4Cpu
         var descriptorPointer = State.R[11];
         var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);
         if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
-            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !CanReadSystemOrAicaRamWord(descriptorPointer)
             || !memory.TryGetSystemRamOffset(slot, 24, out _)
             || !memory.TryGetSystemRamOffset(workBase, 4, out _))
         {
@@ -9774,7 +9774,7 @@ public sealed class Sh4Cpu
         var descriptorPointer = memory.ReadUInt32(finalStack + 28);
         var basePointerAddress = memory.ReadUInt32(0x8C15_C71C);
         if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _)
-            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !CanReadSystemOrAicaRamWord(descriptorPointer)
             || !memory.TryGetSystemRamOffset(slot + 2, 22, out _)
             || !memory.TryGetSystemRamOffset(workBase, 4, out _))
         {
@@ -10201,7 +10201,7 @@ public sealed class Sh4Cpu
             || !IsSonicAdventure2AicaStatusUpdateHelper()
             || !memory.TryGetSystemRamOffset(finalStack, 16, out _)
             || !memory.TryGetSystemRamOffset(descriptorLocalStack, 4, out _)
-            || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _)
+            || !CanReadSystemOrAicaRamWord(descriptorPointer)
             || !memory.TryGetSystemRamOffset(descriptorSlot, 24, out _))
         {
             return false;
@@ -11931,7 +11931,7 @@ public sealed class Sh4Cpu
         var localStack = State.R[15];
         if (!IsSonicAdventure2AicaDescriptorCopyHelper()
             || !memory.TryGetSystemRamOffset(localStack, 4, out _)
-            || !memory.TryGetSystemRamOffset(State.R[5], 4, out _)
+            || !CanReadSystemOrAicaRamWord(State.R[5])
             || !memory.TryGetSystemRamOffset(State.R[4] + 8, 16, out _))
         {
             return false;
@@ -18172,6 +18172,10 @@ public sealed class Sh4Cpu
         memory.TryGetSystemRamOffset(address, length, out _)
         || IsAicaRamAddress(address, length)
         || memory.TryGetPvrVramOffset(address, length, out _);
+
+    private bool CanReadSystemOrAicaRamWord(uint address) =>
+        memory.TryGetSystemRamOffset(address, 4, out _)
+        || IsAicaRamAddress(address, 4);
 
     private void IncrementSystemRamWord(uint address)
     {
