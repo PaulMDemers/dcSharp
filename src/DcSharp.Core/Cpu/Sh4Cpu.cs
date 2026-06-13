@@ -5573,6 +5573,101 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackEmptyScanCompareTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C14_D15A
+            || step.Opcode != 0x3EC3
+            || State.Pc != 0x8C14_D15C
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.T)
+        {
+            return false;
+        }
+
+        const uint pendingAddress = 0x8C29_C714;
+        const ulong branchInstructionCount = 1;
+        const ulong instructionsPerEmptyEntry = 9;
+        if (!IsSonicAdventure2InterruptCallbackScan()
+            || State.R[9] != 0x8C14_D1F4
+            || State.R[11] != 1
+            || State.R[12] != 10
+            || State.R[14] >= State.R[12]
+            || State.R[14] < 2
+            || !memory.TryGetSystemRamOffset(pendingAddress, 4, out _)
+            || memory.ReadUInt32(pendingAddress) != 0)
+        {
+            return false;
+        }
+
+        var remainingEntries = State.R[12] - State.R[14];
+        var skippedInstructionCount = branchInstructionCount + ((ulong)remainingEntries * instructionsPerEmptyEntry);
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        State.R[2] = pendingAddress;
+        State.R[3] = 0;
+        State.R[4] = 1u << 9;
+        State.R[14] = State.R[12];
+        State.T = true;
+        State.Pc = 0x8C14_D15E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackEmptyScanIncrementTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C14_D158
+            || step.Opcode != 0x7E01
+            || State.Pc != 0x8C14_D15A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint pendingAddress = 0x8C29_C714;
+        const ulong compareAndBranchInstructionCount = 2;
+        const ulong instructionsPerEmptyEntry = 9;
+        if (!IsSonicAdventure2InterruptCallbackScan()
+            || State.R[9] != 0x8C14_D1F4
+            || State.R[11] != 1
+            || State.R[12] != 10
+            || State.R[14] >= State.R[12]
+            || State.R[14] < 2
+            || !memory.TryGetSystemRamOffset(pendingAddress, 4, out _)
+            || memory.ReadUInt32(pendingAddress) != 0)
+        {
+            return false;
+        }
+
+        var remainingEntries = State.R[12] - State.R[14];
+        var skippedInstructionCount = compareAndBranchInstructionCount + ((ulong)remainingEntries * instructionsPerEmptyEntry);
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        State.R[2] = pendingAddress;
+        State.R[3] = 0;
+        State.R[4] = 1u << 9;
+        State.R[14] = State.R[12];
+        State.T = true;
+        State.Pc = 0x8C14_D15E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2InterruptCallbackScan() =>
         memory.ReadInstructionUInt16(0x8C14_D12C) == 0xD91C
         && memory.ReadInstructionUInt16(0x8C14_D12E) == 0xEC0A
