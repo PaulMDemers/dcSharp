@@ -6963,7 +6963,11 @@ public sealed class Sh4Cpu
         ulong skippedInstructionCount,
         uint group,
         bool continueToNameSetup,
-        out ulong skippedInstructions)
+        out ulong skippedInstructions,
+        bool continueToNameSetupAllowZeroMask = false,
+        bool continueToNameSetupRequireZeroMask = false,
+        bool continueToNameSetupContinueAfterZeroMask = false,
+        bool continueToNameSetupContinueAfterDescriptorReturn = true)
     {
         skippedInstructions = 0;
         var descriptorLocalStack = unchecked(State.R[15] - 4);
@@ -7075,10 +7079,10 @@ public sealed class Sh4Cpu
                 nameIndex: State.R[12],
                 channel: State.R[13],
                 group: State.R[14],
-                allowZeroMask: false,
-                requireZeroMask: false,
-                continueAfterZeroMask: false,
-                continueAfterDescriptorReturn: true,
+                allowZeroMask: continueToNameSetupAllowZeroMask,
+                requireZeroMask: continueToNameSetupRequireZeroMask,
+                continueAfterZeroMask: continueToNameSetupContinueAfterZeroMask,
+                continueAfterDescriptorReturn: continueToNameSetupContinueAfterDescriptorReturn,
                 out var setupSkippedInstructions))
         {
             skippedInstructions += setupSkippedInstructions;
@@ -7168,6 +7172,38 @@ public sealed class Sh4Cpu
             groupAfterIncrement,
             continueToNameSetup: true,
             out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameGroupTailNextZeroMaskSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B938
+            || step.Opcode != 0x7E01
+            || State.Pc != 0x8C15_B93A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaNameGroupTail())
+        {
+            return false;
+        }
+
+        var groupAfterIncrement = State.R[14];
+        if ((int)groupAfterIncrement >= 4)
+        {
+            return false;
+        }
+
+        const ulong tailAndDescriptorSkippedInstructionCount = 95;
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            tailAndDescriptorSkippedInstructionCount,
+            groupAfterIncrement,
+            continueToNameSetup: true,
+            out skippedInstructions,
+            continueToNameSetupAllowZeroMask: true,
+            continueToNameSetupRequireZeroMask: true,
+            continueToNameSetupContinueAfterZeroMask: true,
+            continueToNameSetupContinueAfterDescriptorReturn: false);
     }
 
     private bool IsSonicAdventure2AicaNameGroupTail() =>
