@@ -5930,6 +5930,33 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B686
+            || step.Opcode != 0x7B78
+            || State.Pc != 0x8C15_B688
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < 4
+            || !IsSonicAdventure2AicaNoWorkSlotScan()
+            || State.R[9] != 24
+            || State.R[14] >= State.R[9])
+        {
+            return false;
+        }
+
+        State.R[12] += 44;
+        State.R[14]++;
+        State.T = (int)State.R[14] >= (int)State.R[9];
+        State.Pc = State.T ? 0x8C15_B690 : 0x8C15_B604;
+        State.InstructionsExecuted += 4;
+        skippedInstructions = 4;
+        delayedBranchTarget = null;
+        immediateBranchTarget = State.T ? null : 0x8C15_B604;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaNoWorkSlotScanEntry(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
