@@ -5667,6 +5667,64 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaCounterCallbackReturnTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5C70
+            || step.Opcode != 0xD02B
+            || State.Pc != 0x8C13_5C72
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 7;
+        var counterAddress = State.R[0];
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaCounterCallbackReturnTail()
+            || !memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 8, out _))
+        {
+            return false;
+        }
+
+        var counter = memory.ReadUInt32(counterAddress);
+        if (counter > 60)
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(State.R[15]);
+        var savedR14 = memory.ReadUInt32(State.R[15] + 4);
+
+        State.R[1] = 60;
+        State.R[3] = counter;
+        State.Pr = savedPr;
+        State.R[14] = savedR14;
+        State.R[15] += 8;
+        State.T = false;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaCounterCallbackReturnTail()
+    {
+        return memory.ReadInstructionUInt16(0x8C13_5C70) == 0xD02B
+            && memory.ReadInstructionUInt16(0x8C13_5C72) == 0xE13C
+            && memory.ReadInstructionUInt16(0x8C13_5C74) == 0x6302
+            && memory.ReadInstructionUInt16(0x8C13_5C76) == 0x3316
+            && memory.ReadInstructionUInt16(0x8C13_5C78) == 0x8B0F
+            && memory.ReadInstructionUInt16(0x8C13_5C9A) == 0x4F26
+            && memory.ReadInstructionUInt16(0x8C13_5C9C) == 0x000B
+            && memory.ReadInstructionUInt16(0x8C13_5C9E) == 0x6EF6
+            && memory.ReadUInt32(0x8C13_5D20) == 0x8C29_BED4;
+    }
+
     private bool IsSonicAdventure2AicaAsicAckCallback()
     {
         return memory.ReadInstructionUInt16(0x8C13_5DB2) == 0xD325
