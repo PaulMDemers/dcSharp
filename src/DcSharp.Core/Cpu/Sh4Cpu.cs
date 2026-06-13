@@ -9202,6 +9202,40 @@ public sealed class Sh4Cpu
         }
 
         const ulong skippedInstructionCount = 30;
+        return TryFastForwardSonicAdventure2AicaDescriptorSetupToPointerAdvanceCore(maxInstructionsToSkip, skippedInstructionCount, out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaDescriptorSetupTailToPointerAdvance(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_BF1E
+            || step.Opcode != 0x62F3
+            || State.Pc != 0x8C15_BF20)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 29;
+        return TryFastForwardSonicAdventure2AicaDescriptorSetupToPointerAdvanceCore(maxInstructionsToSkip, skippedInstructionCount, out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaDescriptorSetupLiteralTailToPointerAdvance(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_BF20
+            || step.Opcode != 0x957A
+            || State.Pc != 0x8C15_BF22)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 28;
+        return TryFastForwardSonicAdventure2AicaDescriptorSetupToPointerAdvanceCore(maxInstructionsToSkip, skippedInstructionCount, out skippedInstructions);
+    }
+
+    private bool TryFastForwardSonicAdventure2AicaDescriptorSetupToPointerAdvanceCore(ulong maxInstructionsToSkip, ulong skippedInstructionCount, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
         var stack = State.R[15];
         var slot = State.R[3];
         var descriptorTable = memory.ReadUInt32(0x8C15_C028);
@@ -9225,7 +9259,7 @@ public sealed class Sh4Cpu
 
         var modeCount = memory.ReadUInt32(workBase + 0x10CC);
         var pointerAdvanceCount = memory.ReadUInt32(workBase + 0x0FD8);
-        if ((int)modeCount <= 0 || (int)pointerAdvanceCount > 0)
+        if ((int)modeCount <= 0)
         {
             return false;
         }
@@ -9235,6 +9269,47 @@ public sealed class Sh4Cpu
         var combinedOffset = State.R[11] + State.R[12];
         var highBits = (uint)(descriptorByte & 0xC0);
         var descriptorBits = highBits >> 6;
+
+        if ((int)pointerAdvanceCount > 0)
+        {
+            const ulong positivePointerAdvanceExtraInstructionCount = 9;
+            var positivePointerAdvanceSkippedInstructionCount = skippedInstructionCount + positivePointerAdvanceExtraInstructionCount;
+            var descriptorPointer = memory.ReadUInt32(workBase + 0x0FCC);
+            if (maxInstructionsToSkip < positivePointerAdvanceSkippedInstructionCount
+                || !memory.TryGetSystemRamOffset(descriptorPointer, 4, out _))
+            {
+                return false;
+            }
+
+            var descriptorWord = memory.ReadUInt32(descriptorPointer);
+            var descriptorWordMode = (uint)(short)(descriptorWord >> 16) & 3u;
+            if (descriptorWordMode == descriptorBits)
+            {
+                return false;
+            }
+
+            memory.Write(slot + 6, [activeByte]);
+            memory.WriteUInt32(stack + 8, combinedOffset + 3);
+            memory.Write(stack + 16, [descriptorByte]);
+            memory.WriteUInt32(stack + 12, highBits);
+            memory.WriteUInt32(stack, descriptorBits);
+
+            State.R[0] = 0x0FCC;
+            State.R[1] = pointerAdvanceCount;
+            State.R[2] = descriptorPointer;
+            State.R[3] = descriptorBits;
+            State.R[4] = descriptorWordMode;
+            State.R[5] = descriptorBits;
+            State.R[8] = combinedOffset;
+            State.R[13] = workBase;
+            State.T = false;
+            State.Pc = 0x8C15_BF72;
+            State.InstructionsExecuted += positivePointerAdvanceSkippedInstructionCount;
+            skippedInstructions = positivePointerAdvanceSkippedInstructionCount;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
 
         memory.Write(slot + 6, [activeByte]);
         memory.WriteUInt32(stack + 8, combinedOffset + 3);
@@ -9291,9 +9366,19 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_BF54) == 0x01DE
         && memory.ReadInstructionUInt16(0x8C15_BF56) == 0x4115
         && memory.ReadInstructionUInt16(0x8C15_BF58) == 0x8B0B
+        && memory.ReadInstructionUInt16(0x8C15_BF5A) == 0x9060
+        && memory.ReadInstructionUInt16(0x8C15_BF5C) == 0x02DE
+        && memory.ReadInstructionUInt16(0x8C15_BF5E) == 0x6322
+        && memory.ReadInstructionUInt16(0x8C15_BF60) == 0x4329
+        && memory.ReadInstructionUInt16(0x8C15_BF62) == 0x633F
+        && memory.ReadInstructionUInt16(0x8C15_BF64) == 0x2439
+        && memory.ReadInstructionUInt16(0x8C15_BF66) == 0x63F2
+        && memory.ReadInstructionUInt16(0x8C15_BF68) == 0x3340
+        && memory.ReadInstructionUInt16(0x8C15_BF6A) == 0x8B02
         && memory.ReadUInt16(0x8C15_C018) == 0x00C0
         && memory.ReadUInt16(0x8C15_C01A) == 0x10CC
         && memory.ReadUInt16(0x8C15_C01C) == 0x0FD8
+        && memory.ReadUInt16(0x8C15_C01E) == 0x0FCC
         && memory.ReadUInt32(0x8C15_C028) == 0x8C17_D8C4;
 
     internal bool TryFastForwardSonicAdventure2AicaDescriptorPointerAndFirstWord(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
