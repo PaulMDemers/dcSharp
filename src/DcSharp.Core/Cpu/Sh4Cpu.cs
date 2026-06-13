@@ -9956,6 +9956,61 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C15_CE8A) == 0x2049
         && memory.ReadUInt32(0x8C15_CEB4) == 0x0FFF_FFFF;
 
+    internal bool TryFastForwardSonicAdventure2AicaWordFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_CE78
+            || step.Opcode != 0x7701
+            || State.Pc != 0x8C15_CE7A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaWordFillLoop())
+        {
+            return false;
+        }
+
+        var count = (int)State.R[6];
+        var completed = (int)State.R[7];
+        if (count <= 0 || completed <= 0 || completed > count)
+        {
+            return false;
+        }
+
+        var remainingWrites = count - completed + 1;
+        var skippedInstructionCount = (ulong)((5 * (count - completed)) + 6);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || remainingWrites > int.MaxValue / 4
+            || !memory.TryGetSystemRamOffset(State.R[0], remainingWrites * 4, out _))
+        {
+            return false;
+        }
+
+        var address = State.R[0];
+        for (var index = 0; index < remainingWrites; index++)
+        {
+            memory.WriteUInt32(address + ((uint)index * 4), State.R[5]);
+        }
+
+        State.R[0] = State.R[6];
+        State.R[7] = State.R[6];
+        State.T = true;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2AicaWordFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C15_CE78) == 0x7701
+        && memory.ReadInstructionUInt16(0x8C15_CE7A) == 0x2052
+        && memory.ReadInstructionUInt16(0x8C15_CE7C) == 0x3763
+        && memory.ReadInstructionUInt16(0x8C15_CE7E) == 0x8FFB
+        && memory.ReadInstructionUInt16(0x8C15_CE80) == 0x7004
+        && memory.ReadInstructionUInt16(0x8C15_CE82) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C15_CE84) == 0x6063;
+
     internal bool TryFastForwardSonicAdventure2AicaDescriptorCopyHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
