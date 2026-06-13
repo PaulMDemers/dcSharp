@@ -4985,6 +4985,52 @@ public sealed class Sh4Cpu
 
     private readonly record struct SonicAdventure2StringHashResult(uint FirstByte, uint LastByte, uint Result, ulong SkippedInstructions);
 
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackListDispatchPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FE4E
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C10_FE50
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 8;
+        const uint tableBase = 0x8C28_D53C;
+        var source = (int)(short)(State.R[4] & 0xFFFF);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || source < 0
+            || !IsSonicAdventure2InterruptCallbackListDispatch()
+            || State.R[15] < 4
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 8, out _))
+        {
+            return false;
+        }
+
+        var tableOffset = (uint)((source >> 4) * 4);
+        var tableEntryAddress = tableBase + tableOffset;
+        if (!memory.TryGetSystemRamOffset(tableEntryAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var listHead = memory.ReadUInt32(tableEntryAddress);
+        memory.WriteUInt32(State.R[15] - 4, State.Pr);
+
+        State.R[0] = tableBase;
+        State.R[3] = 0xFFFF_FFFC;
+        State.R[14] = listHead;
+        State.R[15] -= 4;
+        State.Pc = 0x8C10_FE68;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2InterruptSourceEmptyScanTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -16452,6 +16498,27 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C13_4DB0) == 0x000B
         && memory.ReadInstructionUInt16(0x8C13_4DB2) == 0x6EF6
         && memory.ReadUInt16(0x8C13_4E9A) == 0x00DA;
+
+    private bool IsSonicAdventure2InterruptCallbackListDispatch() =>
+        memory.ReadInstructionUInt16(0x8C10_FE4E) == 0x2FE6
+        && memory.ReadInstructionUInt16(0x8C10_FE50) == 0xE3FC
+        && memory.ReadInstructionUInt16(0x8C10_FE52) == 0x6E4F
+        && memory.ReadInstructionUInt16(0x8C10_FE54) == 0xD017
+        && memory.ReadInstructionUInt16(0x8C10_FE56) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C10_FE58) == 0x4E3C
+        && memory.ReadInstructionUInt16(0x8C10_FE5A) == 0x4E08
+        && memory.ReadInstructionUInt16(0x8C10_FE5C) == 0xA004
+        && memory.ReadInstructionUInt16(0x8C10_FE5E) == 0x0EEE
+        && memory.ReadInstructionUInt16(0x8C10_FE60) == 0x63E2
+        && memory.ReadInstructionUInt16(0x8C10_FE62) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C10_FE64) == 0x54E2
+        && memory.ReadInstructionUInt16(0x8C10_FE66) == 0x5EE1
+        && memory.ReadInstructionUInt16(0x8C10_FE68) == 0x2EE8
+        && memory.ReadInstructionUInt16(0x8C10_FE6A) == 0x8BF9
+        && memory.ReadInstructionUInt16(0x8C10_FE6C) == 0x4F26
+        && memory.ReadInstructionUInt16(0x8C10_FE6E) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C10_FE70) == 0x6EF6
+        && memory.ReadUInt32(0x8C10_FEB4) == 0x8C28_D53C;
 
     private bool IsSonicAdventure2InterruptSourceBitScan() =>
         memory.ReadInstructionUInt16(0x8C10_FF20) == 0x2CC8
