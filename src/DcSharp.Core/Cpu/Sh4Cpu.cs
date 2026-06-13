@@ -6862,6 +6862,86 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C14_D0EC) == 0xA05F_6908
         && memory.ReadUInt32(0x8C14_D1A8) == 0x8C29_C698;
 
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackFpuWrapperPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C14_D1F4
+            || step.Opcode != 0x006A
+            || State.Pc != 0x8C14_D1F6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.R[4] != 0x8C10_FE72
+            || !IsSonicAdventure2InterruptCallbackFpuWrapper())
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 27;
+        var originalStack = State.R[15];
+        var finalStack = unchecked(originalStack - 72);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(finalStack, 72, out _))
+        {
+            return false;
+        }
+
+        var savedPr = State.Pr;
+        var callbackTarget = State.R[4];
+        var callbackArgument = State.R[5];
+        var finalFpscr = State.R[0] & ~Sh4State.FpscrSzBit;
+        memory.WriteUInt32(originalStack - 4, State.R[0]);
+        for (var register = 0; register < State.Fr.Length; register++)
+        {
+            memory.WriteUInt32(originalStack - 8 - ((uint)register * 4), State.Fr[register]);
+        }
+
+        memory.WriteUInt32(finalStack, savedPr);
+
+        State.R[0] = finalFpscr;
+        State.R[1] = Sh4State.FpscrSzBit;
+        State.R[3] = callbackTarget;
+        State.R[4] = callbackArgument;
+        State.R[15] = finalStack;
+        State.Pr = 0x8C14_D22C;
+        State.Fpscr = finalFpscr;
+        State.Pc = callbackTarget;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2InterruptCallbackFpuWrapper() =>
+        memory.ReadInstructionUInt16(0x8C14_D1F4) == 0x006A
+        && memory.ReadInstructionUInt16(0x8C14_D1F6) == 0x2F06
+        && memory.ReadInstructionUInt16(0x8C14_D1F8) == 0xE110
+        && memory.ReadInstructionUInt16(0x8C14_D1FA) == 0x4128
+        && memory.ReadInstructionUInt16(0x8C14_D1FC) == 0x6007
+        && memory.ReadInstructionUInt16(0x8C14_D1FE) == 0x201B
+        && memory.ReadInstructionUInt16(0x8C14_D200) == 0x6007
+        && memory.ReadInstructionUInt16(0x8C14_D202) == 0x406A
+        && memory.ReadInstructionUInt16(0x8C14_D204) == 0xFF0B
+        && memory.ReadInstructionUInt16(0x8C14_D206) == 0xFF1B
+        && memory.ReadInstructionUInt16(0x8C14_D208) == 0xFF2B
+        && memory.ReadInstructionUInt16(0x8C14_D20A) == 0xFF3B
+        && memory.ReadInstructionUInt16(0x8C14_D20C) == 0xFF4B
+        && memory.ReadInstructionUInt16(0x8C14_D20E) == 0xFF5B
+        && memory.ReadInstructionUInt16(0x8C14_D210) == 0xFF6B
+        && memory.ReadInstructionUInt16(0x8C14_D212) == 0xFF7B
+        && memory.ReadInstructionUInt16(0x8C14_D214) == 0xFF8B
+        && memory.ReadInstructionUInt16(0x8C14_D216) == 0xFF9B
+        && memory.ReadInstructionUInt16(0x8C14_D218) == 0xFFAB
+        && memory.ReadInstructionUInt16(0x8C14_D21A) == 0xFFBB
+        && memory.ReadInstructionUInt16(0x8C14_D21C) == 0xFFCB
+        && memory.ReadInstructionUInt16(0x8C14_D21E) == 0xFFDB
+        && memory.ReadInstructionUInt16(0x8C14_D220) == 0xFFEB
+        && memory.ReadInstructionUInt16(0x8C14_D222) == 0xFFFB
+        && memory.ReadInstructionUInt16(0x8C14_D224) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C14_D226) == 0x6343
+        && memory.ReadInstructionUInt16(0x8C14_D228) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C14_D22A) == 0x6453;
+
     internal bool TryFastForwardSonicAdventure2SrCallbackListExitTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
