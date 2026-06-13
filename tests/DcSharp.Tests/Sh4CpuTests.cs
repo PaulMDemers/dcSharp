@@ -5731,6 +5731,85 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(normalMemory);
+        WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(fastMemory);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(normalMemory, statusIndex: 1);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(fastMemory, statusIndex: 1);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_61C0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_61C0);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(normal);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(fastStart, 21, out var skippedInstructions));
+        Assert.Equal(21UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normalMemory.ReadUInt32(0x8C29_BECC), fastMemory.ReadUInt32(0x8C29_BECC));
+        Assert.Equal(normalMemory.ReadUInt16(0x8C29_BC52), fastMemory.ReadUInt16(0x8C29_BC52));
+        Assert.Equal(normalMemory.ReadUInt16(0x8C29_BC4A), fastMemory.ReadUInt16(0x8C29_BC4A));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(0x8C13_61ECu, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(memory);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(memory, statusIndex: 0);
+        var cpu = new Sh4Cpu(memory, 0x8C13_61C0);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_61C2u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateWhenServiceResultIsNegative()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(memory);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(memory, statusIndex: 0);
+        var cpu = new Sh4Cpu(memory, 0x8C13_61C0);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(cpu);
+        cpu.State.R[0] = 0xFFFF_FFFF;
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateWhenStatusIndexIsOutOfRange()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(memory);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(memory, statusIndex: 2);
+        var cpu = new Sh4Cpu(memory, 0x8C13_61C0);
+        InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaServiceHelperFinalCounterTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -19958,6 +20037,37 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C13_619C, 0x8C29_BC1C);
     }
 
+    private static void WriteSonicAdventure2AicaServiceHelperPostStatusMirrorUpdate(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_61C0, 0xD93F);
+        WriteInstruction(memory, 0x8C13_61C2, 0x6C03);
+        WriteInstruction(memory, 0x8C13_61C4, 0x4C11);
+        WriteInstruction(memory, 0x8C13_61C6, 0x8B18);
+        WriteInstruction(memory, 0x8C13_61C8, 0xD43F);
+        WriteInstruction(memory, 0x8C13_61CA, 0x61E3);
+        WriteInstruction(memory, 0x8C13_61CC, 0x7134);
+        WriteInstruction(memory, 0x8C13_61CE, 0xD23D);
+        WriteInstruction(memory, 0x8C13_61D0, 0x22B2);
+        WriteInstruction(memory, 0x8C13_61D2, 0x6342);
+        WriteInstruction(memory, 0x8C13_61D4, 0x4300);
+        WriteInstruction(memory, 0x8C13_61D6, 0x331C);
+        WriteInstruction(memory, 0x8C13_61D8, 0x61E3);
+        WriteInstruction(memory, 0x8C13_61DA, 0x23B1);
+        WriteInstruction(memory, 0x8C13_61DC, 0x712C);
+        WriteInstruction(memory, 0x8C13_61DE, 0x6342);
+        WriteInstruction(memory, 0x8C13_61E0, 0x4300);
+        WriteInstruction(memory, 0x8C13_61E2, 0x331C);
+        WriteInstruction(memory, 0x8C13_61E4, 0xD139);
+        WriteInstruction(memory, 0x8C13_61E6, 0x6012);
+        WriteInstruction(memory, 0x8C13_61E8, 0x20A9);
+        WriteInstruction(memory, 0x8C13_61EA, 0x2301);
+        WriteInstruction(memory, 0x8C13_61EC, 0xBDF6);
+        memory.WriteUInt32(0x8C13_62C0, 0x8C29_BED4);
+        memory.WriteUInt32(0x8C13_62C4, 0x8C29_BECC);
+        memory.WriteUInt32(0x8C13_62C8, 0x8C29_BEA0);
+        memory.WriteUInt32(0x8C13_62CC, 0xA05F_810C);
+    }
+
     private static void WriteSonicAdventure2AicaServiceHelperFinalCounterTail(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C13_61F0, 0x62E2);
@@ -20072,6 +20182,22 @@ public class Sh4CpuTests
         cpu.State.R[4] = 0;
         cpu.State.R[6] = 0x8C29_BEAC;
         cpu.State.R[11] = 0;
+        cpu.State.T = false;
+    }
+
+    private static void InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateState(DreamcastMemory memory, uint statusIndex)
+    {
+        memory.WriteUInt32(0x8C29_BEA0, statusIndex);
+        memory.WriteUInt32(0xA05F_810C, 0x0000_3000);
+    }
+
+    private static void InitializeSonicAdventure2AicaServiceHelperPostStatusMirrorUpdateRegisters(Sh4Cpu cpu)
+    {
+        cpu.State.R[0] = 7;
+        cpu.State.R[10] = 0x0000_2000;
+        cpu.State.R[11] = 0x0000_55AA;
+        cpu.State.R[12] = 0xCAFE_BABE;
+        cpu.State.R[14] = 0x8C29_BC1C;
         cpu.State.T = false;
     }
 
