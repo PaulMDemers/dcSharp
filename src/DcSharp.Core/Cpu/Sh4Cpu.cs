@@ -7400,6 +7400,78 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C10_F8E8) == 0xD207
         && memory.ReadUInt32(0x8C10_F908) == 0x8C10_FAD8;
 
+    internal bool TryFastForwardSonicAdventure2InterruptMaskTableClearLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C10_FC76
+            || step.Opcode != 0x8BFB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || State.Pc != 0x8C10_FC70
+            || delayedBranchTarget is not null
+            || immediateBranchTarget != 0x8C10_FC70)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2InterruptMaskTableClearLoop()
+            || State.R[5] != 0
+            || State.R[4] >= State.R[6])
+        {
+            return false;
+        }
+
+        var remainingBytes = State.R[6] - State.R[4];
+        if ((remainingBytes & 0xF) != 0)
+        {
+            return false;
+        }
+
+        var remainingIterations = remainingBytes / 16u;
+        if (remainingIterations == 0
+            || remainingIterations > 4096
+            || State.R[4] > uint.MaxValue - 12u)
+        {
+            return false;
+        }
+
+        var firstStore = State.R[4] + 12u;
+        var byteCount = ((remainingIterations - 1u) * 16u) + 4u;
+        if (byteCount > int.MaxValue || !memory.TryGetSystemRamOffset(firstStore, (int)byteCount, out _))
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 4;
+        skippedInstructions = remainingIterations * instructionsPerIteration;
+        if (skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        for (var address = firstStore; address < State.R[6]; address += 16)
+        {
+            memory.WriteUInt32(address, 0);
+        }
+
+        State.R[4] = State.R[6];
+        State.T = true;
+        State.Pc = 0x8C10_FC78;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2InterruptMaskTableClearLoop() =>
+        memory.ReadInstructionUInt16(0x8C10_FC70) == 0x1453
+        && memory.ReadInstructionUInt16(0x8C10_FC72) == 0x7410
+        && memory.ReadInstructionUInt16(0x8C10_FC74) == 0x3462
+        && memory.ReadInstructionUInt16(0x8C10_FC76) == 0x8BFB
+        && memory.ReadInstructionUInt16(0x8C10_FC78) == 0x966C
+        && memory.ReadUInt16(0x8C10_FD52) == 0x1000
+        && memory.ReadUInt32(0x8C10_FD60) == 0x8C28_C53C;
+
     internal bool TryFastForwardSonicAdventure2InterruptCallbackEmptyScanTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
