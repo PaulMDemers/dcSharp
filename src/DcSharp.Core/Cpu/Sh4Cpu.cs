@@ -5330,6 +5330,176 @@ public sealed class Sh4Cpu
             State.R[15]);
     }
 
+    internal bool TryFastForwardSonicAdventure2RecordNameWalkLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_4EAA
+            || step.Opcode != 0x65C3
+            || State.Pc != 0x8C13_4EAC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2RecordNameWalkLoopTail()
+            || State.R[5] != State.R[12]
+            || State.R[15] < 16
+            || !memory.TryGetSystemRamOffset(State.R[15] - 16, 28, out _))
+        {
+            return false;
+        }
+
+        var endSource = memory.ReadUInt32(State.R[15] + 8);
+        var currentSource = State.R[13];
+        var currentDestination = State.R[12];
+        var currentIndex = State.R[14];
+        var plans = new List<SonicAdventure2RecordNameParsePlan>();
+        var skippedInstructionCount = 0UL;
+        var firstIteration = true;
+        uint terminalPc = 0;
+        while (true)
+        {
+            if (!TryPrepareSonicAdventure2RecordNameParse(
+                    currentSource,
+                    currentDestination,
+                    prologueSkippedInstructionCount: 6,
+                    maxInstructionsToSkip: ulong.MaxValue,
+                    out var plan))
+            {
+                if (plans.Count == 0)
+                {
+                    return false;
+                }
+
+                terminalPc = 0x8C13_4EAA;
+                break;
+            }
+
+            var iterationSkippedInstructions = (firstIteration ? 0UL : 1UL) + 2UL + plan.SkippedInstructions + 3;
+            if (plan.FirstByte == 0)
+            {
+                terminalPc = 0x8C13_4ED2;
+                skippedInstructionCount += iterationSkippedInstructions;
+                plans.Add(plan);
+                break;
+            }
+
+            if (currentIndex == 0)
+            {
+                if (!memory.TryGetSystemRamOffset(currentSource + 10, 4, out _)
+                    || memory.ReadUInt32(currentSource + 10) != State.R[11])
+                {
+                    return false;
+                }
+
+                iterationSkippedInstructions += 5;
+            }
+            else
+            {
+                iterationSkippedInstructions += 2;
+            }
+
+            if (currentSource > uint.MaxValue - plan.FirstByte
+                || currentDestination > uint.MaxValue - 44)
+            {
+                return false;
+            }
+
+            var nextSource = currentSource + plan.FirstByte;
+            var nextDestination = currentDestination + 44;
+            var nextIndex = currentIndex + 1;
+            iterationSkippedInstructions += 6;
+            if (nextSource >= endSource)
+            {
+                terminalPc = 0x8C13_4ED2;
+                skippedInstructionCount += iterationSkippedInstructions;
+                plans.Add(plan);
+                break;
+            }
+
+            iterationSkippedInstructions += 2;
+            if (nextIndex >= State.R[10])
+            {
+                terminalPc = 0x8C13_4ED2;
+                skippedInstructionCount += iterationSkippedInstructions;
+                plans.Add(plan);
+                break;
+            }
+
+            skippedInstructionCount += iterationSkippedInstructions;
+            plans.Add(plan);
+            currentSource = nextSource;
+            currentDestination = nextDestination;
+            currentIndex = nextIndex;
+            firstIteration = false;
+
+            if (skippedInstructionCount > maxInstructionsToSkip)
+            {
+                return false;
+            }
+        }
+
+        if (plans.Count == 0
+            || terminalPc == 0
+            || skippedInstructionCount > maxInstructionsToSkip)
+        {
+            return false;
+        }
+
+        currentSource = State.R[13];
+        currentDestination = State.R[12];
+        currentIndex = State.R[14];
+        firstIteration = true;
+        foreach (var plan in plans)
+        {
+            if (!firstIteration)
+            {
+                State.R[5] = currentDestination;
+            }
+
+            memory.WriteUInt32(State.R[15] - 4, currentIndex);
+            memory.WriteUInt32(State.R[15] - 8, currentSource);
+            memory.WriteUInt32(State.R[15] - 12, currentDestination);
+            memory.WriteUInt32(State.R[15] - 16, 0x8C13_4EB0);
+            ApplySonicAdventure2RecordNameParsePlan(plan, 0x8C13_4EB0, currentDestination, currentSource, currentIndex, State.R[15]);
+
+            State.R[4] = plan.FirstByte;
+            if (plan.FirstByte == 0)
+            {
+                State.T = true;
+                State.Pc = terminalPc;
+                break;
+            }
+
+            if (currentIndex == 0)
+            {
+                State.R[2] = memory.ReadUInt32(currentDestination + 4);
+                State.T = State.R[2] == State.R[11];
+            }
+
+            State.R[2] = endSource;
+            State.R[13] = unchecked(State.R[13] + State.R[4]);
+            State.R[12] = unchecked(State.R[12] + 44);
+            State.T = State.R[13] >= State.R[2];
+            State.R[14]++;
+            if (State.T)
+            {
+                State.Pc = terminalPc;
+                break;
+            }
+
+            State.T = State.R[14] >= State.R[10];
+            State.Pc = State.T ? terminalPc : 0x8C13_4EAA;
+            currentSource = State.R[13];
+            currentDestination = State.R[12];
+            currentIndex = State.R[14];
+            firstIteration = false;
+        }
+
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool TryFastForwardSonicAdventure2RecordNameParseCore(
         uint source,
         uint destination,
@@ -5344,6 +5514,35 @@ public sealed class Sh4Cpu
         uint? prologueTailStackPointer = null)
     {
         skippedInstructions = 0;
+        if (!TryPrepareSonicAdventure2RecordNameParse(source, destination, prologueSkippedInstructionCount, maxInstructionsToSkip, out var plan))
+        {
+            return false;
+        }
+
+        if (prologueTailStackPointer is not null)
+        {
+            var stackPointer = prologueTailStackPointer.Value;
+            memory.WriteUInt32(stackPointer - 4, savedR13);
+            memory.WriteUInt32(stackPointer - 8, savedR12);
+            memory.WriteUInt32(stackPointer - 12, savedPr);
+        }
+
+        ApplySonicAdventure2RecordNameParsePlan(plan, savedPr, savedR12, savedR13, savedR14, finalStackPointer);
+        State.InstructionsExecuted += plan.SkippedInstructions;
+        skippedInstructions = plan.SkippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryPrepareSonicAdventure2RecordNameParse(
+        uint source,
+        uint destination,
+        ulong prologueSkippedInstructionCount,
+        ulong maxInstructionsToSkip,
+        out SonicAdventure2RecordNameParsePlan plan)
+    {
+        plan = default;
         if (!memory.TryGetSystemRamOffset(source, 34, out _))
         {
             return false;
@@ -5406,38 +5605,51 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        if (prologueTailStackPointer is not null)
-        {
-            var stackPointer = prologueTailStackPointer.Value;
-            memory.WriteUInt32(stackPointer - 4, savedR13);
-            memory.WriteUInt32(stackPointer - 8, savedR12);
-            memory.WriteUInt32(stackPointer - 12, savedPr);
-        }
+        plan = new SonicAdventure2RecordNameParsePlan(
+            source,
+            destination,
+            firstByte,
+            flags,
+            copiedNameLength,
+            name,
+            hashedName,
+            hash,
+            skippedInstructionCount);
+        return true;
+    }
 
-        memory.Write(destination, [
-            memory.ReadByte(source + 2),
-            memory.ReadByte(source + 3),
-            memory.ReadByte(source + 4),
-            memory.ReadByte(source + 5)]);
-        memory.Write(destination + 4, [
-            memory.ReadByte(source + 10),
-            memory.ReadByte(source + 11),
-            memory.ReadByte(source + 12),
-            memory.ReadByte(source + 13)]);
-        memory.Write(destination + 8, [flags]);
-        memory.Write(destination + 10, name);
-        memory.Write(destination + 10 + copiedNameLength, [0]);
-        memory.Write(destination + 10, hashedName);
-        memory.Write(destination + 10 + (uint)hashedName.Length, [0]);
-        memory.Write(destination + 9, [(byte)hash.Result]);
+    private void ApplySonicAdventure2RecordNameParsePlan(
+        SonicAdventure2RecordNameParsePlan plan,
+        uint savedPr,
+        uint savedR12,
+        uint savedR13,
+        uint savedR14,
+        uint finalStackPointer)
+    {
+        memory.Write(plan.Destination, [
+            memory.ReadByte(plan.Source + 2),
+            memory.ReadByte(plan.Source + 3),
+            memory.ReadByte(plan.Source + 4),
+            memory.ReadByte(plan.Source + 5)]);
+        memory.Write(plan.Destination + 4, [
+            memory.ReadByte(plan.Source + 10),
+            memory.ReadByte(plan.Source + 11),
+            memory.ReadByte(plan.Source + 12),
+            memory.ReadByte(plan.Source + 13)]);
+        memory.Write(plan.Destination + 8, [plan.Flags]);
+        memory.Write(plan.Destination + 10, plan.Name);
+        memory.Write(plan.Destination + 10 + plan.CopiedNameLength, [0]);
+        memory.Write(plan.Destination + 10, plan.HashedName);
+        memory.Write(plan.Destination + 10 + (uint)plan.HashedName.Length, [0]);
+        memory.Write(plan.Destination + 9, [(byte)plan.Hash.Result]);
 
-        State.R[0] = firstByte;
+        State.R[0] = plan.FirstByte;
         State.R[2] = 0;
         State.R[3] = 97;
-        State.R[4] = hash.LastByte;
-        State.R[5] = hash.LastByte;
+        State.R[4] = plan.Hash.LastByte;
+        State.R[5] = plan.Hash.LastByte;
         State.R[6] = 0;
-        State.R[7] = source + 33 + copiedNameLength;
+        State.R[7] = plan.Source + 33 + plan.CopiedNameLength;
         State.R[12] = savedR12;
         State.R[13] = savedR13;
         State.R[14] = savedR14;
@@ -5445,12 +5657,18 @@ public sealed class Sh4Cpu
         State.Pr = savedPr;
         State.Pc = savedPr;
         State.T = true;
-        State.InstructionsExecuted += skippedInstructionCount;
-        skippedInstructions = skippedInstructionCount;
-        delayedBranchTarget = null;
-        immediateBranchTarget = null;
-        return true;
     }
+
+    private readonly record struct SonicAdventure2RecordNameParsePlan(
+        uint Source,
+        uint Destination,
+        uint FirstByte,
+        byte Flags,
+        uint CopiedNameLength,
+        byte[] Name,
+        byte[] HashedName,
+        SonicAdventure2StringHashResult Hash,
+        ulong SkippedInstructions);
 
     private static bool TryComputeSonicAdventure2StringHash(ReadOnlySpan<byte> source, out SonicAdventure2StringHashResult result)
     {
@@ -18138,6 +18356,36 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C13_4E48) == 0x6EF6
         && IsSonicAdventure2ByteCopyLoop()
         && IsSonicAdventure2StringHashLoop();
+
+    private bool IsSonicAdventure2RecordNameWalkLoopTail() =>
+        memory.ReadInstructionUInt16(0x8C13_4EAA) == 0x65C3
+        && memory.ReadInstructionUInt16(0x8C13_4EAC) == 0xBF82
+        && memory.ReadInstructionUInt16(0x8C13_4EAE) == 0x64D3
+        && memory.ReadInstructionUInt16(0x8C13_4EB0) == 0x2008
+        && memory.ReadInstructionUInt16(0x8C13_4EB2) == 0x8D0E
+        && memory.ReadInstructionUInt16(0x8C13_4EB4) == 0x6403
+        && memory.ReadInstructionUInt16(0x8C13_4EB6) == 0x2EE8
+        && memory.ReadInstructionUInt16(0x8C13_4EB8) == 0x8B03
+        && memory.ReadInstructionUInt16(0x8C13_4EBA) == 0x52C1
+        && memory.ReadInstructionUInt16(0x8C13_4EBC) == 0x32B0
+        && memory.ReadInstructionUInt16(0x8C13_4EBE) == 0x8900
+        && memory.ReadInstructionUInt16(0x8C13_4EC2) == 0x52F2
+        && memory.ReadInstructionUInt16(0x8C13_4EC4) == 0x3D4C
+        && memory.ReadInstructionUInt16(0x8C13_4EC6) == 0x7C2C
+        && memory.ReadInstructionUInt16(0x8C13_4EC8) == 0x3D22
+        && memory.ReadInstructionUInt16(0x8C13_4ECA) == 0x8D02
+        && memory.ReadInstructionUInt16(0x8C13_4ECC) == 0x7E01
+        && memory.ReadInstructionUInt16(0x8C13_4ECE) == 0x3EA3
+        && memory.ReadInstructionUInt16(0x8C13_4ED0) == 0x8BEB
+        && memory.ReadInstructionUInt16(0x8C13_4ED2) == 0x3EA3
+        && memory.ReadInstructionUInt16(0x8C13_4ED4) == 0x8905
+        && memory.ReadInstructionUInt16(0x8C13_4ED6) == 0x62F2
+        && memory.ReadInstructionUInt16(0x8C13_4ED8) == 0x3B88
+        && memory.ReadInstructionUInt16(0x8C13_4EDA) == 0x7201
+        && memory.ReadInstructionUInt16(0x8C13_4EDC) == 0x2F22
+        && memory.ReadInstructionUInt16(0x8C13_4EDE) == 0x4B15
+        && memory.ReadInstructionUInt16(0x8C13_4EE0) == 0x89CF
+        && IsSonicAdventure2RecordNameParseHelper();
 
     private bool IsSonicAdventure2RecordHashScan() =>
         memory.ReadInstructionUInt16(0x8C13_4F3E) == 0x84E9
