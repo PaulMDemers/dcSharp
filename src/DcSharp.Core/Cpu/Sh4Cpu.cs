@@ -392,6 +392,108 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinGlyphTableScanLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_86D8
+            || step.Opcode != 0x8BE6
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || immediateBranchTarget != 0x8C00_86A8
+            || State.Pc != 0x8C00_86A8
+            || !IsIpBinGlyphTableScanLoop())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or > 0x7E00_0FD0)
+        {
+            return false;
+        }
+
+        var table = memory.ReadUInt32(stack);
+        var accumulator = memory.ReadUInt32(stack + 0x20);
+        var limit = memory.ReadUInt32(stack + 0x24);
+        var index = memory.ReadUInt32(stack + 0x28);
+        if (index >= limit || limit > 4096)
+        {
+            return false;
+        }
+
+        var remaining = limit - index;
+        if (remaining > (uint.MaxValue / 3u) || table > uint.MaxValue - (remaining * 3u))
+        {
+            return false;
+        }
+
+        var tableBytes = checked((int)(remaining * 3u));
+        if (!memory.TryGetSystemRamOffset(table, tableBytes, out _))
+        {
+            return false;
+        }
+
+        var targetByte = memory.ReadByte(stack + 0x2F);
+        var targetRegister = unchecked((uint)(sbyte)targetByte);
+        var pointer = table;
+        var skippedUnmatchedIterations = 0ul;
+        var foundMatch = false;
+        byte lastAdvance = 0;
+
+        while (index < limit)
+        {
+            var tableByte = memory.ReadByte(pointer);
+            if (tableByte == targetRegister)
+            {
+                foundMatch = true;
+                break;
+            }
+
+            lastAdvance = memory.ReadByte(pointer + 2);
+            accumulator += lastAdvance;
+            pointer += 3;
+            index++;
+            skippedUnmatchedIterations++;
+        }
+
+        skippedInstructions = foundMatch
+            ? (skippedUnmatchedIterations * 23) + 11
+            : (skippedUnmatchedIterations * 23) + 2;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt32(stack, pointer);
+        memory.WriteUInt32(stack + 0x20, accumulator);
+        memory.WriteUInt32(stack + 0x28, index);
+
+        if (foundMatch)
+        {
+            var tableByte = memory.ReadByte(pointer);
+            State.R[0] = 47;
+            State.R[1] = index;
+            State.R[2] = targetRegister;
+            State.R[3] = tableByte;
+            State.T = true;
+        }
+        else
+        {
+            State.R[0] = lastAdvance;
+            State.R[1] = limit;
+            State.R[2] = limit;
+            State.R[3] = limit;
+            State.T = true;
+        }
+
+        State.Pc = 0x8C00_86DE;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinZeroBitGlyphLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1676,6 +1778,36 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
     }
+
+    private bool IsIpBinGlyphTableScanLoop() =>
+        memory.ReadInstructionUInt16(0x8C00_86A8) == 0x62F2
+        && memory.ReadInstructionUInt16(0x8C00_86AA) == 0x6320
+        && memory.ReadInstructionUInt16(0x8C00_86AC) == 0x633C
+        && memory.ReadInstructionUInt16(0x8C00_86AE) == 0xE02F
+        && memory.ReadInstructionUInt16(0x8C00_86B0) == 0x02FC
+        && memory.ReadInstructionUInt16(0x8C00_86B2) == 0x3320
+        && memory.ReadInstructionUInt16(0x8C00_86B4) == 0x8B01
+        && memory.ReadInstructionUInt16(0x8C00_86B6) == 0xA010
+        && memory.ReadInstructionUInt16(0x8C00_86B8) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_86BA) == 0x63F2
+        && memory.ReadInstructionUInt16(0x8C00_86BC) == 0x8432
+        && memory.ReadInstructionUInt16(0x8C00_86BE) == 0x600C
+        && memory.ReadInstructionUInt16(0x8C00_86C0) == 0x52F8
+        && memory.ReadInstructionUInt16(0x8C00_86C2) == 0x320C
+        && memory.ReadInstructionUInt16(0x8C00_86C4) == 0x1F28
+        && memory.ReadInstructionUInt16(0x8C00_86C6) == 0x61F2
+        && memory.ReadInstructionUInt16(0x8C00_86C8) == 0x7103
+        && memory.ReadInstructionUInt16(0x8C00_86CA) == 0x2F12
+        && memory.ReadInstructionUInt16(0x8C00_86CC) == 0x53FA
+        && memory.ReadInstructionUInt16(0x8C00_86CE) == 0x7301
+        && memory.ReadInstructionUInt16(0x8C00_86D0) == 0x1F3A
+        && memory.ReadInstructionUInt16(0x8C00_86D2) == 0x52F9
+        && memory.ReadInstructionUInt16(0x8C00_86D4) == 0x51FA
+        && memory.ReadInstructionUInt16(0x8C00_86D6) == 0x3123
+        && memory.ReadInstructionUInt16(0x8C00_86D8) == 0x8BE6
+        && memory.ReadInstructionUInt16(0x8C00_86DA) == 0xA000
+        && memory.ReadInstructionUInt16(0x8C00_86DC) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_86DE) == 0x63F3;
 
     private bool IsIpBinGlyphBitDispatch() =>
         memory.ReadInstructionUInt16(0x8C00_89F6) == 0xE01F

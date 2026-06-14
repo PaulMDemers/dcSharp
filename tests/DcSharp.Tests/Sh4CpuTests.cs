@@ -345,6 +345,110 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsIpBinGlyphTableScanLoopToMatch()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinGlyphTableScanLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinGlyphTableScanLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_86D2);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_86D2);
+        InitializeIpBinGlyphTableScanLoopState(normalMemory, normal, target: 0x50, records:
+        [
+            0x41, 0x00, 0x05,
+            0x42, 0x00, 0x07,
+            0x50, 0x00, 0x09,
+            0x60, 0x00, 0x0B,
+        ]);
+        InitializeIpBinGlyphTableScanLoopState(fastMemory, fast, target: 0x50, records:
+        [
+            0x41, 0x00, 0x05,
+            0x42, 0x00, 0x07,
+            0x50, 0x00, 0x09,
+            0x60, 0x00, 0x0B,
+        ]);
+
+        var normalStart = StepMany(normal, 4);
+        var fastStart = StepMany(fast, 4);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphTableScanLoop(fastStart, 57, out var skippedInstructions));
+        Assert.Equal(57UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C00_86DEu, fast.State.Pc);
+        Assert.Equal(0x8C20_0006u, fastMemory.ReadUInt32(0x7E00_0F70));
+        Assert.Equal(0x10Cu, fastMemory.ReadUInt32(0x7E00_0F90));
+        Assert.Equal(2u, fastMemory.ReadUInt32(0x7E00_0F98));
+    }
+
+    [Fact]
+    public void FastForwardsIpBinGlyphTableScanLoopToLimit()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteIpBinGlyphTableScanLoop(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteIpBinGlyphTableScanLoop(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C00_86D2);
+        var fast = new Sh4Cpu(fastMemory, 0x8C00_86D2);
+        InitializeIpBinGlyphTableScanLoopState(normalMemory, normal, target: 0x50, records:
+        [
+            0x41, 0x00, 0x05,
+            0x42, 0x00, 0x07,
+            0x43, 0x00, 0x09,
+        ]);
+        InitializeIpBinGlyphTableScanLoopState(fastMemory, fast, target: 0x50, records:
+        [
+            0x41, 0x00, 0x05,
+            0x42, 0x00, 0x07,
+            0x43, 0x00, 0x09,
+        ]);
+
+        var normalStart = StepMany(normal, 4);
+        var fastStart = StepMany(fast, 4);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardIpBinGlyphTableScanLoop(fastStart, 71, out var skippedInstructions));
+        Assert.Equal(71UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C00_86DEu, fast.State.Pc);
+        Assert.Equal(0x8C20_0009u, fastMemory.ReadUInt32(0x7E00_0F70));
+        Assert.Equal(0x115u, fastMemory.ReadUInt32(0x7E00_0F90));
+        Assert.Equal(3u, fastMemory.ReadUInt32(0x7E00_0F98));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardIpBinGlyphTableScanLoopWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinGlyphTableScanLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C00_86D2);
+        InitializeIpBinGlyphTableScanLoopState(memory, cpu, target: 0x50, records:
+        [
+            0x41, 0x00, 0x05,
+            0x50, 0x00, 0x07,
+        ]);
+
+        var start = StepMany(cpu, 4);
+
+        Assert.False(cpu.TryFastForwardIpBinGlyphTableScanLoop(start, 33, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C00_86A8u, cpu.State.Pc);
+        Assert.Equal(0x8C20_0000u, memory.ReadUInt32(0x7E00_0F70));
+        Assert.Equal(0x100u, memory.ReadUInt32(0x7E00_0F90));
+        Assert.Equal(0u, memory.ReadUInt32(0x7E00_0F98));
+    }
+
+    [Fact]
     public void FastForwardsIpBinZeroBitGlyphLoopToNextSetBit()
     {
         var normalMemory = new DreamcastMemory();
@@ -24829,6 +24933,49 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C00_909E, 0xC808);
         WriteInstruction(memory, 0x8C00_90A0, 0x89FB);
         memory.WriteUInt32(0x8C00_90E8, 0xA05F_6900);
+    }
+
+    private static void WriteIpBinGlyphTableScanLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_86A8, 0x62F2);
+        WriteInstruction(memory, 0x8C00_86AA, 0x6320);
+        WriteInstruction(memory, 0x8C00_86AC, 0x633C);
+        WriteInstruction(memory, 0x8C00_86AE, 0xE02F);
+        WriteInstruction(memory, 0x8C00_86B0, 0x02FC);
+        WriteInstruction(memory, 0x8C00_86B2, 0x3320);
+        WriteInstruction(memory, 0x8C00_86B4, 0x8B01);
+        WriteInstruction(memory, 0x8C00_86B6, 0xA010);
+        WriteInstruction(memory, 0x8C00_86B8, 0x0009);
+        WriteInstruction(memory, 0x8C00_86BA, 0x63F2);
+        WriteInstruction(memory, 0x8C00_86BC, 0x8432);
+        WriteInstruction(memory, 0x8C00_86BE, 0x600C);
+        WriteInstruction(memory, 0x8C00_86C0, 0x52F8);
+        WriteInstruction(memory, 0x8C00_86C2, 0x320C);
+        WriteInstruction(memory, 0x8C00_86C4, 0x1F28);
+        WriteInstruction(memory, 0x8C00_86C6, 0x61F2);
+        WriteInstruction(memory, 0x8C00_86C8, 0x7103);
+        WriteInstruction(memory, 0x8C00_86CA, 0x2F12);
+        WriteInstruction(memory, 0x8C00_86CC, 0x53FA);
+        WriteInstruction(memory, 0x8C00_86CE, 0x7301);
+        WriteInstruction(memory, 0x8C00_86D0, 0x1F3A);
+        WriteInstruction(memory, 0x8C00_86D2, 0x52F9);
+        WriteInstruction(memory, 0x8C00_86D4, 0x51FA);
+        WriteInstruction(memory, 0x8C00_86D6, 0x3123);
+        WriteInstruction(memory, 0x8C00_86D8, 0x8BE6);
+        WriteInstruction(memory, 0x8C00_86DA, 0xA000);
+        WriteInstruction(memory, 0x8C00_86DC, 0x0009);
+        WriteInstruction(memory, 0x8C00_86DE, 0x63F3);
+    }
+
+    private static void InitializeIpBinGlyphTableScanLoopState(DreamcastMemory memory, Sh4Cpu cpu, byte target, byte[] records)
+    {
+        cpu.State.R[15] = 0x7E00_0F70;
+        memory.Write(0x8C20_0000, records);
+        memory.WriteUInt32(0x7E00_0F70, 0x8C20_0000);
+        memory.WriteUInt32(0x7E00_0F90, 0x100);
+        memory.WriteUInt32(0x7E00_0F94, (uint)(records.Length / 3));
+        memory.WriteUInt32(0x7E00_0F98, 0);
+        memory.Write(0x7E00_0F9F, [target]);
     }
 
     private static void WriteIpBinZeroBitGlyphLoop(DreamcastMemory memory)
