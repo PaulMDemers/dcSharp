@@ -8097,6 +8097,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveSlotModeOneDescriptorUpdateThroughLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        if (!TryFastForwardSonicAdventure2AicaActiveSlotModeOneDescriptorUpdate(step, maxInstructionsToSkip, out skippedInstructions))
+        {
+            return false;
+        }
+
+        if (State.Pc != 0x8C15_B652
+            || maxInstructionsToSkip <= skippedInstructions
+            || memory.ReadInstructionUInt16(0x8C15_B652) != 0xA018
+            || memory.ReadInstructionUInt16(0x8C15_B654) != 0x0009
+            || memory.ReadInstructionUInt16(0x8C15_B686) != 0x7B78)
+        {
+            return true;
+        }
+
+        var remainingInstructions = maxInstructionsToSkip - skippedInstructions;
+        if (remainingInstructions < 3)
+        {
+            return true;
+        }
+
+        State.Pc = 0x8C15_B686;
+        State.InstructionsExecuted += 2;
+        skippedInstructions += 2;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        State.R[11] = unchecked(State.R[11] + 120);
+        State.Pc = 0x8C15_B688;
+        State.InstructionsExecuted++;
+        skippedInstructions++;
+
+        if (maxInstructionsToSkip > skippedInstructions
+            && TryFastForwardSonicAdventure2AicaNoWorkSlotScanLoopTail(
+                new Sh4StepResult(0x8C15_B686, 0x7B78, string.Empty),
+                maxInstructionsToSkip - skippedInstructions,
+                out var loopTailSkippedInstructions))
+        {
+            skippedInstructions += loopTailSkippedInstructions;
+        }
+
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaActiveSlotModeNineDescriptorUpdate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
