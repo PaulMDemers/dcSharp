@@ -8320,6 +8320,50 @@ public sealed class Sh4Cpu
             out skippedInstructions);
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadNextActiveSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B8EC
+            || step.Opcode != 0xD01E
+            || State.Pc != 0x8C15_B8EE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            skippedInstructionCount: 91,
+            group: State.R[14],
+            continueToNameSetup: true,
+            out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadNextZeroMaskSetupAggregate(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B8EC
+            || step.Opcode != 0xD01E
+            || State.Pc != 0x8C15_B8EE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
+            maxInstructionsToSkip,
+            skippedInstructionCount: 91,
+            group: State.R[14],
+            continueToNameSetup: true,
+            out skippedInstructions,
+            continueToNameSetupAllowZeroMask: true,
+            continueToNameSetupRequireZeroMask: true,
+            continueToNameSetupContinueAfterZeroMask: true,
+            continueToNameSetupContinueAfterDescriptorReturn: false);
+    }
+
     private bool TryFastForwardSonicAdventure2AicaNameGroupDescriptorHeadAggregateCore(
         ulong maxInstructionsToSkip,
         ulong skippedInstructionCount,
