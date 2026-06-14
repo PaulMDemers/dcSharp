@@ -4327,6 +4327,106 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2SmallWordCopyTableHelperForThirtyTwoBytes()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2SmallWordCopyTableHelper(normalMemory);
+        WriteSonicAdventure2SmallWordCopyTableHelper(fastMemory);
+        WriteSmallWordCopySource(normalMemory, 0x8C20_2000);
+        WriteSmallWordCopySource(fastMemory, 0x8C20_2000);
+        FillBytes(normalMemory, 0x8C20_3000, 48, 0xCC);
+        FillBytes(fastMemory, 0x8C20_3000, 48, 0xCC);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0C_1098);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0C_1098);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(normal, 0x8C20_3000, 0x8C20_2000, 32);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(fast, 0x8C20_3000, 0x8C20_2000, 32);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2SmallWordCopyTableHelper(fastStart, 22, out var skippedInstructions));
+        Assert.Equal(22UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_3000, 48), ReadBytes(fastMemory, 0x8C20_3000, 48));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[1], fast.State.R[1]);
+        Assert.Equal(normal.State.R[2], fast.State.R[2]);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[15], fast.State.R[15]);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C20_0100u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void FastForwardsSonicAdventure2SmallWordCopyTableHelperForEightBytes()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2SmallWordCopyTableHelper(normalMemory);
+        WriteSonicAdventure2SmallWordCopyTableHelper(fastMemory);
+        WriteSmallWordCopySource(normalMemory, 0x8C20_2000);
+        WriteSmallWordCopySource(fastMemory, 0x8C20_2000);
+        FillBytes(normalMemory, 0x8C20_3000, 16, 0xCC);
+        FillBytes(fastMemory, 0x8C20_3000, 16, 0xCC);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0C_1098);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0C_1098);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(normal, 0x8C20_3000, 0x8C20_2000, 8);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(fast, 0x8C20_3000, 0x8C20_2000, 8);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2SmallWordCopyTableHelper(fastStart, 10, out var skippedInstructions));
+        Assert.Equal(10UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_3000, 16), ReadBytes(fastMemory, 0x8C20_3000, 16));
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R[0], fast.State.R[0]);
+        Assert.Equal(normal.State.R[3], fast.State.R[3]);
+        Assert.Equal(normal.State.R[15], fast.State.R[15]);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2SmallWordCopyTableHelperWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2SmallWordCopyTableHelper(memory);
+        WriteSmallWordCopySource(memory, 0x8C20_2000);
+        FillBytes(memory, 0x8C20_3000, 48, 0xCC);
+        var cpu = new Sh4Cpu(memory, 0x8C0C_1098);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(cpu, 0x8C20_3000, 0x8C20_2000, 32);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2SmallWordCopyTableHelper(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0xCC, memory.ReadByte(0x8C20_3000));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2SmallWordCopyTableHelperForUnsupportedByteCount()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2SmallWordCopyTableHelper(memory);
+        WriteSmallWordCopySource(memory, 0x8C20_2000);
+        var cpu = new Sh4Cpu(memory, 0x8C0C_1098);
+        InitializeSonicAdventure2SmallWordCopyTableHelperState(cpu, 0x8C20_3000, 0x8C20_2000, 12);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2SmallWordCopyTableHelper(start, 20, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2ByteCopyLoop()
     {
         var memory = new DreamcastMemory();
@@ -21883,6 +21983,50 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C11_0582, 0x0009);
     }
 
+    private static void WriteSonicAdventure2SmallWordCopyTableHelper(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C0C_1098, 0x2F36);
+        WriteInstruction(memory, 0x8C0C_109A, 0xD305);
+        WriteInstruction(memory, 0x8C0C_109C, 0x033E);
+        WriteInstruction(memory, 0x8C0C_109E, 0x70FC);
+        WriteInstruction(memory, 0x8C0C_10A0, 0x432B);
+        WriteInstruction(memory, 0x8C0C_10A2, 0x002E);
+        memory.WriteUInt32(0x8C0C_10B0, 0x8C0C_10F8);
+        WriteInstruction(memory, 0x8C0C_10D6, 0x5326);
+        WriteInstruction(memory, 0x8C0C_10D8, 0x1107);
+        WriteInstruction(memory, 0x8C0C_10DA, 0x5025);
+        WriteInstruction(memory, 0x8C0C_10DC, 0x1136);
+        WriteInstruction(memory, 0x8C0C_10DE, 0x5324);
+        WriteInstruction(memory, 0x8C0C_10E0, 0x1105);
+        WriteInstruction(memory, 0x8C0C_10E2, 0x5023);
+        WriteInstruction(memory, 0x8C0C_10E4, 0x1134);
+        WriteInstruction(memory, 0x8C0C_10E6, 0x5322);
+        WriteInstruction(memory, 0x8C0C_10E8, 0x1103);
+        WriteInstruction(memory, 0x8C0C_10EA, 0x5021);
+        WriteInstruction(memory, 0x8C0C_10EC, 0x1132);
+        WriteInstruction(memory, 0x8C0C_10EE, 0x6322);
+        WriteInstruction(memory, 0x8C0C_10F0, 0x1101);
+        WriteInstruction(memory, 0x8C0C_10F2, 0x2132);
+        WriteInstruction(memory, 0x8C0C_10F4, 0x000B);
+        WriteInstruction(memory, 0x8C0C_10F6, 0x63F6);
+        memory.WriteUInt32(0x8C0C_1100, 0x8C0C_10EE);
+        memory.WriteUInt32(0x8C0C_1108, 0x8C0C_10E6);
+        memory.WriteUInt32(0x8C0C_1110, 0x8C0C_10DE);
+        memory.WriteUInt32(0x8C0C_1118, 0x8C0C_10D6);
+    }
+
+    private static void WriteSmallWordCopySource(DreamcastMemory memory, uint source)
+    {
+        memory.WriteUInt32(source, 0x1122_3344);
+        memory.WriteUInt32(source + 4, 0x5566_7788);
+        memory.WriteUInt32(source + 8, 0x99AA_BBCC);
+        memory.WriteUInt32(source + 12, 0xDDEE_FF00);
+        memory.WriteUInt32(source + 16, 0x1357_9BDF);
+        memory.WriteUInt32(source + 20, 0x2468_ACE0);
+        memory.WriteUInt32(source + 24, 0x0BAD_F00D);
+        memory.WriteUInt32(source + 28, 0xCAFE_BABE);
+    }
+
     private static void WriteSonicAdventure2ByteCopyLoop(DreamcastMemory memory)
     {
         WriteInstruction(memory, 0x8C13_4CA8, 0x4615);
@@ -23334,6 +23478,17 @@ public class Sh4CpuTests
         cpu.State.R[7] = destination;
         cpu.State.R[14] = byteCount;
         cpu.State.T = true;
+    }
+
+    private static void InitializeSonicAdventure2SmallWordCopyTableHelperState(Sh4Cpu cpu, uint destination, uint source, uint byteCount)
+    {
+        cpu.State.Pr = 0x8C20_0100;
+        cpu.State.R[0] = byteCount;
+        cpu.State.R[1] = destination;
+        cpu.State.R[2] = source;
+        cpu.State.R[3] = 0x8C0C_1098;
+        cpu.State.R[15] = 0x8CFF_FF80;
+        cpu.State.T = false;
     }
 
     private static void InitializeSonicAdventure2G2DmaStatusSetLoopState(Sh4Cpu cpu, uint currentOffset)

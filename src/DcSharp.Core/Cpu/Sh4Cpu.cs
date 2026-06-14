@@ -4869,6 +4869,66 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2SmallWordCopyTableHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0C_1098
+            || step.Opcode != 0x2F36
+            || State.Pc != 0x8C0C_109A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        var byteCount = State.R[0];
+        if (!IsSonicAdventure2SmallWordCopyTableHelper()
+            || byteCount < 8
+            || byteCount > 32
+            || (byteCount & 7) != 0
+            || (State.R[1] & 3) != 0
+            || (State.R[2] & 3) != 0
+            || State.R[1] > uint.MaxValue - (byteCount - 1)
+            || State.R[2] > uint.MaxValue - (byteCount - 1)
+            || !memory.TryGetSystemRamOffset(State.R[1], (int)byteCount, out _)
+            || !memory.TryGetSystemRamOffset(State.R[2], (int)byteCount, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        var expectedTarget = 0x8C0C_10F6u - byteCount;
+        if (memory.ReadUInt32(0x8C0C_10F8 + byteCount) != expectedTarget)
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = ((ulong)byteCount / 2UL) + 6UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var copy = new byte[(int)byteCount];
+        for (var offset = 0; offset < copy.Length; offset++)
+        {
+            copy[offset] = memory.ReadByte(State.R[2] + (uint)offset);
+        }
+
+        var finalR0 = memory.ReadUInt32(State.R[2] + 4);
+        memory.Write(State.R[1], copy);
+
+        State.R[0] = finalR0;
+        State.R[3] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2ByteCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -18233,6 +18293,36 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_0572) == 0x34E2
         && memory.ReadInstructionUInt16(0x8C11_0574) == 0x8D05
         && memory.ReadInstructionUInt16(0x8C11_0576) == 0x364C;
+
+    private bool IsSonicAdventure2SmallWordCopyTableHelper() =>
+        memory.ReadInstructionUInt16(0x8C0C_1098) == 0x2F36
+        && memory.ReadInstructionUInt16(0x8C0C_109A) == 0xD305
+        && memory.ReadInstructionUInt16(0x8C0C_109C) == 0x033E
+        && memory.ReadInstructionUInt16(0x8C0C_109E) == 0x70FC
+        && memory.ReadInstructionUInt16(0x8C0C_10A0) == 0x432B
+        && memory.ReadInstructionUInt16(0x8C0C_10A2) == 0x002E
+        && memory.ReadUInt32(0x8C0C_10B0) == 0x8C0C_10F8
+        && memory.ReadInstructionUInt16(0x8C0C_10D6) == 0x5326
+        && memory.ReadInstructionUInt16(0x8C0C_10D8) == 0x1107
+        && memory.ReadInstructionUInt16(0x8C0C_10DA) == 0x5025
+        && memory.ReadInstructionUInt16(0x8C0C_10DC) == 0x1136
+        && memory.ReadInstructionUInt16(0x8C0C_10DE) == 0x5324
+        && memory.ReadInstructionUInt16(0x8C0C_10E0) == 0x1105
+        && memory.ReadInstructionUInt16(0x8C0C_10E2) == 0x5023
+        && memory.ReadInstructionUInt16(0x8C0C_10E4) == 0x1134
+        && memory.ReadInstructionUInt16(0x8C0C_10E6) == 0x5322
+        && memory.ReadInstructionUInt16(0x8C0C_10E8) == 0x1103
+        && memory.ReadInstructionUInt16(0x8C0C_10EA) == 0x5021
+        && memory.ReadInstructionUInt16(0x8C0C_10EC) == 0x1132
+        && memory.ReadInstructionUInt16(0x8C0C_10EE) == 0x6322
+        && memory.ReadInstructionUInt16(0x8C0C_10F0) == 0x1101
+        && memory.ReadInstructionUInt16(0x8C0C_10F2) == 0x2132
+        && memory.ReadInstructionUInt16(0x8C0C_10F4) == 0x000B
+        && memory.ReadInstructionUInt16(0x8C0C_10F6) == 0x63F6
+        && memory.ReadUInt32(0x8C0C_1100) == 0x8C0C_10EE
+        && memory.ReadUInt32(0x8C0C_1108) == 0x8C0C_10E6
+        && memory.ReadUInt32(0x8C0C_1110) == 0x8C0C_10DE
+        && memory.ReadUInt32(0x8C0C_1118) == 0x8C0C_10D6;
 
     private bool IsSonicAdventure2ByteCopyLoop() =>
         memory.ReadInstructionUInt16(0x8C13_4CA8) == 0x4615
