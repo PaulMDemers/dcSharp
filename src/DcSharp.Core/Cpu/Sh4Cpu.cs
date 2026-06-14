@@ -5014,6 +5014,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaDescriptorNameSpaceFillLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_C9D0
+            || step.Opcode != 0x63E3
+            || State.Pc != 0x8C15_C9D2
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2AicaDescriptorNameSpaceFillLoop()
+            || State.R[14] > uint.MaxValue - 51)
+        {
+            return false;
+        }
+
+        var end = State.R[14] + 51;
+        if (State.R[4] >= end)
+        {
+            return false;
+        }
+
+        var byteCount = end - State.R[4];
+        var skippedInstructionCount = 5UL + ((ulong)byteCount - 1UL) * 6UL;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || byteCount > int.MaxValue
+            || !memory.TryGetSystemRamOffset(State.R[4], (int)byteCount, out _))
+        {
+            return false;
+        }
+
+        var fill = new byte[(int)byteCount];
+        Array.Fill(fill, (byte)State.R[5]);
+        memory.Write(State.R[4], fill);
+
+        State.R[3] = end;
+        State.R[4] = end;
+        State.T = true;
+        State.Pc = 0x8C15_C9DC;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2ByteCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -18512,6 +18560,14 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C16_B48A) == 0x8FF5
         && memory.ReadInstructionUInt16(0x8C16_B48C) == 0x7420
         && memory.ReadUInt32(0x8C16_B4C0) == 0x8C0C_1098;
+
+    private bool IsSonicAdventure2AicaDescriptorNameSpaceFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C15_C9D0) == 0x63E3
+        && memory.ReadInstructionUInt16(0x8C15_C9D2) == 0x2450
+        && memory.ReadInstructionUInt16(0x8C15_C9D4) == 0x7333
+        && memory.ReadInstructionUInt16(0x8C15_C9D6) == 0x7401
+        && memory.ReadInstructionUInt16(0x8C15_C9D8) == 0x3432
+        && memory.ReadInstructionUInt16(0x8C15_C9DA) == 0x8BF9;
 
     private bool IsSonicAdventure2ByteCopyLoop() =>
         memory.ReadInstructionUInt16(0x8C13_4CA8) == 0x4615
