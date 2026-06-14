@@ -4929,6 +4929,91 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkQueueCopyTableLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_B478
+            || step.Opcode != 0x61E2
+            || State.Pc != 0x8C16_B47A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.R[5] >= State.R[11])
+        {
+            return false;
+        }
+
+        var entryCount = State.R[11] - State.R[5];
+        if (entryCount > uint.MaxValue / 32)
+        {
+            return false;
+        }
+
+        var totalBytes = entryCount * 32;
+        if (!IsSonicAdventure2AicaWorkQueueCopyTableLoop()
+            || !IsSonicAdventure2SmallWordCopyTableHelper()
+            || State.R[1] != memory.ReadUInt32(State.R[14])
+            || State.R[1] > uint.MaxValue - 16
+            || State.R[4] > uint.MaxValue - totalBytes
+            || State.R[6] > uint.MaxValue - 31
+            || State.R[15] < 4
+            || !memory.TryGetSystemRamOffset(State.R[6], 32, out _)
+            || !memory.TryGetSystemRamOffset(State.R[15] - 4, 4, out _)
+            || totalBytes > int.MaxValue)
+        {
+            return false;
+        }
+
+        var destinationBase = memory.ReadUInt32(State.R[1] + 16);
+        if (destinationBase == 0
+            || destinationBase > uint.MaxValue - State.R[4]
+            || destinationBase + State.R[4] > uint.MaxValue - (totalBytes - 1))
+        {
+            return false;
+        }
+
+        var destination = destinationBase + State.R[4];
+        var stackSlot = State.R[15] - 4;
+        if (!memory.TryGetSystemRamOffset(destination, (int)totalBytes, out _)
+            || RangesOverlap(State.R[6], 32, stackSlot, 4)
+            || RangesOverlap(destination, totalBytes, stackSlot, 4))
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = 33UL + ((ulong)entryCount - 1UL) * 34UL;
+        if (maxInstructionsToSkip < skippedInstructionCount)
+        {
+            return false;
+        }
+
+        var row = new byte[32];
+        for (var offset = 0; offset < row.Length; offset++)
+        {
+            row[offset] = memory.ReadByte(State.R[6] + (uint)offset);
+        }
+
+        for (var entry = 0u; entry < entryCount; entry++)
+        {
+            memory.Write(destination + (entry * 32), row);
+        }
+
+        memory.WriteUInt32(stackSlot, 0x8C0C_1098);
+        State.R[0] = memory.ReadUInt32(State.R[6] + 4);
+        State.R[1] = destination + ((entryCount - 1) * 32);
+        State.R[2] = State.R[6];
+        State.R[3] = 0x8C0C_1098;
+        State.R[4] += totalBytes;
+        State.R[5] = State.R[11];
+        State.Pr = 0x8C16_B486;
+        State.T = true;
+        State.Pc = 0x8C16_B48E;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2ByteCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -18294,6 +18379,13 @@ public sealed class Sh4Cpu
         && memory.ReadInstructionUInt16(0x8C11_0574) == 0x8D05
         && memory.ReadInstructionUInt16(0x8C11_0576) == 0x364C;
 
+    private static bool RangesOverlap(uint firstStart, uint firstLength, uint secondStart, uint secondLength)
+    {
+        var firstEnd = (ulong)firstStart + firstLength;
+        var secondEnd = (ulong)secondStart + secondLength;
+        return firstStart < secondEnd && secondStart < firstEnd;
+    }
+
     private bool IsSonicAdventure2SmallWordCopyTableHelper() =>
         memory.ReadInstructionUInt16(0x8C0C_1098) == 0x2F36
         && memory.ReadInstructionUInt16(0x8C0C_109A) == 0xD305
@@ -18323,6 +18415,20 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C0C_1108) == 0x8C0C_10E6
         && memory.ReadUInt32(0x8C0C_1110) == 0x8C0C_10DE
         && memory.ReadUInt32(0x8C0C_1118) == 0x8C0C_10D6;
+
+    private bool IsSonicAdventure2AicaWorkQueueCopyTableLoop() =>
+        memory.ReadInstructionUInt16(0x8C16_B478) == 0x61E2
+        && memory.ReadInstructionUInt16(0x8C16_B47A) == 0x6263
+        && memory.ReadInstructionUInt16(0x8C16_B47C) == 0xD310
+        && memory.ReadInstructionUInt16(0x8C16_B47E) == 0x5114
+        && memory.ReadInstructionUInt16(0x8C16_B480) == 0x314C
+        && memory.ReadInstructionUInt16(0x8C16_B482) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C16_B484) == 0xE020
+        && memory.ReadInstructionUInt16(0x8C16_B486) == 0x7501
+        && memory.ReadInstructionUInt16(0x8C16_B488) == 0x35B2
+        && memory.ReadInstructionUInt16(0x8C16_B48A) == 0x8FF5
+        && memory.ReadInstructionUInt16(0x8C16_B48C) == 0x7420
+        && memory.ReadUInt32(0x8C16_B4C0) == 0x8C0C_1098;
 
     private bool IsSonicAdventure2ByteCopyLoop() =>
         memory.ReadInstructionUInt16(0x8C13_4CA8) == 0x4615
