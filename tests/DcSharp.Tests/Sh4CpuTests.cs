@@ -4857,6 +4857,40 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2RecordNameParseEntryTailTrimmedUppercaseName()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2RecordNameParseHelper(normalMemory);
+        WriteSonicAdventure2RecordNameParseHelper(fastMemory);
+        InitializeSonicAdventure2RecordNameParseUppercaseNameMemory(normalMemory, 0x8C20_1000);
+        InitializeSonicAdventure2RecordNameParseUppercaseNameMemory(fastMemory, 0x8C20_1000);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_4DB4);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_4DB4);
+        InitializeSonicAdventure2RecordNameParseState(normal, 0x8C20_1000, 0x8C20_2000);
+        InitializeSonicAdventure2RecordNameParseState(fast, 0x8C20_1000, 0x8C20_2000);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C13_4DB4u, fastStart.Pc);
+        Assert.Equal(0x2FE6, fastStart.Opcode);
+        Assert.Equal(0x8C13_4DB6u, fast.State.Pc);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2RecordNameParseEntryTail(fastStart, 329, out var skippedInstructions));
+        Assert.Equal(329UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(ReadBytes(normalMemory, 0x8C20_2000, 21), ReadBytes(fastMemory, 0x8C20_2000, 21));
+        Assert.Equal(ReadBytes(normalMemory, 0x8CFF_FF70, 16), ReadBytes(fastMemory, 0x8CFF_FF70, 16));
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2RecordNameParseWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();

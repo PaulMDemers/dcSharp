@@ -5283,8 +5283,68 @@ public sealed class Sh4Cpu
         var source = State.R[13];
         var destination = State.R[5];
         if (!IsSonicAdventure2RecordNameParseHelper()
-            || !memory.TryGetSystemRamOffset(State.R[15], 16, out _)
-            || !memory.TryGetSystemRamOffset(source, 34, out _))
+            || !memory.TryGetSystemRamOffset(State.R[15], 16, out _))
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2RecordNameParseCore(
+            source,
+            destination,
+            memory.ReadUInt32(State.R[15]),
+            memory.ReadUInt32(State.R[15] + 4),
+            memory.ReadUInt32(State.R[15] + 8),
+            memory.ReadUInt32(State.R[15] + 12),
+            State.R[15] + 16,
+            0,
+            maxInstructionsToSkip,
+            out skippedInstructions);
+    }
+
+    internal bool TryFastForwardSonicAdventure2RecordNameParseEntryTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_4DB4
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C13_4DB6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2RecordNameParseHelper()
+            || State.R[15] < 12
+            || !memory.TryGetSystemRamOffset(State.R[15] - 12, 16, out _))
+        {
+            return false;
+        }
+
+        return TryFastForwardSonicAdventure2RecordNameParseCore(
+            State.R[4],
+            State.R[5],
+            State.Pr,
+            State.R[12],
+            State.R[13],
+            memory.ReadUInt32(State.R[15]),
+            State.R[15] + 4,
+            5,
+            maxInstructionsToSkip,
+            out skippedInstructions,
+            State.R[15]);
+    }
+
+    private bool TryFastForwardSonicAdventure2RecordNameParseCore(
+        uint source,
+        uint destination,
+        uint savedPr,
+        uint savedR12,
+        uint savedR13,
+        uint savedR14,
+        uint finalStackPointer,
+        ulong prologueSkippedInstructionCount,
+        ulong maxInstructionsToSkip,
+        out ulong skippedInstructions,
+        uint? prologueTailStackPointer = null)
+    {
+        skippedInstructions = 0;
+        if (!memory.TryGetSystemRamOffset(source, 34, out _))
         {
             return false;
         }
@@ -5338,6 +5398,7 @@ public sealed class Sh4Cpu
                 : 134UL + (19UL * copiedNameLength);
         }
 
+        skippedInstructionCount += prologueSkippedInstructionCount;
         if (maxInstructionsToSkip < skippedInstructionCount
             || !TryComputeSonicAdventure2StringHash(hashedName, out var hash)
             || !memory.TryGetSystemRamOffset(destination, 10 + hashedName.Length + 1, out _))
@@ -5345,10 +5406,13 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        var savedPr = memory.ReadUInt32(State.R[15]);
-        var savedR12 = memory.ReadUInt32(State.R[15] + 4);
-        var savedR13 = memory.ReadUInt32(State.R[15] + 8);
-        var savedR14 = memory.ReadUInt32(State.R[15] + 12);
+        if (prologueTailStackPointer is not null)
+        {
+            var stackPointer = prologueTailStackPointer.Value;
+            memory.WriteUInt32(stackPointer - 4, savedR13);
+            memory.WriteUInt32(stackPointer - 8, savedR12);
+            memory.WriteUInt32(stackPointer - 12, savedPr);
+        }
 
         memory.Write(destination, [
             memory.ReadByte(source + 2),
@@ -5377,7 +5441,7 @@ public sealed class Sh4Cpu
         State.R[12] = savedR12;
         State.R[13] = savedR13;
         State.R[14] = savedR14;
-        State.R[15] += 16;
+        State.R[15] = finalStackPointer;
         State.Pr = savedPr;
         State.Pc = savedPr;
         State.T = true;
