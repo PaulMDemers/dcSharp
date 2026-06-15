@@ -53,3 +53,5 @@ Do not commit commercial games, BIOS/flash dumps, proprietary SDK files, extract
 - [Dreamcast emulator list](https://dreamcast.wiki/Dreamcast_emulators)
 - [Flycast source](https://github.com/flyinghead/flycast)
 - [lxdream source](https://github.com/lxdream/lxdream)
+
+See also [Dreamcast Development Map](dreamcast-development-map.md) for the current subsystem build plan and development workflow.
