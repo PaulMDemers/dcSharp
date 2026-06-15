@@ -1209,6 +1209,51 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsAicaRamAccessHotspots()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x0082_1000, 0x1234_5678);
+        memory.CurrentInstructionPc = 0x8C10_2000;
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0x0082_1000));
+        memory.CurrentInstructionPc = 0x8C10_2002;
+        Assert.Equal(0x1234_5678u, memory.ReadUInt32(0x0082_1000));
+        memory.CurrentInstructionPc = 0x8C10_3000;
+        memory.WriteUInt16(0x0082_1004, 0xBEEF);
+
+        var hotspots = memory.CreateAudioSnapshot().RamAccessHotspots;
+
+        Assert.Equal(3, hotspots.Count);
+        Assert.Equal(MemoryAccessKind.Read, hotspots[0].Kind);
+        Assert.Equal(0x0002_1000u, hotspots[0].Offset);
+        Assert.Equal("0x021000", hotspots[0].OffsetHex);
+        Assert.Equal(0x0082_1000u, hotspots[0].Address);
+        Assert.Equal("0x00821000", hotspots[0].AddressHex);
+        Assert.Equal(4, hotspots[0].Size);
+        Assert.Equal(2UL, hotspots[0].Count);
+        Assert.Equal(0x1234_5678u, hotspots[0].LastValue);
+        Assert.Equal("0x12345678", hotspots[0].LastValueHex);
+        Assert.Equal(0x8C10_2002u, hotspots[0].LastPc);
+        Assert.Equal("0x8C102002", hotspots[0].LastPcHex);
+        Assert.Equal("ControlArea", hotspots[0].Area);
+    }
+
+    [Fact]
+    public void AudioSnapshotSeparatesAicaRamHotspotsByKindAndSize()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x0083_0000, 0x1122_3344);
+
+        Assert.Equal(0x3344u, memory.ReadUInt16(0x0083_0000));
+        Assert.Equal(0x1122_3344u, memory.ReadUInt32(0x0083_0000));
+
+        var hotspots = memory.CreateAudioSnapshot().RamAccessHotspots;
+
+        Assert.Contains(hotspots, hotspot => hotspot.Kind == MemoryAccessKind.Read && hotspot.Offset == 0x0003_0000 && hotspot.Size == 2);
+        Assert.Contains(hotspots, hotspot => hotspot.Kind == MemoryAccessKind.Read && hotspot.Offset == 0x0003_0000 && hotspot.Size == 4);
+        Assert.Contains(hotspots, hotspot => hotspot.Kind == MemoryAccessKind.Write && hotspot.Offset == 0x0003_0000 && hotspot.Size == 4);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();

@@ -1726,6 +1726,7 @@ public sealed record DreamcastAudioSummary(
     IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities,
     IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues,
     IReadOnlyList<DreamcastAicaRamRegionSummary> RamRegions,
+    IReadOnlyList<DreamcastAicaRamAccessHotspotSummary> RamAccessHotspots,
     IReadOnlyList<DreamcastAicaRamTextMarkerSummary> TextMarkers)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
@@ -1743,6 +1744,7 @@ public sealed record DreamcastAudioSummary(
             snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray(),
             snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray(),
             snapshot.RamRegions.Select(DreamcastAicaRamRegionSummary.FromRegion).ToArray(),
+            snapshot.RamAccessHotspots.Select(DreamcastAicaRamAccessHotspotSummary.FromHotspot).ToArray(),
             snapshot.TextMarkers.Select(DreamcastAicaRamTextMarkerSummary.FromMarker).ToArray());
 }
 
@@ -1876,6 +1878,36 @@ public sealed record DreamcastAicaRamRegionSummary(
             region.Fnv1A32,
             region.Fnv1A32Hex,
             region.Area);
+}
+
+public sealed record DreamcastAicaRamAccessHotspotSummary(
+    MemoryAccessKind Kind,
+    uint Offset,
+    string OffsetHex,
+    uint Address,
+    string AddressHex,
+    int Size,
+    ulong Count,
+    uint LastValue,
+    string LastValueHex,
+    uint? LastPc,
+    string? LastPcHex,
+    string Area)
+{
+    public static DreamcastAicaRamAccessHotspotSummary FromHotspot(DreamcastAicaRamAccessHotspot hotspot) =>
+        new(
+            hotspot.Kind,
+            hotspot.Offset,
+            hotspot.OffsetHex,
+            hotspot.Address,
+            hotspot.AddressHex,
+            hotspot.Size,
+            hotspot.Count,
+            hotspot.LastValue,
+            hotspot.LastValueHex,
+            hotspot.LastPc,
+            hotspot.LastPcHex,
+            hotspot.Area);
 }
 
 public sealed record DreamcastAicaRamTextMarkerSummary(

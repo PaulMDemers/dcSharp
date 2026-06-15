@@ -6,6 +6,7 @@ using DcSharp.Core.Dreamcast.Timer;
 using DcSharp.Core.Dreamcast.Video;
 using DcSharp.Core.Media;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace DcSharp.Core.Dreamcast.Memory;
@@ -194,6 +195,7 @@ public sealed class DreamcastMemory
     private readonly HashSet<int> pvrPreviewWrittenPixelIndices = [];
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastAicaCommandQueueActivity> aicaCommandQueueActivities = [];
+    private readonly Dictionary<AicaRamAccessKey, AicaRamAccessCounter> aicaRamAccessCounters = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
@@ -766,6 +768,7 @@ public sealed class DreamcastMemory
         if (TryGetAicaRamOffset(address, data.Length, out var aicaOffset))
         {
             data.CopyTo(aicaRam.AsSpan(aicaOffset));
+            LogAicaRamAccess(MemoryAccessKind.Write, address, aicaOffset, data.Length, ToValue(data));
             if (TouchesAicaCommandQueueServiceRegion(aicaOffset, data.Length))
             {
                 aicaCommandQueueServicePending = true;
@@ -878,6 +881,7 @@ public sealed class DreamcastMemory
         if (TryGetAicaRamOffset(address, 1, out var aicaOffset))
         {
             var value = aicaRam[aicaOffset];
+            LogAicaRamAccess(MemoryAccessKind.Read, address, aicaOffset, 1, value);
             RecordWatchedRead(address, 1, value);
             return value;
         }
@@ -967,6 +971,7 @@ public sealed class DreamcastMemory
         if (TryGetAicaRamOffset(address, 2, out var aicaOffset))
         {
             var value = (ushort)(aicaRam[aicaOffset] | (aicaRam[aicaOffset + 1] << 8));
+            LogAicaRamAccess(MemoryAccessKind.Read, address, aicaOffset, 2, value);
             RecordWatchedRead(address, 2, value);
             return value;
         }
@@ -1060,6 +1065,7 @@ public sealed class DreamcastMemory
                 | (aicaRam[aicaOffset + 1] << 8)
                 | (aicaRam[aicaOffset + 2] << 16)
                 | (aicaRam[aicaOffset + 3] << 24));
+            LogAicaRamAccess(MemoryAccessKind.Read, address, aicaOffset, 4, value);
             RecordWatchedRead(address, 4, value);
             return value;
         }
@@ -1486,6 +1492,7 @@ public sealed class DreamcastMemory
             aicaCommandQueueActivities.ToArray(),
             CreateAicaCommandQueueSnapshots(),
             CreateAicaRamRegions(),
+            CreateAicaRamAccessHotspots(),
             CreateAicaTextMarkers(),
             (byte[])aicaRam.Clone());
     }
@@ -2398,6 +2405,45 @@ public sealed class DreamcastMemory
         }
 
         return "SampleDataArea";
+    }
+
+    private void LogAicaRamAccess(MemoryAccessKind kind, uint address, int offset, int size, uint value)
+    {
+        var key = new AicaRamAccessKey(kind, (uint)offset, size);
+        ref var counter = ref CollectionsMarshal.GetValueRefOrAddDefault(aicaRamAccessCounters, key, out var exists);
+        if (!exists || counter is null)
+        {
+            counter = new AicaRamAccessCounter();
+        }
+
+        counter.Count++;
+        counter.LastAddress = address;
+        counter.LastValue = value;
+        counter.LastPc = CurrentInstructionPc;
+    }
+
+    private IReadOnlyList<DreamcastAicaRamAccessHotspot> CreateAicaRamAccessHotspots()
+    {
+        const int maxHotspots = 32;
+        return aicaRamAccessCounters
+            .OrderByDescending(pair => pair.Value.Count)
+            .ThenBy(pair => pair.Key.Offset)
+            .ThenBy(pair => pair.Key.Size)
+            .Take(maxHotspots)
+            .Select(pair => new DreamcastAicaRamAccessHotspot(
+                pair.Key.Kind,
+                pair.Key.Offset,
+                $"0x{pair.Key.Offset:X6}",
+                pair.Value.LastAddress,
+                $"0x{pair.Value.LastAddress:X8}",
+                pair.Key.Size,
+                pair.Value.Count,
+                pair.Value.LastValue,
+                $"0x{pair.Value.LastValue:X8}",
+                pair.Value.LastPc,
+                pair.Value.LastPc is { } pc ? $"0x{pc:X8}" : null,
+                ClassifyAicaRamRegion((int)pair.Key.Offset, (int)pair.Key.Offset + pair.Key.Size)))
+            .ToArray();
     }
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()
@@ -3923,6 +3969,16 @@ public sealed class DreamcastMemory
         public uint Command => Words.Length > 1 ? Words[1] : 0;
         public uint Timestamp => Words.Length > 2 ? Words[2] : 0;
         public uint CommandId => Words.Length > 3 ? Words[3] : 0;
+    }
+
+    private readonly record struct AicaRamAccessKey(MemoryAccessKind Kind, uint Offset, int Size);
+
+    private sealed class AicaRamAccessCounter
+    {
+        public ulong Count { get; set; }
+        public uint LastAddress { get; set; }
+        public uint LastValue { get; set; }
+        public uint? LastPc { get; set; }
     }
 }
 
