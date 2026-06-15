@@ -2434,6 +2434,7 @@ public sealed class DreamcastMemory
                 pair.Key.Kind,
                 pair.Key.Offset,
                 $"0x{pair.Key.Offset:X6}",
+                GetAicaRamOffsetName(pair.Key.Offset),
                 pair.Value.LastAddress,
                 $"0x{pair.Value.LastAddress:X8}",
                 pair.Key.Size,
@@ -2444,6 +2445,44 @@ public sealed class DreamcastMemory
                 pair.Value.LastPc is { } pc ? $"0x{pc:X8}" : null,
                 ClassifyAicaRamRegion((int)pair.Key.Offset, (int)pair.Key.Offset + pair.Key.Size)))
             .ToArray();
+    }
+
+    private static string GetAicaRamOffsetName(uint offset)
+    {
+        if (offset < AicaCommandQueueOffset)
+        {
+            return offset switch
+            {
+                0x0000_00F8 => "SA2_EXEC_COMPLETION_CANDIDATE",
+                _ => "ARM_PROGRAM_RAM"
+            };
+        }
+
+        if (offset >= AicaCommandQueueOffset && offset < AicaResponseQueueOffset)
+        {
+            return offset switch
+            {
+                0x0001_2400 => "SA2_AICA_STATUS_CANDIDATE",
+                _ => "COMMAND_QUEUE_AREA"
+            };
+        }
+
+        if (offset >= AicaResponseQueueOffset && offset < AicaChannelStatusOffset)
+        {
+            return "RESPONSE_QUEUE_AREA";
+        }
+
+        if (offset >= AicaChannelStatusOffset && offset < AicaChannelStatusOffset + (64 * AicaChannelDwords * 4))
+        {
+            return "CHANNEL_STATUS_AREA";
+        }
+
+        if (offset == AicaClockOffset)
+        {
+            return "KOS_AICA_CLOCK";
+        }
+
+        return offset < 0x0003_0000 ? "AICA_CONTROL_AREA" : "SAMPLE_DATA_AREA";
     }
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()

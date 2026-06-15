@@ -648,7 +648,7 @@ static void PrintAudioActivity(DreamcastAudioSummary audio)
 
     foreach (var hotspot in audio.RamAccessHotspots.Take(8))
     {
-        Console.WriteLine($"  AICA RAM {hotspot.Kind}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
+        Console.WriteLine($"  AICA RAM {hotspot.Kind} {hotspot.Name}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
     }
 
     foreach (var activity in audio.RecentCommandQueueActivities.TakeLast(8))
@@ -1215,7 +1215,7 @@ static void RunElf(string path, string[] args)
 
     foreach (var hotspot in result.Audio.RamAccessHotspots.Take(8))
     {
-        Console.WriteLine($"  AICA RAM {hotspot.Kind}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
+        Console.WriteLine($"  AICA RAM {hotspot.Kind} {hotspot.Name}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
     }
 
     foreach (var activity in result.Audio.CommandQueueActivities.TakeLast(8))

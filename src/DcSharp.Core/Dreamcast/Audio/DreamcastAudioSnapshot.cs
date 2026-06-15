@@ -126,6 +126,7 @@ public sealed record DreamcastAicaRamAccessHotspot(
     MemoryAccessKind Kind,
     uint Offset,
     string OffsetHex,
+    string Name,
     uint Address,
     string AddressHex,
     int Size,

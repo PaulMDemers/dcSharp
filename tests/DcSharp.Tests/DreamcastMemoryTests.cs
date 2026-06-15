@@ -1226,6 +1226,7 @@ public class DreamcastMemoryTests
         Assert.Equal(MemoryAccessKind.Read, hotspots[0].Kind);
         Assert.Equal(0x0002_1000u, hotspots[0].Offset);
         Assert.Equal("0x021000", hotspots[0].OffsetHex);
+        Assert.Equal("KOS_AICA_CLOCK", hotspots[0].Name);
         Assert.Equal(0x0082_1000u, hotspots[0].Address);
         Assert.Equal("0x00821000", hotspots[0].AddressHex);
         Assert.Equal(4, hotspots[0].Size);
@@ -1235,6 +1236,18 @@ public class DreamcastMemoryTests
         Assert.Equal(0x8C10_2002u, hotspots[0].LastPc);
         Assert.Equal("0x8C102002", hotspots[0].LastPcHex);
         Assert.Equal("ControlArea", hotspots[0].Area);
+    }
+
+    [Fact]
+    public void AudioSnapshotNamesSonicAdventure2AicaRamHotspotCandidates()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0xA081_2400, 1);
+        memory.ReadUInt32(0xA081_2400);
+
+        var hotspot = Assert.Single(memory.CreateAudioSnapshot().RamAccessHotspots, hotspot => hotspot.Kind == MemoryAccessKind.Read);
+        Assert.Equal(0x0001_2400u, hotspot.Offset);
+        Assert.Equal("SA2_AICA_STATUS_CANDIDATE", hotspot.Name);
     }
 
     [Fact]
