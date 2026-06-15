@@ -2197,23 +2197,45 @@ public sealed class DreamcastMemory
         return queues;
     }
 
-    private static bool LooksLikeAicaCommandQueue(int offset, AicaQueue queue)
+    private bool LooksLikeAicaCommandQueue(int offset, AicaQueue queue)
     {
         if (!queue.Valid
             || queue.Size < AicaQueueHeaderBytes
             || queue.Size > 0x1_0000
+            || queue.Data == 0
             || (queue.Size & 3) != 0
             || (queue.Data & 3) != 0)
         {
             return false;
         }
 
-        return queue.ProcessOk
-            || queue.Head != queue.Tail
-            || offset == (int)AicaCommandQueueOffset
+        if (offset == (int)AicaCommandQueueOffset
             || offset == (int)AicaResponseQueueOffset
             || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes
-            || queue.Data == AicaResponseQueueOffset + AicaQueueHeaderBytes;
+            || queue.Data == AicaResponseQueueOffset + AicaQueueHeaderBytes)
+        {
+            return true;
+        }
+
+        if (queue.Data == (uint)(offset + AicaQueueHeaderBytes))
+        {
+            return true;
+        }
+
+        if (queue.Data < (uint)(offset + AicaQueueHeaderBytes))
+        {
+            return false;
+        }
+
+        return queue.Head != queue.Tail && LooksLikeAicaPendingPacket(queue);
+    }
+
+    private bool LooksLikeAicaPendingPacket(AicaQueue queue)
+    {
+        var sizeDwords = ReadAicaQueueDword(queue, queue.Tail);
+        return sizeDwords > 0
+            && sizeDwords <= AicaCommandMaxDwords
+            && sizeDwords * 4 <= queue.Size;
     }
 
     private static string ClassifyAicaQueue(int offset, AicaQueue queue)

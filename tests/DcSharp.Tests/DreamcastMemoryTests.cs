@@ -1071,6 +1071,7 @@ public class DreamcastMemoryTests
     {
         var memory = new DreamcastMemory();
         WriteAicaQueue(memory, offset: 0x0001_2000, head: 0x20, tail: 0, size: 0x80, valid: 1, processOk: 1, data: 0x0001_3000);
+        memory.WriteUInt32(0x0081_3000, 8);
 
         var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
         Assert.Equal(0x0001_2000u, queue.Offset);
@@ -1096,6 +1097,33 @@ public class DreamcastMemoryTests
         Assert.True(queue.Valid);
         Assert.True(queue.ProcessOk);
         Assert.True(queue.Pending);
+    }
+
+    [Fact]
+    public void AudioSnapshotIgnoresZeroDataAicaQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaQueue(memory, offset: 0x0000_49E4, head: 0x1998, tail: 0, size: 0x7330, valid: 1, processOk: 1, data: 0);
+
+        Assert.Empty(memory.CreateAudioSnapshot().CommandQueues);
+    }
+
+    [Fact]
+    public void AudioSnapshotIgnoresBackwardDataAicaQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaQueue(memory, offset: 0x0001_8580, head: 0, tail: 0x1FC, size: 0xA100, valid: 1, processOk: 0, data: 0x0000_FE00);
+
+        Assert.Empty(memory.CreateAudioSnapshot().CommandQueues);
+    }
+
+    [Fact]
+    public void AudioSnapshotIgnoresIdleNonInlineAicaQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        WriteAicaQueue(memory, offset: 0x0000_3DF0, head: 0, tail: 0, size: 0x4000, valid: 1, processOk: 1, data: 0x0000_A000);
+
+        Assert.Empty(memory.CreateAudioSnapshot().CommandQueues);
     }
 
     [Fact]
