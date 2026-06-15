@@ -2172,7 +2172,7 @@ public sealed class DreamcastMemory
         for (var offset = 0; offset <= aicaRam.Length - AicaQueueHeaderBytes && queues.Count < maxQueues; offset += 4)
         {
             if (!TryReadAicaQueue(offset, out var queue)
-                || !LooksLikeAicaCommandQueue(queue))
+                || !LooksLikeAicaCommandQueue(offset, queue))
             {
                 continue;
             }
@@ -2180,6 +2180,7 @@ public sealed class DreamcastMemory
             queues.Add(new DreamcastAicaCommandQueueSnapshot(
                 (uint)offset,
                 $"0x{offset:X6}",
+                ClassifyAicaQueue(offset, queue),
                 queue.Head,
                 $"0x{queue.Head:X8}",
                 queue.Tail,
@@ -2196,7 +2197,7 @@ public sealed class DreamcastMemory
         return queues;
     }
 
-    private static bool LooksLikeAicaCommandQueue(AicaQueue queue)
+    private static bool LooksLikeAicaCommandQueue(int offset, AicaQueue queue)
     {
         if (!queue.Valid
             || queue.Size < AicaQueueHeaderBytes
@@ -2207,7 +2208,27 @@ public sealed class DreamcastMemory
             return false;
         }
 
-        return queue.ProcessOk || queue.Head != queue.Tail || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes;
+        return queue.ProcessOk
+            || queue.Head != queue.Tail
+            || offset == (int)AicaCommandQueueOffset
+            || offset == (int)AicaResponseQueueOffset
+            || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes
+            || queue.Data == AicaResponseQueueOffset + AicaQueueHeaderBytes;
+    }
+
+    private static string ClassifyAicaQueue(int offset, AicaQueue queue)
+    {
+        if (offset == (int)AicaCommandQueueOffset || queue.Data == AicaCommandQueueOffset + AicaQueueHeaderBytes)
+        {
+            return "Command";
+        }
+
+        if (offset == (int)AicaResponseQueueOffset || queue.Data == AicaResponseQueueOffset + AicaQueueHeaderBytes)
+        {
+            return "Response";
+        }
+
+        return "Unknown";
     }
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()

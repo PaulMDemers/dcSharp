@@ -1056,6 +1056,7 @@ public class DreamcastMemoryTests
 
         var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
         Assert.Equal(0x0001_0000u, queue.Offset);
+        Assert.Equal("Command", queue.Role);
         Assert.Equal(0x0001_0018u, queue.Data);
         Assert.Equal(0x100u, queue.Size);
         Assert.Equal(0x20u, queue.Head);
@@ -1073,8 +1074,27 @@ public class DreamcastMemoryTests
 
         var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
         Assert.Equal(0x0001_2000u, queue.Offset);
+        Assert.Equal("Unknown", queue.Role);
         Assert.Equal(0x0001_3000u, queue.Data);
         Assert.Equal(0x80u, queue.Size);
+        Assert.True(queue.Pending);
+    }
+
+    [Fact]
+    public void AudioSnapshotReportsAicaResponseQueueCandidates()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaResponseQueue(memory, head: 0x20);
+
+        var queue = Assert.Single(memory.CreateAudioSnapshot().CommandQueues);
+        Assert.Equal(0x0001_8000u, queue.Offset);
+        Assert.Equal("Response", queue.Role);
+        Assert.Equal(0x0001_8018u, queue.Data);
+        Assert.Equal(0x100u, queue.Size);
+        Assert.Equal(0x20u, queue.Head);
+        Assert.Equal(0u, queue.Tail);
+        Assert.True(queue.Valid);
+        Assert.True(queue.ProcessOk);
         Assert.True(queue.Pending);
     }
 

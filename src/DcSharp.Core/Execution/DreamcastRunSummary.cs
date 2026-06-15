@@ -1817,6 +1817,7 @@ public sealed record DreamcastAicaCommandQueueActivitySummary(
 public sealed record DreamcastAicaCommandQueueSummary(
     uint Offset,
     string OffsetHex,
+    string Role,
     uint Head,
     string HeadHex,
     uint Tail,
@@ -1833,6 +1834,7 @@ public sealed record DreamcastAicaCommandQueueSummary(
         new(
             queue.Offset,
             queue.OffsetHex,
+            queue.Role,
             queue.Head,
             queue.HeadHex,
             queue.Tail,

@@ -118,7 +118,7 @@ Build next:
   - mirror channel start/stop/update status into the channel area;
   - extend response packet generation beyond the current `PING`/`PONG` path where software expects it.
 - Add KOS fixtures that submit each command type and verify queue tail movement, channel state, response behavior, and clock reset.
-- Scan retail AICA RAM for queue-like structures and uploaded ARM driver markers, then report likely queue candidates.
+- Scan retail AICA RAM for queue-like structures and uploaded ARM driver markers, then report likely queue candidates. Queue snapshots now classify fixed and data-pointer-matched command/response queues; keep extending this with title-specific ARM-driver markers as they appear.
 - Decide whether to add a minimal ARM7 interpreter later. For the Sonic intro milestone, a queue/service model is likely higher return than full ARM execution.
 
 Technique: replace title-shaped waits with device-shaped mailbox completion. Keep the existing SA2 `EXEC` shim until the queue model proves it explains the same progress.

@@ -94,6 +94,7 @@ public sealed record DreamcastAicaCommandQueueActivity(
 public sealed record DreamcastAicaCommandQueueSnapshot(
     uint Offset,
     string OffsetHex,
+    string Role,
     uint Head,
     string HeadHex,
     uint Tail,
