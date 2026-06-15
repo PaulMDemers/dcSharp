@@ -929,6 +929,47 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AdvanceHardwareWritesAicaPingResponse()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 8 * 4);
+        InitializeAicaResponseQueue(memory, head: 0);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 8, command: 1, timestamp: 0, commandId: 0x44);
+        memory.WriteUInt32(0x0082_1000, 0x1234);
+
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_0004));
+        Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_8000));
+        Assert.Equal(0u, memory.ReadUInt32(0x0081_8004));
+        Assert.Equal(8u, memory.ReadUInt32(0x0081_8018));
+        Assert.Equal(1u, memory.ReadUInt32(0x0081_801C));
+        Assert.Equal(0x1234u, memory.ReadUInt32(0x0081_8020));
+        Assert.Equal(0x44u, memory.ReadUInt32(0x0081_8024));
+
+        var activity = Assert.Single(memory.CreateAudioSnapshot().CommandQueueActivities);
+        Assert.Equal("PingPong", activity.Result);
+        Assert.Equal("Ping", activity.CommandName);
+    }
+
+    [Fact]
+    public void AdvanceHardwareWrapsAicaPingResponse()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 8 * 4);
+        InitializeAicaResponseQueue(memory, head: 0x28, size: 0x30);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 8, command: 1, timestamp: 0, commandId: 0x55);
+
+        memory.AdvanceHardware(1);
+
+        Assert.Equal(0x18u, memory.ReadUInt32(0x0081_8000));
+        Assert.Equal(8u, memory.ReadUInt32(0x0081_8018 + 0x28));
+        Assert.Equal(1u, memory.ReadUInt32(0x0081_8018 + 0x2C));
+        Assert.Equal(0u, memory.ReadUInt32(0x0081_8018));
+        Assert.Equal(0x55u, memory.ReadUInt32(0x0081_801C));
+    }
+
+    [Fact]
     public void AdvanceHardwareDefersAicaCommandQueueTimestampUntilClockPasses()
     {
         var memory = new DreamcastMemory();
@@ -2460,6 +2501,16 @@ public class DreamcastMemoryTests
         memory.WriteUInt32(0x0081_000C, 1);
         memory.WriteUInt32(0x0081_0010, 1);
         memory.WriteUInt32(0x0081_0014, 0x0001_0018);
+    }
+
+    private static void InitializeAicaResponseQueue(DreamcastMemory memory, uint head, uint size = 0x100)
+    {
+        memory.WriteUInt32(0x0081_8000, head);
+        memory.WriteUInt32(0x0081_8004, 0);
+        memory.WriteUInt32(0x0081_8008, size);
+        memory.WriteUInt32(0x0081_800C, 1);
+        memory.WriteUInt32(0x0081_8010, 1);
+        memory.WriteUInt32(0x0081_8014, 0x0001_8018);
     }
 
     private static void WriteAicaQueue(

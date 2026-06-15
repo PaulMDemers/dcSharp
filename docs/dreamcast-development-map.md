@@ -116,7 +116,7 @@ Build next:
   - advance the KOS-style AICA millisecond clock from hardware ticks and obey timestamp delay against it;
   - process `NONE`, `PING`, `SYNC_CLOCK`, and `CHAN`;
   - mirror channel start/stop/update status into the channel area;
-  - produce response packets where software expects them.
+  - extend response packet generation beyond the current `PING`/`PONG` path where software expects it.
 - Add KOS fixtures that submit each command type and verify queue tail movement, channel state, response behavior, and clock reset.
 - Scan retail AICA RAM for queue-like structures and uploaded ARM driver markers, then report likely queue candidates.
 - Decide whether to add a minimal ARM7 interpreter later. For the Sonic intro milestone, a queue/service model is likely higher return than full ARM execution.

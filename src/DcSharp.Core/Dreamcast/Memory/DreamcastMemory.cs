@@ -83,6 +83,7 @@ public sealed class DreamcastMemory
     private const uint AicaCommandPing = 0x0000_0001;
     private const uint AicaCommandChannel = 0x0000_0002;
     private const uint AicaCommandSyncClock = 0x0000_0003;
+    private const uint AicaResponsePong = 0x0000_0001;
     private const uint AicaChannelCommandMask = 0x0000_000F;
     private const uint AicaChannelCommandNone = 0x0000_0000;
     private const uint AicaChannelCommandStart = 0x0000_0001;
@@ -2300,6 +2301,17 @@ public sealed class DreamcastMemory
         return ReadUInt32From(aicaRam, (int)offset);
     }
 
+    private void WriteAicaQueueDword(AicaQueue queue, uint queueOffset, uint value)
+    {
+        var offset = queue.Data + queueOffset;
+        if (offset >= queue.Data + queue.Size)
+        {
+            offset -= queue.Size;
+        }
+
+        WriteUInt32To(aicaRam, (int)offset, value);
+    }
+
     private string ProcessAicaQueuedCommand(AicaQueuedCommand packet)
     {
         switch (packet.Command)
@@ -2307,7 +2319,7 @@ public sealed class DreamcastMemory
             case AicaCommandNone:
                 return "None";
             case AicaCommandPing:
-                return "Ping";
+                return TryWriteAicaPingResponse(packet) ? "PingPong" : "PingNoResponseQueue";
             case AicaCommandChannel:
                 return ProcessAicaChannelCommand(packet);
             case AicaCommandSyncClock:
@@ -2377,6 +2389,47 @@ public sealed class DreamcastMemory
         }
 
         return "UnknownChannelCommand";
+    }
+
+    private bool TryWriteAicaPingResponse(AicaQueuedCommand packet)
+    {
+        Span<uint> response = stackalloc uint[AicaCommandHeaderDwords];
+        response[0] = AicaCommandHeaderDwords;
+        response[1] = AicaResponsePong;
+        response[2] = ReadUInt32From(aicaRam, (int)AicaClockOffset);
+        response[3] = packet.CommandId;
+        return TryWriteAicaResponsePacket(response);
+    }
+
+    private bool TryWriteAicaResponsePacket(ReadOnlySpan<uint> words)
+    {
+        if (words.Length == 0
+            || words.Length > AicaCommandMaxDwords
+            || !TryReadAicaQueue((int)AicaResponseQueueOffset, out var queue)
+            || !queue.Valid)
+        {
+            return false;
+        }
+
+        var packetBytes = (uint)(words.Length * 4);
+        if (packetBytes > queue.Size)
+        {
+            return false;
+        }
+
+        var offset = queue.Head;
+        for (var index = 0; index < words.Length; index++)
+        {
+            WriteAicaQueueDword(queue, offset, words[index]);
+            offset += 4;
+            if (offset >= queue.Size)
+            {
+                offset -= queue.Size;
+            }
+        }
+
+        WriteUInt32To(aicaRam, (int)AicaResponseQueueOffset, offset);
+        return true;
     }
 
     private void AdvanceAicaClock(ulong ticks)
