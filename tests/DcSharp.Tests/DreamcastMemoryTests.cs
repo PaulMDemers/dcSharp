@@ -956,6 +956,39 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AdvanceHardwareAdvancesAicaClockForValidCommandQueue()
+    {
+        var memory = new DreamcastMemory();
+        InitializeAicaCommandQueue(memory, head: 8 * 4);
+        WriteAicaCommandHeader(memory, 0, sizeDwords: 8, command: 3, timestamp: 10, commandId: 0);
+
+        memory.AdvanceHardware(200_000 * 10UL);
+
+        Assert.Equal(10u, memory.ReadUInt32(0x0082_1000));
+        Assert.Equal(0u, memory.ReadUInt32(0x0081_0004));
+        var deferred = Assert.Single(memory.CreateAudioSnapshot().CommandQueueActivities);
+        Assert.Equal("DeferredTimestamp", deferred.Result);
+
+        memory.AdvanceHardware(200_000);
+
+        Assert.Equal(8u * 4, memory.ReadUInt32(0x0081_0004));
+        Assert.Equal(0u, memory.ReadUInt32(0x0082_1000));
+        var activities = memory.CreateAudioSnapshot().CommandQueueActivities;
+        Assert.Equal(2, activities.Count);
+        Assert.Equal("SyncClock", activities[1].Result);
+    }
+
+    [Fact]
+    public void AdvanceHardwareDoesNotAdvanceAicaClockBeforeQueueIsValid()
+    {
+        var memory = new DreamcastMemory();
+
+        memory.AdvanceHardware(200_000 * 5UL);
+
+        Assert.Equal(0u, memory.ReadUInt32(0x0082_1000));
+    }
+
+    [Fact]
     public void AdvanceHardwareReportsUnknownAicaCommandQueuePackets()
     {
         var memory = new DreamcastMemory();

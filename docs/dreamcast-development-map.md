@@ -113,7 +113,7 @@ Build next:
   - honor `head`, `tail`, `size`, `valid`, `process_ok`, and `data`;
   - support wraparound packets;
   - clamp packet size to `AICA_CMD_MAX_SIZE`;
-  - obey timestamp delay against the AICA clock;
+  - advance the KOS-style AICA millisecond clock from hardware ticks and obey timestamp delay against it;
   - process `NONE`, `PING`, `SYNC_CLOCK`, and `CHAN`;
   - mirror channel start/stop/update status into the channel area;
   - produce response packets where software expects them.

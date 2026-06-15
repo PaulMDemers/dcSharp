@@ -78,6 +78,7 @@ public sealed class DreamcastMemory
     private const int AicaChannelDwords = 16;
     private const int AicaCommandMaxDwords = 256;
     private const int AicaCommandsPerHardwareAdvance = 32;
+    private const ulong AicaClockTicksPerMillisecond = HardwareProfile.CpuClockHz / 1000;
     private const uint AicaCommandNone = 0x0000_0000;
     private const uint AicaCommandPing = 0x0000_0001;
     private const uint AicaCommandChannel = 0x0000_0002;
@@ -205,6 +206,7 @@ public sealed class DreamcastMemory
     private readonly DreamcastMemoryWriteWatch? writeWatch;
     private readonly List<byte> serialOutput = [];
     private ulong pvrVBlankStatusTicksRemaining;
+    private ulong aicaClockTickRemainder;
     private bool aicaCommandQueueServicePending;
     private uint mmuLowVirtualWriteGeneration;
     private uint winCeSectionMappingGeneration = uint.MaxValue;
@@ -564,6 +566,7 @@ public sealed class DreamcastMemory
         }
 
         AdvanceAicaPlayback(instructions);
+        AdvanceAicaClock(instructions);
         if (aicaCommandQueueServicePending)
         {
             ServiceAicaCommandQueue();
@@ -2309,6 +2312,7 @@ public sealed class DreamcastMemory
                 return ProcessAicaChannelCommand(packet);
             case AicaCommandSyncClock:
                 WriteUInt32To(aicaRam, (int)AicaClockOffset, 0);
+                aicaClockTickRemainder = 0;
                 return "SyncClock";
         }
 
@@ -2373,6 +2377,41 @@ public sealed class DreamcastMemory
         }
 
         return "UnknownChannelCommand";
+    }
+
+    private void AdvanceAicaClock(ulong ticks)
+    {
+        if (ticks == 0
+            || !TryReadAicaQueue((int)AicaCommandQueueOffset, out var queue)
+            || !queue.Valid)
+        {
+            return;
+        }
+
+        var totalTicks = aicaClockTickRemainder + ticks;
+        if (totalTicks < aicaClockTickRemainder)
+        {
+            totalTicks = ulong.MaxValue;
+        }
+
+        var milliseconds = totalTicks / AicaClockTicksPerMillisecond;
+        aicaClockTickRemainder = totalTicks % AicaClockTicksPerMillisecond;
+        if (milliseconds == 0)
+        {
+            return;
+        }
+
+        var current = ReadUInt32From(aicaRam, (int)AicaClockOffset);
+        WriteUInt32To(aicaRam, (int)AicaClockOffset, unchecked(current + (uint)milliseconds));
+        if (aicaCommandQueueServicePending)
+        {
+            return;
+        }
+
+        if (queue.Head != queue.Tail && queue.ProcessOk)
+        {
+            aicaCommandQueueServicePending = true;
+        }
     }
 
     private void LogAicaCommandQueueActivity(int queueOffset, AicaQueue queue, AicaQueuedCommand packet, uint packetBytes, uint nextTail, string result)
