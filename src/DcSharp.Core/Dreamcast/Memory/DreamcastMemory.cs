@@ -1485,6 +1485,7 @@ public sealed class DreamcastMemory
             CreateAicaChannelSnapshots(),
             aicaCommandQueueActivities.ToArray(),
             CreateAicaCommandQueueSnapshots(),
+            CreateAicaRamRegions(),
             CreateAicaTextMarkers(),
             (byte[])aicaRam.Clone());
     }
@@ -2251,6 +2252,152 @@ public sealed class DreamcastMemory
         }
 
         return "Unknown";
+    }
+
+    private IReadOnlyList<DreamcastAicaRamRegionSnapshot> CreateAicaRamRegions()
+    {
+        const int pageBytes = 0x1000;
+        const int maxRegions = 64;
+        var regions = new List<DreamcastAicaRamRegionSnapshot>();
+        var page = 0;
+
+        while (page * pageBytes < aicaRam.Length && regions.Count < maxRegions)
+        {
+            if (!AicaPageHasNonZero(page, pageBytes))
+            {
+                page++;
+                continue;
+            }
+
+            var startPage = page;
+            do
+            {
+                page++;
+            }
+            while (page * pageBytes < aicaRam.Length && AicaPageHasNonZero(page, pageBytes));
+
+            var start = startPage * pageBytes;
+            var endExclusive = Math.Min(page * pageBytes, aicaRam.Length);
+            while (start < endExclusive && aicaRam[start] == 0)
+            {
+                start++;
+            }
+
+            while (endExclusive > start && aicaRam[endExclusive - 1] == 0)
+            {
+                endExclusive--;
+            }
+
+            var length = endExclusive - start;
+            if (length <= 0)
+            {
+                continue;
+            }
+
+            var nonZeroBytes = CountNonZeroAicaBytes(start, endExclusive);
+            var hash = Fnv1A32(aicaRam.AsSpan(start, length));
+            regions.Add(new DreamcastAicaRamRegionSnapshot(
+                (uint)start,
+                $"0x{start:X6}",
+                (uint)endExclusive,
+                $"0x{endExclusive:X6}",
+                (uint)length,
+                $"0x{length:X6}",
+                nonZeroBytes,
+                nonZeroBytes * 100.0 / length,
+                hash,
+                $"0x{hash:X8}",
+                ClassifyAicaRamRegion(start, endExclusive)));
+        }
+
+        return regions;
+    }
+
+    private bool AicaPageHasNonZero(int page, int pageBytes)
+    {
+        var start = page * pageBytes;
+        var endExclusive = Math.Min(start + pageBytes, aicaRam.Length);
+        for (var offset = start; offset < endExclusive; offset++)
+        {
+            if (aicaRam[offset] != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private ulong CountNonZeroAicaBytes(int start, int endExclusive)
+    {
+        ulong count = 0;
+        for (var offset = start; offset < endExclusive; offset++)
+        {
+            if (aicaRam[offset] != 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static uint Fnv1A32(ReadOnlySpan<byte> bytes)
+    {
+        const uint fnvPrime = 16_777_619;
+        var hash = 2_166_136_261u;
+        foreach (var value in bytes)
+        {
+            hash ^= value;
+            hash *= fnvPrime;
+        }
+
+        return hash;
+    }
+
+    private static string ClassifyAicaRamRegion(int start, int endExclusive)
+    {
+        if (endExclusive <= (int)AicaCommandQueueOffset)
+        {
+            return "ArmProgramArea";
+        }
+
+        if (start < (int)AicaCommandQueueOffset)
+        {
+            return "MixedArmControlArea";
+        }
+
+        if (endExclusive <= (int)AicaResponseQueueOffset)
+        {
+            return "CommandQueueArea";
+        }
+
+        if (start < (int)AicaResponseQueueOffset)
+        {
+            return "MixedQueueArea";
+        }
+
+        if (endExclusive <= (int)AicaChannelStatusOffset)
+        {
+            return "ResponseQueueArea";
+        }
+
+        if (start < (int)AicaChannelStatusOffset)
+        {
+            return "MixedResponseControlArea";
+        }
+
+        if (endExclusive <= 0x0003_0000)
+        {
+            return "ControlArea";
+        }
+
+        if (start < 0x0003_0000)
+        {
+            return "MixedControlSampleArea";
+        }
+
+        return "SampleDataArea";
     }
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()

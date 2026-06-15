@@ -630,7 +630,7 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
 
 static void PrintAudioActivity(DreamcastAudioSummary audio)
 {
-    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}, queues={audio.CommandQueues.Count} (cmd={audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={audio.CommandQueues.Count(queue => queue.Role == "Response")}), text={audio.TextMarkers.Count}");
+    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}, queues={audio.CommandQueues.Count} (cmd={audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={audio.RamRegions.Count}, text={audio.TextMarkers.Count}");
     foreach (var marker in audio.TextMarkers.TakeLast(8))
     {
         Console.WriteLine($"  AICA text: offset={marker.OffsetHex}, length={marker.Length}, text=\"{marker.Text}\"");
@@ -639,6 +639,11 @@ static void PrintAudioActivity(DreamcastAudioSummary audio)
     foreach (var queue in audio.CommandQueues.TakeLast(8))
     {
         Console.WriteLine($"  AICA queue {queue.Role}: offset={queue.OffsetHex}, data={queue.DataHex}, size={queue.SizeHex}, head={queue.HeadHex}, tail={queue.TailHex}, valid={queue.Valid}, processOk={queue.ProcessOk}, pending={queue.Pending}");
+    }
+
+    foreach (var region in audio.RamRegions.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA region {region.Area}: start={region.StartOffsetHex}, end={region.EndOffsetExclusiveHex}, length={region.LengthHex}, nonzero={region.NonZeroBytes}, density={region.DensityPercent:F1}%, checksum={region.Fnv1A32Hex}");
     }
 
     foreach (var activity in audio.RecentCommandQueueActivities.TakeLast(8))
@@ -1118,7 +1123,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR current: {string.Join(", ", currentPvrRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
-    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}, queues={result.Audio.CommandQueues.Count} (cmd={result.Audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={result.Audio.CommandQueues.Count(queue => queue.Role == "Response")}), text={result.Audio.TextMarkers.Count}");
+    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}, queues={result.Audio.CommandQueues.Count} (cmd={result.Audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={result.Audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={result.Audio.RamRegions.Count}, text={result.Audio.TextMarkers.Count}");
     var currentAicaRegisters = result.Audio.Registers.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentAicaRegisters.Length > 0)
     {
@@ -1196,6 +1201,11 @@ static void RunElf(string path, string[] args)
     foreach (var queue in result.Audio.CommandQueues.TakeLast(8))
     {
         Console.WriteLine($"  AICA queue {queue.Role}: offset={queue.OffsetHex}, data={queue.DataHex}, size={queue.SizeHex}, head={queue.HeadHex}, tail={queue.TailHex}, valid={queue.Valid}, processOk={queue.ProcessOk}, pending={queue.Pending}");
+    }
+
+    foreach (var region in result.Audio.RamRegions.TakeLast(8))
+    {
+        Console.WriteLine($"  AICA region {region.Area}: start={region.StartOffsetHex}, end={region.EndOffsetExclusiveHex}, length={region.LengthHex}, nonzero={region.NonZeroBytes}, density={region.DensityPercent:F1}%, checksum={region.Fnv1A32Hex}");
     }
 
     foreach (var activity in result.Audio.CommandQueueActivities.TakeLast(8))

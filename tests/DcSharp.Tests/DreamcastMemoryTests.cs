@@ -1159,6 +1159,56 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsAicaRamRegions()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x0080_0100, 0x1234_5600);
+        memory.WriteUInt32(0x0083_0000, 0xDEAD_BEEF);
+
+        var regions = memory.CreateAudioSnapshot().RamRegions;
+
+        Assert.Equal(2, regions.Count);
+        Assert.Equal(0x0000_0101u, regions[0].StartOffset);
+        Assert.Equal("0x000101", regions[0].StartOffsetHex);
+        Assert.Equal(0x0000_0104u, regions[0].EndOffsetExclusive);
+        Assert.Equal("0x000003", regions[0].LengthHex);
+        Assert.Equal(3UL, regions[0].NonZeroBytes);
+        Assert.Equal(100.0, regions[0].DensityPercent);
+        Assert.Equal("ArmProgramArea", regions[0].Area);
+        Assert.NotEqual("0x00000000", regions[0].Fnv1A32Hex);
+
+        Assert.Equal(0x0003_0000u, regions[1].StartOffset);
+        Assert.Equal("SampleDataArea", regions[1].Area);
+    }
+
+    [Fact]
+    public void AudioSnapshotCoalescesAdjacentAicaRamRegionPages()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x0080_0FFC, 0x1111_1111);
+        memory.WriteUInt32(0x0080_1000, 0x2222_2222);
+
+        var region = Assert.Single(memory.CreateAudioSnapshot().RamRegions);
+        Assert.Equal(0x0000_0FFCu, region.StartOffset);
+        Assert.Equal(0x0000_1004u, region.EndOffsetExclusive);
+        Assert.Equal(8u, region.Length);
+        Assert.Equal(8UL, region.NonZeroBytes);
+    }
+
+    [Fact]
+    public void AudioSnapshotReportsMixedAicaRamRegionAreas()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x0082_FFFC, 0x1111_1111);
+        memory.WriteUInt32(0x0083_0000, 0x2222_2222);
+
+        var region = Assert.Single(memory.CreateAudioSnapshot().RamRegions);
+        Assert.Equal(0x0002_FFFCu, region.StartOffset);
+        Assert.Equal(0x0003_0004u, region.EndOffsetExclusive);
+        Assert.Equal("MixedControlSampleArea", region.Area);
+    }
+
+    [Fact]
     public void VideoSnapshotReportsVramChanges()
     {
         var memory = new DreamcastMemory();

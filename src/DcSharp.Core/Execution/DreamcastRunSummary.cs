@@ -1725,6 +1725,7 @@ public sealed record DreamcastAudioSummary(
     int CommandQueueActivityCount,
     IReadOnlyList<DreamcastAicaCommandQueueActivitySummary> RecentCommandQueueActivities,
     IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues,
+    IReadOnlyList<DreamcastAicaRamRegionSummary> RamRegions,
     IReadOnlyList<DreamcastAicaRamTextMarkerSummary> TextMarkers)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
@@ -1741,6 +1742,7 @@ public sealed record DreamcastAudioSummary(
             snapshot.CommandQueueActivities.Count,
             snapshot.CommandQueueActivities.TakeLast(Math.Max(0, recentCount)).Select(DreamcastAicaCommandQueueActivitySummary.FromActivity).ToArray(),
             snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray(),
+            snapshot.RamRegions.Select(DreamcastAicaRamRegionSummary.FromRegion).ToArray(),
             snapshot.TextMarkers.Select(DreamcastAicaRamTextMarkerSummary.FromMarker).ToArray());
 }
 
@@ -1846,6 +1848,34 @@ public sealed record DreamcastAicaCommandQueueSummary(
             queue.Pending,
             queue.Data,
             queue.DataHex);
+}
+
+public sealed record DreamcastAicaRamRegionSummary(
+    uint StartOffset,
+    string StartOffsetHex,
+    uint EndOffsetExclusive,
+    string EndOffsetExclusiveHex,
+    uint Length,
+    string LengthHex,
+    ulong NonZeroBytes,
+    double DensityPercent,
+    uint Fnv1A32,
+    string Fnv1A32Hex,
+    string Area)
+{
+    public static DreamcastAicaRamRegionSummary FromRegion(DreamcastAicaRamRegionSnapshot region) =>
+        new(
+            region.StartOffset,
+            region.StartOffsetHex,
+            region.EndOffsetExclusive,
+            region.EndOffsetExclusiveHex,
+            region.Length,
+            region.LengthHex,
+            region.NonZeroBytes,
+            region.DensityPercent,
+            region.Fnv1A32,
+            region.Fnv1A32Hex,
+            region.Area);
 }
 
 public sealed record DreamcastAicaRamTextMarkerSummary(
