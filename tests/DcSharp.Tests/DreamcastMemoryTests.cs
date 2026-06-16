@@ -1297,6 +1297,51 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void CompleteAicaDriverCompletionWordWritesDerivedAicaRamField()
+    {
+        var memory = new DreamcastMemory();
+        memory.CurrentInstructionPc = 0x8C12_F57A;
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_5740, 0x0000_0020);
+
+        var completed = memory.TryCompleteAicaDriverCompletionWord(
+            0x8C18_33A4,
+            completionBasePointerOffset: 0x80,
+            completionFieldOffset: 0xD8,
+            completionValue: 0x4345_5845,
+            out var completionAddress);
+
+        Assert.True(completed);
+        Assert.Equal(0xA080_00F8u, completionAddress);
+        Assert.Equal(0x4345_5845u, memory.ReadUInt32(0xA080_00F8));
+        var accesses = memory.CreateAudioSnapshot().RamFieldAccesses;
+        Assert.Equal(2, accesses.Count);
+        Assert.Equal(MemoryAccessKind.Write, accesses[0].Kind);
+        Assert.Equal("SA2_EXEC_COMPLETION_CANDIDATE", accesses[0].Name);
+        Assert.Equal("0x43455845", accesses[0].ValueHex);
+        Assert.Equal("0x8C12F57A", accesses[0].PcHex);
+        Assert.Equal(MemoryAccessKind.Read, accesses[1].Kind);
+    }
+
+    [Fact]
+    public void CompleteAicaDriverCompletionWordRejectsOutOfRangeAicaOffset()
+    {
+        var memory = new DreamcastMemory();
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_5740, 0x0020_0000);
+
+        var completed = memory.TryCompleteAicaDriverCompletionWord(
+            0x8C18_33A4,
+            completionBasePointerOffset: 0x80,
+            completionFieldOffset: 0xD8,
+            completionValue: 0x4345_5845,
+            out var completionAddress);
+
+        Assert.False(completed);
+        Assert.Equal(0u, completionAddress);
+    }
+
+    [Fact]
     public void AudioSnapshotSeparatesAicaRamHotspotsByKindAndSize()
     {
         var memory = new DreamcastMemory();

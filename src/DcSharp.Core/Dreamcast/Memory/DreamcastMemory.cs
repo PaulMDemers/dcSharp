@@ -2144,6 +2144,55 @@ public sealed class DreamcastMemory
         }
     }
 
+    internal bool TryCompleteAicaDriverCompletionWord(
+        uint workPointerAddress,
+        uint completionBasePointerOffset,
+        uint completionFieldOffset,
+        uint completionValue,
+        out uint completionAddress)
+    {
+        if (!TryResolveAicaDriverCompletionWordAddress(
+            workPointerAddress,
+            completionBasePointerOffset,
+            completionFieldOffset,
+            out completionAddress))
+        {
+            return false;
+        }
+
+        WriteUInt32(completionAddress, completionValue);
+        return true;
+    }
+
+    internal bool TryResolveAicaDriverCompletionWordAddress(
+        uint workPointerAddress,
+        uint completionBasePointerOffset,
+        uint completionFieldOffset,
+        out uint completionAddress)
+    {
+        completionAddress = 0;
+        if (!TryGetSystemRamOffset(workPointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workAddress = ReadUInt32(workPointerAddress);
+        if (workAddress > uint.MaxValue - completionBasePointerOffset
+            || !TryGetSystemRamOffset(workAddress + completionBasePointerOffset, 4, out _))
+        {
+            return false;
+        }
+
+        var baseCompletionOffset = ReadUInt32(workAddress + completionBasePointerOffset);
+        if (baseCompletionOffset > AicaRamBytes - 4 - completionFieldOffset)
+        {
+            return false;
+        }
+
+        completionAddress = 0xA080_0000 + baseCompletionOffset + completionFieldOffset;
+        return true;
+    }
+
     private bool TryReadAicaQueue(int queueOffset, out AicaQueue queue)
     {
         queue = default;

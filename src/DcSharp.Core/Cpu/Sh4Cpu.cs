@@ -4491,13 +4491,13 @@ public sealed class Sh4Cpu
         var savedPr = memory.ReadUInt32(State.R[15] + 8);
         const uint sonicAdventure2AicaExecCompletion = 0x4345_5845; // "EXEC"
         if (savedPr == 0x8C12_F576
-            && TryGetSonicAdventure2AicaExecutionCompletionAddress(out var executionCompletionAddress)
+            && memory.TryResolveAicaDriverCompletionWordAddress(0x8C18_33A4, 0x80, 0xD8, out var executionCompletionAddress)
             && State.R[4] == executionCompletionAddress
             && value != sonicAdventure2AicaExecCompletion
             && IsSonicAdventure2AicaExecutionWaitLoop())
         {
             value = sonicAdventure2AicaExecCompletion;
-            memory.WriteUInt32(State.R[4], value);
+            memory.TryCompleteAicaDriverCompletionWord(0x8C18_33A4, 0x80, 0xD8, value, out _);
         }
 
         memory.WriteUInt32(State.R[5], value);
@@ -4563,13 +4563,13 @@ public sealed class Sh4Cpu
         var value = memory.ReadUInt32(aicaAddress);
         const uint sonicAdventure2AicaExecCompletion = 0x4345_5845; // "EXEC"
         if (savedPr == 0x8C12_F576
-            && TryGetSonicAdventure2AicaExecutionCompletionAddress(out var executionCompletionAddress)
+            && memory.TryResolveAicaDriverCompletionWordAddress(0x8C18_33A4, 0x80, 0xD8, out var executionCompletionAddress)
             && aicaAddress == executionCompletionAddress
             && value != sonicAdventure2AicaExecCompletion
             && IsSonicAdventure2AicaExecutionWaitLoop())
         {
             value = sonicAdventure2AicaExecCompletion;
-            memory.WriteUInt32(aicaAddress, value);
+            memory.TryCompleteAicaDriverCompletionWord(0x8C18_33A4, 0x80, 0xD8, value, out _);
         }
 
         memory.WriteUInt32(frameAddress, 0);
@@ -4646,13 +4646,13 @@ public sealed class Sh4Cpu
         var value = memory.ReadUInt32(aicaAddress);
         const uint sonicAdventure2AicaExecCompletion = 0x4345_5845; // "EXEC"
         if (savedPr == 0x8C12_F576
-            && TryGetSonicAdventure2AicaExecutionCompletionAddress(out var executionCompletionAddress)
+            && memory.TryResolveAicaDriverCompletionWordAddress(0x8C18_33A4, 0x80, 0xD8, out var executionCompletionAddress)
             && aicaAddress == executionCompletionAddress
             && value != sonicAdventure2AicaExecCompletion
             && IsSonicAdventure2AicaExecutionWaitLoop())
         {
             value = sonicAdventure2AicaExecCompletion;
-            memory.WriteUInt32(aicaAddress, value);
+            memory.TryCompleteAicaDriverCompletionWord(0x8C18_33A4, 0x80, 0xD8, value, out _);
         }
 
         memory.WriteUInt32(frameAddress, 0);
@@ -4765,12 +4765,11 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        if (!TryGetSonicAdventure2AicaExecutionCompletionAddress(out var completionAddress))
+        if (!memory.TryCompleteAicaDriverCompletionWord(0x8C18_33A4, 0x80, 0xD8, expectedCompletion, out _))
         {
             return false;
         }
 
-        memory.WriteUInt32(completionAddress, expectedCompletion);
         memory.WriteUInt32(State.R[15] + 8, expectedCompletion);
         State.R[2] = expectedCompletion;
         State.T = true;
@@ -4779,27 +4778,6 @@ public sealed class Sh4Cpu
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
-        return true;
-    }
-
-    private bool TryGetSonicAdventure2AicaExecutionCompletionAddress(out uint address)
-    {
-        address = 0;
-        var aicaWork = memory.ReadUInt32(0x8C18_33A4);
-        if (aicaWork > uint.MaxValue - 0x80
-            || !memory.TryGetSystemRamOffset(aicaWork + 0x80, 4, out _))
-        {
-            return false;
-        }
-
-        var baseCompletionOffset = memory.ReadUInt32(aicaWork + 0x80);
-        if (baseCompletionOffset > 0x0020_0000 - 4 - 0xD8)
-        {
-            return false;
-        }
-
-        var completionOffset = baseCompletionOffset + 0xD8;
-        address = 0xA080_0000 + completionOffset;
         return true;
     }
 
