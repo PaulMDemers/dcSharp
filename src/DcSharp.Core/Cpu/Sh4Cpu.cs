@@ -21372,6 +21372,12 @@ public sealed class Sh4Cpu
             return true;
         }
 
+        if (opcode == 0xE000)
+        {
+            State.R[0] = 0;
+            return true;
+        }
+
         if ((opcode & 0xF00F) == 0x2006)
         {
             var destinationRegister = (opcode >> 8) & 0xF;

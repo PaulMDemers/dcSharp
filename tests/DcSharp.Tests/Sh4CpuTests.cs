@@ -130,6 +130,33 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsMaskedCountedDelayLoopWithMoveImmediateDelaySlot()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0x0009); // nop
+        WriteInstruction(memory, 0x8C01_0002, 0x4110); // dt r1
+        WriteInstruction(memory, 0x8C01_0004, 0x8FFC); // bf/s 0x8C010000
+        WriteInstruction(memory, 0x8C01_0006, 0xE000); // mov #0,r0
+        WriteInstruction(memory, 0x8C01_0008, 0x0009); // fallthrough
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Sr = 0xF0;
+        cpu.State.R[0] = 0x1234_5678;
+        cpu.State.R[1] = 3;
+
+        cpu.Step();
+        cpu.Step();
+        var branch = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardCountedIdleLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(9UL, skippedInstructions);
+        Assert.Equal(0u, cpu.State.R[0]);
+        Assert.Equal(0u, cpu.State.R[1]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C01_0008u, cpu.State.Pc);
+        Assert.Equal(12UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void FastForwardsMaskedCountedMemoryClearLoop()
     {
         var memory = new DreamcastMemory();
