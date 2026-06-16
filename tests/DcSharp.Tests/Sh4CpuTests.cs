@@ -13883,6 +13883,66 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaMemoryBlockHeaderProbe()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMemoryBlockHeaderProbe(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMemoryBlockHeaderProbe(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_3BB4);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_3BB4);
+        InitializeSonicAdventure2AicaMemoryBlockHeaderProbeState(normalMemory, normal);
+        InitializeSonicAdventure2AicaMemoryBlockHeaderProbeState(fastMemory, fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaMemoryBlockHeaderProbe(fastStart, 25, out var skippedInstructions));
+        Assert.Equal(25UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF18), fastMemory.ReadUInt32(0x8CFF_FF18));
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF1C), fastMemory.ReadUInt32(0x8CFF_FF1C));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaMemoryBlockHeaderProbeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMemoryBlockHeaderProbe(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_3BB4);
+        InitializeSonicAdventure2AicaMemoryBlockHeaderProbeState(memory, cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaMemoryBlockHeaderProbe(start, 24, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_3BB6u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaMemoryBlockHeaderProbeWhenHeaderDiffers()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaMemoryBlockHeaderProbe(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_3BB4);
+        InitializeSonicAdventure2AicaMemoryBlockHeaderProbeState(memory, cpu);
+        memory.WriteUInt32(0x8C2D_5B18, 0x4E4F_5045);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaMemoryBlockHeaderProbe(start, 25, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_3BB6u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2InterruptCallbackStatusDecoderPrefix()
     {
         var normalMemory = new DreamcastMemory();
@@ -26619,6 +26679,38 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C14_CC1C, 0x8C29_C66C);
     }
 
+    private static void WriteSonicAdventure2AicaMemoryBlockHeaderProbe(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C15_3BB4, 0xD313);
+        WriteInstruction(memory, 0x8C15_3BB6, 0x2FE6);
+        WriteInstruction(memory, 0x8C15_3BB8, 0xEE00);
+        WriteInstruction(memory, 0x8C15_3BBA, 0x4F22);
+        WriteInstruction(memory, 0x8C15_3BBC, 0x6632);
+        WriteInstruction(memory, 0x8C15_3BBE, 0x2668);
+        WriteInstruction(memory, 0x8C15_3BC0, 0x8D03);
+        WriteInstruction(memory, 0x8C15_3BC2, 0x6543);
+        WriteInstruction(memory, 0x8C15_3BC4, 0x6063);
+        WriteInstruction(memory, 0x8C15_3BC6, 0x88FF);
+        WriteInstruction(memory, 0x8C15_3BC8, 0x8B02);
+        WriteInstruction(memory, 0x8C15_3BD0, 0x2448);
+        WriteInstruction(memory, 0x8C15_3BD2, 0x8902);
+        WriteInstruction(memory, 0x8C15_3BD4, 0x6043);
+        WriteInstruction(memory, 0x8C15_3BD6, 0x88FF);
+        WriteInstruction(memory, 0x8C15_3BD8, 0x8B02);
+        WriteInstruction(memory, 0x8C15_3BE0, 0xD20B);
+        WriteInstruction(memory, 0x8C15_3BE2, 0x6452);
+        WriteInstruction(memory, 0x8C15_3BE4, 0x3420);
+        WriteInstruction(memory, 0x8C15_3BE6, 0x8903);
+        WriteInstruction(memory, 0x8C15_3BF0, 0x2EE8);
+        WriteInstruction(memory, 0x8C15_3BF2, 0x8903);
+        WriteInstruction(memory, 0x8C15_3BFC, 0x4F26);
+        WriteInstruction(memory, 0x8C15_3BFE, 0x60E3);
+        WriteInstruction(memory, 0x8C15_3C00, 0x000B);
+        WriteInstruction(memory, 0x8C15_3C02, 0x6EF6);
+        memory.WriteUInt32(0x8C15_3C04, 0x8C18_33A4);
+        memory.WriteUInt32(0x8C15_3C10, 0x4B4C_424D);
+    }
+
     private static void WriteSonicAdventure2InterruptCallbackStatusDecoderPrefix(DreamcastMemory memory)
     {
         WriteSonicAdventure2InterruptCallbackScan(memory);
@@ -26810,6 +26902,18 @@ public class Sh4CpuTests
         cpu.State.R[15] = stack;
         cpu.State.Pr = 0xDEAD_BEEF;
         cpu.State.T = true;
+    }
+
+    private static void InitializeSonicAdventure2AicaMemoryBlockHeaderProbeState(DreamcastMemory memory, Sh4Cpu cpu)
+    {
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C2D_5B18, 0x4B4C_424D);
+
+        cpu.State.R[4] = 0x8C2D_5B18;
+        cpu.State.R[14] = 0x8C2D_5B18;
+        cpu.State.R[15] = 0x8CFF_FF20;
+        cpu.State.Pr = 0x8C15_3C94;
+        cpu.State.T = false;
     }
 
     private static void InitializeSonicAdventure2InterruptCallbackStatusDecoderPrefixState(DreamcastMemory memory, Sh4Cpu cpu)
