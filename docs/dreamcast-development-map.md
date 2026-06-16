@@ -122,6 +122,7 @@ Build next:
 - Decide whether to add a minimal ARM7 interpreter later. For the Sonic intro milestone, a queue/service model is likely higher return than full ARM execution.
 - Keep moving AICA-driver completion behavior into `DreamcastMemory` instead of SH-4 fast-forward bodies. The SA2 `EXEC` completion shim now resolves the AICA RAM completion word through `TryCompleteAicaDriverCompletionWord`, which is still title-shaped but puts the custom driver field mutation in the audio/memory subsystem where a future ARM/mailbox service can replace it.
 - Use `driverFields` in run summaries to track current custom AICA driver state. The known SA2 `EXEC` and status candidates now report value, read/write counts, and last read/write PCs directly, which should make the next active-work/status-table producer easier to isolate.
+- Route custom driver field writes through memory-owned helpers even when they are reached by SH-4 fast-forward paths. SA2's G2 PIO write shortcut now calls `TryWriteAicaRamDriverField` for known fields, keeping future replacement service behavior local to AICA memory instead of scattered through CPU shortcuts.
 
 Technique: replace title-shaped waits with device-shaped mailbox completion. Keep the existing SA2 `EXEC` shim until the queue model proves it explains the same progress.
 

@@ -12967,6 +12967,36 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2G2PioWriteLoopThroughDriverField()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioWriteLoop(memory);
+        memory.WriteUInt32(0x8C20_0004, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C13_5C12);
+        cpu.State.R[3] = 1;
+        cpu.State.R[9] = 2;
+        cpu.State.R[15] = 0x8CFF_FF40;
+        cpu.State.T = false;
+        memory.WriteUInt32(cpu.State.R[15] + 4, 0xA081_2400);
+        memory.WriteUInt32(cpu.State.R[15] + 8, 0x8C20_0004);
+        memory.WriteUInt32(cpu.State.R[15] + 12, 4);
+        memory.WriteUInt32(cpu.State.R[15] + 16, 4);
+
+        cpu.Step();
+        var delaySlot = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardSonicAdventure2G2PioWriteLoop(delaySlot, 20, out var skippedInstructions));
+        Assert.Equal(20UL, skippedInstructions);
+        Assert.Equal(1u, memory.ReadUInt32(0xA081_2400));
+        var field = Assert.Single(memory.CreateAudioSnapshot().DriverFields);
+        Assert.Equal("SA2_AICA_STATUS_CANDIDATE", field.Name);
+        Assert.Equal(1u, field.Value);
+        Assert.Equal(1UL, field.WriteCount);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C13_5C16u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void PartiallyFastForwardsSonicAdventure2G2PioWriteLoopWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();

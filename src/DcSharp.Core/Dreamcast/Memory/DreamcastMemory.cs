@@ -2168,6 +2168,18 @@ public sealed class DreamcastMemory
         return true;
     }
 
+    internal bool TryWriteAicaRamDriverField(uint address, uint value)
+    {
+        if (!TryGetAicaRamOffset(address, 4, out var offset)
+            || !IsKnownAicaRamDriverField((uint)offset))
+        {
+            return false;
+        }
+
+        WriteUInt32(address, value);
+        return true;
+    }
+
     internal bool TryResolveAicaDriverCompletionWordAddress(
         uint workPointerAddress,
         uint completionBasePointerOffset,
@@ -2610,6 +2622,9 @@ public sealed class DreamcastMemory
     private static bool IsNamedAicaRamField(string name) =>
         name.StartsWith("SA2_", StringComparison.Ordinal)
         || name.StartsWith("KOS_", StringComparison.Ordinal);
+
+    private static bool IsKnownAicaRamDriverField(uint offset) =>
+        offset is Sa2ExecCompletionOffset or Sa2AicaStatusOffset;
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()
     {

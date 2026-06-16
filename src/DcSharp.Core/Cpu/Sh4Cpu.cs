@@ -7152,14 +7152,16 @@ public sealed class Sh4Cpu
             var value = memory.ReadUInt32(source);
             for (var iteration = 0ul; iteration < iterationsToSkip; iteration++)
             {
-                memory.WriteUInt32(destination + ((uint)iteration * destinationStride), value);
+                WriteSonicAdventure2G2PioWord(destination + ((uint)iteration * destinationStride), value);
             }
         }
         else
         {
             for (var iteration = 0ul; iteration < iterationsToSkip; iteration++)
             {
-                memory.WriteUInt32(destination + ((uint)iteration * destinationStride), memory.ReadUInt32(source + ((uint)iteration * sourceStride)));
+                WriteSonicAdventure2G2PioWord(
+                    destination + ((uint)iteration * destinationStride),
+                    memory.ReadUInt32(source + ((uint)iteration * sourceStride)));
             }
         }
 
@@ -7233,7 +7235,7 @@ public sealed class Sh4Cpu
         memory.WriteUInt32(stack, 0);
         memory.WriteUInt32(stack + 12, sourceStride);
         memory.WriteUInt32(stack + 16, destinationStride);
-        memory.WriteUInt32(destination, memory.ReadUInt32(source));
+        WriteSonicAdventure2G2PioWord(destination, memory.ReadUInt32(source));
 
         var completedDestination = destination + destinationStride;
         var completedSource = source + sourceStride;
@@ -7264,6 +7266,14 @@ public sealed class Sh4Cpu
         delayedBranchTarget = null;
         immediateBranchTarget = null;
         return true;
+    }
+
+    private void WriteSonicAdventure2G2PioWord(uint destination, uint value)
+    {
+        if (!memory.TryWriteAicaRamDriverField(destination, value))
+        {
+            memory.WriteUInt32(destination, value);
+        }
     }
 
     internal bool TryFastForwardSonicAdventure2CacheInvalidateLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)

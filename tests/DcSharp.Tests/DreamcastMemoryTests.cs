@@ -1369,6 +1369,34 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void WriteAicaRamDriverFieldWritesKnownDriverField()
+    {
+        var memory = new DreamcastMemory();
+        memory.CurrentInstructionPc = 0x8C13_5BFA;
+
+        var handled = memory.TryWriteAicaRamDriverField(0xA081_2400, 1);
+
+        Assert.True(handled);
+        Assert.Equal(1u, memory.ReadUInt32(0xA081_2400));
+        var field = Assert.Single(memory.CreateAudioSnapshot().DriverFields);
+        Assert.Equal("SA2_AICA_STATUS_CANDIDATE", field.Name);
+        Assert.Equal(1UL, field.WriteCount);
+        Assert.Equal("0x8C135BFA", field.LastWritePcHex);
+    }
+
+    [Fact]
+    public void WriteAicaRamDriverFieldIgnoresUnknownAicaRamField()
+    {
+        var memory = new DreamcastMemory();
+
+        var handled = memory.TryWriteAicaRamDriverField(0xA081_2404, 1);
+
+        Assert.False(handled);
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2404));
+        Assert.Empty(memory.CreateAudioSnapshot().DriverFields);
+    }
+
+    [Fact]
     public void AudioSnapshotSeparatesAicaRamHotspotsByKindAndSize()
     {
         var memory = new DreamcastMemory();
