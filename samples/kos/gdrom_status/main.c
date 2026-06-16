@@ -4,6 +4,8 @@
 
 KOS_INIT_FLAGS(INIT_DEFAULT);
 
+#define DCSHARP_EXPECTED_DISC_GDROM 0x80
+
 int main(int argc, char **argv) {
     int rv;
     int status = -99;
@@ -24,7 +26,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if(status != CD_STATUS_STANDBY || disc_type != CD_CDROM_XA) {
+    if(status != CD_STATUS_STANDBY || disc_type != DCSHARP_EXPECTED_DISC_GDROM) {
         printf("dcSharp GD-ROM status mismatch\n");
         return 2;
     }

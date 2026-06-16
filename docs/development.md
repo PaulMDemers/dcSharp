@@ -385,6 +385,8 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dotnet run --project src\DcSharp.Cli\DcSharp.Cli.csproj -c Release -- fixtures fixtures\kos.json --validate-only` reports `Manifest OK: 75 fixtures`.
 - `minimal`, `trap_exception`, `illegal_instruction`, `slot_illegal_branch`, and every `aica*` fixture pass after this pass. `aica_registers` and the playback/metadata fixtures now terminate as `ProgramExit` when KOS has printed `arch: exit return code` and reaches its shutdown register-write loop.
 - The broad `aica` fixture filter now passes `6/6` locally in Release. The shared KOS startup profile exposed `_sq_set32`, `_scif_init`, and shutdown-loop overhead; the store-queue zero-fill fast path now collapses YUV clears and bulk-clears VRAM backing storage for KOS video clears, and the masked counted-loop fast path now handles KOS's `mov #0,r0` SCIF delay-slot loop. This raises AICA fixture CPU fast-forward from roughly 4.8M to roughly 14.3M instructions per sample, reduces `minimal`'s PVR YUV TA command writes from 524,288 to 16, cuts a representative `aica_adpcm_metadata` run from about 4.4 minutes to about 39 seconds, and cuts the full `aica` filter to about 4 minutes.
+- The broad `timer` fixture filter passes `6/6` locally in Release, covering KOS sleeps/callbacks/VBlank arbitration plus bare-metal TMU mask/acceptance probes.
+- The broad `gdrom` fixture filter passes `17/17` locally in Release after rebuilding `dcsharp_gdrom_status.elf` to expect the generated local GDI media's GD-ROM disc type (`0x80`) instead of the CD-ROM/XA constant.
 
 ## Current Fixture Expectations
 
@@ -395,7 +397,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - `dcsharp_slot_illegal_branch.elf`: bare-metal SH fixture that places a `bra` instruction in a delay slot, resumes through an `rte` handler, writes a serial marker, stops on an unsupported opcode, and exposes slot-illegal `EXPEVT`.
 - `dcsharp_gdrom_read.elf`: reads one sector from generated local GDI media through `cdrom_read_sectors()`, observes the `DCSH` sentinel in RAM, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_toc.elf`: reads the TOC from generated local GDI media through `cdrom_read_toc()`, verifies the first/last track, data track FAD, leadout FAD, and `cdrom_locate_data_track()` result, shuts down, and reports `ProgramExit`.
-- `dcsharp_gdrom_status.elf`: calls `cdrom_get_status()` with generated local GDI media loaded, verifies KOS sees standby status and the current XA disc type, shuts down, and reports `ProgramExit`.
+- `dcsharp_gdrom_status.elf`: calls `cdrom_get_status()` with generated local GDI media loaded, verifies KOS sees standby status and the generated GD-ROM disc type, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_sector_mode.elf`: calls `cdrom_reinit_ex()` with 2048-byte data-area sector mode against generated local GDI media, verifies KOS sees success, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_no_media.elf`: attempts a raw `cdrom_read_sectors()` call without loaded media, observes the KOS-visible failure, verifies the destination buffer is unchanged, shuts down, and reports `ProgramExit`.
 - `dcsharp_gdrom_status_no_media.elf`: calls `cdrom_get_status()` without loaded media, verifies KOS sees no-disc status and the no-disc disc type, shuts down, and reports `ProgramExit`.
