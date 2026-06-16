@@ -8654,6 +8654,78 @@ public sealed class Sh4Cpu
         && memory.ReadUInt32(0x8C14_CA74) == 0x8C29_C688
         && memory.ReadUInt32(0x8C14_CC00) == 0x8C29_C7B0;
 
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackStatusQuietTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C14_C8AA
+            || step.Opcode != 0x2402
+            || State.Pc != 0x8C14_C8AC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2InterruptCallbackStatusQuietPath())
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 167;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(State.R[15], 52, out _))
+        {
+            return false;
+        }
+
+        var toggle = State.R[0];
+        if (toggle > 1
+            || State.R[3] != toggle
+            || State.R[4] != 0x8C18_31C4
+            || State.R[5] != 0x8C29_C9C4
+            || memory.ReadUInt32(0x8C18_31C4) != toggle
+            || (memory.ReadUInt32(0x8C29_C468) & 2) != 0
+            || (memory.ReadUInt32(0x8C29_C484) & 4) == 4
+            || memory.ReadUInt32(0x8C29_C644) != 0
+            || memory.ReadUInt32(0x8C29_C7E0) != 0
+            || memory.ReadUInt32(0x8C29_C7DC) != 0
+            || memory.ReadUInt32(0x8C29_C688) == 0
+            || memory.ReadUInt32(0x8C29_C7B0) != 0
+            || (int)memory.ReadUInt32(0x8C29_C7B4) >= 0
+            || (int)memory.ReadUInt32(0x8C29_C7B8) >= 0
+            || (int)memory.ReadUInt32(0x8C29_C7BC) >= 0)
+        {
+            return false;
+        }
+
+        var frame = State.R[15];
+        memory.WriteUInt32(0x8C29_C9C4, toggle);
+        memory.WriteUInt32(0x8C29_C644, memory.ReadUInt32(0x8C29_C648));
+        memory.WriteUInt32(0x8C29_C968, 1);
+        memory.WriteUInt32(frame, 4);
+        memory.WriteUInt32(frame + 4, 16);
+        memory.WriteUInt32(frame + 8, 16);
+        memory.WriteUInt32(frame + 12, 16);
+        memory.WriteUInt32(frame + 16, 1);
+
+        State.R[0] = 0x8C29_C7B0;
+        State.R[1] = 4;
+        State.R[2] = 4;
+        State.R[3] = 16;
+        State.R[4] = 0;
+        State.R[5] = 0;
+        State.R[8] = 0xA05F_8044;
+        State.R[9] = 0x8C29_C968;
+        State.R[10] = 12;
+        State.R[11] = 0xA05F_8008;
+        State.R[12] = 1;
+        State.R[13] = 0x8C29_C96C;
+        State.R[14] = 0;
+        State.T = true;
+        State.Pc = 0x8C14_CB80;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2InterruptCallbackStatusReturnTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

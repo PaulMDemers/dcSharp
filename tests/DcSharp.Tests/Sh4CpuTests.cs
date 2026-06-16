@@ -13953,6 +13953,73 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2InterruptCallbackStatusQuietTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptCallbackStatusQuietPath(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptCallbackStatusQuietPath(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C14_C860);
+        var fast = new Sh4Cpu(fastMemory, 0x8C14_C860);
+        InitializeSonicAdventure2InterruptCallbackStatusQuietPathState(normalMemory, normal);
+        InitializeSonicAdventure2InterruptCallbackStatusQuietPathState(fastMemory, fast);
+
+        var normalStart = StepMany(normal, 31);
+        var fastStart = StepMany(fast, 31);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2InterruptCallbackStatusQuietTail(fastStart, 167, out var skippedInstructions));
+        Assert.Equal(167UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(0x8C14_CB80u, fast.State.Pc);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C18_31C4), fastMemory.ReadUInt32(0x8C18_31C4));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C29_C9C4), fastMemory.ReadUInt32(0x8C29_C9C4));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C29_C644), fastMemory.ReadUInt32(0x8C29_C644));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C29_C968), fastMemory.ReadUInt32(0x8C29_C968));
+        Assert.Equal(normalMemory.ReadUInt32(fast.State.R[15]), fastMemory.ReadUInt32(fast.State.R[15]));
+        Assert.Equal(normalMemory.ReadUInt32(fast.State.R[15] + 4), fastMemory.ReadUInt32(fast.State.R[15] + 4));
+        Assert.Equal(normalMemory.ReadUInt32(fast.State.R[15] + 8), fastMemory.ReadUInt32(fast.State.R[15] + 8));
+        Assert.Equal(normalMemory.ReadUInt32(fast.State.R[15] + 12), fastMemory.ReadUInt32(fast.State.R[15] + 12));
+        Assert.Equal(normalMemory.ReadUInt32(fast.State.R[15] + 16), fastMemory.ReadUInt32(fast.State.R[15] + 16));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2InterruptCallbackStatusQuietTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptCallbackStatusQuietPath(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C14_C860);
+        InitializeSonicAdventure2InterruptCallbackStatusQuietPathState(memory, cpu);
+
+        var start = StepMany(cpu, 31);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2InterruptCallbackStatusQuietTail(start, 166, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C14_C8ACu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2InterruptCallbackStatusQuietTailWhenRemainingEntryIsActive()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2InterruptCallbackStatusQuietPath(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C14_C860);
+        InitializeSonicAdventure2InterruptCallbackStatusQuietPathState(memory, cpu);
+        memory.WriteUInt32(0x8C29_C7B8, 0);
+
+        var start = StepMany(cpu, 31);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2InterruptCallbackStatusQuietTail(start, 167, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C14_C8ACu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2InterruptCallbackStatusReturnTail()
     {
         var normalMemory = new DreamcastMemory();
