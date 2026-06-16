@@ -1251,6 +1251,52 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsNamedAicaRamFieldAccesses()
+    {
+        var memory = new DreamcastMemory();
+        memory.CurrentInstructionPc = 0x8C13_5BFA;
+        memory.WriteUInt32(0xA081_2400, 0x4450_4D44);
+        memory.CurrentInstructionPc = 0x8C16_BF10;
+        Assert.Equal(0x4450_4D44u, memory.ReadUInt32(0xA081_2400));
+
+        var accesses = memory.CreateAudioSnapshot().RamFieldAccesses;
+
+        Assert.Equal(2, accesses.Count);
+        Assert.Equal(MemoryAccessKind.Write, accesses[0].Kind);
+        Assert.Equal("SA2_AICA_STATUS_CANDIDATE", accesses[0].Name);
+        Assert.Equal(0x0001_2400u, accesses[0].Offset);
+        Assert.Equal("0x012400", accesses[0].OffsetHex);
+        Assert.Equal(0xA081_2400u, accesses[0].Address);
+        Assert.Equal("0xA0812400", accesses[0].AddressHex);
+        Assert.Equal(4, accesses[0].Size);
+        Assert.Equal(0x4450_4D44u, accesses[0].Value);
+        Assert.Equal("0x44504D44", accesses[0].ValueHex);
+        Assert.Equal(0x8C13_5BFAu, accesses[0].Pc);
+        Assert.Equal("0x8C135BFA", accesses[0].PcHex);
+        Assert.Equal("CommandQueueArea", accesses[0].Area);
+        Assert.Equal(MemoryAccessKind.Read, accesses[1].Kind);
+        Assert.Equal(0x8C16_BF10u, accesses[1].Pc);
+    }
+
+    [Fact]
+    public void AudioSnapshotKeepsFirstAndRecentNamedAicaRamFieldAccessesBounded()
+    {
+        var memory = new DreamcastMemory();
+        for (var index = 0; index < 600; index++)
+        {
+            memory.WriteUInt32(0xA081_2400, (uint)index);
+        }
+
+        var accesses = memory.CreateAudioSnapshot().RamFieldAccesses;
+
+        Assert.Equal(512, accesses.Count);
+        Assert.Equal(0u, accesses[0].Value);
+        Assert.Equal(63u, accesses[63].Value);
+        Assert.Equal(152u, accesses[64].Value);
+        Assert.Equal(599u, accesses[^1].Value);
+    }
+
+    [Fact]
     public void AudioSnapshotSeparatesAicaRamHotspotsByKindAndSize()
     {
         var memory = new DreamcastMemory();

@@ -196,6 +196,7 @@ public sealed class DreamcastMemory
     private readonly List<DreamcastAicaRegisterAccess> aicaRegisterAccesses = [];
     private readonly List<DreamcastAicaCommandQueueActivity> aicaCommandQueueActivities = [];
     private readonly Dictionary<AicaRamAccessKey, AicaRamAccessCounter> aicaRamAccessCounters = [];
+    private readonly List<DreamcastAicaRamFieldAccess> aicaRamFieldAccesses = [];
     private readonly List<DreamcastMapleDmaTransfer> mapleTransfers = [];
     private readonly List<DreamcastMapleDmaBatch> mapleDmaBatches = [];
     private readonly List<DreamcastGdromReadCommand> gdromReadCommands = [];
@@ -1493,6 +1494,7 @@ public sealed class DreamcastMemory
             CreateAicaCommandQueueSnapshots(),
             CreateAicaRamRegions(),
             CreateAicaRamAccessHotspots(),
+            aicaRamFieldAccesses.ToArray(),
             CreateAicaTextMarkers(),
             (byte[])aicaRam.Clone());
     }
@@ -2420,6 +2422,31 @@ public sealed class DreamcastMemory
         counter.LastAddress = address;
         counter.LastValue = value;
         counter.LastPc = CurrentInstructionPc;
+
+        var name = GetAicaRamOffsetName((uint)offset);
+        if (IsNamedAicaRamField(name))
+        {
+            const int preservedFieldAccessHeadCount = 64;
+            const int maxFieldAccesses = 512;
+            if (aicaRamFieldAccesses.Count == maxFieldAccesses)
+            {
+                aicaRamFieldAccesses.RemoveAt(preservedFieldAccessHeadCount);
+            }
+
+            aicaRamFieldAccesses.Add(new DreamcastAicaRamFieldAccess(
+                kind,
+                (uint)offset,
+                $"0x{offset:X6}",
+                name,
+                address,
+                $"0x{address:X8}",
+                size,
+                value,
+                $"0x{value:X8}",
+                CurrentInstructionPc,
+                CurrentInstructionPc is { } pc ? $"0x{pc:X8}" : null,
+                ClassifyAicaRamRegion(offset, offset + size)));
+        }
     }
 
     private IReadOnlyList<DreamcastAicaRamAccessHotspot> CreateAicaRamAccessHotspots()
@@ -2484,6 +2511,10 @@ public sealed class DreamcastMemory
 
         return offset < 0x0003_0000 ? "AICA_CONTROL_AREA" : "SAMPLE_DATA_AREA";
     }
+
+    private static bool IsNamedAicaRamField(string name) =>
+        name.StartsWith("SA2_", StringComparison.Ordinal)
+        || name.StartsWith("KOS_", StringComparison.Ordinal);
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()
     {

@@ -14,6 +14,7 @@ public sealed record DreamcastAudioSnapshot(
     IReadOnlyList<DreamcastAicaCommandQueueSnapshot> CommandQueues,
     IReadOnlyList<DreamcastAicaRamRegionSnapshot> RamRegions,
     IReadOnlyList<DreamcastAicaRamAccessHotspot> RamAccessHotspots,
+    IReadOnlyList<DreamcastAicaRamFieldAccess> RamFieldAccesses,
     IReadOnlyList<DreamcastAicaRamTextMarker> TextMarkers,
     byte[] AudioRam);
 
@@ -135,6 +136,20 @@ public sealed record DreamcastAicaRamAccessHotspot(
     string LastValueHex,
     uint? LastPc,
     string? LastPcHex,
+    string Area);
+
+public sealed record DreamcastAicaRamFieldAccess(
+    MemoryAccessKind Kind,
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    uint Address,
+    string AddressHex,
+    int Size,
+    uint Value,
+    string ValueHex,
+    uint? Pc,
+    string? PcHex,
     string Area);
 
 public sealed record DreamcastAicaRamTextMarker(

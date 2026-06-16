@@ -1727,6 +1727,7 @@ public sealed record DreamcastAudioSummary(
     IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues,
     IReadOnlyList<DreamcastAicaRamRegionSummary> RamRegions,
     IReadOnlyList<DreamcastAicaRamAccessHotspotSummary> RamAccessHotspots,
+    IReadOnlyList<DreamcastAicaRamFieldAccessSummary> RamFieldAccesses,
     IReadOnlyList<DreamcastAicaRamTextMarkerSummary> TextMarkers)
 {
     public static DreamcastAudioSummary FromSnapshot(DreamcastAudioSnapshot snapshot, int recentCount = 16) =>
@@ -1745,6 +1746,7 @@ public sealed record DreamcastAudioSummary(
             snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray(),
             snapshot.RamRegions.Select(DreamcastAicaRamRegionSummary.FromRegion).ToArray(),
             snapshot.RamAccessHotspots.Select(DreamcastAicaRamAccessHotspotSummary.FromHotspot).ToArray(),
+            snapshot.RamFieldAccesses.Select(DreamcastAicaRamFieldAccessSummary.FromAccess).ToArray(),
             snapshot.TextMarkers.Select(DreamcastAicaRamTextMarkerSummary.FromMarker).ToArray());
 }
 
@@ -1910,6 +1912,36 @@ public sealed record DreamcastAicaRamAccessHotspotSummary(
             hotspot.LastPc,
             hotspot.LastPcHex,
             hotspot.Area);
+}
+
+public sealed record DreamcastAicaRamFieldAccessSummary(
+    MemoryAccessKind Kind,
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    uint Address,
+    string AddressHex,
+    int Size,
+    uint Value,
+    string ValueHex,
+    uint? Pc,
+    string? PcHex,
+    string Area)
+{
+    public static DreamcastAicaRamFieldAccessSummary FromAccess(DreamcastAicaRamFieldAccess access) =>
+        new(
+            access.Kind,
+            access.Offset,
+            access.OffsetHex,
+            access.Name,
+            access.Address,
+            access.AddressHex,
+            access.Size,
+            access.Value,
+            access.ValueHex,
+            access.Pc,
+            access.PcHex,
+            access.Area);
 }
 
 public sealed record DreamcastAicaRamTextMarkerSummary(
