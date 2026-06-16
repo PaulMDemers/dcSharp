@@ -1727,6 +1727,7 @@ public sealed record DreamcastAudioSummary(
     IReadOnlyList<DreamcastAicaCommandQueueSummary> CommandQueues,
     IReadOnlyList<DreamcastAicaRamRegionSummary> RamRegions,
     IReadOnlyList<DreamcastAicaRamAccessHotspotSummary> RamAccessHotspots,
+    IReadOnlyList<DreamcastAicaRamDriverFieldSummary> DriverFields,
     IReadOnlyList<DreamcastAicaRamFieldAccessSummary> RamFieldAccesses,
     IReadOnlyList<DreamcastAicaRamTextMarkerSummary> TextMarkers)
 {
@@ -1746,6 +1747,7 @@ public sealed record DreamcastAudioSummary(
             snapshot.CommandQueues.Select(DreamcastAicaCommandQueueSummary.FromQueue).ToArray(),
             snapshot.RamRegions.Select(DreamcastAicaRamRegionSummary.FromRegion).ToArray(),
             snapshot.RamAccessHotspots.Select(DreamcastAicaRamAccessHotspotSummary.FromHotspot).ToArray(),
+            snapshot.DriverFields.Select(DreamcastAicaRamDriverFieldSummary.FromField).ToArray(),
             snapshot.RamFieldAccesses.Select(DreamcastAicaRamFieldAccessSummary.FromAccess).ToArray(),
             snapshot.TextMarkers.Select(DreamcastAicaRamTextMarkerSummary.FromMarker).ToArray());
 }
@@ -1912,6 +1914,40 @@ public sealed record DreamcastAicaRamAccessHotspotSummary(
             hotspot.LastPc,
             hotspot.LastPcHex,
             hotspot.Area);
+}
+
+public sealed record DreamcastAicaRamDriverFieldSummary(
+    uint Offset,
+    string OffsetHex,
+    string Name,
+    uint Address,
+    string AddressHex,
+    uint Value,
+    string ValueHex,
+    ulong ReadCount,
+    ulong WriteCount,
+    uint? LastReadPc,
+    string? LastReadPcHex,
+    uint? LastWritePc,
+    string? LastWritePcHex,
+    string Area)
+{
+    public static DreamcastAicaRamDriverFieldSummary FromField(DreamcastAicaRamDriverField field) =>
+        new(
+            field.Offset,
+            field.OffsetHex,
+            field.Name,
+            field.Address,
+            field.AddressHex,
+            field.Value,
+            field.ValueHex,
+            field.ReadCount,
+            field.WriteCount,
+            field.LastReadPc,
+            field.LastReadPcHex,
+            field.LastWritePc,
+            field.LastWritePcHex,
+            field.Area);
 }
 
 public sealed record DreamcastAicaRamFieldAccessSummary(

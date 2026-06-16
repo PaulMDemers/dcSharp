@@ -630,7 +630,7 @@ static void PrintVideoActivity(DreamcastVideoSummary video)
 
 static void PrintAudioActivity(DreamcastAudioSummary audio)
 {
-    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}, queues={audio.CommandQueues.Count} (cmd={audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={audio.RamRegions.Count}, ramHotspots={audio.RamAccessHotspots.Count}, fieldEvents={audio.RamFieldAccesses.Count}, text={audio.TextMarkers.Count}");
+    Console.WriteLine($"AICA: registers={audio.RegisterAccessCount}, channels={audio.Channels.Count}, active={audio.ActiveChannelCount}, mailbox={audio.CommandQueueActivityCount}, queues={audio.CommandQueues.Count} (cmd={audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={audio.RamRegions.Count}, ramHotspots={audio.RamAccessHotspots.Count}, driverFields={audio.DriverFields.Count}, fieldEvents={audio.RamFieldAccesses.Count}, text={audio.TextMarkers.Count}");
     foreach (var marker in audio.TextMarkers.TakeLast(8))
     {
         Console.WriteLine($"  AICA text: offset={marker.OffsetHex}, length={marker.Length}, text=\"{marker.Text}\"");
@@ -649,6 +649,11 @@ static void PrintAudioActivity(DreamcastAudioSummary audio)
     foreach (var hotspot in audio.RamAccessHotspots.Take(8))
     {
         Console.WriteLine($"  AICA RAM {hotspot.Kind} {hotspot.Name}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
+    }
+
+    foreach (var field in audio.DriverFields)
+    {
+        Console.WriteLine($"  AICA driver {field.Name}: offset={field.OffsetHex}, addr={field.AddressHex}, value={field.ValueHex}, reads={field.ReadCount}, writes={field.WriteCount}, lastReadPc={field.LastReadPcHex ?? "none"}, lastWritePc={field.LastWritePcHex ?? "none"}, area={field.Area}");
     }
 
     PrintAicaRamFieldAccesses(audio.RamFieldAccesses, PrintAicaRamFieldAccessSummary);
@@ -1163,7 +1168,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine($"PVR current: {string.Join(", ", currentPvrRegisters.Select(register => $"{register.Name}={register.ValueHex}"))}");
     }
 
-    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}, queues={result.Audio.CommandQueues.Count} (cmd={result.Audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={result.Audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={result.Audio.RamRegions.Count}, ramHotspots={result.Audio.RamAccessHotspots.Count}, fieldEvents={result.Audio.RamFieldAccesses.Count}, text={result.Audio.TextMarkers.Count}");
+    Console.WriteLine($"AICA: registers={result.Audio.RegisterAccesses.Count}, channels={result.Audio.Channels.Count}, active={result.Audio.Channels.Count(channel => channel.Active)}, ramNonZero={result.Audio.NonZeroBytes}, mailbox={result.Audio.CommandQueueActivities.Count}, queues={result.Audio.CommandQueues.Count} (cmd={result.Audio.CommandQueues.Count(queue => queue.Role == "Command")}, resp={result.Audio.CommandQueues.Count(queue => queue.Role == "Response")}), regions={result.Audio.RamRegions.Count}, ramHotspots={result.Audio.RamAccessHotspots.Count}, driverFields={result.Audio.DriverFields.Count}, fieldEvents={result.Audio.RamFieldAccesses.Count}, text={result.Audio.TextMarkers.Count}");
     var currentAicaRegisters = result.Audio.Registers.Where(register => register.Value != 0).Take(8).ToArray();
     if (currentAicaRegisters.Length > 0)
     {
@@ -1251,6 +1256,11 @@ static void RunElf(string path, string[] args)
     foreach (var hotspot in result.Audio.RamAccessHotspots.Take(8))
     {
         Console.WriteLine($"  AICA RAM {hotspot.Kind} {hotspot.Name}: offset={hotspot.OffsetHex}, addr={hotspot.AddressHex}, size={hotspot.Size}, count={hotspot.Count}, last={hotspot.LastValueHex}, pc={hotspot.LastPcHex ?? "none"}, area={hotspot.Area}");
+    }
+
+    foreach (var field in result.Audio.DriverFields)
+    {
+        Console.WriteLine($"  AICA driver {field.Name}: offset={field.OffsetHex}, addr={field.AddressHex}, value={field.ValueHex}, reads={field.ReadCount}, writes={field.WriteCount}, lastReadPc={field.LastReadPcHex ?? "none"}, lastWritePc={field.LastWritePcHex ?? "none"}, area={field.Area}");
     }
 
     PrintAicaRamFieldAccesses(result.Audio.RamFieldAccesses, PrintAicaRamFieldAccessSnapshot);

@@ -95,6 +95,9 @@ public sealed class DreamcastMemory
     private const uint AicaChannelUpdateSetPan = 0x0000_4000;
     private const uint AicaRamBase = 0x0080_0000;
     private const uint AicaRamBytes = 2 * 1024 * 1024;
+    private const uint AicaRamUncachedBase = 0xA080_0000;
+    private const uint Sa2ExecCompletionOffset = 0x0000_00F8;
+    private const uint Sa2AicaStatusOffset = 0x0001_2400;
     private const uint OperandCacheRamArea1Base = 0x7C00_0000;
     private const uint OperandCacheRamArea2Base = 0x7E00_0000;
     private const int OperandCacheRamAreaBytes = 4 * 1024;
@@ -1494,6 +1497,7 @@ public sealed class DreamcastMemory
             CreateAicaCommandQueueSnapshots(),
             CreateAicaRamRegions(),
             CreateAicaRamAccessHotspots(),
+            CreateAicaRamDriverFields(),
             aicaRamFieldAccesses.ToArray(),
             CreateAicaTextMarkers(),
             (byte[])aicaRam.Clone());
@@ -2523,13 +2527,55 @@ public sealed class DreamcastMemory
             .ToArray();
     }
 
+    private IReadOnlyList<DreamcastAicaRamDriverField> CreateAicaRamDriverFields()
+    {
+        return KnownAicaRamDriverFields()
+            .Select(CreateAicaRamDriverField)
+            .Where(field => field.Value != 0 || field.ReadCount != 0 || field.WriteCount != 0)
+            .ToArray();
+    }
+
+    private DreamcastAicaRamDriverField CreateAicaRamDriverField(AicaRamDriverFieldDefinition definition)
+    {
+        var value = ReadUInt32From(aicaRam, (int)definition.Offset);
+        var readCounter = GetAicaRamAccessCounter(MemoryAccessKind.Read, definition.Offset, 4);
+        var writeCounter = GetAicaRamAccessCounter(MemoryAccessKind.Write, definition.Offset, 4);
+        var address = AicaRamUncachedBase + definition.Offset;
+        return new DreamcastAicaRamDriverField(
+            definition.Offset,
+            $"0x{definition.Offset:X6}",
+            definition.Name,
+            address,
+            $"0x{address:X8}",
+            value,
+            $"0x{value:X8}",
+            readCounter?.Count ?? 0,
+            writeCounter?.Count ?? 0,
+            readCounter?.LastPc,
+            readCounter?.LastPc is { } readPc ? $"0x{readPc:X8}" : null,
+            writeCounter?.LastPc,
+            writeCounter?.LastPc is { } writePc ? $"0x{writePc:X8}" : null,
+            ClassifyAicaRamRegion((int)definition.Offset, (int)definition.Offset + 4));
+    }
+
+    private AicaRamAccessCounter? GetAicaRamAccessCounter(MemoryAccessKind kind, uint offset, int size) =>
+        aicaRamAccessCounters.TryGetValue(new AicaRamAccessKey(kind, offset, size), out var counter)
+            ? counter
+            : null;
+
+    private static IReadOnlyList<AicaRamDriverFieldDefinition> KnownAicaRamDriverFields() =>
+    [
+        new(Sa2ExecCompletionOffset, "SA2_EXEC_COMPLETION_CANDIDATE"),
+        new(Sa2AicaStatusOffset, "SA2_AICA_STATUS_CANDIDATE")
+    ];
+
     private static string GetAicaRamOffsetName(uint offset)
     {
         if (offset < AicaCommandQueueOffset)
         {
             return offset switch
             {
-                0x0000_00F8 => "SA2_EXEC_COMPLETION_CANDIDATE",
+                Sa2ExecCompletionOffset => "SA2_EXEC_COMPLETION_CANDIDATE",
                 _ => "ARM_PROGRAM_RAM"
             };
         }
@@ -2538,7 +2584,7 @@ public sealed class DreamcastMemory
         {
             return offset switch
             {
-                0x0001_2400 => "SA2_AICA_STATUS_CANDIDATE",
+                Sa2AicaStatusOffset => "SA2_AICA_STATUS_CANDIDATE",
                 _ => "COMMAND_QUEUE_AREA"
             };
         }
@@ -4091,6 +4137,8 @@ public sealed class DreamcastMemory
     }
 
     private readonly record struct AicaRamAccessKey(MemoryAccessKind Kind, uint Offset, int Size);
+
+    private readonly record struct AicaRamDriverFieldDefinition(uint Offset, string Name);
 
     private sealed class AicaRamAccessCounter
     {
