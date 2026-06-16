@@ -14604,7 +14604,7 @@ public sealed class Sh4Cpu
         return true;
     }
 
-    internal bool TryFastForwardStoreQueueYuvZeroFillDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    internal bool TryFastForwardStoreQueueZeroFillDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
         if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
@@ -14667,12 +14667,10 @@ public sealed class Sh4Cpu
         const uint bytesPerFlush = 32;
         var firstSkippedQueueAddress = unchecked(State.R[0] + bytesPerFlush);
         var lastSkippedQueueAddress = unchecked(State.R[0] + (remainingIterations * bytesPerFlush));
+        var bytesToClear = (ulong)remainingIterations * bytesPerFlush;
         if (lastSkippedQueueAddress < firstSkippedQueueAddress
             || !memory.TryGetStoreQueueDestination(firstSkippedQueueAddress, out var firstDestination)
-            || !memory.TryGetStoreQueueDestination(lastSkippedQueueAddress, out var lastDestination)
-            || firstDestination < 0x1080_0000
-            || lastDestination < firstDestination
-            || lastDestination > 0x1100_0000 - bytesPerFlush)
+            || !memory.TryGetStoreQueueDestination(lastSkippedQueueAddress, out var lastDestination))
         {
             return false;
         }
@@ -14680,6 +14678,13 @@ public sealed class Sh4Cpu
         const uint bodyInstructionCount = 10;
         if (!TryComputeSkippedInstructions(remainingIterations, bodyInstructionCount, out skippedInstructions)
             || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        if (!IsPvrYuvConverterZeroFill(firstDestination, lastDestination, bytesPerFlush)
+            && (bytesToClear > int.MaxValue || !memory.TryClearPvrVramRange(firstDestination, (int)bytesToClear)))
         {
             skippedInstructions = 0;
             return false;
@@ -14694,6 +14699,11 @@ public sealed class Sh4Cpu
         immediateBranchTarget = null;
         return true;
     }
+
+    private static bool IsPvrYuvConverterZeroFill(uint firstDestination, uint lastDestination, uint bytesPerFlush) =>
+        firstDestination >= 0x1080_0000
+        && lastDestination >= firstDestination
+        && lastDestination <= 0x1100_0000 - bytesPerFlush;
 
     internal bool TryFastForwardPredecrementByteCopyDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {

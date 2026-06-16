@@ -171,13 +171,36 @@ public class Sh4CpuTests
 
         var branch = StepMany(cpu, 11);
 
-        Assert.True(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.True(cpu.TryFastForwardStoreQueueZeroFillDtLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(37UL, skippedInstructions);
         Assert.Equal(0xE080_0080u, cpu.State.R[0]);
         Assert.Equal(0u, cpu.State.R[1]);
         Assert.True(cpu.State.T);
         Assert.Equal(0x8C01_0044u, cpu.State.Pc);
         Assert.Equal(48UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void FastForwardsKosStoreQueueVramZeroFillLoop()
+    {
+        var memory = new DreamcastMemory();
+        FillWords(memory, 0x0500_0020, 3 * 8, 0xFFFF_FFFF);
+        WriteKosStoreQueueYuvZeroFillLoop(memory, 0x8C01_002C);
+        memory.WriteUInt32(0xFF00_0038, 0x04);
+        var cpu = new Sh4Cpu(memory, 0x8C01_002C);
+        cpu.State.R[0] = 0xE100_0000;
+        cpu.State.R[1] = 4;
+        cpu.State.R[12] = 0;
+
+        var branch = StepMany(cpu, 11);
+
+        Assert.True(cpu.TryFastForwardStoreQueueZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(37UL, skippedInstructions);
+        Assert.Equal(0xE100_0080u, cpu.State.R[0]);
+        Assert.Equal(0u, cpu.State.R[1]);
+        Assert.Equal(0u, memory.ReadUInt32(0x0500_0020));
+        Assert.Equal(0u, memory.ReadUInt32(0x0500_0040));
+        Assert.Equal(0u, memory.ReadUInt32(0x0500_0060));
     }
 
     [Fact]
@@ -193,7 +216,7 @@ public class Sh4CpuTests
 
         var branch = StepMany(cpu, 11);
 
-        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 36, out var skippedInstructions));
+        Assert.False(cpu.TryFastForwardStoreQueueZeroFillDtLoop(branch, 36, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0xE080_0000u, cpu.State.R[0]);
         Assert.Equal(3u, cpu.State.R[1]);
@@ -213,7 +236,7 @@ public class Sh4CpuTests
 
         var branch = StepMany(cpu, 11);
 
-        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.False(cpu.TryFastForwardStoreQueueZeroFillDtLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
     }
 
@@ -230,7 +253,7 @@ public class Sh4CpuTests
 
         var branch = StepMany(cpu, 11);
 
-        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.False(cpu.TryFastForwardStoreQueueZeroFillDtLoop(branch, 100, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
     }
 

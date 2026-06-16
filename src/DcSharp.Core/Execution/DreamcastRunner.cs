@@ -2014,7 +2014,7 @@ public sealed class DreamcastRunner
                         && string.IsNullOrWhiteSpace(options.StopOnDeviceDomain)
                         && TryGetDelayedBranchRange(step, out var storeQueueYuvBranchStartPc, out var storeQueueYuvBranchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, storeQueueYuvBranchStartPc, storeQueueYuvBranchEndPc)
-                        && cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var storeQueueYuvZeroFillSkippedInstructions))
+                        && cpu.TryFastForwardStoreQueueZeroFillDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var storeQueueYuvZeroFillSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(storeQueueYuvZeroFillSkippedInstructions, cpu.State.InstructionsExecuted);
                     }

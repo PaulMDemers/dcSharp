@@ -654,6 +654,17 @@ public sealed class DreamcastMemory
         return offset + length <= pvrVram.Length;
     }
 
+    internal bool TryClearPvrVramRange(uint address, int length)
+    {
+        if (!TryGetPvrVramOffset(address, length, out var offset))
+        {
+            return false;
+        }
+
+        pvrVram.AsSpan(offset, length).Clear();
+        return true;
+    }
+
     private bool TryGetOperandCacheRamOffset(uint address, int length, out byte[] ram, out int offset)
     {
         ram = operandCacheRamArea1;
