@@ -13943,6 +13943,69 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2G2DmaInactiveStatusProbe()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaInactiveStatusProbe(normalMemory);
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaInactiveStatusProbe(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C13_5688);
+        var fast = new Sh4Cpu(fastMemory, 0x8C13_5688);
+        InitializeSonicAdventure2G2DmaInactiveStatusProbeState(normalMemory, normal);
+        InitializeSonicAdventure2G2DmaInactiveStatusProbeState(fastMemory, fast);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2G2DmaInactiveStatusProbe(fastStart, 34, out var skippedInstructions));
+        Assert.Equal(34UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF18), fastMemory.ReadUInt32(0x8CFF_FF18));
+        Assert.Equal(0u, fastMemory.ReadUInt32(0x8CFF_FF18));
+        Assert.Equal(0x8C15_3D16u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2G2DmaInactiveStatusProbeWhenStatusIsBusy()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaInactiveStatusProbe(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_5688);
+        InitializeSonicAdventure2G2DmaInactiveStatusProbeState(memory, cpu);
+        memory.WriteUInt32(0xA05F_7818, 1);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaInactiveStatusProbe(start, 34, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_568Au, cpu.State.Pc);
+        Assert.Equal(0xCAFE_BABEu, memory.ReadUInt32(0x8CFF_FF18));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2G2DmaInactiveStatusProbeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaInactiveStatusProbe(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C13_5688);
+        InitializeSonicAdventure2G2DmaInactiveStatusProbeState(memory, cpu);
+
+        var start = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaInactiveStatusProbe(start, 33, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C13_568Au, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2InterruptCallbackStatusDecoderPrefix()
     {
         var normalMemory = new DreamcastMemory();
@@ -26711,6 +26774,47 @@ public class Sh4CpuTests
         memory.WriteUInt32(0x8C15_3C10, 0x4B4C_424D);
     }
 
+    private static void WriteSonicAdventure2G2DmaInactiveStatusProbe(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C13_5688, 0x0002);
+        WriteInstruction(memory, 0x8C13_568A, 0x9322);
+        WriteInstruction(memory, 0x8C13_568C, 0x4009);
+        WriteInstruction(memory, 0x8C13_568E, 0x4009);
+        WriteInstruction(memory, 0x8C13_5690, 0xC90F);
+        WriteInstruction(memory, 0x8C13_5692, 0x6603);
+        WriteInstruction(memory, 0x8C13_5694, 0x0002);
+        WriteInstruction(memory, 0x8C13_5696, 0x2039);
+        WriteInstruction(memory, 0x8C13_5698, 0xCBF0);
+        WriteInstruction(memory, 0x8C13_569A, 0x400E);
+        WriteInstruction(memory, 0x8C13_569C, 0xD30D);
+        WriteInstruction(memory, 0x8C13_569E, 0x6442);
+        WriteInstruction(memory, 0x8C13_56A0, 0x6232);
+        WriteInstruction(memory, 0x8C13_56A2, 0x4408);
+        WriteInstruction(memory, 0x8C13_56A4, 0x6122);
+        WriteInstruction(memory, 0x8C13_56A6, 0x4408);
+        WriteInstruction(memory, 0x8C13_56A8, 0x4400);
+        WriteInstruction(memory, 0x8C13_56AA, 0x6213);
+        WriteInstruction(memory, 0x8C13_56AC, 0x342C);
+        WriteInstruction(memory, 0x8C13_56AE, 0x5046);
+        WriteInstruction(memory, 0x8C13_56B0, 0xC801);
+        WriteInstruction(memory, 0x8C13_56B2, 0x8901);
+        WriteInstruction(memory, 0x8C13_56B8, 0xE100);
+        WriteInstruction(memory, 0x8C13_56BA, 0x6063);
+        WriteInstruction(memory, 0x8C13_56BC, 0x9309);
+        WriteInstruction(memory, 0x8C13_56BE, 0x0202);
+        WriteInstruction(memory, 0x8C13_56C0, 0xC90F);
+        WriteInstruction(memory, 0x8C13_56C2, 0x2512);
+        WriteInstruction(memory, 0x8C13_56C4, 0x4008);
+        WriteInstruction(memory, 0x8C13_56C6, 0x2239);
+        WriteInstruction(memory, 0x8C13_56C8, 0x4008);
+        WriteInstruction(memory, 0x8C13_56CA, 0x202B);
+        WriteInstruction(memory, 0x8C13_56CC, 0x400E);
+        WriteInstruction(memory, 0x8C13_56CE, 0x000B);
+        WriteInstruction(memory, 0x8C13_56D0, 0xE000);
+        WriteInstruction(memory, 0x8C13_56D2, 0xFF0F);
+        memory.WriteUInt32(0x8C13_56D4, 0x8C18_3544);
+    }
+
     private static void WriteSonicAdventure2InterruptCallbackStatusDecoderPrefix(DreamcastMemory memory)
     {
         WriteSonicAdventure2InterruptCallbackScan(memory);
@@ -26914,6 +27018,26 @@ public class Sh4CpuTests
         cpu.State.R[15] = 0x8CFF_FF20;
         cpu.State.Pr = 0x8C15_3C94;
         cpu.State.T = false;
+    }
+
+    private static void InitializeSonicAdventure2G2DmaInactiveStatusProbeState(DreamcastMemory memory, Sh4Cpu cpu)
+    {
+        memory.WriteUInt32(0x8C18_3544, 0x8C2A_21E0);
+        memory.WriteUInt32(0x8C2A_21E0, 0xA05F_7800);
+        memory.WriteUInt32(0x8C2A_21E4, 0);
+        memory.WriteUInt32(0xA05F_7818, 0);
+        memory.WriteUInt32(0x8CFF_FF18, 0xCAFE_BABE);
+
+        cpu.State.Sr = 0x7000_01F1;
+        cpu.State.R[1] = 0x1111_0001;
+        cpu.State.R[2] = 0x2222_0002;
+        cpu.State.R[3] = 0x3333_0003;
+        cpu.State.R[4] = 0x8C2A_21E4;
+        cpu.State.R[5] = 0x8CFF_FF18;
+        cpu.State.R[6] = 0x6666_0006;
+        cpu.State.R[7] = 0x7777_0007;
+        cpu.State.R[15] = 0x8CFF_FF40;
+        cpu.State.Pr = 0x8C15_3D16;
     }
 
     private static void InitializeSonicAdventure2InterruptCallbackStatusDecoderPrefixState(DreamcastMemory memory, Sh4Cpu cpu)
