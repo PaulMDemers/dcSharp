@@ -98,6 +98,14 @@ public sealed class DreamcastMemory
     private const uint AicaRamUncachedBase = 0xA080_0000;
     private const uint Sa2ExecCompletionOffset = 0x0000_00F8;
     private const uint Sa2AicaStatusOffset = 0x0001_2400;
+    private const uint Sa2AicaDriverField012418Offset = 0x0001_2418;
+    private const uint Sa2AicaDriverField01241COffset = 0x0001_241C;
+    private const uint Sa2AicaDriverField012420Offset = 0x0001_2420;
+    private const uint Sa2AicaDriverField012424Offset = 0x0001_2424;
+    private const uint Sa2AicaDriverField01243COffset = 0x0001_243C;
+    private const uint Sa2AicaDriverField012680Offset = 0x0001_2680;
+    private const uint Sa2AicaDriverField012684Offset = 0x0001_2684;
+    private const uint Sa2AicaDriverField012688Offset = 0x0001_2688;
     private const uint OperandCacheRamArea1Base = 0x7C00_0000;
     private const uint OperandCacheRamArea2Base = 0x7E00_0000;
     private const int OperandCacheRamAreaBytes = 4 * 1024;
@@ -2578,7 +2586,15 @@ public sealed class DreamcastMemory
     private static IReadOnlyList<AicaRamDriverFieldDefinition> KnownAicaRamDriverFields() =>
     [
         new(Sa2ExecCompletionOffset, "SA2_EXEC_COMPLETION_CANDIDATE"),
-        new(Sa2AicaStatusOffset, "SA2_AICA_STATUS_CANDIDATE")
+        new(Sa2AicaStatusOffset, "SA2_AICA_STATUS_CANDIDATE"),
+        new(Sa2AicaDriverField012418Offset, "SA2_AICA_DRIVER_FIELD_012418"),
+        new(Sa2AicaDriverField01241COffset, "SA2_AICA_DRIVER_FIELD_01241C"),
+        new(Sa2AicaDriverField012420Offset, "SA2_AICA_DRIVER_FIELD_012420"),
+        new(Sa2AicaDriverField012424Offset, "SA2_AICA_DRIVER_FIELD_012424"),
+        new(Sa2AicaDriverField01243COffset, "SA2_AICA_DRIVER_FIELD_01243C"),
+        new(Sa2AicaDriverField012680Offset, "SA2_AICA_DRIVER_FIELD_012680"),
+        new(Sa2AicaDriverField012684Offset, "SA2_AICA_DRIVER_FIELD_012684"),
+        new(Sa2AicaDriverField012688Offset, "SA2_AICA_DRIVER_FIELD_012688")
     ];
 
     private static string GetAicaRamOffsetName(uint offset)
@@ -2597,6 +2613,14 @@ public sealed class DreamcastMemory
             return offset switch
             {
                 Sa2AicaStatusOffset => "SA2_AICA_STATUS_CANDIDATE",
+                Sa2AicaDriverField012418Offset => "SA2_AICA_DRIVER_FIELD_012418",
+                Sa2AicaDriverField01241COffset => "SA2_AICA_DRIVER_FIELD_01241C",
+                Sa2AicaDriverField012420Offset => "SA2_AICA_DRIVER_FIELD_012420",
+                Sa2AicaDriverField012424Offset => "SA2_AICA_DRIVER_FIELD_012424",
+                Sa2AicaDriverField01243COffset => "SA2_AICA_DRIVER_FIELD_01243C",
+                Sa2AicaDriverField012680Offset => "SA2_AICA_DRIVER_FIELD_012680",
+                Sa2AicaDriverField012684Offset => "SA2_AICA_DRIVER_FIELD_012684",
+                Sa2AicaDriverField012688Offset => "SA2_AICA_DRIVER_FIELD_012688",
                 _ => "COMMAND_QUEUE_AREA"
             };
         }
@@ -2624,7 +2648,16 @@ public sealed class DreamcastMemory
         || name.StartsWith("KOS_", StringComparison.Ordinal);
 
     private static bool IsKnownAicaRamDriverField(uint offset) =>
-        offset is Sa2ExecCompletionOffset or Sa2AicaStatusOffset;
+        offset is Sa2ExecCompletionOffset
+            or Sa2AicaStatusOffset
+            or Sa2AicaDriverField012418Offset
+            or Sa2AicaDriverField01241COffset
+            or Sa2AicaDriverField012420Offset
+            or Sa2AicaDriverField012424Offset
+            or Sa2AicaDriverField01243COffset
+            or Sa2AicaDriverField012680Offset
+            or Sa2AicaDriverField012684Offset
+            or Sa2AicaDriverField012688Offset;
 
     private IReadOnlyList<DreamcastAicaRamTextMarker> CreateAicaTextMarkers()
     {

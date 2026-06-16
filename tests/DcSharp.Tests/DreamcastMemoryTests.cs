@@ -1369,6 +1369,48 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
+    public void AudioSnapshotReportsSonicAdventure2AdjacentAicaDriverFields()
+    {
+        var memory = new DreamcastMemory();
+        memory.CurrentInstructionPc = 0x8C15_43A6;
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2418));
+        memory.WriteUInt32(0xA081_241C, 0x0216_7EBF);
+        memory.WriteUInt32(0xA081_2420, 0x0000_008D);
+        memory.WriteUInt32(0xA081_2424, 0x0008_0830);
+        memory.WriteUInt32(0xA081_243C, 0x02B7_7001);
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2684));
+
+        var snapshot = memory.CreateAudioSnapshot();
+
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_012418"
+            && field.Value == 0
+            && field.ReadCount == 1);
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_01241C"
+            && field.Value == 0x0216_7EBF
+            && field.WriteCount == 1);
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_012420"
+            && field.Value == 0x0000_008D
+            && field.WriteCount == 1);
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_012424"
+            && field.Value == 0x0008_0830
+            && field.WriteCount == 1);
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_01243C"
+            && field.Value == 0x02B7_7001
+            && field.WriteCount == 1);
+        Assert.Contains(snapshot.DriverFields, field =>
+            field.Name == "SA2_AICA_DRIVER_FIELD_012684"
+            && field.Value == 0
+            && field.ReadCount == 1);
+        Assert.Contains(snapshot.RamFieldAccesses, access => access.Name == "SA2_AICA_DRIVER_FIELD_012418");
+        Assert.Contains(snapshot.RamFieldAccesses, access => access.Name == "SA2_AICA_DRIVER_FIELD_012684");
+    }
+
+    [Fact]
     public void WriteAicaRamDriverFieldWritesKnownDriverField()
     {
         var memory = new DreamcastMemory();
