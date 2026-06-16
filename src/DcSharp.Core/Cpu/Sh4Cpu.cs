@@ -4022,6 +4022,67 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2DmaStatusClearLoopEntryTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B16A
+            || step.Opcode != 0x64C2
+            || State.Pc != 0x8C15_B16C
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint iterationStride = 0x34;
+        const uint loopLimit = 0xD0;
+        const ulong instructionsPerIteration = 20;
+        var loopOffset = State.R[14];
+        var tableBase = memory.ReadUInt32(0x8C18_3544);
+        if (!IsSonicAdventure2G2DmaStatusClearLoop()
+            || State.R[4] != tableBase
+            || State.R[11] != 0x8C17_09E0
+            || State.R[12] != 0x8C18_3544
+            || State.R[13] != loopLimit
+            || loopOffset >= loopLimit
+            || loopOffset % iterationStride != 0
+            || !memory.TryGetSystemRamOffset(tableBase, 0xD0, out _))
+        {
+            return false;
+        }
+
+        var remainingIterations = ((loopLimit - loopOffset) + iterationStride - 1) / iterationStride;
+        if (remainingIterations == 0
+            || remainingIterations > 4)
+        {
+            return false;
+        }
+
+        var skippedInstructionCount = (remainingIterations * instructionsPerIteration) - 1;
+        if (skippedInstructionCount > maxInstructionsToSkip
+            || !TryClearSonicAdventure2G2DmaStatusRegisters(tableBase, loopOffset, out var lastRegisterBlock))
+        {
+            return false;
+        }
+
+        State.R[0] = 0;
+        State.R[1] = 0;
+        State.R[2] = 0x8C18_3544;
+        State.R[3] = 0xA05F_7800;
+        State.R[4] = lastRegisterBlock;
+        State.R[11] = 0x8C17_09E0;
+        State.R[12] = 0x8C18_3544;
+        State.R[13] = loopLimit;
+        State.R[14] = loopLimit;
+        State.T = true;
+        State.Pc = 0x8C15_B178;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2DmaStatusClearHelperTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
