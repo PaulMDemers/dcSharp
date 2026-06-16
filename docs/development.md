@@ -387,6 +387,7 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 - The broad `aica` fixture filter now passes `6/6` locally in Release. The shared KOS startup profile exposed `_sq_set32`, `_scif_init`, and shutdown-loop overhead; the store-queue zero-fill fast path now collapses YUV clears and bulk-clears VRAM backing storage for KOS video clears, and the masked counted-loop fast path now handles KOS's `mov #0,r0` SCIF delay-slot loop. This raises AICA fixture CPU fast-forward from roughly 4.8M to roughly 14.3M instructions per sample, reduces `minimal`'s PVR YUV TA command writes from 524,288 to 16, cuts a representative `aica_adpcm_metadata` run from about 4.4 minutes to about 39 seconds, and cuts the full `aica` filter to about 4 minutes.
 - The broad `timer` fixture filter passes `6/6` locally in Release, covering KOS sleeps/callbacks/VBlank arbitration plus bare-metal TMU mask/acceptance probes.
 - The broad `gdrom` fixture filter passes `17/17` locally in Release after rebuilding `dcsharp_gdrom_status.elf` to expect the generated local GDI media's GD-ROM disc type (`0x80`) instead of the CD-ROM/XA constant.
+- The broad `maple` fixture filter passes `6/6` locally in Release, covering neutral/scripted controller reads, controller script transitions, configured/absent port B behavior, and Maple IRQB acceptance. The `input_idle` fixture also passes, covering scripted input wakeups during idle advancement.
 
 ## Current Fixture Expectations
 
