@@ -3449,6 +3449,20 @@ public sealed class DreamcastMemory
         FlushStoreQueue(address);
     }
 
+    internal bool TryGetStoreQueueDestination(uint address, out uint destination)
+    {
+        destination = 0;
+        if (!IsStoreQueueAddress(address))
+        {
+            return false;
+        }
+
+        var queueIndex = StoreQueueIndex(address);
+        var qacr = p4Registers.GetValueOrDefault(StoreQueueQacrAddress(queueIndex));
+        destination = StoreQueueDestinationBase(address, qacr);
+        return true;
+    }
+
     private void WriteStoreQueue(uint address, ReadOnlySpan<byte> data)
     {
         if (data.Length is not (1 or 2 or 4))

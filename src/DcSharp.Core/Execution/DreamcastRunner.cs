@@ -2010,6 +2010,14 @@ public sealed class DreamcastRunner
                     {
                         scheduler.AdvanceAfterCpuFastForward(doa2InterpolationSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
+                    else if (options.MemoryWriteWatch is null
+                        && string.IsNullOrWhiteSpace(options.StopOnDeviceDomain)
+                        && TryGetDelayedBranchRange(step, out var storeQueueYuvBranchStartPc, out var storeQueueYuvBranchEndPc)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, storeQueueYuvBranchStartPc, storeQueueYuvBranchEndPc)
+                        && cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var storeQueueYuvZeroFillSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(storeQueueYuvZeroFillSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
                     else if (TryGetDelayedBranchRange(step, out var predecrementStoreBranchStartPc, out var predecrementStoreBranchEndPc)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, predecrementStoreBranchStartPc, predecrementStoreBranchEndPc)
                         && cpu.TryFastForwardPredecrementStoreDtLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var predecrementStoreSkippedInstructions))
@@ -2054,6 +2062,12 @@ public sealed class DreamcastRunner
                 if (ShouldStopOnDeviceAccess(options, memory.DeviceAccesses, deviceAccessCountBeforeStep, out var stopAccess, out var stopDetail))
                 {
                     return DreamcastRunResult.DeviceAccessStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), stopAccess, stopDetail, CaptureFinalMemorySnapshot(options, memory))
+                        with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
+                }
+
+                if (HasKosExitBanner(memory.SerialOutput) && HasKosShutdownWrite(memory.DeviceAccesses, deviceAccessCountBeforeStep))
+                {
+                    return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), step.Pc, step.Opcode, "KOS exit banner reached shutdown loop", CaptureFinalMemorySnapshot(options, memory))
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
             }
@@ -2492,6 +2506,13 @@ public sealed class DreamcastRunner
 
         return Encoding.ASCII.GetString(serialOutput.ToArray()).Contains(banner, StringComparison.Ordinal);
     }
+
+    private static bool HasKosShutdownWrite(IReadOnlyList<MemoryAccess> deviceAccesses, int previousCount) =>
+        deviceAccesses.Skip(previousCount).Any(access =>
+            access.Kind == MemoryAccessKind.Write
+            && access.Address == 0xFF00_0010
+            && access.Size == 4
+            && access.Value == 4);
 
     private static bool IsInExecutableSegment(ElfLoadResult load, uint address) =>
         load.LoadedSegments.Any(segment => (segment.Flags & 0x1) != 0

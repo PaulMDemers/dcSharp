@@ -14604,6 +14604,97 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardStoreQueueYuvZeroFillDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if ((step.Opcode & 0xFF00) != 0x8F00 || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var branchTarget = (uint)(step.Pc + 4 + ((sbyte)(step.Opcode & 0xFF) * 2));
+        if (delayedBranchTarget != branchTarget || State.Pc != step.Pc + 2 || branchTarget + 20 != step.Pc)
+        {
+            return false;
+        }
+
+        var firstStoreOpcode = memory.ReadInstructionUInt16(branchTarget);
+        if ((firstStoreOpcode & 0xF000) != 0x1000)
+        {
+            return false;
+        }
+
+        var baseRegister = (firstStoreOpcode >> 8) & 0xF;
+        var valueRegister = (firstStoreOpcode >> 4) & 0xF;
+        if (baseRegister != 0 || State.R[valueRegister] != 0)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < 7; index++)
+        {
+            var opcode = memory.ReadInstructionUInt16(branchTarget + ((uint)index * 2));
+            var expectedDisplacement = 7 - index;
+            if ((opcode & 0xF00F) != (0x1000 | expectedDisplacement)
+                || ((opcode >> 8) & 0xF) != baseRegister
+                || ((opcode >> 4) & 0xF) != valueRegister)
+            {
+                return false;
+            }
+        }
+
+        var finalStoreOpcode = memory.ReadInstructionUInt16(branchTarget + 14);
+        var prefOpcode = memory.ReadInstructionUInt16(branchTarget + 16);
+        var dtOpcode = memory.ReadInstructionUInt16(branchTarget + 18);
+        var delaySlotOpcode = memory.ReadInstructionUInt16(step.Pc + 2);
+        if ((finalStoreOpcode & 0xF00F) != 0x2002
+            || ((finalStoreOpcode >> 8) & 0xF) != baseRegister
+            || ((finalStoreOpcode >> 4) & 0xF) != valueRegister
+            || prefOpcode != 0x0083
+            || (dtOpcode & 0xF0FF) != 0x4010
+            || delaySlotOpcode != 0x7020)
+        {
+            return false;
+        }
+
+        var counterRegister = (dtOpcode >> 8) & 0xF;
+        var remainingIterations = State.R[counterRegister];
+        if (remainingIterations == 0)
+        {
+            return false;
+        }
+
+        const uint bytesPerFlush = 32;
+        var firstSkippedQueueAddress = unchecked(State.R[0] + bytesPerFlush);
+        var lastSkippedQueueAddress = unchecked(State.R[0] + (remainingIterations * bytesPerFlush));
+        if (lastSkippedQueueAddress < firstSkippedQueueAddress
+            || !memory.TryGetStoreQueueDestination(firstSkippedQueueAddress, out var firstDestination)
+            || !memory.TryGetStoreQueueDestination(lastSkippedQueueAddress, out var lastDestination)
+            || firstDestination < 0x1080_0000
+            || lastDestination < firstDestination
+            || lastDestination > 0x1100_0000 - bytesPerFlush)
+        {
+            return false;
+        }
+
+        const uint bodyInstructionCount = 10;
+        if (!TryComputeSkippedInstructions(remainingIterations, bodyInstructionCount, out skippedInstructions)
+            || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        State.R[0] = unchecked(State.R[0] + ((remainingIterations + 1) * bytesPerFlush));
+        State.R[counterRegister] = 0;
+        State.T = true;
+        State.Pc = step.Pc + 4;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardPredecrementByteCopyDtLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

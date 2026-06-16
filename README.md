@@ -113,10 +113,10 @@ dotnet run --project src/DcSharp.Cli -- run artifacts/kos/dcsharp_aica_registers
 Run every manifest-listed KOS fixture and validate the expected stop reason, serial output, and device/video/audio expectations. The manifest declares `fixtures/kos.schema.json` for editor validation:
 
 ```bash
-dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --validate-only
-dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json
-dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --filter input_idle
-dotnet run --project src/DcSharp.Cli -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
+dotnet run --project src/DcSharp.Cli -c Release -- fixtures fixtures/kos.json --validate-only
+dotnet run --project src/DcSharp.Cli -c Release -- fixtures fixtures/kos.json
+dotnet run --project src/DcSharp.Cli -c Release -- fixtures fixtures/kos.json --filter input_idle
+dotnet run --project src/DcSharp.Cli -c Release -- fixtures fixtures/kos.json --report-json artifacts/reports/kos-fixtures.json
 ```
 
 The `run` command also accepts `--vblank-interval <instructions>`. Use `--vblank-interval 0` to disable the current synthetic VBlank source while debugging timing-sensitive behavior.

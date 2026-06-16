@@ -740,6 +740,22 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void ReportsProgramExitWhenKosExitBannerReachesShutdownLoop()
+    {
+        var elf = ElfFile.Read(new MemoryStream(CreateKosExitShutdownLoopElf()));
+
+        var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(InstructionLimit: 1_000, TraceTailLength: 8));
+
+        Assert.Equal(DreamcastStopReason.ProgramExit, result.StopReason);
+        Assert.Contains("KOS exit banner reached shutdown loop", result.StopDetail);
+        Assert.Contains("arch: exit return code", Encoding.ASCII.GetString(result.SerialOutput.ToArray()));
+        Assert.Contains(result.DeviceAccesses, access =>
+            access.Kind == MemoryAccessKind.Write
+            && access.Address == 0xFF00_0010
+            && access.Value == 4);
+    }
+
+    [Fact]
     public void CapturesTrapExceptionRegistersInCpuSnapshot()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateTrapElf()));
@@ -1172,6 +1188,33 @@ public class DreamcastRunnerTests
         WriteUInt32(bytes, 0x24, baseAddress + 0x2C);
         WriteUInt32(bytes, 0x28, 0x8CFF_FFF2);
         Encoding.ASCII.GetBytes("\narch: exit return code 0\n\0").CopyTo(bytes, 0x2C);
+
+        return CreateElfWithSegment(bytes);
+    }
+
+    private static byte[] CreateKosExitShutdownLoopElf()
+    {
+        const uint baseAddress = 0x8C01_0000;
+
+        var bytes = new byte[0x34 + 32];
+        WriteUInt16(bytes, 0x00, 0xD109); // mov.l @(0x09,pc),r1
+        WriteUInt16(bytes, 0x02, 0xD20A); // mov.l @(0x0A,pc),r2
+        WriteUInt16(bytes, 0x04, 0x0009); // nop
+        WriteUInt16(bytes, 0x06, 0x6024); // mov.b @r2+,r0
+        WriteUInt16(bytes, 0x08, 0x8800); // cmp/eq #0,r0
+        WriteUInt16(bytes, 0x0A, 0x8903); // bt done
+        WriteUInt16(bytes, 0x0C, 0x2100); // mov.b r0,@r1
+        WriteUInt16(bytes, 0x0E, 0xAFFA); // bra loop
+        WriteUInt16(bytes, 0x10, 0x0009); // nop
+        WriteUInt16(bytes, 0x14, 0xE004); // mov #4,r0
+        WriteUInt16(bytes, 0x16, 0xD106); // mov.l @(0x06,pc),r1
+        WriteUInt16(bytes, 0x18, 0x2102); // mov.l r0,@r1
+        WriteUInt16(bytes, 0x1A, 0xAFFB); // bra done
+        WriteUInt16(bytes, 0x1C, 0x0009); // nop
+        WriteUInt32(bytes, 0x28, 0xFFE8_000C);
+        WriteUInt32(bytes, 0x2C, baseAddress + 0x34);
+        WriteUInt32(bytes, 0x30, 0xFF00_0010);
+        Encoding.ASCII.GetBytes("\narch: exit return code 0\n\0").CopyTo(bytes, 0x34);
 
         return CreateElfWithSegment(bytes);
     }

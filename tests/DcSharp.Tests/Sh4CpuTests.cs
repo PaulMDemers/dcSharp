@@ -159,6 +159,82 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsKosStoreQueueYuvZeroFillLoop()
+    {
+        var memory = new DreamcastMemory();
+        WriteKosStoreQueueYuvZeroFillLoop(memory, 0x8C01_002C);
+        memory.WriteUInt32(0xFF00_0038, 0x10);
+        var cpu = new Sh4Cpu(memory, 0x8C01_002C);
+        cpu.State.R[0] = 0xE080_0000;
+        cpu.State.R[1] = 4;
+        cpu.State.R[12] = 0;
+
+        var branch = StepMany(cpu, 11);
+
+        Assert.True(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(37UL, skippedInstructions);
+        Assert.Equal(0xE080_0080u, cpu.State.R[0]);
+        Assert.Equal(0u, cpu.State.R[1]);
+        Assert.True(cpu.State.T);
+        Assert.Equal(0x8C01_0044u, cpu.State.Pc);
+        Assert.Equal(48UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void StoreQueueYuvZeroFillFastForwardRespectsInstructionBudget()
+    {
+        var memory = new DreamcastMemory();
+        WriteKosStoreQueueYuvZeroFillLoop(memory, 0x8C01_002C);
+        memory.WriteUInt32(0xFF00_0038, 0x10);
+        var cpu = new Sh4Cpu(memory, 0x8C01_002C);
+        cpu.State.R[0] = 0xE080_0000;
+        cpu.State.R[1] = 4;
+        cpu.State.R[12] = 0;
+
+        var branch = StepMany(cpu, 11);
+
+        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 36, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0xE080_0000u, cpu.State.R[0]);
+        Assert.Equal(3u, cpu.State.R[1]);
+        Assert.Equal(0x8C01_0042u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void StoreQueueYuvZeroFillFastForwardRejectsNonzeroFill()
+    {
+        var memory = new DreamcastMemory();
+        WriteKosStoreQueueYuvZeroFillLoop(memory, 0x8C01_002C);
+        memory.WriteUInt32(0xFF00_0038, 0x10);
+        var cpu = new Sh4Cpu(memory, 0x8C01_002C);
+        cpu.State.R[0] = 0xE080_0000;
+        cpu.State.R[1] = 4;
+        cpu.State.R[12] = 1;
+
+        var branch = StepMany(cpu, 11);
+
+        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
+    public void StoreQueueYuvZeroFillFastForwardRejectsTaInputDestination()
+    {
+        var memory = new DreamcastMemory();
+        WriteKosStoreQueueYuvZeroFillLoop(memory, 0x8C01_002C);
+        memory.WriteUInt32(0xFF00_0038, 0);
+        var cpu = new Sh4Cpu(memory, 0x8C01_002C);
+        cpu.State.R[0] = 0xE000_0000;
+        cpu.State.R[1] = 4;
+        cpu.State.R[12] = 0;
+
+        var branch = StepMany(cpu, 11);
+
+        Assert.False(cpu.TryFastForwardStoreQueueYuvZeroFillDtLoop(branch, 100, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsImmediateDtLoop()
     {
         var memory = new DreamcastMemory();
@@ -21394,6 +21470,23 @@ public class Sh4CpuTests
     private static void WriteInstruction(DreamcastMemory memory, uint address, ushort opcode)
     {
         memory.Write(address, [(byte)opcode, (byte)(opcode >> 8)]);
+    }
+
+    private static void WriteKosStoreQueueYuvZeroFillLoop(DreamcastMemory memory, uint start)
+    {
+        WriteInstruction(memory, start, 0x10C7);
+        WriteInstruction(memory, start + 0x02, 0x10C6);
+        WriteInstruction(memory, start + 0x04, 0x10C5);
+        WriteInstruction(memory, start + 0x06, 0x10C4);
+        WriteInstruction(memory, start + 0x08, 0x10C3);
+        WriteInstruction(memory, start + 0x0A, 0x10C2);
+        WriteInstruction(memory, start + 0x0C, 0x10C1);
+        WriteInstruction(memory, start + 0x0E, 0x20C2);
+        WriteInstruction(memory, start + 0x10, 0x0083);
+        WriteInstruction(memory, start + 0x12, 0x4110);
+        WriteInstruction(memory, start + 0x14, 0x8FF4);
+        WriteInstruction(memory, start + 0x16, 0x7020);
+        WriteInstruction(memory, start + 0x18, 0x0009);
     }
 
     private static void FillWords(DreamcastMemory memory, uint start, int count, uint value)

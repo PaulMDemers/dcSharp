@@ -378,6 +378,14 @@ Use `-FixtureFilter <name>` with `-KosFixtures` to run only matching CLI fixture
 
 The fixture checks assume the corresponding ELF files already exist under `artifacts/kos/`. The test suite and CLI runner both read `fixtures/kos.json`.
 
+2026-06-16 KOS ladder pass:
+
+- `tools/kos/verify-kos.sh` still resolves `KOS_BASE=/home/paul/kos`, `KOS_PORTS=/home/paul/kos-ports`, and `sh-elf-gcc (GCC) 15.1.0`.
+- `tools/kos/build-fixtures.sh` rebuilt all 73 KOS sample directories represented by the 75-entry fixture manifest.
+- `dotnet run --project src\DcSharp.Cli\DcSharp.Cli.csproj -c Release -- fixtures fixtures\kos.json --validate-only` reports `Manifest OK: 75 fixtures`.
+- `minimal`, `trap_exception`, `illegal_instruction`, `slot_illegal_branch`, and `aica_registers` pass individually after this pass. `aica_registers` now terminates as `ProgramExit` when KOS has printed `arch: exit return code` and reaches its shutdown register-write loop.
+- The broad `aica` fixture filter still exceeds a 15-minute local timeout and should be split by sample next. The current hot profile exposes KOS `_sq_set32`, `_scif_init`, and shutdown-loop overhead; the YUV zero-clear path is now collapsed, reducing the `minimal` fixture's PVR YUV TA command writes from 524,288 to 16.
+
 ## Current Fixture Expectations
 
 - `dcsharp_minimal.elf`: reaches `main()` and exits through the firmware-exit trap.
