@@ -258,6 +258,81 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardIpBinPatternFillLoopEntryTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C00_8EE4
+            || step.Opcode != 0x85F1
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.Pc != 0x8C00_8EE6
+            || !IsIpBinPatternFillLoop())
+        {
+            return false;
+        }
+
+        var stack = State.R[15];
+        if (stack is < 0x7E00_0000 or >= 0x7E00_1000)
+        {
+            return false;
+        }
+
+        var column = memory.ReadUInt16(stack + 0x02);
+        var row = memory.ReadUInt32(stack + 0x0C);
+        var rowLimit = memory.ReadUInt32(stack + 0x04);
+        var total = memory.ReadUInt32(stack + 0x10);
+        var geometry = memory.ReadUInt32(stack + 0x2C);
+        var width = memory.ReadUInt16(stack + 0x24);
+        if (rowLimit == 0 || width == 0 || column >= width || row >= rowLimit || total >= 0x0010_0000)
+        {
+            return false;
+        }
+
+        var rowsRemaining = rowLimit - row;
+        var firstRowCells = (uint)(width - column);
+        var cellsRemaining = firstRowCells + ((rowsRemaining - 1) * (uint)width);
+        if (cellsRemaining == 0)
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 59;
+        var iterationsToSkip = (ulong)cellsRemaining;
+        if (iterationsToSkip > ulong.MaxValue / instructionsPerIteration)
+        {
+            return false;
+        }
+
+        skippedInstructions = (iterationsToSkip * instructionsPerIteration) - 1;
+        if (skippedInstructions == 0 || skippedInstructions > maxInstructionsToSkip)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        var finalTotal = (ulong)total + iterationsToSkip;
+        if (finalTotal > uint.MaxValue)
+        {
+            skippedInstructions = 0;
+            return false;
+        }
+
+        memory.WriteUInt16(stack + 0x02, (ushort)(width - 1));
+        memory.WriteUInt32(stack + 0x0C, rowLimit - 1);
+        memory.WriteUInt32(stack + 0x10, (uint)finalTotal);
+        State.R[0] = (uint)width - 1;
+        State.R[1] = rowLimit - 2;
+        State.R[2] = rowLimit - 1;
+        State.R[3] = rowLimit - 1;
+        State.R[4] = (geometry & 0xFFFF) + ((uint)width - 1);
+        State.T = false;
+        State.Pc = 0x8C00_8F50;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardIpBinFramebufferCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -1778,6 +1853,62 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C00_8B0C) == 0x027F
             && memory.ReadUInt32(0x8C00_8B10) == 0x8CED_4000;
     }
+
+    private bool IsIpBinPatternFillLoop() =>
+        memory.ReadInstructionUInt16(0x8C00_8EE4) == 0x85F1
+        && memory.ReadInstructionUInt16(0x8C00_8EE6) == 0x61F3
+        && memory.ReadInstructionUInt16(0x8C00_8EE8) == 0x7126
+        && memory.ReadInstructionUInt16(0x8C00_8EEA) == 0x6311
+        && memory.ReadInstructionUInt16(0x8C00_8EEC) == 0x3033
+        && memory.ReadInstructionUInt16(0x8C00_8EEE) == 0x8917
+        && memory.ReadInstructionUInt16(0x8C00_8EF0) == 0x62F1
+        && memory.ReadInstructionUInt16(0x8C00_8EF2) == 0xE024
+        && memory.ReadInstructionUInt16(0x8C00_8EF4) == 0x03FD
+        && memory.ReadInstructionUInt16(0x8C00_8EF6) == 0x3233
+        && memory.ReadInstructionUInt16(0x8C00_8EF8) == 0x8912
+        && memory.ReadInstructionUInt16(0x8C00_8EFA) == 0x50FB
+        && memory.ReadInstructionUInt16(0x8C00_8EFC) == 0x61F3
+        && memory.ReadInstructionUInt16(0x8C00_8EFE) == 0x711F
+        && memory.ReadInstructionUInt16(0x8C00_8F00) == 0x6610
+        && memory.ReadInstructionUInt16(0x8C00_8F02) == 0x666C
+        && memory.ReadInstructionUInt16(0x8C00_8F04) == 0x4608
+        && memory.ReadInstructionUInt16(0x8C00_8F06) == 0x5001
+        && memory.ReadInstructionUInt16(0x8C00_8F08) == 0x066E
+        && memory.ReadInstructionUInt16(0x8C00_8F0A) == 0x55FA
+        && memory.ReadInstructionUInt16(0x8C00_8F0C) == 0x8551
+        && memory.ReadInstructionUInt16(0x8C00_8F0E) == 0x65F1
+        && memory.ReadInstructionUInt16(0x8C00_8F10) == 0x350C
+        && memory.ReadInstructionUInt16(0x8C00_8F12) == 0x54FA
+        && memory.ReadInstructionUInt16(0x8C00_8F14) == 0x6441
+        && memory.ReadInstructionUInt16(0x8C00_8F16) == 0x85F1
+        && memory.ReadInstructionUInt16(0x8C00_8F18) == 0x340C
+        && memory.ReadInstructionUInt16(0x8C00_8F1A) == 0xD314
+        && memory.ReadInstructionUInt16(0x8C00_8F1C) == 0x430B
+        && memory.ReadInstructionUInt16(0x8C00_8F1E) == 0x0009
+        && memory.ReadInstructionUInt16(0x8C00_8F20) == 0x52F4
+        && memory.ReadInstructionUInt16(0x8C00_8F22) == 0x7201
+        && memory.ReadInstructionUInt16(0x8C00_8F24) == 0x1F24
+        && memory.ReadInstructionUInt16(0x8C00_8F26) == 0x85F1
+        && memory.ReadInstructionUInt16(0x8C00_8F28) == 0x7001
+        && memory.ReadInstructionUInt16(0x8C00_8F2A) == 0x81F1
+        && memory.ReadInstructionUInt16(0x8C00_8F2C) == 0x600F
+        && memory.ReadInstructionUInt16(0x8C00_8F2E) == 0x6203
+        && memory.ReadInstructionUInt16(0x8C00_8F30) == 0x53FB
+        && memory.ReadInstructionUInt16(0x8C00_8F32) == 0x8536
+        && memory.ReadInstructionUInt16(0x8C00_8F34) == 0x3203
+        && memory.ReadInstructionUInt16(0x8C00_8F36) == 0x8B04
+        && memory.ReadInstructionUInt16(0x8C00_8F38) == 0xE000
+        && memory.ReadInstructionUInt16(0x8C00_8F3A) == 0x81F1
+        && memory.ReadInstructionUInt16(0x8C00_8F3C) == 0x63F1
+        && memory.ReadInstructionUInt16(0x8C00_8F3E) == 0x7301
+        && memory.ReadInstructionUInt16(0x8C00_8F40) == 0x2F31
+        && memory.ReadInstructionUInt16(0x8C00_8F42) == 0x52F3
+        && memory.ReadInstructionUInt16(0x8C00_8F44) == 0x7201
+        && memory.ReadInstructionUInt16(0x8C00_8F46) == 0x1F23
+        && memory.ReadInstructionUInt16(0x8C00_8F48) == 0x53F1
+        && memory.ReadInstructionUInt16(0x8C00_8F4A) == 0x51F3
+        && memory.ReadInstructionUInt16(0x8C00_8F4C) == 0x3132
+        && memory.ReadInstructionUInt16(0x8C00_8F4E) == 0x8BC9;
 
     private bool IsIpBinGlyphTableScanLoop() =>
         memory.ReadInstructionUInt16(0x8C00_86A8) == 0x62F2

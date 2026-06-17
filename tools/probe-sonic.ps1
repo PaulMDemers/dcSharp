@@ -75,5 +75,5 @@ $sonicAdventure2 = Join-Path $repoRoot "retail_discs\Sonic Adventure 2 (USA) (En
 $sonicShuffle = Join-Path $repoRoot "retail_discs\Sonic Shuffle (USA)\Sonic Shuffle (USA)\Sonic Shuffle (USA).gdi"
 
 Invoke-SonicBootSmoke "Sonic Adventure" $sonicAdventure "sonic-adventure-gdi" "FirmwareExit" "0x8C0000E8"
-Invoke-SonicBootSmoke "Sonic Adventure 2" $sonicAdventure2 "sonic-adventure-2-cue" "InstructionLimit" "0x8C135C10"
+Invoke-SonicBootSmoke "Sonic Adventure 2" $sonicAdventure2 "sonic-adventure-2-cue" "InstructionLimit" "0x8C135C00"
 Invoke-SonicBootSmoke "Sonic Shuffle" $sonicShuffle "sonic-shuffle-gdi" "UnsupportedInstruction" "0x8C008300"

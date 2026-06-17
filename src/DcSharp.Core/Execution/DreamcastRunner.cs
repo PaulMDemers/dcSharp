@@ -240,6 +240,11 @@ public sealed class DreamcastRunner
                 else
                 {
                     if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8EE4, 0x8C00_8F4E)
+                        && cpu.TryFastForwardIpBinPatternFillLoopEntryTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var patternFillEntrySkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(patternFillEntrySkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C00_8EE4, 0x8C00_8F4E)
                         && cpu.TryFastForwardIpBinPatternFillLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var patternFillSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(patternFillSkippedInstructions, cpu.State.InstructionsExecuted);

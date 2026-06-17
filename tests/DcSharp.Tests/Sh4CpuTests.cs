@@ -309,7 +309,7 @@ public class Sh4CpuTests
     public void FastForwardsIpBinPatternFillLoop()
     {
         var memory = new DreamcastMemory();
-        WriteInstruction(memory, 0x8C00_8F4E, 0x8BC9); // bf 0x8C008EE4
+        WriteIpBinPatternFillLoop(memory);
         WriteInstruction(memory, 0x8C00_8F50, 0x0009);
         var cpu = new Sh4Cpu(memory, 0x8C00_8F4E);
         cpu.State.Sr = 0xF0;
@@ -325,6 +325,34 @@ public class Sh4CpuTests
 
         Assert.True(cpu.TryFastForwardIpBinPatternFillLoop(branch, 1_000, out var skippedInstructions));
         Assert.Equal(10UL * 59, skippedInstructions);
+        Assert.Equal(3, memory.ReadUInt16(0x7E00_0F72));
+        Assert.Equal(4u, memory.ReadUInt32(0x7E00_0F7C));
+        Assert.Equal(19u, memory.ReadUInt32(0x7E00_0F80));
+        Assert.Equal(0x8C00_8F50u, cpu.State.Pc);
+        Assert.Equal(1UL + skippedInstructions, cpu.State.InstructionsExecuted);
+        Assert.False(cpu.State.T);
+    }
+
+    [Fact]
+    public void FastForwardsIpBinPatternFillLoopEntryTail()
+    {
+        var memory = new DreamcastMemory();
+        WriteIpBinPatternFillLoop(memory);
+        WriteInstruction(memory, 0x8C00_8F50, 0x0009);
+        var cpu = new Sh4Cpu(memory, 0x8C00_8EE4);
+        cpu.State.Sr = 0xF0;
+        cpu.State.R[15] = 0x7E00_0F70;
+        memory.WriteUInt16(0x7E00_0F72, 1);
+        memory.WriteUInt16(0x7E00_0F94, 4);
+        memory.WriteUInt32(0x7E00_0F7C, 2);
+        memory.WriteUInt32(0x7E00_0F74, 5);
+        memory.WriteUInt32(0x7E00_0F80, 8);
+        memory.WriteUInt32(0x7E00_0F9C, 0x0000_0020);
+
+        var start = cpu.Step();
+
+        Assert.True(cpu.TryFastForwardIpBinPatternFillLoopEntryTail(start, 1_000, out var skippedInstructions));
+        Assert.Equal((11UL * 59UL) - 1UL, skippedInstructions);
         Assert.Equal(3, memory.ReadUInt16(0x7E00_0F72));
         Assert.Equal(4u, memory.ReadUInt32(0x7E00_0F7C));
         Assert.Equal(19u, memory.ReadUInt32(0x7E00_0F80));
@@ -25668,6 +25696,64 @@ public class Sh4CpuTests
         WriteInstruction(memory, 0x8C00_909E, 0xC808);
         WriteInstruction(memory, 0x8C00_90A0, 0x89FB);
         memory.WriteUInt32(0x8C00_90E8, 0xA05F_6900);
+    }
+
+    private static void WriteIpBinPatternFillLoop(DreamcastMemory memory)
+    {
+        WriteInstruction(memory, 0x8C00_8EE4, 0x85F1);
+        WriteInstruction(memory, 0x8C00_8EE6, 0x61F3);
+        WriteInstruction(memory, 0x8C00_8EE8, 0x7126);
+        WriteInstruction(memory, 0x8C00_8EEA, 0x6311);
+        WriteInstruction(memory, 0x8C00_8EEC, 0x3033);
+        WriteInstruction(memory, 0x8C00_8EEE, 0x8917);
+        WriteInstruction(memory, 0x8C00_8EF0, 0x62F1);
+        WriteInstruction(memory, 0x8C00_8EF2, 0xE024);
+        WriteInstruction(memory, 0x8C00_8EF4, 0x03FD);
+        WriteInstruction(memory, 0x8C00_8EF6, 0x3233);
+        WriteInstruction(memory, 0x8C00_8EF8, 0x8912);
+        WriteInstruction(memory, 0x8C00_8EFA, 0x50FB);
+        WriteInstruction(memory, 0x8C00_8EFC, 0x61F3);
+        WriteInstruction(memory, 0x8C00_8EFE, 0x711F);
+        WriteInstruction(memory, 0x8C00_8F00, 0x6610);
+        WriteInstruction(memory, 0x8C00_8F02, 0x666C);
+        WriteInstruction(memory, 0x8C00_8F04, 0x4608);
+        WriteInstruction(memory, 0x8C00_8F06, 0x5001);
+        WriteInstruction(memory, 0x8C00_8F08, 0x066E);
+        WriteInstruction(memory, 0x8C00_8F0A, 0x55FA);
+        WriteInstruction(memory, 0x8C00_8F0C, 0x8551);
+        WriteInstruction(memory, 0x8C00_8F0E, 0x65F1);
+        WriteInstruction(memory, 0x8C00_8F10, 0x350C);
+        WriteInstruction(memory, 0x8C00_8F12, 0x54FA);
+        WriteInstruction(memory, 0x8C00_8F14, 0x6441);
+        WriteInstruction(memory, 0x8C00_8F16, 0x85F1);
+        WriteInstruction(memory, 0x8C00_8F18, 0x340C);
+        WriteInstruction(memory, 0x8C00_8F1A, 0xD314);
+        WriteInstruction(memory, 0x8C00_8F1C, 0x430B);
+        WriteInstruction(memory, 0x8C00_8F1E, 0x0009);
+        WriteInstruction(memory, 0x8C00_8F20, 0x52F4);
+        WriteInstruction(memory, 0x8C00_8F22, 0x7201);
+        WriteInstruction(memory, 0x8C00_8F24, 0x1F24);
+        WriteInstruction(memory, 0x8C00_8F26, 0x85F1);
+        WriteInstruction(memory, 0x8C00_8F28, 0x7001);
+        WriteInstruction(memory, 0x8C00_8F2A, 0x81F1);
+        WriteInstruction(memory, 0x8C00_8F2C, 0x600F);
+        WriteInstruction(memory, 0x8C00_8F2E, 0x6203);
+        WriteInstruction(memory, 0x8C00_8F30, 0x53FB);
+        WriteInstruction(memory, 0x8C00_8F32, 0x8536);
+        WriteInstruction(memory, 0x8C00_8F34, 0x3203);
+        WriteInstruction(memory, 0x8C00_8F36, 0x8B04);
+        WriteInstruction(memory, 0x8C00_8F38, 0xE000);
+        WriteInstruction(memory, 0x8C00_8F3A, 0x81F1);
+        WriteInstruction(memory, 0x8C00_8F3C, 0x63F1);
+        WriteInstruction(memory, 0x8C00_8F3E, 0x7301);
+        WriteInstruction(memory, 0x8C00_8F40, 0x2F31);
+        WriteInstruction(memory, 0x8C00_8F42, 0x52F3);
+        WriteInstruction(memory, 0x8C00_8F44, 0x7201);
+        WriteInstruction(memory, 0x8C00_8F46, 0x1F23);
+        WriteInstruction(memory, 0x8C00_8F48, 0x53F1);
+        WriteInstruction(memory, 0x8C00_8F4A, 0x51F3);
+        WriteInstruction(memory, 0x8C00_8F4C, 0x3132);
+        WriteInstruction(memory, 0x8C00_8F4E, 0x8BC9);
     }
 
     private static void WriteIpBinGlyphTableScanLoop(DreamcastMemory memory)
