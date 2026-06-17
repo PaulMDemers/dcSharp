@@ -200,7 +200,7 @@ public sealed class DreamcastPvrTaSpritePacketDecoder
         public DreamcastPvrTaSprite ToSprite()
         {
             var rgb565 = Argb8888ToRgb565(HeaderPayload.Argb);
-            var hasTexturePayload = HasTexturePayload(HeaderPayload.HeaderValue);
+            var hasTexturePayload = HeaderPayload.EffectiveTextureEnabled;
             (float U, float V, uint Value) aUv = hasTexturePayload ? DecodePackedUv(Dummy1 ?? 0) : (0.0f, 0.0f, 0u);
             (float U, float V, uint Value) bUv = hasTexturePayload ? DecodePackedUv(Dummy2 ?? 0) : (0.0f, 0.0f, 0u);
             (float U, float V, uint Value) cUv = hasTexturePayload ? DecodePackedUv(Dummy3 ?? 0) : (0.0f, 0.0f, 0u);

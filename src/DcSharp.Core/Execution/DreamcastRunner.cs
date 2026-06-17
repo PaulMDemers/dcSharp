@@ -2065,9 +2065,9 @@ public sealed class DreamcastRunner
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
 
-                if (HasKosExitBanner(memory.SerialOutput) && HasKosShutdownWrite(memory.DeviceAccesses, deviceAccessCountBeforeStep))
+                if (HasKosExitBanner(memory.SerialOutput))
                 {
-                    return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), step.Pc, step.Opcode, "KOS exit banner reached shutdown loop", CaptureFinalMemorySnapshot(options, memory))
+                    return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), step.Pc, step.Opcode, "KOS exit banner observed", CaptureFinalMemorySnapshot(options, memory))
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
             }
@@ -2506,13 +2506,6 @@ public sealed class DreamcastRunner
 
         return Encoding.ASCII.GetString(serialOutput.ToArray()).Contains(banner, StringComparison.Ordinal);
     }
-
-    private static bool HasKosShutdownWrite(IReadOnlyList<MemoryAccess> deviceAccesses, int previousCount) =>
-        deviceAccesses.Skip(previousCount).Any(access =>
-            access.Kind == MemoryAccessKind.Write
-            && access.Address == 0xFF00_0010
-            && access.Size == 4
-            && access.Value == 4);
 
     private static bool IsInExecutableSegment(ElfLoadResult load, uint address) =>
         load.LoadedSegments.Any(segment => (segment.Flags & 0x1) != 0
@@ -2981,7 +2974,7 @@ public sealed record DreamcastRunResult(
         ushort opcode,
         string detail,
         DreamcastMemorySnapshot? finalMemorySnapshot = null) =>
-        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, fpuAnomalies, fpuRegisterWrites, fpscrEvents, deviceAccesses, watchedMemoryWrites, watchedMemoryReads, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS shutdown at 0x{pc:X8}: {detail}", pc, opcode, gdrom, timer)
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, fpuAnomalies, fpuRegisterWrites, fpscrEvents, deviceAccesses, watchedMemoryWrites, watchedMemoryReads, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ProgramExit, $"Program returned after KOS exit at 0x{pc:X8}: {detail}", pc, opcode, gdrom, timer)
         {
             FpuSnapshots = fpuSnapshots,
             FpuMemoryTransfers = fpuMemoryTransfers,

@@ -362,6 +362,39 @@ public class DreamcastPvrTaStateTests
     }
 
     [Fact]
+    public void DecodesSpriteUvPayloadFromMode1TextureBit()
+    {
+        var state = new DreamcastPvrTaState();
+
+        Assert.Null(state.Accept(CreateWrite("SpriteHeader", 0xA084_0001)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0200_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0xFFFF_FFFF)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+        Assert.Null(state.Accept(CreateWrite("Unknown", 0x0000_0000)));
+
+        var render = AcceptSpritePacket(
+            state,
+            dummy1: 0x0000_0000,
+            dummy2: 0x3F80_0000,
+            dummy3: 0x3F80_3F80);
+
+        Assert.NotNull(render);
+        var sprite = Assert.Single(state.CompletedSprites);
+        Assert.True(sprite.HeaderPayload.Mode1Fields.TextureEnabled);
+        Assert.Equal(0.0f, sprite.Vertices[0].U);
+        Assert.Equal(0.0f, sprite.Vertices[0].V);
+        Assert.Equal(1.0f, sprite.Vertices[1].U);
+        Assert.Equal(0.0f, sprite.Vertices[1].V);
+        Assert.Equal(1.0f, sprite.Vertices[2].U);
+        Assert.Equal(1.0f, sprite.Vertices[2].V);
+        Assert.Equal(0.0f, sprite.Vertices[3].U);
+        Assert.Equal(1.0f, sprite.Vertices[3].V);
+    }
+
+    [Fact]
     public void TreatsSubpixelWidthSpriteAsRenderablePreviewArea()
     {
         var state = new DreamcastPvrTaState();

@@ -35,7 +35,7 @@ public static class DreamcastPvrTaStreamDecoder
                     {
                         pendingSpriteHeader = new PendingSpriteHeader(
                             payloadControl.Region,
-                            SpriteHeaderHasTexturePayload(payloadControl.Value));
+                            SpriteHeaderHasTexturePayload(payloadControl.Value) || SpriteHeaderMode1TextureEnabled(payloadControl.PayloadWords.FirstOrDefault()));
                     }
                     else if (string.Equals(payloadControl.Kind, "PolygonHeader", StringComparison.Ordinal))
                     {
@@ -138,6 +138,9 @@ public static class DreamcastPvrTaStreamDecoder
 
     private static bool SpriteHeaderHasTexturePayload(uint headerValue) =>
         (headerValue & 0x0000_0008u) != 0;
+
+    private static bool SpriteHeaderMode1TextureEnabled(uint mode1) =>
+        (mode1 & 0x0200_0000u) != 0;
 
     private static string? PayloadWordName(string controlKind, int payloadWordIndex, bool? spriteTextureEnabled = null) =>
         controlKind switch

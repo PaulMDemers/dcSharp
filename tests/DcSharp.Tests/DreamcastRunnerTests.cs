@@ -734,8 +734,8 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(InstructionLimit: 1_000, TraceTailLength: 8));
 
         Assert.Equal(DreamcastStopReason.ProgramExit, result.StopReason);
-        Assert.Equal(0x8CFF_FFF2u, result.StopPc);
-        Assert.Contains("Program returned after KOS shutdown", result.StopDetail);
+        Assert.Equal(0x8C01_000Cu, result.StopPc);
+        Assert.Contains("Program returned after KOS exit", result.StopDetail);
         Assert.Contains("arch: exit return code", Encoding.ASCII.GetString(result.SerialOutput.ToArray()));
     }
 
@@ -747,9 +747,9 @@ public class DreamcastRunnerTests
         var result = new DreamcastRunner().Run(elf, new DreamcastRunOptions(InstructionLimit: 1_000, TraceTailLength: 8));
 
         Assert.Equal(DreamcastStopReason.ProgramExit, result.StopReason);
-        Assert.Contains("KOS exit banner reached shutdown loop", result.StopDetail);
+        Assert.Contains("KOS exit banner observed", result.StopDetail);
         Assert.Contains("arch: exit return code", Encoding.ASCII.GetString(result.SerialOutput.ToArray()));
-        Assert.Contains(result.DeviceAccesses, access =>
+        Assert.DoesNotContain(result.DeviceAccesses, access =>
             access.Kind == MemoryAccessKind.Write
             && access.Address == 0xFF00_0010
             && access.Value == 4);
@@ -838,7 +838,7 @@ public class DreamcastRunnerTests
 
         Assert.Equal(DreamcastStopReason.ProgramExit, summary.StopReason);
         Assert.Equal(result.Cpu.InstructionsExecuted, summary.InstructionsExecuted);
-        Assert.Equal("0x8CFFFFF2", summary.StopPcHex);
+        Assert.Equal("0x8C01000C", summary.StopPcHex);
         Assert.Equal("0x8C010000", summary.Load.EntryPointHex);
         Assert.Contains("arch: exit return code", summary.SerialText);
         Assert.Equal(result.DeviceAccesses.Count, summary.DeviceAccessCount);
