@@ -7635,6 +7635,142 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2PioWriteLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5C00
+            || step.Opcode != 0x313C
+            || State.Pc != 0x8C13_5C02
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong tailInstructions = 10;
+        if (maxInstructionsToSkip < tailInstructions
+            || !IsSonicAdventure2G2PioWriteLoop()
+            || State.R[9] == 0
+            || (State.R[9] & 0x8000_0000) != 0
+            || !memory.TryGetSystemRamOffset(State.R[15], 20, out _))
+        {
+            return false;
+        }
+
+        var index = memory.ReadUInt32(State.R[15]);
+        var destination = memory.ReadUInt32(State.R[15] + 4);
+        var previousSource = memory.ReadUInt32(State.R[15] + 8);
+        var sourceStride = memory.ReadUInt32(State.R[15] + 12);
+        var destinationStride = memory.ReadUInt32(State.R[15] + 16);
+        var source = unchecked(previousSource + sourceStride);
+        if (index >= State.R[9]
+            || destinationStride == 0
+            || destinationStride > 4
+            || sourceStride > 4
+            || State.R[1] != source)
+        {
+            return false;
+        }
+
+        var completedIndex = index + 1;
+        var completedDestination = unchecked(destination + destinationStride);
+        memory.WriteUInt32(State.R[15], completedIndex);
+        memory.WriteUInt32(State.R[15] + 4, completedDestination);
+        memory.WriteUInt32(State.R[15] + 8, source);
+        State.R[0] = completedDestination;
+        State.R[2] = destinationStride;
+        State.R[3] = completedIndex;
+        State.T = completedIndex >= State.R[9];
+        State.Pc = State.T ? 0x8C13_5C16 : 0x8C13_5BDA;
+        State.InstructionsExecuted += tailInstructions;
+        skippedInstructions = tailInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        if (!State.T
+            && maxInstructionsToSkip > skippedInstructions)
+        {
+            var loopStep = new Sh4StepResult(0x8C13_5C14, 0x2F32, string.Empty);
+            if (TryFastForwardSonicAdventure2G2PioWriteLoop(loopStep, maxInstructionsToSkip - skippedInstructions, out var chainedSkippedInstructions))
+            {
+                skippedInstructions += chainedSkippedInstructions;
+            }
+        }
+
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2G2PioWriteScalarPath(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_5BF4
+            || step.Opcode != 0x53F2
+            || State.Pc != 0x8C13_5BF6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong scalarPathInstructions = 16;
+        if (maxInstructionsToSkip < scalarPathInstructions
+            || !IsSonicAdventure2G2PioWriteLoop()
+            || State.R[9] == 0
+            || (State.R[9] & 0x8000_0000) != 0
+            || !memory.TryGetSystemRamOffset(State.R[15], 20, out _))
+        {
+            return false;
+        }
+
+        var index = memory.ReadUInt32(State.R[15]);
+        var destination = memory.ReadUInt32(State.R[15] + 4);
+        var source = State.R[3];
+        var storedSource = memory.ReadUInt32(State.R[15] + 8);
+        var sourceStride = memory.ReadUInt32(State.R[15] + 12);
+        var destinationStride = memory.ReadUInt32(State.R[15] + 16);
+        if (index >= State.R[9]
+            || source != storedSource
+            || destinationStride == 0
+            || destinationStride > 4
+            || sourceStride > 4
+            || !IsAicaRamAddress(destination, 4)
+            || !CanReadContiguousWordRange(source, 4))
+        {
+            return false;
+        }
+
+        var value = memory.ReadUInt32(source);
+        WriteSonicAdventure2G2PioWord(destination, value);
+        var completedSource = unchecked(source + sourceStride);
+        var completedDestination = unchecked(destination + destinationStride);
+        var completedIndex = index + 1;
+        memory.WriteUInt32(State.R[15], completedIndex);
+        memory.WriteUInt32(State.R[15] + 4, completedDestination);
+        memory.WriteUInt32(State.R[15] + 8, completedSource);
+        State.R[0] = completedDestination;
+        State.R[1] = completedSource;
+        State.R[2] = destinationStride;
+        State.R[3] = completedIndex;
+        State.T = completedIndex >= State.R[9];
+        State.Pc = State.T ? 0x8C13_5C16 : 0x8C13_5BDA;
+        State.InstructionsExecuted += scalarPathInstructions;
+        skippedInstructions = scalarPathInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+
+        if (!State.T
+            && maxInstructionsToSkip > skippedInstructions)
+        {
+            var loopStep = new Sh4StepResult(0x8C13_5C14, 0x2F32, string.Empty);
+            if (TryFastForwardSonicAdventure2G2PioWriteLoop(loopStep, maxInstructionsToSkip - skippedInstructions, out var chainedSkippedInstructions))
+            {
+                skippedInstructions += chainedSkippedInstructions;
+            }
+        }
+
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioWriteLoopEntryTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

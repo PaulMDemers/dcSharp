@@ -1615,6 +1615,24 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_5BDA, 0x8C13_5C16)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B244, 0x8C15_B262)
+                        && cpu.TryFastForwardSonicAdventure2G2PioWriteScalarPath(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2PioWriteScalarSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2PioWriteScalarSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_5BDA, 0x8C13_5C16)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B244, 0x8C15_B262)
+                        && cpu.TryFastForwardSonicAdventure2G2PioWriteLoopTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2PioWriteTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2PioWriteTailSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_5BDA, 0x8C13_5C16)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_B244, 0x8C15_B262)
                         && cpu.TryFastForwardSonicAdventure2G2PioWriteLoop(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2G2PioWriteSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2G2PioWriteSkippedInstructions, cpu.State.InstructionsExecuted);
