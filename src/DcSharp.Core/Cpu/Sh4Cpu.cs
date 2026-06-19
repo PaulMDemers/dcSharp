@@ -9334,6 +9334,70 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaNoWorkSetupTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        const ulong setupInstructionCount = 19;
+        if (step.Pc != 0x8C15_B5B4
+            || step.Opcode != 0xDA11
+            || State.Pc != 0x8C15_B5B6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || maxInstructionsToSkip < setupInstructionCount
+            || !IsSonicAdventure2AicaNoWorkSetup()
+            || !IsSonicAdventure2AicaNoWorkSlotScan()
+            || State.R[15] < 12
+            || !memory.TryGetSystemRamOffset(State.R[15] - 12, 12, out _))
+        {
+            return false;
+        }
+
+        var basePointerAddress = State.R[10];
+        if (!memory.TryGetSystemRamOffset(basePointerAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var workBase = memory.ReadUInt32(basePointerAddress);
+        var counterAddress = workBase + 0x10E4;
+        if (!memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || (int)memory.ReadUInt32(counterAddress) > 0)
+        {
+            return false;
+        }
+
+        var entryAddress = workBase + 40;
+        var savedR9 = State.R[9];
+        State.R[9] = 24;
+        if (!TryComputeSonicAdventure2AicaNoWorkSlotScan(
+            workBase,
+            0,
+            entryAddress,
+            counterAddress,
+            maxInstructionsToSkip - setupInstructionCount,
+            out var result))
+        {
+            State.R[9] = savedR9;
+            return false;
+        }
+
+        var frame = State.R[15] - 12;
+        memory.WriteUInt32(frame + 8, savedR9);
+        memory.WriteUInt32(frame + 4, State.R[8]);
+        memory.WriteUInt32(frame, State.Pr);
+
+        State.R[8] = 0x8C17_D8DC;
+        State.R[9] = 24;
+        State.R[11] = counterAddress;
+        State.R[12] = entryAddress;
+        State.R[13] = 1;
+        State.R[14] = 0;
+        State.R[15] = frame;
+        ApplySonicAdventure2AicaNoWorkSlotScanResult(result, setupInstructionCount);
+        skippedInstructions = setupInstructionCount + result.SkippedInstructions;
+        return true;
+    }
+
     private bool TryComputeSonicAdventure2AicaNoWorkSlotScan(
         uint workBase,
         uint startIndex,
@@ -10017,6 +10081,36 @@ public sealed class Sh4Cpu
             && memory.ReadUInt16(0x8C15_B6D8) == 0x0F90
             && memory.ReadUInt32(0x8C15_B6F0) == 0x8C15_CE5C;
     }
+
+    private bool IsSonicAdventure2AicaNoWorkSetup() =>
+        memory.ReadInstructionUInt16(0x8C15_B5AA) == 0x2FE6
+        && memory.ReadInstructionUInt16(0x8C15_B5AC) == 0x2FD6
+        && memory.ReadInstructionUInt16(0x8C15_B5AE) == 0x2FC6
+        && memory.ReadInstructionUInt16(0x8C15_B5B0) == 0x2FB6
+        && memory.ReadInstructionUInt16(0x8C15_B5B2) == 0x2FA6
+        && memory.ReadInstructionUInt16(0x8C15_B5B4) == 0xDA11
+        && memory.ReadInstructionUInt16(0x8C15_B5B6) == 0x9018
+        && memory.ReadInstructionUInt16(0x8C15_B5B8) == 0x2F96
+        && memory.ReadInstructionUInt16(0x8C15_B5BA) == 0x2F86
+        && memory.ReadInstructionUInt16(0x8C15_B5BC) == 0x4F22
+        && memory.ReadInstructionUInt16(0x8C15_B5BE) == 0x6EA2
+        && memory.ReadInstructionUInt16(0x8C15_B5C0) == 0x9B12
+        && memory.ReadInstructionUInt16(0x8C15_B5C2) == 0x03EE
+        && memory.ReadInstructionUInt16(0x8C15_B5C4) == 0x6CE3
+        && memory.ReadInstructionUInt16(0x8C15_B5C6) == 0x7C28
+        && memory.ReadInstructionUInt16(0x8C15_B5C8) == 0x4315
+        && memory.ReadInstructionUInt16(0x8C15_B5CA) == 0x8F03
+        && memory.ReadInstructionUInt16(0x8C15_B5CC) == 0x3BEC
+        && memory.ReadInstructionUInt16(0x8C15_B5D4) == 0xD806
+        && memory.ReadInstructionUInt16(0x8C15_B5D6) == 0xED01
+        && memory.ReadInstructionUInt16(0x8C15_B5D8) == 0xE918
+        && memory.ReadInstructionUInt16(0x8C15_B5DA) == 0xA057
+        && memory.ReadInstructionUInt16(0x8C15_B5DC) == 0xEE00
+        && memory.ReadUInt16(0x8C15_B5E8) == 0x10E4
+        && memory.ReadUInt16(0x8C15_B5EA) == 0x10E4
+        && memory.ReadUInt32(0x8C15_B5F0) == 0x8C17_D8DC
+        && memory.ReadUInt32(0x8C15_B5F8) == 0x8C15_BE94
+        && memory.ReadUInt32(0x8C15_B5FC) == 0x8C2A_34F8;
 
     private bool IsSonicAdventure2AicaActiveSlotModeDispatch() =>
         IsSonicAdventure2AicaNoWorkSlotScan()
