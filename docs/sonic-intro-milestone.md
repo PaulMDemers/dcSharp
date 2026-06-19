@@ -127,6 +127,7 @@ Latest Sonic Adventure 2 audio/G2 progress:
 - Interrupt pending-table clear update: the `0x8C10FC80-0x8C10FC86` contiguous zero-store loop now fast-forwards the remaining system-RAM words after the first taken branch, preserving final `r4 == r6`, `T=1`, and the fallthrough at `0x8C10FC88`. Focused parity/guard tests and the full 1368-test suite pass; the desktop app also builds in Release. The 50M SA2 probe `sa2-interrupt-pending-table-clear-50m-20260614-195754` remains at `PC=0x8C135BFC` with 45 GD-ROM reads and 2 TOC requests, CPU fast-forward rises to `49,881,642`, and the `0x8C10FC80-0x8C10FC86` band leaves the top profile. The remaining fixed-budget pressure is now IP.BIN glyph dispatch/byte-exit plus the IP.BIN pattern-fill body.
 
 - AICA no-work setup-tail update: the `0x8C15B5B6` setup tail now completes the post-literal save path and chains into the existing no-work slot scan when the work counter is nonpositive. Focused AICA no-work tests pass; a 500002000-instruction SA2 sanity probe advances from the former `0x8C15B5B6` frontier to `PC=0x8C15C094`, with 51 GD-ROM commands observed, no TA writes yet, and `497,550,588` CPU-fast-forwarded instructions.
+- AICA channel-setup pre-callback update: the `0x8C15C512` bridge tail now covers the short setup span before the existing callback-tail helper. Focused channel-setup tests pass; a 500010080-instruction SA2 sanity probe advances from the former `0x8C15C512` frontier to `PC=0x8C15C666`, with `497,557,963` CPU-fast-forwarded instructions.
 
 ## Work Plan
 
