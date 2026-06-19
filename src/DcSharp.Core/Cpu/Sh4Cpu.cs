@@ -8618,6 +8618,51 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2InterruptCallbackFpuWrapperSavedRegisterTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C14_D210
+            || step.Opcode != 0xFF6B
+            || State.Pc != 0x8C14_D212
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.R[4] != 0x8C10_FE72
+            || !IsSonicAdventure2InterruptCallbackFpuWrapper())
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 13;
+        var currentStack = State.R[15];
+        var finalStack = unchecked(currentStack - 40);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !memory.TryGetSystemRamOffset(finalStack, 40, out _))
+        {
+            return false;
+        }
+
+        var savedPr = State.Pr;
+        var callbackTarget = State.R[4];
+        var callbackArgument = State.R[5];
+        for (var register = 7; register < State.Fr.Length; register++)
+        {
+            memory.WriteUInt32(currentStack - 4 - (((uint)register - 7) * 4), State.Fr[register]);
+        }
+
+        memory.WriteUInt32(finalStack, savedPr);
+
+        State.R[3] = callbackTarget;
+        State.R[4] = callbackArgument;
+        State.R[15] = finalStack;
+        State.Pr = 0x8C14_D22C;
+        State.Pc = callbackTarget;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool IsSonicAdventure2InterruptCallbackFpuWrapper() =>
         memory.ReadInstructionUInt16(0x8C14_D1F4) == 0x006A
         && memory.ReadInstructionUInt16(0x8C14_D1F6) == 0x2F06
