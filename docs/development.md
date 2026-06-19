@@ -473,4 +473,6 @@ The fixture checks assume the corresponding ELF files already exist under `artif
 
 ## Commit Hygiene
 
+SA2 AICA/G2 frontier update: three narrow budget-edge fast-forwards now clear the `0x8C15C666` inactive descriptor-copy return, the `0x8C15B24E` G2 DMA inactive-status wrapper, and the `0x8C1356DE` G2 PIO read mid-prologue. Focused parity/guard tests cover each path, and a 500060000-instruction SA2 sanity probe now reaches `PC=0x8C16B598` with `497,609,898` CPU-fast-forwarded instructions and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
