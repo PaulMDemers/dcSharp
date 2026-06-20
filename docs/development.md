@@ -477,4 +477,6 @@ SA2 AICA/G2 frontier update: three narrow budget-edge fast-forwards now clear th
 
 SA2 G2 status helper tail update: the `0x8C170AAE` G2 DMA status-set helper now has a guarded post-status-read tail for probes that expire immediately after loading the channel index. Focused G2 status helper tests pass; a 500061020-instruction SA2 sanity probe clears the former `PC=0x8C170AB0` edge and returns to the caller loop, while a 500063000-instruction probe advances to the known inactive-status wrapper return edge at `PC=0x8C15B270` with `497,612,910` CPU-fast-forwarded instructions and no TA writes yet.
 
+SA2 AICA register-pair status tail update: the `0x8C15AFBC` status-probe wrapper return now has a guarded six-instruction tail after the successful `A05F688C & 1` probe and `tableBase+0x110` counter increment. Focused AICA register-pair tests pass; a 500063046-instruction SA2 probe clears the former `PC=0x8C15AFBE` edge, and a 500064600-instruction probe advances to the AICA work-queue prologue at `PC=0x8C16B50A` with no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
