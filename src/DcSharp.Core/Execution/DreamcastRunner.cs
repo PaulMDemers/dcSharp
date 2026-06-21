@@ -634,6 +634,15 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_BF10, 0x8C16_BF44)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_43A0, 0x8C15_43EE)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
+                        && cpu.TryFastForwardSonicAdventure2AicaByteReadHelperToActiveBytePoll(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaByteReadToActiveBytePollSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaByteReadToActiveBytePollSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_BF10, 0x8C16_BF44)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_43A0, 0x8C15_43EE)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
                         && cpu.TryFastForwardSonicAdventure2AicaByteReadHelper(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaByteReadSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaByteReadSkippedInstructions, cpu.State.InstructionsExecuted);
@@ -893,6 +902,16 @@ public sealed class DreamcastRunner
                             out var sonicAdventure2AicaWorkQueueActiveByteSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaWorkQueueActiveByteSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_500C, 0x8C15_5038)
+                        && cpu.TryFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingTail(
+                            step,
+                            options.InstructionLimit - cpu.State.InstructionsExecuted,
+                            out var sonicAdventure2AicaActiveWorkCallbackNoPendingTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaActiveWorkCallbackNoPendingTailSkippedInstructions, cpu.State.InstructionsExecuted);
                     }
                     else if (options.MemoryReadWatch is null
                         && options.MemoryWriteWatch is null

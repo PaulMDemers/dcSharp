@@ -484,4 +484,6 @@ SA2 G2 status helper tail update: the `0x8C170AAE` G2 DMA status-set helper now 
 
 SA2 AICA register-pair status tail update: the `0x8C15AFBC` status-probe wrapper return now has a guarded six-instruction tail after the successful `A05F688C & 1` probe and `tableBase+0x110` counter increment. Focused AICA register-pair tests pass; a 500063046-instruction SA2 probe clears the former `PC=0x8C15AFBE` edge, and a 500064600-instruction probe advances to the AICA work-queue prologue at `PC=0x8C16B50A` with no TA writes yet.
 
+SA2 AICA active-callback no-pending update: the `0x8C15501C` active callback tail now fast-forwards the zero-pending-work path after the callback status word has already been loaded. Focused active-callback/active-byte-poll tests pass; a 500068350-instruction SA2 probe clears the former `PC=0x8C15501E` edge and reaches `PC=0x8C153AA8`, while a 500068800-instruction probe advances to `PC=0x8C1709F0` in the G2 DMA status-clear helper, still with no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.

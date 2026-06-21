@@ -231,7 +231,7 @@ This prevents retail games from becoming the only test suite.
 
 ### Sonic Adventure 2
 
-State: best current canary. Reaches 50M at `PC=0x8C135BFC`, 45 GD-ROM reads, 2 TOCs, no TA traffic yet.
+State: best current canary. The focused long SA2 AICA/G2 ladder reaches the 500,068,800-instruction budget at `PC=0x8C1709F0` in the G2 DMA status-clear helper, with no TA traffic yet.
 
 Next:
 
