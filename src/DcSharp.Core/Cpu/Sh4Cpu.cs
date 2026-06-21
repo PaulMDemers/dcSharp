@@ -5450,14 +5450,17 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        var skippedInstructionCount = (remainingIterations * instructionsPerIteration) - 1;
-        if (skippedInstructionCount > maxInstructionsToSkip
-            || !TrySetSonicAdventure2G2DmaStatusRegisters(tableBase, loopOffset, out var lastRegisterBlock))
+        var possibleIterations = Math.Min((ulong)remainingIterations, (maxInstructionsToSkip + 1) / instructionsPerIteration);
+        if (possibleIterations == 0
+            || !TrySetSonicAdventure2G2DmaStatusRegisters(tableBase, loopOffset, (uint)possibleIterations, out var lastRegisterBlock))
         {
             return false;
         }
 
         var restoredInterruptMask = (State.Sr >> 4) & 0x0F;
+        var skippedInstructionCount = (possibleIterations * instructionsPerIteration) - 1;
+        var nextLoopOffset = loopOffset + ((uint)possibleIterations * iterationStride);
+        var completedLoop = nextLoopOffset >= loopLimit;
         State.R[0] = 0;
         State.R[1] = 0xFFFF_FF0F;
         State.R[2] = 1;
@@ -5467,11 +5470,158 @@ public sealed class Sh4Cpu
         State.R[11] = 0x8C17_0A98;
         State.R[12] = 0x8C18_3544;
         State.R[13] = loopLimit;
-        State.R[14] = loopLimit;
+        State.R[14] = nextLoopOffset;
         State.Sr = (State.Sr & 0xFFFF_FF0E & 0xFFFF_FF0F) | (restoredInterruptMask << 4);
         State.Pr = 0x8C15_B21A;
-        State.T = true;
-        State.Pc = 0x8C15_B220;
+        State.T = completedLoop;
+        State.Pc = completedLoop ? 0x8C15_B220 : 0x8C15_B212;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2G2DmaStatusSetFunctionLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B200
+            || step.Opcode != 0x2FE6
+            || State.Pc != 0x8C15_B202
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint iterationStride = 0x34;
+        const uint loopLimit = 0xD0;
+        const ulong prologueInstructionsAfterFirstStore = 8;
+        const ulong instructionsPerIteration = 39;
+        var tableBase = memory.ReadUInt32(0x8C18_3544);
+        var possibleIterations = maxInstructionsToSkip <= prologueInstructionsAfterFirstStore
+            ? 0
+            : Math.Min((ulong)(loopLimit / iterationStride), (maxInstructionsToSkip - prologueInstructionsAfterFirstStore) / instructionsPerIteration);
+        var savedR14StackAddress = State.R[15];
+        var frameStackAddress = unchecked(savedR14StackAddress - 16);
+
+        if (possibleIterations == 0
+            || !IsSonicAdventure2G2DmaStatusSetLoop()
+            || !memory.TryGetSystemRamOffset(frameStackAddress, 20, out _)
+            || memory.ReadUInt32(savedR14StackAddress) != State.R[14]
+            || !TrySetSonicAdventure2G2DmaStatusRegisters(tableBase, 0, (uint)possibleIterations, out var lastRegisterBlock))
+        {
+            return false;
+        }
+
+        var restoredInterruptMask = (State.Sr >> 4) & 0x0F;
+        var skippedInstructionCount = prologueInstructionsAfterFirstStore + (possibleIterations * instructionsPerIteration);
+        var nextLoopOffset = (uint)possibleIterations * iterationStride;
+        var completedLoop = nextLoopOffset >= loopLimit;
+        memory.WriteUInt32(savedR14StackAddress - 4, State.R[13]);
+        memory.WriteUInt32(savedR14StackAddress - 8, State.R[12]);
+        memory.WriteUInt32(savedR14StackAddress - 12, State.R[11]);
+        memory.WriteUInt32(savedR14StackAddress - 16, State.Pr);
+
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[2] = 1;
+        State.R[3] = (State.Sr & 0xFFFF_FF0E) & 0xFFFF_FF0F;
+        State.R[4] = lastRegisterBlock;
+        State.R[5] = restoredInterruptMask;
+        State.R[11] = 0x8C17_0A98;
+        State.R[12] = 0x8C18_3544;
+        State.R[13] = loopLimit;
+        State.R[14] = nextLoopOffset;
+        State.R[15] = frameStackAddress;
+        State.Sr = (State.Sr & 0xFFFF_FF0E & 0xFFFF_FF0F) | (restoredInterruptMask << 4);
+        State.Pr = 0x8C15_B21A;
+        State.T = completedLoop;
+        State.Pc = completedLoop ? 0x8C15_B220 : 0x8C15_B212;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2G2DmaStatusSetLoopTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B21A
+            || step.Opcode != 0x7E34
+            || State.Pc != 0x8C15_B21C
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const uint iterationStride = 0x34;
+        const uint loopLimit = 0xD0;
+        const ulong branchTailInstructions = 2;
+        const ulong instructionsPerIteration = 39;
+        var loopOffset = State.R[14];
+        var tableBase = memory.ReadUInt32(0x8C18_3544);
+        var previousLoopOffset = loopOffset - iterationStride;
+        if (maxInstructionsToSkip < branchTailInstructions
+            || !IsSonicAdventure2G2DmaStatusSetLoop()
+            || State.R[11] != 0x8C17_0A98
+            || State.R[12] != 0x8C18_3544
+            || State.R[13] != loopLimit
+            || State.Pr != 0x8C15_B21A
+            || loopOffset == 0
+            || loopOffset > loopLimit
+            || loopOffset % iterationStride != 0
+            || !memory.TryGetSystemRamOffset(tableBase, 0xD0, out _)
+            || memory.ReadUInt32(tableBase) != 0xA05F_7800)
+        {
+            return false;
+        }
+
+        var previousChannel = memory.ReadUInt32(tableBase + 4 + previousLoopOffset);
+        if (previousChannel > 3)
+        {
+            return false;
+        }
+
+        var previousRegisterBlock = 0xA05F_7800 + (previousChannel * 0x20);
+        if (State.R[4] != previousRegisterBlock
+            || memory.ReadUInt32(previousRegisterBlock + 0x1C) != 1)
+        {
+            return false;
+        }
+
+        var remainingIterations = loopOffset >= loopLimit ? 0 : ((loopLimit - loopOffset) + iterationStride - 1) / iterationStride;
+        var possibleIterations = Math.Min((ulong)remainingIterations, (maxInstructionsToSkip - branchTailInstructions) / instructionsPerIteration);
+        var lastRegisterBlock = previousRegisterBlock;
+        if (possibleIterations > 0
+            && !TrySetSonicAdventure2G2DmaStatusRegisters(tableBase, loopOffset, (uint)possibleIterations, out lastRegisterBlock))
+        {
+            return false;
+        }
+
+        var nextLoopOffset = loopOffset + ((uint)possibleIterations * iterationStride);
+        var completedLoop = nextLoopOffset >= loopLimit;
+        var skippedInstructionCount = branchTailInstructions + (possibleIterations * instructionsPerIteration);
+        if (possibleIterations > 0)
+        {
+            var restoredInterruptMask = (State.Sr >> 4) & 0x0F;
+            State.R[0] = 0;
+            State.R[1] = 0xFFFF_FF0F;
+            State.R[2] = 1;
+            State.R[3] = (State.Sr & 0xFFFF_FF0E) & 0xFFFF_FF0F;
+            State.R[4] = lastRegisterBlock;
+            State.R[5] = restoredInterruptMask;
+            State.Sr = (State.Sr & 0xFFFF_FF0E & 0xFFFF_FF0F) | (restoredInterruptMask << 4);
+        }
+
+        State.R[11] = 0x8C17_0A98;
+        State.R[12] = 0x8C18_3544;
+        State.R[13] = loopLimit;
+        State.R[14] = nextLoopOffset;
+        State.T = completedLoop;
+        State.Pc = completedLoop ? 0x8C15_B220 : 0x8C15_B212;
         State.InstructionsExecuted += skippedInstructionCount;
         skippedInstructions = skippedInstructionCount;
         delayedBranchTarget = null;
@@ -5696,19 +5846,31 @@ public sealed class Sh4Cpu
     {
         const uint iterationStride = 0x34;
         const uint loopLimit = 0xD0;
+        var iterationCount = ((loopLimit - loopOffset) + iterationStride - 1) / iterationStride;
+        return TrySetSonicAdventure2G2DmaStatusRegisters(tableBase, loopOffset, iterationCount, out lastRegisterBlock);
+    }
+
+    private bool TrySetSonicAdventure2G2DmaStatusRegisters(uint tableBase, uint loopOffset, uint iterationCount, out uint lastRegisterBlock)
+    {
+        const uint iterationStride = 0x34;
+        const uint loopLimit = 0xD0;
         Span<uint> registerBlocks = stackalloc uint[4];
         var registerBlockCount = 0;
         lastRegisterBlock = 0;
         if (loopOffset >= loopLimit
             || loopOffset % iterationStride != 0
+            || iterationCount == 0
+            || iterationCount > 4
+            || loopOffset + ((iterationCount - 1) * iterationStride) >= loopLimit
             || !memory.TryGetSystemRamOffset(tableBase, 0xD0, out _)
             || memory.ReadUInt32(tableBase) != 0xA05F_7800)
         {
             return false;
         }
 
-        for (var offset = loopOffset; offset < loopLimit; offset += iterationStride)
+        for (uint index = 0; index < iterationCount; index++)
         {
+            var offset = loopOffset + (index * iterationStride);
             var channel = memory.ReadUInt32(tableBase + 4 + offset);
             if (channel > 3)
             {

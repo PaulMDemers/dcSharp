@@ -490,4 +490,6 @@ SA2 G2 DMA status-clear post-shift update: the `0x8C1709EE` helper tail now fast
 
 SA2 AICA active-callback store-tail update: the `0x8C155018` active callback tail now fast-forwards the no-pending path after the callback argument store but before the work-global load. Focused active-callback tests pass; a 500068920-instruction SA2 probe clears `PC=0x8C15501A` and reaches `PC=0x8C16B59C`, still with no TA writes yet.
 
+SA2 G2 DMA status-set function/tail update: the `0x8C15B200` status-set function entry now folds the remaining saved-register prologue plus partial/full caller-loop status writes, while the `0x8C15B21A` tail folds post-helper increment/branch edges and chains into remaining entries. Focused G2 status-set tests pass; a 500071000-instruction SA2 probe clears the status-set caller loop and reaches `PC=0x8C13572A`, still with no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
