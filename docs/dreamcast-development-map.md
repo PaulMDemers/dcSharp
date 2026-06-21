@@ -231,7 +231,7 @@ This prevents retail games from becoming the only test suite.
 
 ### Sonic Adventure 2
 
-State: best current canary. The focused long SA2 AICA/G2 ladder reaches the 500,068,860-instruction budget at `PC=0x8C15501A` in the active AICA callback, with no TA traffic yet.
+State: best current canary. The focused long SA2 AICA/G2 ladder reaches the 500,068,920-instruction budget at `PC=0x8C16B59C` in the active AICA work-queue callback path, with no TA traffic yet.
 
 Next:
 

@@ -3827,6 +3827,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_5018
+            || step.Opcode != 0x2252
+            || State.Pc != 0x8C15_501A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 6;
+        var savedR14StackAddress = State.R[15];
+        var savedR14Readable = memory.TryGetSystemRamOffset(savedR14StackAddress, 4, out _);
+        var savedR14 = savedR14Readable ? memory.ReadUInt32(savedR14StackAddress) : 0;
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaActiveWorkCallback()
+            || State.Pr != 0x8C16_B5A2
+            || State.R[0] != 0x438
+            || State.R[1] != 0x8C18_33A4
+            || State.R[2] != 0x8C18_33A0
+            || State.R[4] != 0x8C16_B4CC
+            || State.R[5] == 0
+            || !savedR14Readable
+            || State.R[14] != savedR14
+            || workGlobal == 0
+            || !memory.TryGetSystemRamOffset(workGlobal, 0x43C, out _)
+            || memory.ReadUInt32(workGlobal + 0x438) != 0
+            || memory.ReadUInt32(0x8C18_339C) != State.R[4]
+            || memory.ReadUInt32(0x8C18_33A0) != State.R[5])
+        {
+            return false;
+        }
+
+        State.R[3] = 0;
+        State.R[14] = savedR14;
+        State.R[15] = savedR14StackAddress + 4;
+        State.Pc = State.Pr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaMirrorCopyLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;

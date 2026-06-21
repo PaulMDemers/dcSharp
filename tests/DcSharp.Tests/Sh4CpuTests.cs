@@ -3836,6 +3836,73 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTail()
+    {
+        const uint frameAddress = 0x8CFF_FF68;
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaActiveWorkCallback(normalMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(fastMemory);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingTailState(normalMemory, frameAddress);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingTailState(fastMemory, frameAddress);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_5018);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_5018);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailRegisters(normal, frameAddress);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailRegisters(fast, frameAddress);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C15_501Au, fast.State.Pc);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTail(fastStart, 6, out var skippedInstructions));
+        Assert.Equal(6UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C16_B5A2u, fast.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailWhenBudgetIsShort()
+    {
+        const uint frameAddress = 0x8CFF_FF68;
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingTailState(memory, frameAddress);
+        var cpu = new Sh4Cpu(memory, 0x8C15_5018);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailRegisters(cpu, frameAddress);
+
+        var step = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTail(step, 5, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_501Au, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailWhenCallbackWorkIsPending()
+    {
+        const uint frameAddress = 0x8CFF_FF68;
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingTailState(memory, frameAddress);
+        memory.WriteUInt32(0x8C2D_5AF8, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C15_5018);
+        InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailRegisters(cpu, frameAddress);
+
+        var step = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTail(step, 6, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaWorkQueueActiveCallbackTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -24289,6 +24356,20 @@ public class Sh4CpuTests
         cpu.State.R[4] = 0x8C16_B4CC;
         cpu.State.R[5] = 0x0B00_0003;
         cpu.State.R[14] = 0x8C2D_56C0;
+        cpu.State.R[15] = frameAddress;
+    }
+
+    private static void InitializeSonicAdventure2AicaActiveWorkCallbackNoPendingStoreTailRegisters(Sh4Cpu cpu, uint frameAddress)
+    {
+        cpu.State.Pr = 0x8C16_B5A2;
+        cpu.State.Sr = 0x4000_00F0;
+        cpu.State.R[0] = 0x438;
+        cpu.State.R[1] = 0x8C18_33A4;
+        cpu.State.R[2] = 0x8C18_33A0;
+        cpu.State.R[3] = 0x8C18_339C;
+        cpu.State.R[4] = 0x8C16_B4CC;
+        cpu.State.R[5] = 0x0B00_0003;
+        cpu.State.R[14] = 0x8C2D_56C8;
         cpu.State.R[15] = frameAddress;
     }
 
