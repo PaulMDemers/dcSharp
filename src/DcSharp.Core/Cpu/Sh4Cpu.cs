@@ -2815,6 +2815,93 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePollAfterByteReadReturn(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_BF42
+            || step.Opcode != 0xE000
+            || State.Pc != 0x8C16_B51C
+            || State.Pr != 0x8C16_B51C
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 45;
+        var frameAddress = State.R[15];
+        var savedPrStackAddress = frameAddress + 12;
+        var callerStackAddress = frameAddress + 44;
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        var workGlobalReadable = workGlobal != 0 && memory.TryGetSystemRamOffset(workGlobal, 0x43C, out _);
+        var workCount = workGlobalReadable ? memory.ReadUInt32(workGlobal + 0x18) : 0;
+        var statusByte = memory.TryGetSystemRamOffset(frameAddress, 1, out _)
+            ? memory.ReadByte(frameAddress)
+            : 0;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || !IsSonicAdventure2AicaByteReadHelper()
+            || !IsSonicAdventure2AicaActiveWorkCallback()
+            || frameAddress > uint.MaxValue - 44
+            || !memory.TryGetSystemRamOffset(frameAddress, 44, out _)
+            || !workGlobalReadable
+            || workCount == 0
+            || memory.ReadUInt32(workGlobal + 0x14) == 0
+            || memory.ReadUInt32(workGlobal + 0x438) != 0
+            || State.R[0] != 0
+            || (byte)State.R[1] != statusByte
+            || State.R[2] != frameAddress
+            || State.R[10] != workGlobal
+            || State.R[11] != memory.ReadUInt32(workGlobal + 0x14)
+            || State.R[14] != workGlobal + 8
+            || statusByte == 0
+            || memory.ReadUInt32(frameAddress + 4) != workCount
+            || memory.ReadUInt32(savedPrStackAddress) != 0x8C15_3AC4)
+        {
+            return false;
+        }
+
+        var savedInterruptMask = memory.ReadUInt32(frameAddress + 8);
+        var savedR8 = memory.ReadUInt32(savedPrStackAddress + 4);
+        var savedR9 = memory.ReadUInt32(savedPrStackAddress + 8);
+        var savedR10 = memory.ReadUInt32(savedPrStackAddress + 12);
+        var savedR11 = memory.ReadUInt32(savedPrStackAddress + 16);
+        var savedR12 = memory.ReadUInt32(savedPrStackAddress + 20);
+        var savedR13 = memory.ReadUInt32(savedPrStackAddress + 24);
+        var savedR14 = memory.ReadUInt32(savedPrStackAddress + 28);
+
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+        memory.WriteUInt32(0x8C18_339C, 0x8C16_B4CC);
+        memory.WriteUInt32(0x8C18_33A0, 0x0B00_0003);
+
+        State.R[0] = 0x0B00_0003;
+        State.R[1] = 0x8C18_33A4;
+        State.R[2] = 0x8C18_33A0;
+        State.R[3] = 0;
+        State.R[4] = 0x8C16_B4CC;
+        State.R[5] = 0x0B00_0003;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.R[8] = savedR8;
+        State.R[9] = savedR9;
+        State.R[10] = savedR10;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = callerStackAddress;
+        State.Pr = 0x8C15_3AC4;
+        State.Pc = 0x8C15_3AC4;
+        State.T = false;
+        State.Sr = (State.Sr & 0xFFFF_FF0Eu) | ((savedInterruptMask & 0xFu) << 4);
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePollPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
