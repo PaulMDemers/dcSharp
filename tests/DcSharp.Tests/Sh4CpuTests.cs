@@ -2759,6 +2759,38 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(normalMemory);
+        WriteSonicAdventure2G2PioReadWordHelper(fastMemory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(normalMemory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_AF98);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(normal);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(fast);
+
+        var normalStart = StepMany(normal, 30);
+        var fastStart = StepMany(fast, 30);
+        Assert.Equal(0x8C15_AFC4u, fastStart.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C15_AFC6u, fast.State.Pc);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail(fastStart, 2, out var skippedInstructions));
+        Assert.Equal(2UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C13_5770u, fast.State.Pc);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaRegisterPairPollWrapperWhenStatusIsBusy()
     {
         var memory = new DreamcastMemory();
@@ -2795,6 +2827,23 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTailWhenStatusIsBusy()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(cpu);
+
+        var start = StepMany(cpu, 30);
+        memory.WriteUInt32(0xA05F_688C, 1);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail(start, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_AFC6u, cpu.State.Pc);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperReturnTailWhenBudgetIsShort()
     {
         var memory = new DreamcastMemory();
@@ -2808,6 +2857,22 @@ public class Sh4CpuTests
         Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperReturnTail(start, 5, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C15_AFBEu, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(cpu);
+
+        var start = StepMany(cpu, 30);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail(start, 1, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_AFC6u, cpu.State.Pc);
     }
 
     [Fact]

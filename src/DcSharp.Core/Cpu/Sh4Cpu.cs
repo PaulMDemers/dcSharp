@@ -5328,6 +5328,42 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_AFC4
+            || step.Opcode != 0x6DF6
+            || State.Pc != 0x8C15_AFC6
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 2;
+        var savedR14StackAddress = State.R[15];
+        var statusRegister = memory.ReadUInt32(0x8C17_08C4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2PioReadHelper()
+            || State.R[0] != 0
+            || State.Pr != 0x8C13_5770
+            || !memory.TryGetSystemRamOffset(savedR14StackAddress, 4, out _)
+            || (memory.ReadUInt32(statusRegister) & 1) != 0)
+        {
+            return false;
+        }
+
+        State.R[14] = memory.ReadUInt32(savedR14StackAddress);
+        State.R[15] = savedR14StackAddress + 4;
+        State.Pc = State.Pr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool TrySetSonicAdventure2G2DmaStatusRegisters(uint tableBase, uint loopOffset, out uint lastRegisterBlock)
     {
         const uint iterationStride = 0x34;

@@ -136,6 +136,7 @@ Latest Sonic Adventure 2 audio/G2 progress:
 - AICA register-pair status return-tail update: the `0x8C15AFBC` wrapper tail now restores the caller frame after the successful `A05F688C & 1` probe and counter update. Focused AICA register-pair tests pass; a 500063046-instruction SA2 probe clears `PC=0x8C15AFBE`, and a 500064600-instruction probe reaches `PC=0x8C16B50A` with no TA writes yet.
 - AICA active byte-poll prologue update: the `0x8C16B4DA` prologue now fast-forwards the nonzero active-work status path through the nested byte-read helper and callback local-frame setup. Focused active-byte-poll tests pass; a 500068000-instruction SA2 sanity probe clears the former `PC=0x8C16B4F4` budget edge and reaches `PC=0x8C170AC2`, with `497,618,174` CPU-fast-forwarded instructions and no TA writes yet.
 - G2 DMA status-set write-tail update: the `0x8C170AC0` post-write tail now completes the SR restore and return path after the channel status register has already been set. Focused G2 status-set tests pass; a 500068100-instruction SA2 sanity probe clears `PC=0x8C170AC2` and reaches `PC=0x8C15AFC6`, with `497,618,263` CPU-fast-forwarded instructions and no TA writes yet.
+- AICA register-pair epilogue update: the `0x8C15AFC4` post-restore tail now completes the `rts`/`r14` restore path when the status probe has already succeeded. Focused register-pair tests pass; a 500068200-instruction SA2 sanity probe clears `PC=0x8C15AFC6` and reaches `PC=0x8C16B51C`, with `497,618,384` CPU-fast-forwarded instructions and no TA writes yet.
 
 ## Work Plan
 
