@@ -3709,6 +3709,60 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkPollNoWorkInterruptCountTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_3ABA
+            || step.Opcode != 0x4215
+            || State.Pc != 0x8C15_3ABC
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !step.Trace.EndsWith(" ; t=1", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 601;
+        var localStackAddress = State.R[15];
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaWorkPollFunction()
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || localStackAddress > uint.MaxValue - 8
+            || !memory.TryGetSystemRamOffset(localStackAddress, 8, out _)
+            || workGlobal == 0
+            || State.R[4] != workGlobal
+            || !memory.TryGetSystemRamOffset(workGlobal, 0x90, out _)
+            || memory.ReadUInt32(0x8C18_33A8) != 1
+            || State.R[2] == 0
+            || State.R[2] != memory.ReadUInt32(workGlobal + 0x18))
+        {
+            return false;
+        }
+
+        var savedInterruptMask = memory.ReadUInt32(localStackAddress) & 0x0F;
+        var savedPr = memory.ReadUInt32(localStackAddress + 4);
+        var maskedSr = State.Sr & 0xFFFF_FF0F;
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[2] = 0x8C18_33A0;
+        State.R[3] = maskedSr;
+        State.R[4] = 0x8C16_B4CC;
+        State.R[5] = 0x0B00_0003;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.R[15] = localStackAddress + 8;
+        State.Pr = savedPr;
+        State.Sr = maskedSr | (savedInterruptMask << 4);
+        State.T = true;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaOuterWorkPollLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
