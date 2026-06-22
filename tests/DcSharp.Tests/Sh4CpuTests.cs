@@ -3158,6 +3158,41 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaReadWordWrapperValidRangeBridge()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(normalMemory);
+        WriteSonicAdventure2G2PioReadWordHelper(fastMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(normalMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_43A0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_43A0);
+        InitializeSonicAdventure2AicaReadWordWrapperState(normal);
+        InitializeSonicAdventure2AicaReadWordWrapperState(fast);
+
+        var normalStart = StepUntilPc(normal, 0x8C15_43BE);
+        var fastStart = StepUntilPc(fast, 0x8C15_43BE);
+        Assert.Equal(0x8C15_43C0u, fast.State.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaReadWordWrapperValidRangeBridge(fastStart, 8, out var skippedInstructions));
+        Assert.Equal(8UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF78), fastMemory.ReadUInt32(0x8CFF_FF78));
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF7C), fastMemory.ReadUInt32(0x8CFF_FF7C));
+        Assert.Equal(0x8C13_56D8u, fast.State.Pc);
+        Assert.Equal(0x8C15_43D0u, fast.State.Pr);
+        Assert.Equal(0xA081_2418u, fast.State.R[4]);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaReadWordWrapperWithExecCompletion()
     {
         var memory = new DreamcastMemory();
@@ -3214,6 +3249,22 @@ public class Sh4CpuTests
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(7u, memory.ReadUInt32(0x8C2A_22EC));
         Assert.Equal(11u, memory.ReadUInt32(0x8C2A_22F0));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaReadWordWrapperValidRangeBridgeWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        WriteSonicAdventure2AicaReadWordWrapper(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_43A0);
+        InitializeSonicAdventure2AicaReadWordWrapperState(cpu);
+
+        var start = StepUntilPc(cpu, 0x8C15_43BE);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaReadWordWrapperValidRangeBridge(start, 7, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_43C0u, cpu.State.Pc);
     }
 
     [Fact]
