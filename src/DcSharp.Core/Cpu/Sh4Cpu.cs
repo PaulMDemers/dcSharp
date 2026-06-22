@@ -3266,6 +3266,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackStatusLoadTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_B584
+            || step.Opcode != 0x50F2
+            || State.Pc != 0x8C16_B586
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong statusRegisterLoadInstructionCount = 1;
+        const ulong statusRestoreTailInstructionCount = 37;
+        if (maxInstructionsToSkip < statusRegisterLoadInstructionCount + statusRestoreTailInstructionCount)
+        {
+            return false;
+        }
+
+        var previousR3 = State.R[3];
+        var previousPc = State.Pc;
+        var previousInstructionCount = State.InstructionsExecuted;
+        State.R[3] = State.Sr;
+        State.Pc = 0x8C16_B588;
+        State.InstructionsExecuted += statusRegisterLoadInstructionCount;
+        skippedInstructions = statusRegisterLoadInstructionCount;
+
+        var statusRestoreStep = new Sh4StepResult(0x8C16_B586, 0x0302, string.Empty);
+        if (TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackStatusRestoreTail(
+                statusRestoreStep,
+                maxInstructionsToSkip - skippedInstructions,
+                out var chainedSkippedInstructions))
+        {
+            skippedInstructions += chainedSkippedInstructions;
+            delayedBranchTarget = null;
+            immediateBranchTarget = null;
+            return true;
+        }
+
+        State.R[3] = previousR3;
+        State.Pc = previousPc;
+        State.InstructionsExecuted = previousInstructionCount;
+        skippedInstructions = 0;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return false;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackStatusRestoreTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
