@@ -989,6 +989,7 @@ public class DreamcastFixtureRunnerTests
             null,
             null,
             null,
+            null,
             new DreamcastLoadSummary(0, "0x00000000", 0, "0x00000000", 0, 0, [], 0),
             tmuDeviceAccesses,
             tmuDeviceAccesses == 0 ? [] : [new DreamcastDeviceAccessDomainSummary("tmu", tmuDeviceAccesses)],

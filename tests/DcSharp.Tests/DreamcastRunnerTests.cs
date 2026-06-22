@@ -922,6 +922,40 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void KnownAddressCatalogLabelsRetailAndHardwareAddresses()
+    {
+        var function = DreamcastKnownAddressCatalog.Find(0x8C15_B21A);
+        var helper = DreamcastKnownAddressCatalog.Find(0x8C17_0AAE);
+        var register = DreamcastKnownAddressCatalog.Find(0xA05F_781C);
+
+        Assert.NotNull(function);
+        Assert.Equal("SA2.G2DmaStatusSetFunction+0x1A", function.Display);
+        Assert.Equal("SA2 code", function.Category);
+        Assert.NotNull(helper);
+        Assert.Equal("SA2.G2DmaStatusSetHelper+0x16", helper.Display);
+        Assert.NotNull(register);
+        Assert.Equal("G2.DmaChannelRegisters+0x1C", register.Display);
+        Assert.Equal("MMIO", register.Category);
+        Assert.Null(DreamcastKnownAddressCatalog.Find(0x8C77_7777));
+    }
+
+    [Fact]
+    public void StructuredTraceAndMemorySummariesIncludeKnownAddresses()
+    {
+        var trace = DreamcastTraceSummary.FromStep(new Sh4StepResult(0x8C15_B21A, 0x7E34, "add #52,r14"));
+        var access = DreamcastMemoryAccessSummary.FromAccess(new MemoryAccess(
+            MemoryAccessKind.Write,
+            0xA05F_781C,
+            4,
+            1,
+            Pc: 0x8C17_0AC0));
+
+        Assert.Equal("SA2.G2DmaStatusSetFunction+0x1A", trace.KnownAddress?.Display);
+        Assert.Equal("G2.DmaChannelRegisters+0x1C", access.AddressKnownAddress?.Display);
+        Assert.Equal("SA2.G2DmaStatusSetHelper+0x28", access.PcKnownAddress?.Display);
+    }
+
+    [Fact]
     public void SummaryIncludesConfiguredControllerState()
     {
         var elf = ElfFile.Read(new MemoryStream(CreateNopElf()));

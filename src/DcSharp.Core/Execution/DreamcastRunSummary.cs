@@ -25,6 +25,7 @@ public sealed record DreamcastRunSummary(
     ushort? StopOpcode,
     string? StopOpcodeHex,
     DreamcastSymbolSummary? StopSymbol,
+    DreamcastKnownAddress? StopKnownAddress,
     DreamcastLoadSummary Load,
     int DeviceAccessCount,
     IReadOnlyList<DreamcastDeviceAccessDomainSummary> DeviceAccessDomains,
@@ -68,6 +69,7 @@ public sealed record DreamcastRunSummary(
             result.StopOpcode,
             result.StopOpcode is { } stopOpcode ? Hex16(stopOpcode) : null,
             result.StopPc is { } symbolPc ? DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(symbolPc), symbolPc) : null,
+            result.StopPc is { } knownPc ? DreamcastKnownAddressCatalog.Find(knownPc) : null,
             DreamcastLoadSummary.FromResult(result),
             result.DeviceAccesses.Count,
             result.DeviceAccesses
@@ -216,7 +218,9 @@ public sealed record DreamcastMemoryAccessSummary(
     uint Value,
     string ValueHex,
     uint? Pc,
-    string? PcHex)
+    string? PcHex,
+    DreamcastKnownAddress? AddressKnownAddress,
+    DreamcastKnownAddress? PcKnownAddress)
 {
     public static DreamcastMemoryAccessSummary FromAccess(MemoryAccess access) =>
         new(
@@ -228,7 +232,9 @@ public sealed record DreamcastMemoryAccessSummary(
             access.Value,
             $"0x{access.Value:X8}",
             access.Pc,
-            access.Pc is { } pc ? $"0x{pc:X8}" : null);
+            access.Pc is { } pc ? $"0x{pc:X8}" : null,
+            DreamcastKnownAddressCatalog.Find(access.Address),
+            access.Pc is { } knownPc ? DreamcastKnownAddressCatalog.Find(knownPc) : null);
 }
 
 public sealed record DreamcastTraceSummary(
@@ -237,10 +243,18 @@ public sealed record DreamcastTraceSummary(
     ushort Opcode,
     string OpcodeHex,
     string Trace,
-    DreamcastSymbolSummary? Symbol)
+    DreamcastSymbolSummary? Symbol,
+    DreamcastKnownAddress? KnownAddress)
 {
     public static DreamcastTraceSummary FromStep(Sh4StepResult step, ElfSymbol? symbol = null) =>
-        new(step.Pc, $"0x{step.Pc:X8}", step.Opcode, $"0x{step.Opcode:X4}", step.Trace, DreamcastSymbolSummary.FromSymbol(symbol, step.Pc));
+        new(
+            step.Pc,
+            $"0x{step.Pc:X8}",
+            step.Opcode,
+            $"0x{step.Opcode:X4}",
+            step.Trace,
+            DreamcastSymbolSummary.FromSymbol(symbol, step.Pc),
+            DreamcastKnownAddressCatalog.Find(step.Pc));
 }
 
 public sealed record DreamcastSymbolSummary(

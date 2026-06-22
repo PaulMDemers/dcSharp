@@ -1104,6 +1104,12 @@ static void RunElf(string path, string[] args)
         {
             Console.WriteLine($"Stop symbol: {symbol.Display} ({symbol.AddressHex})");
         }
+
+        var knownAddress = DreamcastKnownAddressCatalog.Find(stopPc);
+        if (knownAddress is not null)
+        {
+            Console.WriteLine($"Stop label: {knownAddress.Display} [{knownAddress.Category}]");
+        }
     }
 
     var controllerInstruction = EffectiveControllerInstruction(result);
@@ -1317,9 +1323,7 @@ static void RunElf(string path, string[] args)
         Console.WriteLine("Trace tail:");
         foreach (var step in result.TraceTail)
         {
-            var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
-            var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
-            Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+            Console.WriteLine($"  0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{FormatPcAnnotation(result.Load, step.Pc)}");
         }
     }
 }
@@ -1328,6 +1332,23 @@ static void WriteJsonRunSummary(DreamcastRunResult result, DreamcastRunOptions o
 {
     var summary = DreamcastRunSummary.FromResult(result, options);
     Console.WriteLine(SerializeJson(summary));
+}
+
+static string FormatPcAnnotation(ElfLoadResult load, uint pc)
+{
+    var parts = new List<string>(2);
+    if (DreamcastSymbolSummary.FromSymbol(load.FindNearestSymbol(pc), pc) is { } symbol)
+    {
+        parts.Add(symbol.Display);
+    }
+
+    if (DreamcastKnownAddressCatalog.Find(pc) is { } knownAddress
+        && !parts.Contains(knownAddress.Display, StringComparer.Ordinal))
+    {
+        parts.Add($"{knownAddress.Display} [{knownAddress.Category}]");
+    }
+
+    return parts.Count == 0 ? string.Empty : $" ; {string.Join(" ; ", parts)}";
 }
 
 static int RunFixtures(string manifestPath, string[] args)
@@ -1586,9 +1607,7 @@ static void DumpTraceLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var step in result.TraceLog)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
-        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{FormatPcAnnotation(result.Load, step.Pc)}");
     }
 }
 
@@ -1689,10 +1708,8 @@ static void DumpFpuAnomalyLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var anomaly in result.FpuAnomalies)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(anomaly.Pc), anomaly.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{anomaly.Instruction}: {anomaly.PcHex}: {anomaly.OpcodeHex}  {anomaly.Trace} ; {anomaly.Register} {anomaly.OldValueHex}->{anomaly.NewValueHex} {anomaly.Kind}, fpscr={FormatFpscr(anomaly.Fpscr)}{symbolText}");
+            $"#{anomaly.Instruction}: {anomaly.PcHex}: {anomaly.OpcodeHex}  {anomaly.Trace} ; {anomaly.Register} {anomaly.OldValueHex}->{anomaly.NewValueHex} {anomaly.Kind}, fpscr={FormatFpscr(anomaly.Fpscr)}{FormatPcAnnotation(result.Load, anomaly.Pc)}");
     }
 }
 
@@ -1701,10 +1718,8 @@ static void DumpFpuWriteLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var write in result.FpuRegisterWrites)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(write.Pc), write.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{write.Instruction}: {write.PcHex}: {write.OpcodeHex}  {write.Trace} ; {write.Register} {write.OldValueHex}->{write.NewValueHex}, fpscr={FormatFpscr(write.Fpscr)}{symbolText}");
+            $"#{write.Instruction}: {write.PcHex}: {write.OpcodeHex}  {write.Trace} ; {write.Register} {write.OldValueHex}->{write.NewValueHex}, fpscr={FormatFpscr(write.Fpscr)}{FormatPcAnnotation(result.Load, write.Pc)}");
     }
 }
 
@@ -1713,10 +1728,8 @@ static void DumpFpscrLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var fpscrEvent in result.FpscrEvents)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(fpscrEvent.Pc), fpscrEvent.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{fpscrEvent.Instruction}: {fpscrEvent.PcHex}: {fpscrEvent.OpcodeHex}  {fpscrEvent.Trace} ; fpscr {FormatFpscr(fpscrEvent.OldValue)}->{FormatFpscr(fpscrEvent.NewValue)} {fpscrEvent.Kind}{symbolText}");
+            $"#{fpscrEvent.Instruction}: {fpscrEvent.PcHex}: {fpscrEvent.OpcodeHex}  {fpscrEvent.Trace} ; fpscr {FormatFpscr(fpscrEvent.OldValue)}->{FormatFpscr(fpscrEvent.NewValue)} {fpscrEvent.Kind}{FormatPcAnnotation(result.Load, fpscrEvent.Pc)}");
     }
 }
 
@@ -1725,10 +1738,8 @@ static void DumpFpuSnapshotLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var snapshot in result.FpuSnapshots)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(snapshot.Pc), snapshot.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         writer.WriteLine(
-            $"#{snapshot.Instruction}: {snapshot.PcHex}: {snapshot.OpcodeHex}  {snapshot.Trace}{symbolText}");
+            $"#{snapshot.Instruction}: {snapshot.PcHex}: {snapshot.OpcodeHex}  {snapshot.Trace}{FormatPcAnnotation(result.Load, snapshot.Pc)}");
         writer.WriteLine($"  fpscr={FormatFpscr(snapshot.Fpscr)}, fpul={snapshot.FpulHex}, pr={snapshot.PrHex}, r15={snapshot.R15Hex}");
         writer.WriteLine($"  fr={FormatFpuSnapshotBank("fr", snapshot.Fr)}");
         writer.WriteLine($"  xf={FormatFpuSnapshotBank("xf", snapshot.Xf)}");
@@ -1740,11 +1751,9 @@ static void DumpCpuSnapshotLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var snapshot in result.CpuSnapshots)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(snapshot.Pc), snapshot.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         var state = snapshot.State;
         writer.WriteLine(
-            $"#{snapshot.Instruction}: {snapshot.PcHex}: {snapshot.OpcodeHex}  {snapshot.Trace}{symbolText}");
+            $"#{snapshot.Instruction}: {snapshot.PcHex}: {snapshot.OpcodeHex}  {snapshot.Trace}{FormatPcAnnotation(result.Load, snapshot.Pc)}");
         writer.WriteLine($"  r0-r7={FormatRegisterRange(state.R, 0, 8)}");
         writer.WriteLine($"  r8-r15={FormatRegisterRange(state.R, 8, 8)}");
         writer.WriteLine($"  pr=0x{state.Pr:X8}, sr=0x{state.Sr:X8}, gbr=0x{state.Gbr:X8}, vbr=0x{state.Vbr:X8}");
@@ -1773,13 +1782,11 @@ static void DumpFpuMemoryLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var transfer in result.FpuMemoryTransfers)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(transfer.Pc), transfer.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         var value = transfer.ValueHighHex is { } high
             ? $"{transfer.ValueHex},{high}"
             : transfer.ValueHex;
         writer.WriteLine(
-            $"#{transfer.Instruction}: {transfer.PcHex}: {transfer.OpcodeHex}  {transfer.Trace} ; {transfer.Direction} {transfer.Register}, addr={transfer.AddressHex}, size={transfer.Size}, value={value}, fpscr={FormatFpscr(transfer.Fpscr)}{symbolText}");
+            $"#{transfer.Instruction}: {transfer.PcHex}: {transfer.OpcodeHex}  {transfer.Trace} ; {transfer.Direction} {transfer.Register}, addr={transfer.AddressHex}, size={transfer.Size}, value={value}, fpscr={FormatFpscr(transfer.Fpscr)}{FormatPcAnnotation(result.Load, transfer.Pc)}");
     }
 }
 
@@ -1789,12 +1796,10 @@ static void DumpPcProfileLog(DreamcastRunResult result, string path)
     var total = result.PcProfile.Aggregate(0UL, (sum, entry) => sum + entry.Count);
     foreach (var entry in result.PcProfile)
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(entry.Pc), entry.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
         var percent = total == 0
             ? 0
             : (double)entry.Count * 100 / total;
-        writer.WriteLine($"{entry.PcHex}: count={entry.Count}, percent={percent:F2}{symbolText}");
+        writer.WriteLine($"{entry.PcHex}: count={entry.Count}, percent={percent:F2}{FormatPcAnnotation(result.Load, entry.Pc)}");
     }
 }
 
@@ -1803,9 +1808,7 @@ static void DumpWindowsCeSyscallLog(DreamcastRunResult result, string path)
     using var writer = CreateTextLog(path);
     foreach (var step in result.TraceLog.Where(step => (step.Pc & 1) != 0 && (step.Pc & 0xFFFF_0000) == 0xFFFF_0000))
     {
-        var symbol = DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(step.Pc), step.Pc);
-        var symbolText = symbol is null ? string.Empty : $" ; {symbol.Display}";
-        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{symbolText}");
+        writer.WriteLine($"#{step.Instruction}: 0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{FormatPcAnnotation(result.Load, step.Pc)}");
     }
 }
 

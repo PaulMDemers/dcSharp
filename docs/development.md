@@ -2,6 +2,8 @@
 
 This project is currently optimized around legal KallistiOS fixtures, deterministic CLI runs, and small emulator slices that can be regression-tested.
 
+For probe output decoding, see `docs/address-annotations.md`. Known retail/MMIO labels are emitted alongside ELF symbols in run summaries, trace tails, trace logs, snapshot logs, PC profiles, JSON summaries, and the desktop trace view.
+
 ## Toolchain
 
 KallistiOS is installed in WSL:

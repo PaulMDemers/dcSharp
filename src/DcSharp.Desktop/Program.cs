@@ -430,6 +430,11 @@ internal sealed class MainForm : Form
             lines.Add($"Stop symbol: {symbol.Name}+0x{symbol.Offset:X}");
         }
 
+        if (summary.StopKnownAddress is { } knownAddress)
+        {
+            lines.Add($"Stop label: {knownAddress.Display} [{knownAddress.Category}]");
+        }
+
         if (summary.Video.PvrTaStrips.Count > 0)
         {
             lines.Add("");
@@ -622,7 +627,24 @@ internal sealed class MainForm : Form
         }
 
         return string.Join(Environment.NewLine, result.TraceTail.Select(step =>
-            $"0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}"));
+            $"0x{step.Pc:X8}: 0x{step.Opcode:X4}  {step.Trace}{FormatPcAnnotation(result, step.Pc)}"));
+    }
+
+    private static string FormatPcAnnotation(DreamcastRunResult result, uint pc)
+    {
+        var parts = new List<string>(2);
+        if (DreamcastSymbolSummary.FromSymbol(result.Load.FindNearestSymbol(pc), pc) is { } symbol)
+        {
+            parts.Add(symbol.Display);
+        }
+
+        if (DreamcastKnownAddressCatalog.Find(pc) is { } knownAddress
+            && !parts.Contains(knownAddress.Display, StringComparer.Ordinal))
+        {
+            parts.Add($"{knownAddress.Display} [{knownAddress.Category}]");
+        }
+
+        return parts.Count == 0 ? string.Empty : $" ; {string.Join(" ; ", parts)}";
     }
 
     private static string BuildDevices(DreamcastRunResult result, DreamcastRunSummary summary)
