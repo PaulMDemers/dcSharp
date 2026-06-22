@@ -4259,6 +4259,57 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaOuterWorkPollLoopHead(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_F7F2
+            || step.Opcode != 0x4C0B
+            || State.Pc != 0x8C12_F7F4
+            || delayedBranchTarget != 0x8C15_3A90
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong firstIterationRemainingInstructions = 631;
+        const ulong additionalInstructionsPerIteration = 632;
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        if (maxInstructionsToSkip < firstIterationRemainingInstructions
+            || !IsSonicAdventure2AicaOuterWorkPollLoop()
+            || !IsSonicAdventure2AicaWorkPollFunction()
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || State.Pr != 0x8C12_F7F6
+            || State.R[11] != 0x8C18_33A4
+            || State.R[12] != 0x8C15_3A90
+            || State.R[13] != 0x0B00_0003
+            || workGlobal == 0
+            || !memory.TryGetSystemRamOffset(workGlobal, 0x1C, out _)
+            || memory.ReadUInt32(workGlobal + 0x18) == 0)
+        {
+            return false;
+        }
+
+        var additionalIterationsToSkip = (maxInstructionsToSkip - firstIterationRemainingInstructions) / additionalInstructionsPerIteration;
+        var workCount = memory.ReadUInt32(workGlobal + 0x18);
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[2] = workGlobal;
+        State.R[3] = workCount;
+        State.R[4] = 0x8C16_B4CC;
+        State.R[5] = 0x0B00_0003;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.R[14] = 0;
+        State.Pr = 0x8C12_F7F6;
+        State.Pc = 0x8C12_F7F2;
+        State.T = true;
+        skippedInstructions = firstIterationRemainingInstructions + (additionalIterationsToSkip * additionalInstructionsPerIteration);
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioReadWordHelper(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
