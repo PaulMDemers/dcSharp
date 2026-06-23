@@ -6724,6 +6724,38 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaReadWordWrapperReturnDelaySlot(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_43DA
+            || step.Opcode != 0x000B
+            || State.Pc != 0x8C15_43DC
+            || delayedBranchTarget != State.Pr
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 1;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaReadWordWrapper()
+            || State.R[0] != 0
+            || State.R[15] > uint.MaxValue - 4
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        State.R[14] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaReadWordWrapperValidRangeBridge(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
