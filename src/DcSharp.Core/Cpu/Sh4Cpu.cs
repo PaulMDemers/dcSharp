@@ -4348,6 +4348,47 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2PioReadWordHelperLocalFrameTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_56E6
+            || step.Opcode != 0x7FF8
+            || State.Pc != 0x8C13_56E8
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 438;
+        var localStackAddress = State.R[15];
+        var savedFrameAddress = localStackAddress + 8;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2PioReadHelper()
+            || State.R[6] != 4
+            || State.R[7] == 0
+            || localStackAddress > uint.MaxValue - 36
+            || !IsAicaRamAddress(State.R[4], 4)
+            || !memory.TryGetSystemRamOffset(State.R[5], 4, out _)
+            || !memory.TryGetSystemRamOffset(localStackAddress, 36, out _))
+        {
+            return false;
+        }
+
+        var value = memory.ReadUInt32(State.R[4]);
+        memory.WriteUInt32(State.R[5], value);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+
+        State.R[15] = savedFrameAddress;
+        RestoreSonicAdventure2G2PioReadHelperFrame();
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioReadWordPostStatusSetTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
