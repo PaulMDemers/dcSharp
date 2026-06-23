@@ -2051,6 +2051,14 @@ public sealed class DreamcastRunner
                         && options.MemoryWriteWatch is null
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_08B4, 0x8C17_08D4)
+                        && cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperZeroReturnTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaRegisterPairStatusProbeWrapperZeroReturnTailSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaRegisterPairStatusProbeWrapperZeroReturnTailSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_AF98, 0x8C15_AFCA)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C17_08B4, 0x8C17_08D4)
                         && cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTail(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTailSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaRegisterPairStatusProbeWrapperEpilogueTailSkippedInstructions, cpu.State.InstructionsExecuted);
