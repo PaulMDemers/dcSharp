@@ -4236,6 +4236,59 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaWorkQueueActiveCallbackRestoreTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(normalMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(fastMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(normalMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(fastMemory);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(normalMemory, 0x8CFF_FF84);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(fastMemory, 0x8CFF_FF84);
+        var normal = new Sh4Cpu(normalMemory, 0x8C16_B5B0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C16_B5B0);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(normal, 0x8CFF_FF84);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(fast, 0x8CFF_FF84);
+
+        var normalStart = normal.Step();
+        var fastStart = fast.Step();
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C16_B5B2u, fast.State.Pc);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackRestoreTail(fastStart, 3, out var skippedInstructions));
+        Assert.Equal(3UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C15_3AC4u, fast.State.Pc);
+        Assert.Equal(0x8CFF_FF90u, fast.State.R[15]);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(memory, 0x8CFF_FF84);
+        var cpu = new Sh4Cpu(memory, 0x8C16_B5B0);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(cpu, 0x8CFF_FF84);
+
+        var step = cpu.Step();
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackRestoreTail(step, 2, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C16_B5B2u, cpu.State.Pc);
+        Assert.Equal(0x8CFF_FF88u, cpu.State.R[15]);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaMirrorCopyLoop()
     {
         var normalMemory = new DreamcastMemory();
@@ -24785,6 +24838,36 @@ public class Sh4CpuTests
         cpu.State.R[5] = 0x0B00_0003;
         cpu.State.R[14] = 0x8C2D_56C8;
         cpu.State.R[15] = frameAddress;
+    }
+
+    private static void InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(DreamcastMemory memory, uint stackAddress)
+    {
+        memory.WriteUInt32(stackAddress, 0x8C15_3A90);
+        memory.WriteUInt32(stackAddress + 4, 0x0B00_0003);
+        memory.WriteUInt32(stackAddress + 8, 0x8C2D_56C8);
+    }
+
+    private static void InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(Sh4Cpu cpu, uint stackAddress)
+    {
+        cpu.State.Pr = 0x8C15_3AC4;
+        cpu.State.Sr = 0x4000_00F1;
+        cpu.State.R[0] = 0x0B00_0003;
+        cpu.State.R[1] = 0x8C18_33A4;
+        cpu.State.R[2] = 0x8C18_33A0;
+        cpu.State.R[3] = 0;
+        cpu.State.R[4] = 0x8C16_B4CC;
+        cpu.State.R[5] = 0x0B00_0003;
+        cpu.State.R[6] = 4;
+        cpu.State.R[7] = 1;
+        cpu.State.R[8] = 0;
+        cpu.State.R[9] = 0;
+        cpu.State.R[10] = 1;
+        cpu.State.R[11] = 0x8C18_33A4;
+        cpu.State.R[12] = 0x1111_2222;
+        cpu.State.R[13] = 0x3333_4444;
+        cpu.State.R[14] = 0x5555_6666;
+        cpu.State.R[15] = stackAddress;
+        cpu.State.T = true;
     }
 
     private static void InitializeSonicAdventure2AicaByteReadHelperToActiveBytePollRegisters(Sh4Cpu cpu, uint frameAddress)
