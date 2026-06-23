@@ -5969,6 +5969,46 @@ public class Sh4CpuTests
         Assert.Equal(expectedLoopOffset, fast.State.R[14]);
     }
 
+    [Theory]
+    [InlineData(40UL, 0x8C15_B212u, 0x68u)]
+    [InlineData(118UL, 0x8C15_B220u, 0xD0u)]
+    public void FastForwardsSonicAdventure2G2DmaStatusSetLoopBranchTail(ulong budget, uint expectedPc, uint expectedLoopOffset)
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaStatusSetLoop(normalMemory);
+        WriteSonicAdventure2G2DmaStatusSetLoop(fastMemory);
+        InitializeSonicAdventure2G2DmaStatusTable(normalMemory);
+        InitializeSonicAdventure2G2DmaStatusTable(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_B21A);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_B21A);
+        InitializeSonicAdventure2G2DmaStatusSetLoopTailState(normalMemory, normal, 0);
+        InitializeSonicAdventure2G2DmaStatusSetLoopTailState(fastMemory, fast, 0);
+
+        var normalStart = StepMany(normal, 2);
+        var fastStart = StepMany(fast, 2);
+        Assert.Equal(0x8C15_B21Cu, fastStart.Pc);
+        Assert.Equal(0x8C15_B21Eu, fast.State.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2G2DmaStatusSetLoopBranchTail(fastStart, budget, out var skippedInstructions));
+        Assert.Equal(budget, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0xA05F_781C), fastMemory.ReadUInt32(0xA05F_781C));
+        Assert.Equal(normalMemory.ReadUInt32(0xA05F_783C), fastMemory.ReadUInt32(0xA05F_783C));
+        Assert.Equal(normalMemory.ReadUInt32(0xA05F_785C), fastMemory.ReadUInt32(0xA05F_785C));
+        Assert.Equal(normalMemory.ReadUInt32(0xA05F_787C), fastMemory.ReadUInt32(0xA05F_787C));
+        Assert.Equal(expectedPc, fast.State.Pc);
+        Assert.Equal(expectedLoopOffset, fast.State.R[14]);
+    }
+
     [Fact]
     public void FastForwardsSonicAdventure2G2DmaStatusSetLoopPartiallyWhenBudgetFitsSomeIterations()
     {
@@ -6066,6 +6106,23 @@ public class Sh4CpuTests
 
         Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaStatusSetLoopTail(start, 1, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0u, memory.ReadUInt32(0xA05F_783C));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2G2DmaStatusSetLoopBranchTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2DmaStatusSetLoop(memory);
+        InitializeSonicAdventure2G2DmaStatusTable(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_B21A);
+        InitializeSonicAdventure2G2DmaStatusSetLoopTailState(memory, cpu, 0);
+
+        var start = StepMany(cpu, 2);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2G2DmaStatusSetLoopBranchTail(start, 0, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_B21Eu, cpu.State.Pc);
         Assert.Equal(0u, memory.ReadUInt32(0xA05F_783C));
     }
 
