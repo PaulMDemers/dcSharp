@@ -5975,6 +5975,66 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2DmaInactiveStatusProbeWrapperCounterTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B25E
+            || step.Opcode != 0x032E
+            || State.Pc != 0x8C15_B260
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 11;
+        var localStack = State.R[15];
+        var tableBasePointer = memory.ReadUInt32(0x8C15_B278);
+        var statusRegister = memory.ReadUInt32(0x8C17_0BCC);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2DmaInactiveStatusProbeWrapper()
+            || State.R[0] != memory.ReadUInt16(0x8C15_B276)
+            || State.R[13] != tableBasePointer
+            || State.R[14] != memory.ReadUInt32(0x8C15_B27C)
+            || (memory.ReadUInt32(statusRegister) & 0x10) != 0
+            || !memory.TryGetSystemRamOffset(localStack, 16, out _)
+            || !memory.TryGetSystemRamOffset(tableBasePointer, 4, out _)
+            || memory.ReadUInt32(localStack) != 1)
+        {
+            return false;
+        }
+
+        var tableBase = memory.ReadUInt32(tableBasePointer);
+        var counterAddress = unchecked(tableBase + State.R[0]);
+        if (State.R[2] != tableBase
+            || !memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || memory.ReadUInt32(counterAddress) != State.R[3])
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(localStack + 4);
+        var savedR13 = memory.ReadUInt32(localStack + 8);
+        var savedR14 = memory.ReadUInt32(localStack + 12);
+        var incrementedCounter = unchecked(State.R[3] + 1);
+
+        memory.WriteUInt32(counterAddress, incrementedCounter);
+
+        State.R[0] = 0;
+        State.R[3] = incrementedCounter;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = localStack + 16;
+        State.Pr = savedPr;
+        State.Pc = savedPr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperReturnTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
