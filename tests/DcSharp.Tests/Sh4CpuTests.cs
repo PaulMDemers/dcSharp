@@ -4130,6 +4130,51 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaByteReadHelperLimitLoadToActiveBytePoll()
+    {
+        const uint frameAddress = 0x8CFF_FF6C;
+        var referenceMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(referenceMemory);
+        WriteSonicAdventure2G2PioReadWordHelper(fastMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(referenceMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(fastMemory);
+        WriteSonicAdventure2AicaByteReadHelper(referenceMemory);
+        WriteSonicAdventure2AicaByteReadHelper(fastMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(referenceMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(fastMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(referenceMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(fastMemory);
+        InitializeSonicAdventure2AicaWorkQueueActiveBytePollAfterByteReadReturnMemory(referenceMemory, frameAddress);
+        InitializeSonicAdventure2AicaWorkQueueActiveBytePollAfterByteReadReturnMemory(fastMemory, frameAddress);
+        var reference = new Sh4Cpu(referenceMemory, 0x8C16_BF10);
+        var fast = new Sh4Cpu(fastMemory, 0x8C16_BF10);
+        InitializeSonicAdventure2AicaByteReadHelperToActiveBytePollRegisters(reference, frameAddress);
+        InitializeSonicAdventure2AicaByteReadHelperToActiveBytePollRegisters(fast, frameAddress);
+
+        var referenceStart = reference.Step();
+        var fastStart = StepMany(fast, 3);
+        Assert.Equal(0x8C16_BF14u, fastStart.Pc);
+        Assert.Equal(0x8C16_BF16u, fast.State.Pc);
+        Assert.Equal(0x0020_0000u, fast.State.R[3]);
+
+        Assert.True(reference.TryFastForwardSonicAdventure2AicaByteReadHelperToActiveBytePoll(referenceStart, 545, out var referenceSkippedInstructions));
+        Assert.Equal(545UL, referenceSkippedInstructions);
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaByteReadHelperLimitLoadToActiveBytePoll(fastStart, 543, out var skippedInstructions));
+        Assert.Equal(543UL, skippedInstructions);
+
+        Assert.Equal(reference.State.Pc, fast.State.Pc);
+        Assert.Equal(reference.State.Pr, fast.State.Pr);
+        Assert.Equal(reference.State.Sr, fast.State.Sr);
+        Assert.Equal(reference.State.R, fast.State.R);
+        Assert.Equal(reference.State.T, fast.State.T);
+        Assert.Equal(reference.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(referenceMemory.ReadUInt32(0x8C2A_22EC), fastMemory.ReadUInt32(0x8C2A_22EC));
+        Assert.Equal(referenceMemory.ReadUInt32(0x8C2A_22F0), fastMemory.ReadUInt32(0x8C2A_22F0));
+        Assert.Equal(0x8C15_3AC4u, fast.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaWorkQueueActiveBytePollAfterR11Push()
     {
         var normalMemory = new DreamcastMemory();
@@ -4426,6 +4471,27 @@ public class Sh4CpuTests
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C16_BF40u, cpu.State.Pc);
         Assert.Equal(7u, memory.ReadUInt32(0x8C2A_22EC));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaByteReadHelperLimitLoadToActiveBytePollWhenBudgetIsShort()
+    {
+        const uint frameAddress = 0x8CFF_FF6C;
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        WriteSonicAdventure2AicaReadWordWrapper(memory);
+        WriteSonicAdventure2AicaByteReadHelper(memory);
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        InitializeSonicAdventure2AicaWorkQueueActiveBytePollAfterByteReadReturnMemory(memory, frameAddress);
+        var cpu = new Sh4Cpu(memory, 0x8C16_BF10);
+        InitializeSonicAdventure2AicaByteReadHelperToActiveBytePollRegisters(cpu, frameAddress);
+
+        var start = StepMany(cpu, 3);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaByteReadHelperLimitLoadToActiveBytePoll(start, 542, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C16_BF16u, cpu.State.Pc);
     }
 
     [Fact]

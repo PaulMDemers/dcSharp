@@ -634,6 +634,15 @@ public sealed class DreamcastRunner
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_BF10, 0x8C16_BF44)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_43A0, 0x8C15_43EE)
                         && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
+                        && cpu.TryFastForwardSonicAdventure2AicaByteReadHelperLimitLoadToActiveBytePoll(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaByteReadLimitLoadToActiveBytePollSkippedInstructions))
+                    {
+                        scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaByteReadLimitLoadToActiveBytePollSkippedInstructions, cpu.State.InstructionsExecuted);
+                    }
+                    else if (options.MemoryReadWatch is null
+                        && options.MemoryWriteWatch is null
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C16_BF10, 0x8C16_BF44)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C15_43A0, 0x8C15_43EE)
+                        && CanFastForwardTraceRange(options.TraceCapture, traceLog, 0x8C13_56D8, 0x8C13_5838)
                         && cpu.TryFastForwardSonicAdventure2AicaByteReadHelperToActiveBytePoll(step, options.InstructionLimit - cpu.State.InstructionsExecuted, out var sonicAdventure2AicaByteReadToActiveBytePollSkippedInstructions))
                     {
                         scheduler.AdvanceAfterCpuFastForward(sonicAdventure2AicaByteReadToActiveBytePollSkippedInstructions, cpu.State.InstructionsExecuted);

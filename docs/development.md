@@ -526,4 +526,6 @@ SA2 AICA read-wrapper call-delay update: the `0x8C1543CC/0x8C1543CE` `jsr` delay
 
 SA2 AICA active-callback return update: the `0x8C16B5A2/0x8C16B5A4` post-callback epilogue now restores the active-work frame after the no-pending callback has completed. Focused active-callback tests pass; a 500086100-instruction SA2 probe clears `PC=0x8C16B5A2` and reaches `PC=0x8C16BF16`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA byte-read limit-load update: the `0x8C16BF14/0x8C16BF16` adapter edge now bridges the already-allocated byte-read frame into the active byte-poll result used by the adapter-entry shortcut. Focused AICA byte/active-poll tests pass; a 500086700-instruction SA2 probe clears `PC=0x8C16BF16` and reaches `PC=0x8C16B4DC`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
