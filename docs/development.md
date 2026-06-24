@@ -522,4 +522,6 @@ SA2 AICA byte-read PR-restore update: the `0x8C16BF3E/0x8C16BF40` return-delay e
 
 SA2 AICA active byte-poll r11-push update: the `0x8C16B4D2/0x8C16B4D4` partial prologue edge now completes the saved-register/PR frame and reuses the full active byte-poll prologue result. Focused active-byte-poll tests pass; a 500085500-instruction SA2 probe clears `PC=0x8C16B4D4` and reaches `PC=0x8C1543CE`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA read-wrapper call-delay update: the `0x8C1543CC/0x8C1543CE` `jsr` delay-slot edge now applies the pending AICA base/source add and lands on the existing word-read wrapper shortcut result. Focused wrapper tests pass; a 500086000-instruction SA2 probe clears `PC=0x8C1543CE` and reaches `PC=0x8C16B5A2`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
