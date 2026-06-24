@@ -514,4 +514,6 @@ SA2 AICA active callback target-store update: the `0x8C155014` active callback t
 
 SA2 AICA active byte-poll mid-prologue update: the `0x8C16B510` delay-slot edge now fast-forwards the remaining active byte-poll prologue and chains through the modeled nonzero byte status path when the work-count local has already been stored. Focused active-byte/active-callback tests pass; a 500083000-instruction SA2 probe clears `PC=0x8C16B512` and reaches `PC=0x8C13570E` in the G2 PIO read helper prologue, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 G2 PIO read interrupt-restore update: the `0x8C13570C` post-mask edge now fast-forwards the remaining read-word helper after the active status probe, local frame writes, and SR mask setup have executed. Focused G2 PIO read tests pass; a 500083500-instruction SA2 probe clears `PC=0x8C13570E` and reaches `PC=0x8C12F7FC` in the outer interrupt/work-poll loop, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.

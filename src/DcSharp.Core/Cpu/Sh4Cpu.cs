@@ -4763,6 +4763,54 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2PioReadWordHelperInterruptRestoreTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_570C
+            || step.Opcode != 0xCBF0
+            || State.Pc != 0x8C13_570E
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 419;
+        var localStackAddress = State.R[15];
+        var savedFrameAddress = localStackAddress + 8;
+        var restoredInterruptMask = (State.R[0] >> 4) & 0x0F;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2PioReadHelper()
+            || State.R[4] != State.R[10]
+            || State.R[5] != State.R[9]
+            || State.R[6] != 4
+            || State.R[7] == 0
+            || localStackAddress > uint.MaxValue - 36
+            || memory.ReadUInt32(localStackAddress) != 4
+            || memory.ReadUInt32(localStackAddress + 4) != restoredInterruptMask
+            || !IsAicaRamAddress(State.R[10], 4)
+            || !memory.TryGetSystemRamOffset(State.R[9], 4, out _)
+            || !memory.TryGetSystemRamOffset(localStackAddress, 36, out _))
+        {
+            return false;
+        }
+
+        var value = memory.ReadUInt32(State.R[10]);
+        memory.WriteUInt32(State.R[9], value);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+
+        State.R[15] = savedFrameAddress;
+        RestoreSonicAdventure2G2PioReadHelperFrame();
+        State.R[1] = 0;
+        State.R[3] = 0;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioReadWordPostStatusSetTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
