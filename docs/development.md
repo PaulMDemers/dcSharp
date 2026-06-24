@@ -518,4 +518,6 @@ SA2 G2 PIO read interrupt-restore update: the `0x8C13570C` post-mask edge now fa
 
 SA2 G2 PIO status-probe call-tail update: the `0x8C13576A` target-load edge now bridges the AICA register-pair status probe call and lands on the same restored state as the existing post-status-set shortcut. Focused G2 PIO read tests pass; a 500084700-instruction SA2 probe clears `PC=0x8C13576C` and reaches `PC=0x8C16BF40` in the AICA byte-read adapter return delay, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA byte-read PR-restore update: the `0x8C16BF3E/0x8C16BF40` return-delay edge now completes the already-restored byte-read adapter path into the active work-queue callback result. Focused AICA byte/active-poll tests pass; a 500084800-instruction SA2 probe clears the old `PC=0x8C16BF40` stop and reaches `PC=0x8C16B4D4`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
