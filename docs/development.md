@@ -528,4 +528,6 @@ SA2 AICA active-callback return update: the `0x8C16B5A2/0x8C16B5A4` post-callbac
 
 SA2 AICA byte-read limit-load update: the `0x8C16BF14/0x8C16BF16` adapter edge now bridges the already-allocated byte-read frame into the active byte-poll result used by the adapter-entry shortcut. Focused AICA byte/active-poll tests pass; a 500086700-instruction SA2 probe clears `PC=0x8C16BF16` and reaches `PC=0x8C16B4DC`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 G2 DMA status-set mask-tail update: the `0x8C170AA4/0x8C170AA6` helper edge now completes the interrupt mask/or path and status-register write from tight budgets inside the G2 DMA status-set helper. Focused G2 status-set tests pass; a 500087700-instruction SA2 probe clears `PC=0x8C170AA6` and reaches `PC=0x8C13577C`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
