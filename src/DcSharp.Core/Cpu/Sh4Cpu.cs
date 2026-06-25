@@ -5477,6 +5477,95 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2PioReadWordMode4BranchTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C13_577A
+            || step.Opcode != 0x8804
+            || State.Pc != 0x8C13_577C
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 74;
+        var localStackAddress = State.R[15];
+        var savedFrameAddress = localStackAddress + 8;
+        var source = State.R[10];
+        var destination = State.R[9];
+        var tableBase = memory.ReadUInt32(0x8C18_3544);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2PioReadWordPostStatusSetTail()
+            || State.R[0] != 4
+            || State.R[1] != 0x0100_0000
+            || State.R[6] != 4
+            || State.R[7] != 1
+            || State.R[11] != 0
+            || State.R[12] != 0
+            || State.R[13] != 0
+            || State.R[14] != 1
+            || !State.T
+            || localStackAddress > uint.MaxValue - 36
+            || memory.ReadUInt32(localStackAddress) != 4
+            || !IsAicaRamAddress(source, 4)
+            || !memory.TryGetSystemRamOffset(destination, 4, out _)
+            || !memory.TryGetSystemRamOffset(localStackAddress, 36, out _))
+        {
+            return false;
+        }
+
+        if (!memory.TryGetSystemRamOffset(tableBase, 8, out _))
+        {
+            return false;
+        }
+
+        var value = memory.ReadUInt32(source);
+        var firstRegisterBlock = memory.ReadUInt32(tableBase);
+        var channel = memory.ReadUInt32(tableBase + 4);
+        if (firstRegisterBlock != 0xA05F_7800 || channel > 3)
+        {
+            return false;
+        }
+
+        var registerBlock = firstRegisterBlock + (channel * 0x20);
+        var savedPr = memory.ReadUInt32(savedFrameAddress);
+        var savedR9 = memory.ReadUInt32(savedFrameAddress + 4);
+        var savedR10 = memory.ReadUInt32(savedFrameAddress + 8);
+        var savedR11 = memory.ReadUInt32(savedFrameAddress + 12);
+        var savedR12 = memory.ReadUInt32(savedFrameAddress + 16);
+        var savedR13 = memory.ReadUInt32(savedFrameAddress + 20);
+        var savedR14 = memory.ReadUInt32(savedFrameAddress + 24);
+
+        memory.WriteUInt32(destination, value);
+        memory.WriteUInt32(registerBlock + 0x1C, 0);
+        memory.WriteUInt32(0x8C2A_22F8, 0);
+
+        State.R[0] = 0;
+        State.R[1] = 0;
+        State.R[2] = 0;
+        State.R[3] = 0x8C18_3544;
+        State.R[4] = firstRegisterBlock;
+        State.R[5] = destination;
+        State.R[6] = source;
+        State.R[7] = 0;
+        State.Pr = savedPr;
+        State.R[9] = savedR9;
+        State.R[10] = savedR10;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = savedFrameAddress + 28;
+        State.T = false;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2PioReadHelperPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -7249,6 +7338,69 @@ public sealed class Sh4Cpu
         memory.WriteUInt32(counterAddress, incrementedCounter);
 
         State.R[0] = 0;
+        State.R[3] = incrementedCounter;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = localStack + 16;
+        State.Pr = savedPr;
+        State.Pc = savedPr;
+        State.T = true;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2G2DmaInactiveStatusProbeWrapperBranchTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_B256
+            || step.Opcode != 0x8801
+            || State.Pc != 0x8C15_B258
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 15;
+        var localStack = State.R[15];
+        var tableBasePointer = memory.ReadUInt32(0x8C15_B278);
+        var statusRegister = memory.ReadUInt32(0x8C17_0BCC);
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2DmaInactiveStatusProbeWrapper()
+            || State.R[0] != 1
+            || State.R[2] != statusRegister
+            || State.R[4] != localStack
+            || State.R[13] != tableBasePointer
+            || State.R[14] != memory.ReadUInt32(0x8C15_B27C)
+            || !State.T
+            || (memory.ReadUInt32(statusRegister) & 0x10) != 0
+            || !memory.TryGetSystemRamOffset(localStack, 16, out _)
+            || !memory.TryGetSystemRamOffset(tableBasePointer, 4, out _)
+            || memory.ReadUInt32(localStack) != 1)
+        {
+            return false;
+        }
+
+        var tableBase = memory.ReadUInt32(tableBasePointer);
+        var counterOffset = memory.ReadUInt16(0x8C15_B276);
+        var counterAddress = unchecked(tableBase + counterOffset);
+        if (!memory.TryGetSystemRamOffset(counterAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(localStack + 4);
+        var savedR13 = memory.ReadUInt32(localStack + 8);
+        var savedR14 = memory.ReadUInt32(localStack + 12);
+        var incrementedCounter = unchecked(memory.ReadUInt32(counterAddress) + 1);
+
+        memory.WriteUInt32(counterAddress, incrementedCounter);
+
+        State.R[0] = 0;
+        State.R[2] = tableBase;
         State.R[3] = incrementedCounter;
         State.R[13] = savedR13;
         State.R[14] = savedR14;
