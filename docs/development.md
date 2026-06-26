@@ -542,4 +542,6 @@ SA2 AICA read-wrapper entry update: the `0x8C1543A0/0x8C1543A2` wrapper entry no
 
 SA2 AICA active byte-poll SR-load update: the `0x8C16B4F2/0x8C16B4F4` work-queue prologue edge now completes the pending `ldc r0,sr` transition and reuses the modeled active byte-poll result. Focused active-byte-poll tests pass; a 500093000-instruction SA2 probe clears `PC=0x8C16B4F4` and reaches `PC=0x8C153AAC`, still with 47/47 GD-ROM reads, 6981 PVR register writes, and no TA writes yet.
 
+SA2 AICA work-poll global-load update: the `0x8C153AAA/0x8C153AAC` outer work-poll edge now bridges the already-loaded work-global pointer through the modeled work-poll result. Focused work-poll tests pass; a 500093700-instruction SA2 probe clears `PC=0x8C153AAC` and reaches `PC=0x8C1543A8`, still with 47/47 GD-ROM reads, 6981 PVR register writes, and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.

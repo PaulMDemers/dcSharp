@@ -6300,6 +6300,91 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaWorkPollWorkGlobalLoadTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkPollFunction(normalMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(normalMemory);
+        normalMemory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        normalMemory.WriteUInt32(0x8C18_33A8, 1);
+        normalMemory.WriteUInt32(0x8C2D_56D8, 7);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_3A90);
+        normal.State.Pr = 0x8C12_F7F6;
+        normal.State.Sr = 0x4000_0001;
+        normal.State.R[8] = 0x8888_8888;
+        normal.State.R[9] = 0x9999_9999;
+        normal.State.R[10] = 0xAAAA_AAAA;
+        normal.State.R[11] = 0xBBBB_BBBB;
+        normal.State.R[12] = 0xCCCC_CCCC;
+        normal.State.R[13] = 0xDDDD_DDDD;
+        normal.State.R[14] = 0xEEEE_EEEE;
+        normal.State.R[15] = 0x8CFF_FF20;
+
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkPollFunction(fastMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(fastMemory);
+        fastMemory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        fastMemory.WriteUInt32(0x8C18_33A8, 1);
+        fastMemory.WriteUInt32(0x8C2D_56D8, 7);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_3A90);
+        fast.State.Pr = 0x8C12_F7F6;
+        fast.State.Sr = 0x4000_0001;
+        fast.State.R[8] = 0x8888_8888;
+        fast.State.R[9] = 0x9999_9999;
+        fast.State.R[10] = 0xAAAA_AAAA;
+        fast.State.R[11] = 0xBBBB_BBBB;
+        fast.State.R[12] = 0xCCCC_CCCC;
+        fast.State.R[13] = 0xDDDD_DDDD;
+        fast.State.R[14] = 0xEEEE_EEEE;
+        fast.State.R[15] = 0x8CFF_FF20;
+
+        var normalPushPr = normal.Step();
+        var fastWorkGlobalLoad = StepMany(fast, 14);
+        Assert.Equal(0x8C15_3AAAu, fastWorkGlobalLoad.Pc);
+        Assert.Equal(0x6422, fastWorkGlobalLoad.Opcode);
+        Assert.Equal(0x8C15_3AACu, fast.State.Pc);
+        Assert.Equal(0x4000_00F1u, fast.State.R[0]);
+        Assert.Equal(0x8C18_33A4u, fast.State.R[2]);
+        Assert.Equal(0xFFFF_FF0Fu, fast.State.R[3]);
+        Assert.Equal(0x8C2D_56C0u, fast.State.R[4]);
+
+        Assert.True(normal.TryFastForwardSonicAdventure2AicaWorkPollNoWorkInterrupt(normalPushPr, 622, out var referenceSkippedInstructions));
+        Assert.Equal(622UL, referenceSkippedInstructions);
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaWorkPollWorkGlobalLoadTail(fastWorkGlobalLoad, 609, out var skippedInstructions));
+        Assert.Equal(609UL, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C12_F7F6u, fast.State.Pc);
+        Assert.Equal(623UL, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaWorkPollWorkGlobalLoadTailWithoutBudget()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkPollFunction(memory);
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        memory.WriteUInt32(0x8C18_33A4, 0x8C2D_56C0);
+        memory.WriteUInt32(0x8C18_33A8, 1);
+        memory.WriteUInt32(0x8C2D_56D8, 7);
+        var cpu = new Sh4Cpu(memory, 0x8C15_3A90);
+        cpu.State.Pr = 0x8C12_F7F6;
+        cpu.State.Sr = 0x4000_0001;
+        cpu.State.R[15] = 0x8CFF_FF20;
+
+        var step = StepMany(cpu, 14);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaWorkPollWorkGlobalLoadTail(step, 608, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_3AACu, cpu.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaOuterWorkPollLoop()
     {
         var memory = new DreamcastMemory();
