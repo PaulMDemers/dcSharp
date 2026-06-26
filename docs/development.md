@@ -536,4 +536,6 @@ SA2 AICA byte-read offset-store update: the `0x8C16BF24/0x8C16BF26` adapter edge
 
 SA2 AICA active byte-poll interrupt-mask-store update: the `0x8C16B4EA/0x8C16B4EC` work-queue prologue edge now stores the pending saved interrupt mask and chains into the active byte-poll result used by the full prologue shortcut. Focused active-byte-poll tests pass; a 500091100-instruction SA2 probe clears `PC=0x8C16B4EC` and reaches `PC=0x8C153AA4`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA work-poll interrupt-restore update: the `0x8C153AA2/0x8C153AA4` outer work-poll edge now bridges the post-SR-mask state to the same restored result as the full work-poll shortcut. Focused work-poll tests pass; a 500091800-instruction SA2 probe clears `PC=0x8C153AA4` and reaches `PC=0x8C1543A0`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
