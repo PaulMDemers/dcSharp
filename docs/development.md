@@ -534,4 +534,6 @@ SA2 G2 PIO/inactive-status branch-tail update: the `0x8C13577A/0x8C13577C` mode-
 
 SA2 AICA byte-read offset-store update: the `0x8C16BF24/0x8C16BF26` adapter edge now completes the active byte-poll result from the post-offset-mask state, loading the original active-work frame from the helper-local stack slot after `r5` has been repointed. Focused AICA byte-read tests pass; a 500090500-instruction SA2 probe clears `PC=0x8C16BF26` and reaches `PC=0x8C16B4EC`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA active byte-poll interrupt-mask-store update: the `0x8C16B4EA/0x8C16B4EC` work-queue prologue edge now stores the pending saved interrupt mask and chains into the active byte-poll result used by the full prologue shortcut. Focused active-byte-poll tests pass; a 500091100-instruction SA2 probe clears `PC=0x8C16B4EC` and reaches `PC=0x8C153AA4`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
