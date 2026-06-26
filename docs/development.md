@@ -532,4 +532,6 @@ SA2 G2 DMA status-set mask-tail update: the `0x8C170AA4/0x8C170AA6` helper edge 
 
 SA2 G2 PIO/inactive-status branch-tail update: the `0x8C13577A/0x8C13577C` mode-4 branch tail and `0x8C15B256/0x8C15B258` inactive-status wrapper branch tail now cover tight budgets after successful mode/status compares. Focused G2 PIO read and inactive-status tests pass; a 500089500-instruction SA2 probe clears both edges and reaches `PC=0x8C15B21C`, still with 47/47 GD-ROM reads and no TA writes yet.
 
+SA2 AICA byte-read offset-store update: the `0x8C16BF24/0x8C16BF26` adapter edge now completes the active byte-poll result from the post-offset-mask state, loading the original active-work frame from the helper-local stack slot after `r5` has been repointed. Focused AICA byte-read tests pass; a 500090500-instruction SA2 probe clears `PC=0x8C16BF26` and reaches `PC=0x8C16B4EC`, still with 47/47 GD-ROM reads and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.
