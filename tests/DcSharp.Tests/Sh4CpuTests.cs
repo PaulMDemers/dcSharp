@@ -3592,6 +3592,54 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaReadWordWrapperR13StoreTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(normalMemory);
+        WriteSonicAdventure2G2PioReadWordHelper(fastMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(normalMemory);
+        WriteSonicAdventure2AicaReadWordWrapper(fastMemory);
+        normalMemory.WriteUInt32(0xA081_2400, 0x1234_5678);
+        fastMemory.WriteUInt32(0xA081_2400, 0x1234_5678);
+        normalMemory.WriteUInt32(0x8C2A_22EC, 7);
+        fastMemory.WriteUInt32(0x8C2A_22EC, 7);
+        normalMemory.WriteUInt32(0x8C2A_22F0, 11);
+        fastMemory.WriteUInt32(0x8C2A_22F0, 11);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_43A0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_43A0);
+        InitializeSonicAdventure2AicaReadWordWrapperState(normal);
+        InitializeSonicAdventure2AicaReadWordWrapperState(fast);
+        normal.State.R[4] = 0x0001_2400;
+        fast.State.R[4] = 0x0001_2400;
+
+        var normalStart = StepMany(normal, 4);
+        var fastStart = StepMany(fast, 3);
+        Assert.Equal(0x8C15_43A6u, normalStart.Pc);
+        Assert.Equal(0x8C15_43A4u, fastStart.Pc);
+        Assert.Equal(0x2FD6, fastStart.Opcode);
+        Assert.Equal(0x8C15_43A6u, fast.State.Pc);
+        Assert.Equal(0x0001_2400u, fast.State.R[4]);
+        Assert.Equal(0x8CFF_FF78u, fast.State.R[15]);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaReadWordWrapperR13StoreTail(fastStart, 472, out var skippedInstructions));
+        Assert.Equal(472UL, skippedInstructions);
+        Assert.True(normal.TryFastForwardSonicAdventure2AicaReadWordWrapperTail(normalStart, 471, out var referenceSkippedInstructions));
+        Assert.Equal(471UL, referenceSkippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8CFF_FF88), fastMemory.ReadUInt32(0x8CFF_FF88));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C2A_22EC), fastMemory.ReadUInt32(0x8C2A_22EC));
+        Assert.Equal(normalMemory.ReadUInt32(0x8C2A_22F0), fastMemory.ReadUInt32(0x8C2A_22F0));
+        Assert.Equal(0x8C16_BF2Eu, fast.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaReadWordWrapperCallTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -3801,6 +3849,28 @@ public class Sh4CpuTests
 
         Assert.False(cpu.TryFastForwardSonicAdventure2AicaReadWordWrapperTail(start, 470, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(7u, memory.ReadUInt32(0x8C2A_22EC));
+        Assert.Equal(11u, memory.ReadUInt32(0x8C2A_22F0));
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaReadWordWrapperR13StoreTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        WriteSonicAdventure2AicaReadWordWrapper(memory);
+        memory.WriteUInt32(0xA081_2400, 0x1234_5678);
+        memory.WriteUInt32(0x8C2A_22EC, 7);
+        memory.WriteUInt32(0x8C2A_22F0, 11);
+        var cpu = new Sh4Cpu(memory, 0x8C15_43A0);
+        InitializeSonicAdventure2AicaReadWordWrapperState(cpu);
+        cpu.State.R[4] = 0x0001_2400;
+
+        var start = StepMany(cpu, 3);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaReadWordWrapperR13StoreTail(start, 471, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C15_43A6u, cpu.State.Pc);
         Assert.Equal(7u, memory.ReadUInt32(0x8C2A_22EC));
         Assert.Equal(11u, memory.ReadUInt32(0x8C2A_22F0));
     }
