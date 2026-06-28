@@ -3046,6 +3046,40 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTail()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(normalMemory);
+        WriteSonicAdventure2G2PioReadWordHelper(fastMemory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(normalMemory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(fastMemory);
+        var normal = new Sh4Cpu(normalMemory, 0x8C15_AF98);
+        var fast = new Sh4Cpu(fastMemory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(normal);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(fast);
+
+        var normalStart = StepMany(normal, 10);
+        var fastStart = StepMany(fast, 10);
+        Assert.Equal(0x8C17_08B6u, fastStart.Pc);
+        Assert.Equal(0x6022, fastStart.Opcode);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C17_08B8u, fast.State.Pc);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTail(fastStart, 22, out var skippedInstructions));
+        Assert.Equal(22UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(normalMemory.ReadUInt32(0x8C2A_22F0), fastMemory.ReadUInt32(0x8C2A_22F0));
+        Assert.Equal(0x8C13_5770u, fast.State.Pc);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaRegisterPairStatusProbeWrapperReturnTail()
     {
         var normalMemory = new DreamcastMemory();
@@ -3162,6 +3196,24 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTailWhenStatusIsBusy()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(memory);
+        memory.WriteUInt32(0xA05F_688C, 1);
+        var cpu = new Sh4Cpu(memory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(cpu);
+
+        var start = StepMany(cpu, 10);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTail(start, 22, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C17_08B8u, cpu.State.Pc);
+        Assert.Equal(1u, cpu.State.R[0]);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperReturnTailWhenStatusIsBusy()
     {
         var memory = new DreamcastMemory();
@@ -3210,6 +3262,22 @@ public class Sh4CpuTests
         Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperZeroReturnTail(start, 5, out var skippedInstructions));
         Assert.Equal(0UL, skippedInstructions);
         Assert.Equal(0x8C15_AFC0u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTailWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2G2PioReadWordHelper(memory);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperState(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C15_AF98);
+        InitializeSonicAdventure2AicaRegisterPairStatusProbeWrapperRegisters(cpu);
+
+        var start = StepMany(cpu, 10);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaRegisterPairStatusProbeWrapperProbeBodyTail(start, 21, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C17_08B8u, cpu.State.Pc);
     }
 
     [Fact]
