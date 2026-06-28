@@ -5791,6 +5791,60 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2AicaWorkQueueActiveCallbackReturnDelaySlot()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(normalMemory);
+        WriteSonicAdventure2AicaWorkQueueHelper(fastMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(normalMemory);
+        WriteSonicAdventure2AicaActiveWorkCallback(fastMemory);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(normalMemory, 0x8CFF_FF84);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(fastMemory, 0x8CFF_FF84);
+        var normal = new Sh4Cpu(normalMemory, 0x8C16_B5B0);
+        var fast = new Sh4Cpu(fastMemory, 0x8C16_B5B0);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(normal, 0x8CFF_FF84);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(fast, 0x8CFF_FF84);
+
+        var normalStart = StepMany(normal, 3);
+        var fastStart = StepMany(fast, 3);
+        Assert.Equal(0x8C16_B5B4u, fastStart.Pc);
+        Assert.Equal(0x8C16_B5B6u, fast.State.Pc);
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+
+        Assert.True(fast.TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackReturnDelaySlot(fastStart, 1, out var skippedInstructions));
+        Assert.Equal(1UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.Pr, fast.State.Pr);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.Sr, fast.State.Sr);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+        Assert.Equal(0x8C15_3AC4u, fast.State.Pc);
+        Assert.Equal(0x8CFF_FF90u, fast.State.R[15]);
+    }
+
+    [Fact]
+    public void DoesNotFastForwardSonicAdventure2AicaWorkQueueActiveCallbackReturnDelaySlotWhenBudgetIsShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2AicaWorkQueueHelper(memory);
+        WriteSonicAdventure2AicaActiveWorkCallback(memory);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailState(memory, 0x8CFF_FF84);
+        var cpu = new Sh4Cpu(memory, 0x8C16_B5B0);
+        InitializeSonicAdventure2AicaWorkQueueActiveCallbackRestoreTailRegisters(cpu, 0x8CFF_FF84);
+
+        var step = StepMany(cpu, 3);
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackReturnDelaySlot(step, 0, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(0x8C16_B5B6u, cpu.State.Pc);
+        Assert.Equal(0x8CFF_FF8Cu, cpu.State.R[15]);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2AicaMirrorCopyLoop()
     {
         var normalMemory = new DreamcastMemory();

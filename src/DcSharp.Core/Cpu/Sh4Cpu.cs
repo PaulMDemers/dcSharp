@@ -4672,6 +4672,44 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveCallbackReturnDelaySlot(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_B5B4
+            || step.Opcode != 0x000B
+            || State.Pc != 0x8C16_B5B6
+            || delayedBranchTarget != State.Pr
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 1;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || !IsSonicAdventure2AicaActiveWorkCallback()
+            || State.Pr == 0
+            || State.R[4] != 0x8C16_B4CC
+            || State.R[0] != State.R[5]
+            || State.R[6] != 4
+            || State.R[7] != 1
+            || !State.T
+            || State.R[15] > uint.MaxValue - 4
+            || !memory.TryGetSystemRamOffset(State.R[15], 4, out _))
+        {
+            return false;
+        }
+
+        State.R[14] = memory.ReadUInt32(State.R[15]);
+        State.R[15] += 4;
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaEmptyWorkTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
