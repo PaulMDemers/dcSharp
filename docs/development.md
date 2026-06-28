@@ -548,4 +548,6 @@ SA2 AICA read-wrapper r13-store update: the `0x8C1543A4/0x8C1543A6` wrapper prol
 
 SA2 AICA active byte-poll work-global test update: the `0x8C16B4FA/0x8C16B4FC` work-queue prologue edge now bridges the post-`tst r10,r10` nonzero-work path into the modeled active byte-poll result, accounting for the T bit being cleared while `r0` still holds the earlier masked SR value. Focused active-byte-poll tests pass; a 500094900-instruction SA2 probe clears `PC=0x8C16B4FC` and reaches `PC=0x8C153AB4`, still with 47/47 GD-ROM reads, 6981 PVR register writes, and no TA writes yet.
 
+SA2 AICA/G2 tight-frontier update: the `0x8C153AB2/0x8C153AB4` work-poll status-load edge, `0x8C16B508/0x8C16B50A` active-callback pointer load edge, and `0x8C170ACC/0x8C170ACE` G2 status-set SR-restore edge now have guarded fast-forwards. Focused AICA/G2 tests pass; the follow-up probes at `artifacts/tmp/sa2-500095505-work-poll-status-load-tail.txt`, `artifacts/tmp/sa2-500096755-active-callback-load-tail.txt`, and `artifacts/tmp/sa2-500097005-g2-status-set-sr-restore-tail.txt` clear the respective edges and reach `PC=0x8C15B21A`, still with 47/47 GD-ROM reads, 6981 PVR register writes, and no TA writes yet.
+
 Commit source, docs, KOS sample source, and tests. Do not commit generated artifacts, build outputs, downloaded BIOS/media, or generated traces.

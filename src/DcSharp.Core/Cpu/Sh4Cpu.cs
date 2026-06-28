@@ -3966,6 +3966,124 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePollActiveCallbackLoadTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C16_B508
+            || step.Opcode != 0x5BE3
+            || State.Pc != 0x8C16_B50A
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 555;
+        var workFrameAddress = State.R[15];
+        if (workFrameAddress < 16
+            || workFrameAddress > uint.MaxValue - 44)
+        {
+            return false;
+        }
+
+        var helperFrameAddress = workFrameAddress - 16;
+        var savedPrStackAddress = workFrameAddress + 12;
+        var callerStackAddress = workFrameAddress + 44;
+        var stackFrameReadable = memory.TryGetSystemRamOffset(helperFrameAddress, 64, out _);
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        var workGlobalReadable = workGlobal != 0 && memory.TryGetSystemRamOffset(workGlobal, 0x43C, out _);
+        var workCount = workGlobalReadable ? memory.ReadUInt32(workGlobal + 0x18) : 0;
+        var activeCallbackPointer = workGlobalReadable ? memory.ReadUInt32(workGlobal + 0x14) : 0;
+        var sourceOffset = workGlobalReadable ? memory.ReadUInt32(workGlobal + 0x8C) : 0;
+        var alignedSourceOffset = sourceOffset & 0xFFFF_FFFCu;
+        var byteOffset = sourceOffset & 3;
+        var aicaAddress = 0xA080_0000u + alignedSourceOffset;
+        var savedInterruptMask = stackFrameReadable ? memory.ReadUInt32(workFrameAddress + 8) & 0x0F : 0;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || !IsSonicAdventure2AicaByteReadHelper()
+            || !IsSonicAdventure2AicaActiveWorkCallback()
+            || State.Pr != 0x8C15_3AC4
+            || State.R[0] != ((State.Sr & 0xFFFF_FF0Eu) | 0xF1u)
+            || State.R[2] != 0x8C18_33A4
+            || State.R[3] != 0xFFFF_FF0F
+            || State.R[5] != 0x0B00_0003
+            || State.R[6] != 4
+            || State.R[7] != 1
+            || State.R[10] != workGlobal
+            || State.R[11] != activeCallbackPointer
+            || State.R[12] != 0
+            || State.R[13] != 0
+            || State.R[14] != workGlobal + 8
+            || !stackFrameReadable
+            || memory.ReadUInt32(workFrameAddress + 8) != savedInterruptMask
+            || memory.ReadUInt32(savedPrStackAddress) != 0x8C15_3AC4
+            || !workGlobalReadable
+            || workCount == 0
+            || activeCallbackPointer == 0
+            || memory.ReadUInt32(workGlobal + 0x438) != 0
+            || sourceOffset >= 0x0020_0000
+            || alignedSourceOffset > 0x0020_0000 - 4
+            || !IsAicaRamAddress(aicaAddress, 4))
+        {
+            return false;
+        }
+
+        var word = memory.ReadUInt32(aicaAddress);
+        var value = (byte)(word >> ((int)byteOffset * 8));
+        if (value == 0)
+        {
+            return false;
+        }
+
+        var savedR8 = memory.ReadUInt32(savedPrStackAddress + 4);
+        var savedR9 = memory.ReadUInt32(savedPrStackAddress + 8);
+        var savedR10 = memory.ReadUInt32(savedPrStackAddress + 12);
+        var savedR11 = memory.ReadUInt32(savedPrStackAddress + 16);
+        var savedR12 = memory.ReadUInt32(savedPrStackAddress + 20);
+        var savedR13 = memory.ReadUInt32(savedPrStackAddress + 24);
+        var savedR14 = memory.ReadUInt32(savedPrStackAddress + 28);
+
+        memory.WriteUInt32(helperFrameAddress, workFrameAddress);
+        memory.WriteUInt32(helperFrameAddress + 4, byteOffset);
+        memory.WriteUInt32(helperFrameAddress + 8, word);
+        memory.WriteUInt32(workFrameAddress - 4, 0x8C16_B51C);
+        memory.Write(workFrameAddress, [value]);
+        memory.WriteUInt32(workFrameAddress + 4, workCount);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+        IncrementSystemRamWord(0x8C2A_22EC);
+        IncrementSystemRamWord(0x8C2A_22F0);
+        memory.WriteUInt32(0x8C18_339C, 0x8C16_B4CC);
+        memory.WriteUInt32(0x8C18_33A0, 0x0B00_0003);
+
+        State.R[0] = 0x0B00_0003;
+        State.R[1] = 0x8C18_33A4;
+        State.R[2] = 0x8C18_33A0;
+        State.R[3] = 0;
+        State.R[4] = 0x8C16_B4CC;
+        State.R[5] = 0x0B00_0003;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.R[8] = savedR8;
+        State.R[9] = savedR9;
+        State.R[10] = savedR10;
+        State.R[11] = savedR11;
+        State.R[12] = savedR12;
+        State.R[13] = savedR13;
+        State.R[14] = savedR14;
+        State.R[15] = callerStackAddress;
+        State.Pr = 0x8C15_3AC4;
+        State.Pc = 0x8C15_3AC4;
+        State.T = false;
+        State.Sr = (State.Sr & 0xFFFF_FF0Eu) | (savedInterruptMask << 4);
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaWorkQueueActiveBytePollMidPrologue(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
@@ -5498,6 +5616,63 @@ public sealed class Sh4Cpu
             || State.R[2] != 0x8C18_33A4
             || State.R[3] != 0xFFFF_FF0F
             || State.R[4] != workGlobal)
+        {
+            return false;
+        }
+
+        var savedInterruptMask = memory.ReadUInt32(localStackAddress) & 0x0F;
+        var savedPr = memory.ReadUInt32(localStackAddress + 4);
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[2] = 0x8C18_33A0;
+        State.R[3] = maskedSr;
+        State.R[4] = 0x8C16_B4CC;
+        State.R[5] = 0x0B00_0003;
+        State.R[6] = 4;
+        State.R[7] = 1;
+        State.R[15] = localStackAddress + 8;
+        State.Pr = savedPr;
+        State.Sr = maskedSr | (savedInterruptMask << 4);
+        State.T = true;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2AicaWorkPollStatusLoadTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C15_3AB2
+            || step.Opcode != 0x6012
+            || State.Pc != 0x8C15_3AB4
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 605;
+        var localStackAddress = State.R[15];
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        var maskedSr = (State.Sr & 0xFFFF_FF0E) | 1u;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2AicaWorkPollFunction()
+            || !IsSonicAdventure2AicaWorkQueueHelper()
+            || localStackAddress > uint.MaxValue - 8
+            || !memory.TryGetSystemRamOffset(localStackAddress, 8, out _)
+            || workGlobal == 0
+            || !memory.TryGetSystemRamOffset(workGlobal, 0x90, out _)
+            || memory.ReadUInt32(0x8C18_33A8) != 1
+            || memory.ReadUInt32(workGlobal + 0x18) == 0
+            || State.R[0] != 1
+            || State.R[1] != 0x8C18_33A8
+            || State.R[2] != 0x8C18_33A4
+            || State.R[3] != 0xFFFF_FF0F
+            || State.R[4] != workGlobal
+            || State.R[0] != memory.ReadUInt32(0x8C18_33A8))
         {
             return false;
         }
@@ -7321,6 +7496,52 @@ public sealed class Sh4Cpu
         State.R[4] = registerBlock;
         State.R[5] = restoredInterruptMask;
         State.Sr = maskedSr | (restoredInterruptMask << 4);
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2G2DmaStatusSetHelperSrRestoreTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C17_0ACC
+            || step.Opcode != 0x2319
+            || State.Pc != 0x8C17_0ACE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 5;
+        const uint registerBase = 0xA05F_7800;
+        var registerBlock = State.R[4];
+        var registerOffset = registerBlock - registerBase;
+        var restoredInterruptMask = State.R[5] & 0x0F;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2DmaStatusSetHelper()
+            || State.R[0] != (restoredInterruptMask << 2)
+            || State.R[1] != 0xFFFF_FF0F
+            || State.R[2] != 1
+            || (State.R[3] & 0xF0) != 0
+            || (State.R[5] & 0xFFFF_FFF0) != 0
+            || State.R[11] != 0x8C17_0A98
+            || State.R[12] != 0x8C18_3544
+            || State.R[13] != 0xD0
+            || registerBlock < registerBase
+            || registerOffset > 0x60
+            || registerOffset % 0x20 != 0
+            || memory.ReadUInt32(registerBlock + 0x1C) != 1)
+        {
+            return false;
+        }
+
+        State.R[0] = 0;
+        State.R[3] &= 0xFFFF_FF0F;
+        State.Sr = State.R[3] | (restoredInterruptMask << 4);
         State.Pc = State.Pr;
         State.InstructionsExecuted += skippedInstructionCount;
         skippedInstructions = skippedInstructionCount;
