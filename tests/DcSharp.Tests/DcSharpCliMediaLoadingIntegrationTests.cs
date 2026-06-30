@@ -9,9 +9,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
     {
         var repoRoot = FindRepoRoot();
         var cli = FindCliAssembly(repoRoot);
-        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
         var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(mediaDirectory);
+        var elfPath = CreateTemporaryNopElf(mediaDirectory);
         var mediaPath = Path.Combine(mediaDirectory, "media.bin");
 
         try
@@ -44,9 +44,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
     {
         var repoRoot = FindRepoRoot();
         var cli = FindCliAssembly(repoRoot);
-        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
         var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(mediaDirectory);
+        var elfPath = CreateTemporaryNopElf(mediaDirectory);
         var trackPath = Path.Combine(mediaDirectory, "track.bin");
         var cuePath = Path.Combine(mediaDirectory, "game.cue");
 
@@ -93,9 +93,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
     {
         var repoRoot = FindRepoRoot();
         var cli = FindCliAssembly(repoRoot);
-        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
         var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(mediaDirectory);
+        var elfPath = CreateTemporaryNopElf(mediaDirectory);
         var missingMediaPath = Path.Combine(mediaDirectory, "does-not-exist.bin");
 
         try
@@ -126,9 +126,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
     {
         var repoRoot = FindRepoRoot();
         var cli = FindCliAssembly(repoRoot);
-        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
-        var mediaDirectory = Path.Combine(Path.GetTempPath(), "dcsharp cli test");
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), $"dcsharp cli test {Path.GetRandomFileName()}");
         Directory.CreateDirectory(mediaDirectory);
+        var elfPath = CreateTemporaryNopElf(mediaDirectory);
         var trackPath = Path.Combine(mediaDirectory, "audio track.bin");
         var cuePath = Path.Combine(mediaDirectory, "game cue.cue");
 
@@ -815,9 +815,9 @@ public class DcSharpCliMediaLoadingIntegrationTests
     {
         var repoRoot = FindRepoRoot();
         var cli = FindCliAssembly(repoRoot);
-        var elfPath = Path.Combine(repoRoot, "artifacts", "kos", "dcsharp_minimal.elf");
         var outputDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(outputDirectory);
+        var elfPath = CreateTemporaryNopElf(outputDirectory);
         var wavPath = Path.Combine(outputDirectory, "audio.wav");
 
         try
@@ -845,6 +845,55 @@ public class DcSharpCliMediaLoadingIntegrationTests
         {
             Directory.Delete(outputDirectory, recursive: true);
         }
+    }
+
+    private static string CreateTemporaryNopElf(string directory)
+    {
+        var path = Path.Combine(directory, "program.elf");
+        File.WriteAllBytes(
+            path,
+            CreateElfWithSegment(
+            [
+                0x09, 0x00,
+                0x09, 0x00,
+                0x09, 0x00
+            ]));
+        return path;
+    }
+
+    private static byte[] CreateElfWithSegment(byte[] segmentBytes)
+    {
+        var bytes = new byte[84 + segmentBytes.Length];
+        bytes[0] = 0x7F;
+        bytes[1] = (byte)'E';
+        bytes[2] = (byte)'L';
+        bytes[3] = (byte)'F';
+        bytes[4] = 1;
+        bytes[5] = 1;
+        bytes[6] = 1;
+
+        WriteUInt16LittleEndian(bytes, 16, 2);
+        WriteUInt16LittleEndian(bytes, 18, 42);
+        WriteUInt32LittleEndian(bytes, 20, 1);
+        WriteUInt32LittleEndian(bytes, 24, 0x8C01_0000);
+        WriteUInt32LittleEndian(bytes, 28, 52);
+        WriteUInt16LittleEndian(bytes, 40, 52);
+        WriteUInt16LittleEndian(bytes, 42, 32);
+        WriteUInt16LittleEndian(bytes, 44, 1);
+        WriteUInt16LittleEndian(bytes, 46, 40);
+        WriteUInt16LittleEndian(bytes, 48, 3);
+
+        WriteUInt32LittleEndian(bytes, 52, 1);
+        WriteUInt32LittleEndian(bytes, 56, 84);
+        WriteUInt32LittleEndian(bytes, 60, 0x8C01_0000);
+        WriteUInt32LittleEndian(bytes, 64, 0x0C01_0000);
+        WriteUInt32LittleEndian(bytes, 68, (uint)segmentBytes.Length);
+        WriteUInt32LittleEndian(bytes, 72, (uint)segmentBytes.Length);
+        WriteUInt32LittleEndian(bytes, 76, 5);
+        WriteUInt32LittleEndian(bytes, 80, 32);
+
+        segmentBytes.CopyTo(bytes, 84);
+        return bytes;
     }
 
     private static string FindCliAssembly(string repoRoot)
