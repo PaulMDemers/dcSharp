@@ -7942,6 +7942,56 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2G2DmaStatusSetHelperStatusMoveTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C17_0ABC
+            || step.Opcode != 0xE201
+            || State.Pc != 0x8C17_0ABE
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null)
+        {
+            return false;
+        }
+
+        const ulong skippedInstructionCount = 13;
+        const uint registerBase = 0xA05F_7800;
+        var registerBlock = State.R[0];
+        var registerOffset = registerBlock - registerBase;
+        var restoredInterruptMask = State.R[5] & 0x0F;
+        if (maxInstructionsToSkip < skippedInstructionCount
+            || !IsSonicAdventure2G2DmaStatusSetHelper()
+            || State.R[1] != 0x8C18_3544
+            || State.R[2] != 1
+            || State.R[3] != registerBase
+            || (State.R[5] & 0xFFFF_FFF0) != 0
+            || State.R[11] != 0x8C17_0A98
+            || State.R[12] != 0x8C18_3544
+            || State.R[13] != 0xD0
+            || registerBlock < registerBase
+            || registerOffset > 0x60
+            || registerOffset % 0x20 != 0)
+        {
+            return false;
+        }
+
+        var maskedSr = (State.Sr & 0xFFFF_FF0E) & 0xFFFF_FF0F;
+        memory.WriteUInt32(registerBlock + 0x1C, 1);
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[2] = 1;
+        State.R[3] = maskedSr;
+        State.R[4] = registerBlock;
+        State.R[5] = restoredInterruptMask;
+        State.Sr = maskedSr | (restoredInterruptMask << 4);
+        State.Pc = State.Pr;
+        State.InstructionsExecuted += skippedInstructionCount;
+        skippedInstructions = skippedInstructionCount;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2G2DmaStatusSetHelperStatusWriteTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
