@@ -6398,6 +6398,214 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2AicaWorkPollFinalSrRestoreTail(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || !IsSonicAdventure2AicaWorkPollFunction()
+            || !IsSonicAdventure2AicaWorkQueueHelper())
+        {
+            return false;
+        }
+
+        var workGlobal = memory.ReadUInt32(0x8C18_33A4);
+        if (workGlobal == 0
+            || !memory.TryGetSystemRamOffset(workGlobal, 0x90, out _)
+            || memory.ReadUInt32(0x8C18_33A8) != 1
+            || State.R[4] != 0x8C16_B4CC
+            || State.R[5] != 0x0B00_0003)
+        {
+            return false;
+        }
+
+        return step.Pc switch
+        {
+            0x8C15_3ACA when step.Opcode == 0xC90F && State.Pc == 0x8C15_3ACC =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 9,
+                    State.R[15],
+                    savedInterruptMask: State.R[0],
+                    maskedSr: State.Sr & 0xFFFF_FF0F,
+                    require: State.R[0] <= 0x0F
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == State.Sr
+                        && (memory.ReadUInt32(State.R[15]) & 0x0F) == State.R[0],
+                    out skippedInstructions),
+            0x8C15_3ACC when step.Opcode == 0x4008 && State.Pc == 0x8C15_3ACE =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 8,
+                    State.R[15],
+                    savedInterruptMask: State.R[0] >> 2,
+                    maskedSr: State.Sr & 0xFFFF_FF0F,
+                    require: State.R[0] <= 0x3C
+                        && (State.R[0] & 0x03) == 0
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == State.Sr,
+                    out skippedInstructions),
+            0x8C15_3ACE when step.Opcode == 0x2319 && State.Pc == 0x8C15_3AD0 =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 7,
+                    State.R[15],
+                    savedInterruptMask: State.R[0] >> 2,
+                    maskedSr: State.R[3],
+                    require: State.R[0] <= 0x3C
+                        && (State.R[0] & 0x03) == 0
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F),
+                    out skippedInstructions),
+            0x8C15_3AD0 when step.Opcode == 0x4008 && State.Pc == 0x8C15_3AD2 =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 6,
+                    State.R[15],
+                    savedInterruptMask: State.R[0] >> 4,
+                    maskedSr: State.R[3],
+                    require: State.R[0] <= 0xF0
+                        && (State.R[0] & 0x0F) == 0
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F),
+                    out skippedInstructions),
+            0x8C15_3AD2 when step.Opcode == 0x203B && State.Pc == 0x8C15_3AD4 =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 5,
+                    State.R[15],
+                    savedInterruptMask: (State.R[0] >> 4) & 0x0F,
+                    maskedSr: State.R[3],
+                    require: State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F)
+                        && State.R[0] == (State.R[3] | (State.R[0] & 0xF0)),
+                    out skippedInstructions),
+            0x8C15_3AD4 when step.Opcode == 0x400E && State.Pc == 0x8C15_3AD6 =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 4,
+                    State.R[15],
+                    savedInterruptMask: (State.Sr >> 4) & 0x0F,
+                    maskedSr: State.Sr & 0xFFFF_FF0F,
+                    require: State.R[0] == State.Sr
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F),
+                    out skippedInstructions),
+            0x8C15_3AD6 when step.Opcode == 0x7F04 && State.Pc == 0x8C15_3AD8 =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPostLocalPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 3,
+                    savedPrStackAddress: State.R[15],
+                    require: State.R[0] == State.Sr
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F),
+                    out skippedInstructions),
+            0x8C15_3AD8 when step.Opcode == 0x4F26 && State.Pc == 0x8C15_3ADA =>
+                TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPostPrPop(
+                    maxInstructionsToSkip,
+                    requiredInstructions: 2,
+                    require: State.R[0] == State.Sr
+                        && State.R[1] == 0xFFFF_FF0F
+                        && State.R[2] == 0x8C18_33A0
+                        && State.R[3] == (State.Sr & 0xFFFF_FF0F),
+                    out skippedInstructions),
+            _ => false
+        };
+    }
+
+    private bool TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPreStackPop(
+        ulong maxInstructionsToSkip,
+        ulong requiredInstructions,
+        uint localStackAddress,
+        uint savedInterruptMask,
+        uint maskedSr,
+        bool require,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (!require
+            || savedInterruptMask > 0x0F
+            || maxInstructionsToSkip < requiredInstructions
+            || localStackAddress > uint.MaxValue - 8
+            || !memory.TryGetSystemRamOffset(localStackAddress, 8, out _))
+        {
+            return false;
+        }
+
+        var savedPr = memory.ReadUInt32(localStackAddress + 4);
+        State.R[0] = 0;
+        State.R[1] = 0xFFFF_FF0F;
+        State.R[3] = maskedSr;
+        State.R[15] = localStackAddress + 8;
+        State.Pr = savedPr;
+        State.Sr = maskedSr | (savedInterruptMask << 4);
+        State.T = (State.Sr & 1) != 0;
+        State.Pc = savedPr;
+        State.InstructionsExecuted += requiredInstructions;
+        skippedInstructions = requiredInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPostLocalPop(
+        ulong maxInstructionsToSkip,
+        ulong requiredInstructions,
+        uint savedPrStackAddress,
+        bool require,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (!require
+            || maxInstructionsToSkip < requiredInstructions
+            || savedPrStackAddress > uint.MaxValue - 4
+            || !memory.TryGetSystemRamOffset(savedPrStackAddress, 4, out _))
+        {
+            return false;
+        }
+
+        State.R[0] = 0;
+        State.Pr = memory.ReadUInt32(savedPrStackAddress);
+        State.R[15] = savedPrStackAddress + 4;
+        State.Pc = State.Pr;
+        State.T = (State.Sr & 1) != 0;
+        State.InstructionsExecuted += requiredInstructions;
+        skippedInstructions = requiredInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryCompleteSonicAdventure2AicaWorkPollFinalSrRestoreFromPostPrPop(
+        ulong maxInstructionsToSkip,
+        ulong requiredInstructions,
+        bool require,
+        out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (!require
+            || maxInstructionsToSkip < requiredInstructions)
+        {
+            return false;
+        }
+
+        State.R[0] = 0;
+        State.Pc = State.Pr;
+        State.T = (State.Sr & 1) != 0;
+        State.InstructionsExecuted += requiredInstructions;
+        skippedInstructions = requiredInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     internal bool TryFastForwardSonicAdventure2AicaOuterWorkPollLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
