@@ -12038,6 +12038,108 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C0A_4B44) == 0x3C33
         && memory.ReadUInt16(0x8C0A_4B46) == 0x8FE5;
 
+    internal bool TryFastForwardSonicAdventure2ZeroByteMaskGroupScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4AF4
+            || step.Opcode != 0x8BE0
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C0A_4AB8
+            || !IsSonicAdventure2ZeroByteMaskGroupScan())
+        {
+            return false;
+        }
+
+        const ulong instructionsPerGroup = 39;
+        var groupsToSkip = maxInstructionsToSkip / instructionsPerGroup;
+        if (groupsToSkip == 0
+            || State.R[6] >= State.R[10]
+            || State.R[11] != 3
+            || State.R[12] != 0x80
+            || State.R[14] != 0
+            || !memory.TryGetSystemRamOffset(State.R[15] + 0x18, 4, out _))
+        {
+            return false;
+        }
+
+        var baseAddress = State.R[6];
+        var skippedGroups = 0UL;
+        for (; skippedGroups < groupsToSkip; skippedGroups++)
+        {
+            if (baseAddress > uint.MaxValue - 3
+                || baseAddress >= State.R[10]
+                || !TryReadSonicAdventure2ZeroByteMaskGroup(baseAddress))
+            {
+                break;
+            }
+
+            var nextBaseAddress = baseAddress + 3;
+            if (nextBaseAddress >= State.R[10])
+            {
+                break;
+            }
+
+            baseAddress = nextBaseAddress;
+        }
+
+        if (skippedGroups == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = skippedGroups * instructionsPerGroup;
+        State.R[1] = memory.ReadUInt32(State.R[15] + 0x18);
+        State.R[2] = 0;
+        State.R[4] = 0;
+        State.R[5] = 24;
+        State.R[6] = baseAddress;
+        State.R[7] = 3;
+        State.R[13] = baseAddress - 6;
+        State.T = false;
+        State.Pc = 0x8C0A_4AB8;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryReadSonicAdventure2ZeroByteMaskGroup(uint baseAddress)
+    {
+        if (baseAddress < 2
+            || !memory.TryGetSystemRamOffset(baseAddress - 2, 3, out _))
+        {
+            return false;
+        }
+
+        return memory.ReadByte(baseAddress) == 0
+            && memory.ReadByte(baseAddress - 1) == 0
+            && memory.ReadByte(baseAddress - 2) == 0;
+    }
+
+    private bool IsSonicAdventure2ZeroByteMaskGroupScan() =>
+        memory.ReadUInt16(0x8C0A_4AB8) == 0x67E3
+        && memory.ReadUInt16(0x8C0A_4ABA) == 0x65E3
+        && memory.ReadUInt16(0x8C0A_4ABC) == 0x6D63
+        && memory.ReadUInt16(0x8C0A_4ABE) == 0x64D0
+        && memory.ReadUInt16(0x8C0A_4AC0) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4AC2) == 0x2228
+        && memory.ReadUInt16(0x8C0A_4AC4) == 0x8B04
+        && memory.ReadUInt16(0x8C0A_4AC6) == 0x7701
+        && memory.ReadUInt16(0x8C0A_4AC8) == 0x37B3
+        && memory.ReadUInt16(0x8C0A_4ACA) == 0x7508
+        && memory.ReadUInt16(0x8C0A_4ACC) == 0x7DFF
+        && memory.ReadUInt16(0x8C0A_4ACE) == 0x8BF6
+        && memory.ReadUInt16(0x8C0A_4AD0) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4AD2) == 0x2228
+        && memory.ReadUInt16(0x8C0A_4AD4) == 0x8908
+        && memory.ReadUInt16(0x8C0A_4AE8) == 0x51F6
+        && memory.ReadUInt16(0x8C0A_4AEA) == 0x3513
+        && memory.ReadUInt16(0x8C0A_4AEC) == 0x8D01
+        && memory.ReadUInt16(0x8C0A_4AEE) == 0x7603
+        && memory.ReadUInt16(0x8C0A_4AF2) == 0x36A2
+        && memory.ReadUInt16(0x8C0A_4AF4) == 0x8BE0;
+
     internal bool TryFastForwardSonicAdventure2EmptyCallbackTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
