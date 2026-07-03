@@ -231,7 +231,7 @@ This prevents retail games from becoming the only test suite.
 
 ### Sonic Adventure 2
 
-State: best current canary. SA2 now clears the custom AICA status/completion wall and reaches TA traffic. The latest targeted TA probes stop at 64 and 96 writes with 47 successful GD-ROM reads, nonzero framebuffer bytes, and repeated modifier-volume setup rather than renderable polygon/vertex geometry. `artifacts/tmp/sa2-ta-96-probe-release.txt` reaches `PC=0x8C12CACA` after `68,219,095` instructions and is still cycling modifier-volume control packets; modifier-volume packets now decode as one control word plus 15 payload words.
+State: best current canary. SA2 now clears the custom AICA status/completion wall and reaches TA traffic. The latest targeted TA probes stop at 64, 96, and 160 writes with 47 successful GD-ROM reads, nonzero framebuffer bytes, and repeated modifier-volume setup rather than renderable polygon/vertex geometry. `--stop-after-pvr-ta-writes 160` now stops cleanly at `PC=0x8C14B66C` after `68,220,664` instructions; modifier-volume packets decode as one control word plus 15 payload words, and the repeated `0x8C12CB98-0x8C12CBBE` no-op callback poll loop is fast-forwarded under an exact guard.
 
 Next:
 

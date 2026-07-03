@@ -11804,6 +11804,101 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2ModifierVolumeCallbackPollLoop(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C12_CBBE
+            || step.Opcode != 0x8BEB
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C12_CB98)
+        {
+            return false;
+        }
+
+        if (!IsSonicAdventure2ModifierVolumeCallbackPollLoop()
+            || maxInstructionsToSkip < 20)
+        {
+            return false;
+        }
+
+        var callbackPointerAddress = memory.ReadUInt32(0x8C12_CC20);
+        var counterAddress = memory.ReadUInt32(0x8C12_CC24);
+        var secondCounterAddress = memory.ReadUInt32(0x8C12_CC28);
+        var limitAddress = memory.ReadUInt32(0x8C12_CC18);
+        var activeAddress = memory.ReadUInt32(0x8C12_CC1C);
+
+        if (!memory.TryGetSystemRamOffset(callbackPointerAddress, 8, out _)
+            || !memory.TryGetSystemRamOffset(counterAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(secondCounterAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(limitAddress, 4, out _)
+            || !memory.TryGetSystemRamOffset(activeAddress, 4, out _))
+        {
+            return false;
+        }
+
+        var callbackTarget = memory.ReadUInt32(callbackPointerAddress);
+        var callbackArgument = memory.ReadUInt32(callbackPointerAddress + 4);
+        var firstCounter = memory.ReadUInt32(counterAddress);
+        var secondCounter = memory.ReadUInt32(secondCounterAddress);
+        var limit = memory.ReadUInt32(limitAddress);
+        var active = memory.ReadUInt32(activeAddress);
+        if (callbackTarget != 0x8C12_BF50
+            || active == 0
+            || limit > unchecked(firstCounter + secondCounter + 1u))
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 20;
+        var iterationsToSkip = maxInstructionsToSkip / instructionsPerIteration;
+        if (iterationsToSkip == 0)
+        {
+            return false;
+        }
+
+        skippedInstructions = iterationsToSkip * instructionsPerIteration;
+        State.R[0] = secondCounterAddress;
+        State.R[1] = limitAddress;
+        State.R[2] = active;
+        State.R[3] = activeAddress;
+        State.R[4] = callbackArgument;
+        State.Pr = 0x8C12_CBA0;
+        State.T = false;
+        State.Pc = 0x8C12_CB98;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2ModifierVolumeCallbackPollLoop() =>
+        memory.ReadUInt16(0x8C12_CB98) == 0xD321
+        && memory.ReadUInt16(0x8C12_CB9A) == 0x6232
+        && memory.ReadUInt16(0x8C12_CB9C) == 0x420B
+        && memory.ReadUInt16(0x8C12_CB9E) == 0x5431
+        && memory.ReadUInt16(0x8C12_BF50) == 0x000B
+        && memory.ReadUInt16(0x8C12_BF52) == 0x0009
+        && memory.ReadUInt16(0x8C12_CBA0) == 0xD120
+        && memory.ReadUInt16(0x8C12_CBA2) == 0x6312
+        && memory.ReadUInt16(0x8C12_CBA4) == 0xD020
+        && memory.ReadUInt16(0x8C12_CBA6) == 0x6202
+        && memory.ReadUInt16(0x8C12_CBA8) == 0xD11B
+        && memory.ReadUInt16(0x8C12_CBAA) == 0x323C
+        && memory.ReadUInt16(0x8C12_CBAC) == 0x7201
+        && memory.ReadUInt16(0x8C12_CBAE) == 0x6312
+        && memory.ReadUInt16(0x8C12_CBB0) == 0x3326
+        && memory.ReadUInt16(0x8C12_CBB2) == 0x8B01
+        && memory.ReadUInt16(0x8C12_CBB8) == 0xD318
+        && memory.ReadUInt16(0x8C12_CBBA) == 0x6232
+        && memory.ReadUInt16(0x8C12_CBBC) == 0x2228
+        && memory.ReadUInt16(0x8C12_CBBE) == 0x8BEB
+        && memory.ReadUInt32(0x8C12_CC18) == 0x8C29_C7D4
+        && memory.ReadUInt32(0x8C12_CC1C) == 0x8C29_C7D8
+        && memory.ReadUInt32(0x8C12_CC20) == 0x8C29_C6CC
+        && memory.ReadUInt32(0x8C12_CC24) == 0x8C29_C688
+        && memory.ReadUInt32(0x8C12_CC28) == 0x8C29_C68C;
+
     internal bool TryFastForwardSonicAdventure2EmptyCallbackTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
