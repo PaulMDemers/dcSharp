@@ -231,14 +231,14 @@ This prevents retail games from becoming the only test suite.
 
 ### Sonic Adventure 2
 
-State: best current canary. The focused long SA2 AICA/G2 ladder now reaches a 1.5B-instruction stop-condition probe without TA traffic and without the 48th GD-ROM read. The latest run stops at `PC=0x8C153AC8`, with 47 successful GD-ROM reads, 21,978 PVR register accesses, 0 TA writes, and the custom `SA2_AICA_STATUS_CANDIDATE` still held at `1`. The exposed hot path is still AICA work polling and channel/name setup, led by `0x8C10FE86..0x8C10FE8E`, `0x8C15B604`, `0x8C153A90`, and the `0x8C15C57C`/`0x8C15C69A` setup cluster.
+State: best current canary. SA2 now clears the custom AICA status/completion wall and reaches TA traffic. The latest 300M stop-condition probe at `artifacts/tmp/sa2-after-lds-macl-300m.txt` stops on `--stop-on-pvr-ta-write` at `PC=0x8C12D3AC`, with 47 successful GD-ROM reads, 634 PVR register accesses, 8 TA command writes, and nonzero framebuffer bytes. `SA2_AICA_STATUS_CANDIDATE` ends at `0`, and the formerly dominant AICA status poll is no longer the front wall.
 
 Next:
 
-- Continue the AICA/G2 sound-driver path, but bias toward a generic AICA queue/service model that can explain the `0x012400` status field lifecycle instead of adding only title-shaped waits.
-- Use the runner stop conditions (`--stop-on-pvr-ta-write`, `--stop-after-gdrom-reads 48`) for future SA2 probes; the first 1.5B run did not trip either condition.
+- Shift SA2 attention from AICA status polling to PVR TA command correctness: decode the first TA writes, verify list/control words, and make the preview renderer consume the newly reached stream.
+- Keep the AICA status clear modeled in memory, but replace the title-shaped completion shim with a more generic AICA service model once more games expose their mailbox lifecycles.
 - Keep shaving IP.BIN glyph/pattern-fill hotspots only when they block useful probe budgets.
-- Once TA writes appear, switch attention to PVR command correctness and reference-frame comparison.
+- Continue using `--stop-on-pvr-ta-write` and `--stop-after-gdrom-reads 48` for future SA2 probes; the first condition now trips quickly enough to drive TA implementation.
 
 ### Sonic Shuffle
 

@@ -102,6 +102,73 @@ public class Sh4CpuTests
         Assert.Equal(0x8C01_0002u, cpu.State.Pc);
     }
 
+    [Theory]
+    [InlineData(0x4104, 0x8000_0001u, 0x0000_0003u, true, "rotl r1 ; r1=0x00000003, t=1")]
+    [InlineData(0x4105, 0x8000_0001u, 0xC000_0000u, true, "rotr r1 ; r1=0xC0000000, t=1")]
+    public void ExecutesPlainRotates(ushort opcode, uint initialValue, uint expectedValue, bool expectedT, string expectedTrace)
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, opcode);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[1] = initialValue;
+
+        var step = cpu.Step();
+
+        Assert.Equal(expectedTrace, step.Trace);
+        Assert.Equal(expectedValue, cpu.State.R[1]);
+        Assert.Equal(expectedT, cpu.State.T);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void ExecutesFsca()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF0FD);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fpul = 0x4000;
+
+        var step = cpu.Step();
+
+        Assert.StartsWith("fsca fpul,dr0", step.Trace);
+        Assert.Equal(1.0f, BitConverter.UInt32BitsToSingle(cpu.State.Fr[0]), precision: 6);
+        Assert.Equal(0.0f, BitConverter.UInt32BitsToSingle(cpu.State.Fr[1]), precision: 6);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
+    [Fact]
+    public void ExecutesFsrra()
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, 0xF37D);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.Fr[3] = BitConverter.SingleToUInt32Bits(4.0f);
+
+        var step = cpu.Step();
+
+        Assert.Equal($"fsrra fr3 ; fr3=0x{BitConverter.SingleToUInt32Bits(0.5f):X8}", step.Trace);
+        Assert.Equal(0.5f, BitConverter.UInt32BitsToSingle(cpu.State.Fr[3]), precision: 6);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
+    [Theory]
+    [InlineData(0x400A, true, "lds r0,mach ; mach=0x89ABCDEF")]
+    [InlineData(0x401A, false, "lds r0,macl ; macl=0x89ABCDEF")]
+    public void ExecutesLdsRegisterToMac(ushort opcode, bool updatesMach, string expectedTrace)
+    {
+        var memory = new DreamcastMemory();
+        WriteInstruction(memory, 0x8C01_0000, opcode);
+        var cpu = new Sh4Cpu(memory, 0x8C01_0000);
+        cpu.State.R[0] = 0x89AB_CDEF;
+
+        var step = cpu.Step();
+
+        Assert.Equal(expectedTrace, step.Trace);
+        Assert.Equal(updatesMach ? 0x89AB_CDEFu : 0u, cpu.State.Mach);
+        Assert.Equal(updatesMach ? 0u : 0x89AB_CDEFu, cpu.State.Macl);
+        Assert.Equal(0x8C01_0002u, cpu.State.Pc);
+    }
+
     [Fact]
     public void FastForwardsMaskedCountedIdleLoop()
     {
@@ -18261,11 +18328,11 @@ public class Sh4CpuTests
 
         Assert.True(cpu.TryFastForwardSonicAdventure2G2PioWriteLoop(delaySlot, 20, out var skippedInstructions));
         Assert.Equal(20UL, skippedInstructions);
-        Assert.Equal(1u, memory.ReadUInt32(0xA081_2400));
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2400));
         var field = Assert.Single(memory.CreateAudioSnapshot().DriverFields);
         Assert.Equal("SA2_AICA_STATUS_CANDIDATE", field.Name);
-        Assert.Equal(1u, field.Value);
-        Assert.Equal(1UL, field.WriteCount);
+        Assert.Equal(0u, field.Value);
+        Assert.Equal(2UL, field.WriteCount);
         Assert.True(cpu.State.T);
         Assert.Equal(0x8C13_5C16u, cpu.State.Pc);
     }

@@ -1284,7 +1284,7 @@ public class DreamcastMemoryTests
         var memory = new DreamcastMemory();
         for (var index = 0; index < 600; index++)
         {
-            memory.WriteUInt32(0xA081_2400, (uint)index);
+            memory.WriteUInt32(0xA081_2418, (uint)index);
         }
 
         var accesses = memory.CreateAudioSnapshot().RamFieldAccesses;
@@ -1348,7 +1348,7 @@ public class DreamcastMemoryTests
         memory.CurrentInstructionPc = 0x8C13_5BFA;
         memory.WriteUInt32(0xA081_2400, 1);
         memory.CurrentInstructionPc = 0x8C16_BF10;
-        Assert.Equal(1u, memory.ReadUInt32(0xA081_2400));
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2400));
 
         var field = Assert.Single(memory.CreateAudioSnapshot().DriverFields);
 
@@ -1357,10 +1357,10 @@ public class DreamcastMemoryTests
         Assert.Equal("0x012400", field.OffsetHex);
         Assert.Equal(0xA081_2400u, field.Address);
         Assert.Equal("0xA0812400", field.AddressHex);
-        Assert.Equal(1u, field.Value);
-        Assert.Equal("0x00000001", field.ValueHex);
+        Assert.Equal(0u, field.Value);
+        Assert.Equal("0x00000000", field.ValueHex);
         Assert.Equal(1UL, field.ReadCount);
-        Assert.Equal(1UL, field.WriteCount);
+        Assert.Equal(2UL, field.WriteCount);
         Assert.Equal(0x8C16_BF10u, field.LastReadPc);
         Assert.Equal("0x8C16BF10", field.LastReadPcHex);
         Assert.Equal(0x8C13_5BFAu, field.LastWritePc);
@@ -1411,7 +1411,7 @@ public class DreamcastMemoryTests
     }
 
     [Fact]
-    public void WriteAicaRamDriverFieldWritesKnownDriverField()
+    public void WriteAicaRamDriverFieldCompletesSonicAdventure2StatusRequest()
     {
         var memory = new DreamcastMemory();
         memory.CurrentInstructionPc = 0x8C13_5BFA;
@@ -1419,11 +1419,19 @@ public class DreamcastMemoryTests
         var handled = memory.TryWriteAicaRamDriverField(0xA081_2400, 1);
 
         Assert.True(handled);
-        Assert.Equal(1u, memory.ReadUInt32(0xA081_2400));
+        Assert.Equal(0u, memory.ReadUInt32(0xA081_2400));
         var field = Assert.Single(memory.CreateAudioSnapshot().DriverFields);
         Assert.Equal("SA2_AICA_STATUS_CANDIDATE", field.Name);
-        Assert.Equal(1UL, field.WriteCount);
+        Assert.Equal(2UL, field.WriteCount);
+        Assert.Equal(0u, field.Value);
         Assert.Equal("0x8C135BFA", field.LastWritePcHex);
+        var writes = memory.CreateAudioSnapshot().RamFieldAccesses
+            .Where(access => access.Kind == MemoryAccessKind.Write && access.Name == "SA2_AICA_STATUS_CANDIDATE")
+            .ToArray();
+        Assert.Collection(
+            writes,
+            access => Assert.Equal(1u, access.Value),
+            access => Assert.Equal(0u, access.Value));
     }
 
     [Fact]

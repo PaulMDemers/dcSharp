@@ -800,7 +800,9 @@ public sealed class DreamcastMemory
         if (TryGetAicaRamOffset(address, data.Length, out var aicaOffset))
         {
             data.CopyTo(aicaRam.AsSpan(aicaOffset));
-            LogAicaRamAccess(MemoryAccessKind.Write, address, aicaOffset, data.Length, ToValue(data));
+            var value = ToValue(data);
+            LogAicaRamAccess(MemoryAccessKind.Write, address, aicaOffset, data.Length, value);
+            CompleteAicaRamDriverFieldWriteIfNeeded(address, aicaOffset, data.Length, value);
             if (TouchesAicaCommandQueueServiceRegion(aicaOffset, data.Length))
             {
                 aicaCommandQueueServicePending = true;
@@ -2215,6 +2217,17 @@ public sealed class DreamcastMemory
 
         WriteUInt32(address, value);
         return true;
+    }
+
+    private void CompleteAicaRamDriverFieldWriteIfNeeded(uint address, int offset, int size, uint value)
+    {
+        if ((uint)offset != Sa2AicaStatusOffset || size != 4 || value != 1)
+        {
+            return;
+        }
+
+        WriteUInt32To(aicaRam, offset, 0);
+        LogAicaRamAccess(MemoryAccessKind.Write, address, offset, size, 0);
     }
 
     internal bool TryResolveAicaDriverCompletionWordAddress(

@@ -27687,6 +27687,20 @@ public sealed class Sh4Cpu
             return $"shll8 r{n} ; r{n}=0x{State.R[n]:X8}";
         }
 
+        if (highNibble == 0x4 && (opcode & 0x00FF) == 0x0004)
+        {
+            State.T = (State.R[n] & 0x8000_0000) != 0;
+            State.R[n] = (State.R[n] << 1) | (State.T ? 1u : 0u);
+            return $"rotl r{n} ; r{n}=0x{State.R[n]:X8}, t={(State.T ? 1 : 0)}";
+        }
+
+        if (highNibble == 0x4 && (opcode & 0x00FF) == 0x0005)
+        {
+            State.T = (State.R[n] & 0x1) != 0;
+            State.R[n] = (State.R[n] >> 1) | (State.T ? 0x8000_0000u : 0u);
+            return $"rotr r{n} ; r{n}=0x{State.R[n]:X8}, t={(State.T ? 1 : 0)}";
+        }
+
         if (highNibble == 0x4 && (opcode & 0x00FF) == 0x0024)
         {
             var oldT = State.T;
@@ -27961,6 +27975,18 @@ public sealed class Sh4Cpu
         {
             State.Pr = State.R[n];
             return $"lds r{n},pr ; pr=0x{State.Pr:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x400A)
+        {
+            State.Mach = State.R[n];
+            return $"lds r{n},mach ; mach=0x{State.Mach:X8}";
+        }
+
+        if ((opcode & 0xF0FF) == 0x401A)
+        {
+            State.Macl = State.R[n];
+            return $"lds r{n},macl ; macl=0x{State.Macl:X8}";
         }
 
         if ((opcode & 0xF0FF) == 0x400E)
@@ -28288,6 +28314,15 @@ public sealed class Sh4Cpu
             return $"fschg ; fpscr=0x{State.Fpscr:X8}";
         }
 
+        if ((opcode & 0xF0FF) == 0xF0FD)
+        {
+            var destination = n & ~1;
+            var angle = (State.Fpul & 0xFFFF) * (MathF.Tau / 65536.0f);
+            State.Fr[destination] = BitConverter.SingleToUInt32Bits(MathF.Sin(angle));
+            State.Fr[destination + 1] = BitConverter.SingleToUInt32Bits(MathF.Cos(angle));
+            return $"fsca fpul,dr{destination} ; fr{destination}=0x{State.Fr[destination]:X8}, fr{destination + 1}=0x{State.Fr[destination + 1]:X8}";
+        }
+
         if ((opcode & 0xF0FF) == 0xF05D)
         {
             if ((State.Fpscr & Sh4State.FpscrPrBit) != 0)
@@ -28556,6 +28591,18 @@ public sealed class Sh4Cpu
                     return float.IsFinite(result)
                         ? $"fsqrt fr{n} ; fr{n}=0x{State.Fr[n]:X8}"
                         : $"fsqrt fr{n} ; fr{n}=0x{State.Fr[n]:X8} ; nonfinite fr{n}old=0x{operandBits:X8}";
+                }
+
+                if ((opcode & 0xF0FF) == 0xF07D)
+                {
+                    var operandBits = State.Fr[n];
+                    var operand = BitConverter.UInt32BitsToSingle(operandBits);
+                    var result = 1.0f / MathF.Sqrt(operand);
+                    State.Fr[n] = SingleResultToBits(result);
+                    RecordFpuSingleResult([operandBits], result);
+                    return float.IsFinite(result)
+                        ? $"fsrra fr{n} ; fr{n}=0x{State.Fr[n]:X8}"
+                        : $"fsrra fr{n} ; fr{n}=0x{State.Fr[n]:X8} ; nonfinite fr{n}old=0x{operandBits:X8}";
                 }
 
                 if ((opcode & 0xF0FF) == 0xF08D)
