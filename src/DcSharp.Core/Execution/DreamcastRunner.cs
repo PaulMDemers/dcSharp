@@ -71,6 +71,7 @@ public sealed class DreamcastRunner
                 var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
                 var pvrTaCommandWriteCountBeforeStep = memory.PvrTaCommandWriteCount;
                 var gdromReadCommandCountBeforeStep = memory.GdromReadCommandCount;
+                var aicaRamFieldAccessSequenceBeforeStep = memory.AicaRamFieldAccessSequence;
                 Sh4StepResult step;
                 var nextInstruction = cpu.State.InstructionsExecuted + 1;
                 var shouldCaptureFpuAnomalies = ShouldCaptureFpuAnomalies(options.FpuAnomalyCapture, fpuAnomalies, nextInstruction);
@@ -2843,7 +2844,7 @@ public sealed class DreamcastRunner
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
 
-                if (ShouldStopOnProbeCondition(options, memory, pvrTaCommandWriteCountBeforeStep, gdromReadCommandCountBeforeStep, out var conditionDetail))
+                if (ShouldStopOnProbeCondition(options, memory, pvrTaCommandWriteCountBeforeStep, gdromReadCommandCountBeforeStep, aicaRamFieldAccessSequenceBeforeStep, out var conditionDetail))
                 {
                     return DreamcastRunResult.ConditionStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), conditionDetail, CaptureFinalMemorySnapshot(options, memory))
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
@@ -3339,6 +3340,7 @@ public sealed class DreamcastRunner
         DreamcastMemory memory,
         int previousPvrTaCommandWriteCount,
         int previousGdromReadCommandCount,
+        ulong previousAicaRamFieldAccessSequence,
         out string detail)
     {
         detail = string.Empty;
@@ -3355,6 +3357,25 @@ public sealed class DreamcastRunner
         {
             detail = $"Stopped after GD-ROM read command count reached {memory.GdromReadCommandCount}.";
             return true;
+        }
+
+        if (options.AicaFieldStop is { } aicaFieldStop)
+        {
+            foreach (var access in memory.AicaRamFieldAccesses)
+            {
+                if (access.Sequence <= previousAicaRamFieldAccessSequence)
+                {
+                    continue;
+                }
+
+                if (!aicaFieldStop.Matches(access))
+                {
+                    continue;
+                }
+
+                detail = $"Stopped on AICA field {access.Kind} {access.Name}: offset={access.OffsetHex}, addr={access.AddressHex}, size={access.Size}, value={access.ValueHex}, pc={access.PcHex ?? "none"}, seq={access.Sequence}.";
+                return true;
+            }
         }
 
         return false;
@@ -3510,7 +3531,35 @@ public sealed record DreamcastRunOptions(
     DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null,
     IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null,
     bool StopOnPvrTaWrite = false,
-    int? StopAfterGdromReads = null);
+    int? StopAfterGdromReads = null,
+    DreamcastAicaFieldStop? AicaFieldStop = null);
+
+public sealed record DreamcastAicaFieldStop(
+    string? Name = null,
+    uint? Offset = null,
+    MemoryAccessKind? Kind = null,
+    uint? Value = null)
+{
+    public bool Matches(DreamcastAicaRamFieldAccess access)
+    {
+        if (!string.IsNullOrWhiteSpace(Name) && !string.Equals(access.Name, Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (Offset is { } offset && access.Offset != offset)
+        {
+            return false;
+        }
+
+        if (Kind is { } kind && access.Kind != kind)
+        {
+            return false;
+        }
+
+        return Value is not { } value || access.Value == value;
+    }
+}
 
 public sealed record DreamcastMemoryPokeOnPc(uint Pc, uint Address, uint Value);
 

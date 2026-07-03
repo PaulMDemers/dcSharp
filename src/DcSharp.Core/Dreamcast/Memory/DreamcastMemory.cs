@@ -225,6 +225,7 @@ public sealed class DreamcastMemory
     private bool aicaCommandQueueServicePending;
     private uint mmuLowVirtualWriteGeneration;
     private uint winCeSectionMappingGeneration = uint.MaxValue;
+    private ulong aicaRamFieldAccessSequence;
     private readonly DreamcastMemoryRegionWriteCounter[] systemRamWriteCounters =
     [
         new("IP.BIN", 0x8C00_8000, 0x8000),
@@ -236,6 +237,10 @@ public sealed class DreamcastMemory
     internal int PvrTaCommandWriteCount => pvrTaCommandWrites.Count;
 
     internal int GdromReadCommandCount => gdromReadCommands.Count;
+
+    internal ulong AicaRamFieldAccessSequence => aicaRamFieldAccessSequence;
+
+    internal IReadOnlyList<DreamcastAicaRamFieldAccess> AicaRamFieldAccesses => aicaRamFieldAccesses;
 
     public DreamcastMemory(
         DreamcastControllerState? controllerA = null,
@@ -2531,6 +2536,7 @@ public sealed class DreamcastMemory
             }
 
             aicaRamFieldAccesses.Add(new DreamcastAicaRamFieldAccess(
+                ++aicaRamFieldAccessSequence,
                 kind,
                 (uint)offset,
                 $"0x{offset:X6}",

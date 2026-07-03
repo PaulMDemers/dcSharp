@@ -558,6 +558,27 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCanStopOnAicaFieldWrite()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateAicaStatusFieldWriteBootBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 10,
+                TraceTailLength: 4,
+                AicaFieldStop: new DreamcastAicaFieldStop(
+                    Name: "SA2_AICA_STATUS_CANDIDATE",
+                    Kind: MemoryAccessKind.Write)));
+
+        Assert.Equal(DreamcastStopReason.ConditionStop, result.StopReason);
+        Assert.Contains("Stopped on AICA field Write SA2_AICA_STATUS_CANDIDATE", result.StopDetail);
+        var access = Assert.Single(result.Audio.RamFieldAccesses);
+        Assert.Equal(1UL, access.Sequence);
+        Assert.Equal(MemoryAccessKind.Write, access.Kind);
+        Assert.Equal("SA2_AICA_STATUS_CANDIDATE", access.Name);
+        Assert.Equal(0x012400u, access.Offset);
+    }
+
+    [Fact]
     public void RunReportsBootRegionWrites()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -1352,6 +1373,15 @@ public class DreamcastRunnerTests
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
         0x00, 0x00, 0x00, 0x10
+    ];
+
+    private static byte[] CreateAicaStatusFieldWriteBootBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x24, 0x81, 0xA0
     ];
 
     private static byte[] CreateBootWorkReadBinary() =>

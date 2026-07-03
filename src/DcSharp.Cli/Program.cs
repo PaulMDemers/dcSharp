@@ -689,12 +689,12 @@ static void PrintAicaRamFieldAccesses<T>(IReadOnlyList<T> accesses, Action<int, 
 
 static void PrintAicaRamFieldAccessSummary(int index, DreamcastAicaRamFieldAccessSummary access)
 {
-    Console.WriteLine($"  AICA field #{index} {access.Kind} {access.Name}: offset={access.OffsetHex}, addr={access.AddressHex}, size={access.Size}, value={access.ValueHex}, pc={access.PcHex ?? "none"}, area={access.Area}");
+    Console.WriteLine($"  AICA field #{index} seq={access.Sequence} {access.Kind} {access.Name}: offset={access.OffsetHex}, addr={access.AddressHex}, size={access.Size}, value={access.ValueHex}, pc={access.PcHex ?? "none"}, area={access.Area}");
 }
 
 static void PrintAicaRamFieldAccessSnapshot(int index, DreamcastAicaRamFieldAccess access)
 {
-    Console.WriteLine($"  AICA field #{index} {access.Kind} {access.Name}: offset={access.OffsetHex}, addr={access.AddressHex}, size={access.Size}, value={access.ValueHex}, pc={access.PcHex ?? "none"}, area={access.Area}");
+    Console.WriteLine($"  AICA field #{index} seq={access.Sequence} {access.Kind} {access.Name}: offset={access.OffsetHex}, addr={access.AddressHex}, size={access.Size}, value={access.ValueHex}, pc={access.PcHex ?? "none"}, area={access.Area}");
 }
 
 static void PrintMapleActivity(DreamcastMapleSummary maple)
@@ -2517,6 +2517,10 @@ static CliRunOptions ParseRunOptions(string[] args)
     string? stopOnDeviceDomain = null;
     var stopOnPvrTaWrite = false;
     int? stopAfterGdromReads = null;
+    string? stopOnAicaFieldName = null;
+    uint? stopOnAicaFieldOffset = null;
+    MemoryAccessKind? stopOnAicaFieldKind = null;
+    uint? stopOnAicaFieldValue = null;
     var initialStackPointer = 0x8D00_0000u;
     var initialStatusRegister = 0u;
     bool? seedInitialVBlank = null;
@@ -2905,6 +2909,18 @@ static CliRunOptions ParseRunOptions(string[] args)
                 stopAfterGdromReads = parsedStopAfterGdromReads;
                 index++;
                 break;
+            case "--stop-on-aica-field" when index + 1 < args.Length:
+                (stopOnAicaFieldName, stopOnAicaFieldOffset) = ParseAicaFieldSelector(args[index + 1]);
+                index++;
+                break;
+            case "--stop-on-aica-field-kind" when index + 1 < args.Length:
+                stopOnAicaFieldKind = ParseAicaFieldAccessKind(args[index + 1]);
+                index++;
+                break;
+            case "--stop-on-aica-field-value" when index + 1 < args.Length:
+                stopOnAicaFieldValue = ParseAddress(args[index + 1]);
+                index++;
+                break;
             case "--initial-sp" when index + 1 < args.Length:
                 initialStackPointer = ParseAddress(args[index + 1]);
                 index++;
@@ -3031,6 +3047,13 @@ static CliRunOptions ParseRunOptions(string[] args)
     if (stopAfterGdromReads is <= 0)
     {
         throw new InvalidDataException("--stop-after-gdrom-reads must be greater than zero.");
+    }
+
+    if ((stopOnAicaFieldKind is not null || stopOnAicaFieldValue is not null)
+        && stopOnAicaFieldName is null
+        && stopOnAicaFieldOffset is null)
+    {
+        throw new InvalidDataException("--stop-on-aica-field-kind and --stop-on-aica-field-value require --stop-on-aica-field.");
     }
 
     if (memorySnapshotLogPath is not null && memorySnapshotRanges.Count == 0)
@@ -3171,7 +3194,10 @@ static CliRunOptions ParseRunOptions(string[] args)
             MemoryPokesOnPc: memoryPokesOnPc.Count == 0 ? null : memoryPokesOnPc.ToArray(),
             SeedInitialVBlank: seedInitialVBlank == true,
             StopOnPvrTaWrite: stopOnPvrTaWrite,
-            StopAfterGdromReads: stopAfterGdromReads),
+            StopAfterGdromReads: stopAfterGdromReads,
+            AicaFieldStop: stopOnAicaFieldName is null && stopOnAicaFieldOffset is null
+                ? null
+                : new DreamcastAicaFieldStop(stopOnAicaFieldName, stopOnAicaFieldOffset, stopOnAicaFieldKind, stopOnAicaFieldValue)),
         seedInitialVBlank,
         emitJson,
         framebufferDumpPath,
@@ -3310,6 +3336,71 @@ static uint ParseAddress(string text)
     }
 
     throw new InvalidDataException($"Invalid address: {text}");
+}
+
+static (string? Name, uint? Offset) ParseAicaFieldSelector(string text)
+{
+    var selector = text.Trim();
+    if (string.IsNullOrWhiteSpace(selector))
+    {
+        throw new InvalidDataException("--stop-on-aica-field requires a field name, AICA RAM offset, or AICA RAM address.");
+    }
+
+    if (TryParseAddress(selector, out var addressOrOffset))
+    {
+        return (null, NormalizeAicaRamOffset(addressOrOffset));
+    }
+
+    return (selector, null);
+}
+
+static MemoryAccessKind ParseAicaFieldAccessKind(string text)
+{
+    var normalized = text.Trim().ToLowerInvariant();
+    return normalized switch
+    {
+        "read" => MemoryAccessKind.Read,
+        "write" => MemoryAccessKind.Write,
+        _ => throw new InvalidDataException("--stop-on-aica-field-kind must be read or write.")
+    };
+}
+
+static bool TryParseAddress(string text, out uint parsed)
+{
+    var value = text.Trim();
+    if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+    {
+        value = value[2..];
+        return uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out parsed);
+    }
+
+    return uint.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed);
+}
+
+static uint NormalizeAicaRamOffset(uint addressOrOffset)
+{
+    const uint aicaRamPhysicalBase = 0x0080_0000;
+    const uint aicaRamPhysicalEnd = 0x00A0_0000;
+    const uint aicaRamMirrorBase = 0xA080_0000;
+    const uint aicaRamMirrorEnd = 0xA0A0_0000;
+    const uint aicaRamBytes = 2 * 1024 * 1024;
+
+    if (addressOrOffset < aicaRamBytes)
+    {
+        return addressOrOffset;
+    }
+
+    if (addressOrOffset >= aicaRamPhysicalBase && addressOrOffset < aicaRamPhysicalEnd)
+    {
+        return addressOrOffset - aicaRamPhysicalBase;
+    }
+
+    if (addressOrOffset >= aicaRamMirrorBase && addressOrOffset < aicaRamMirrorEnd)
+    {
+        return addressOrOffset - aicaRamMirrorBase;
+    }
+
+    throw new InvalidDataException($"AICA field selector address is outside AICA RAM: 0x{addressOrOffset:X8}");
 }
 
 static string ParseDeviceDomain(string text)
@@ -3559,7 +3650,7 @@ static void PrintUsage()
     Console.WriteLine("  dcsharp media extract-boot <path-to-media> --out <path> [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media analyze-boot <path-to-media-or-boot-bin> [--out-descrambled path] [--scan-sectors count] [--json]");
     Console.WriteLine("  dcsharp media boot-smoke <path-to-media-or-boot-bin> [--layout auto|original|descrambled] [--scan-sectors count] [run options]");
-    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--wince-syscall-log path] [--wince-syscall-log-limit count] [--wince-scheduler-log path] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-write-changed-only] [--memory-write-distinct] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-read-distinct] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--stop-on-pvr-ta-write] [--stop-after-gdrom-reads count] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
+    Console.WriteLine("  dcsharp run <file.elf> [--instructions count] [--trace-tail count] [--vblank-interval instructions] [--seed-initial-vblank] [--no-initial-vblank] [--controller address:state] [--controller-script address:script] [--controller-a state] [--controller-b state] [--controller-a-script script] [--dump-framebuffer path.png] [--framebuffer-size 640x480] [--audio-wav path.wav] [--trace-log path] [--trace-pc start-end] [--trace-instruction start-end] [--pvr-ta-log path] [--pvr-ta-log-limit count] [--pvr-ta-sprite-log path] [--pvr-ta-sprite-log-limit count] [--pvr-ta-sprite-texture-sample-log path] [--pvr-ta-sprite-texture-sample-log-limit count] [--pvr-ta-texture-mode-log path] [--pvr-ta-texture-mode-log-limit count] [--pvr-ta-mode-table-log path] [--pvr-ta-mode-table-log-limit count] [--pvr-ta-sprite-source-log path] [--pvr-ta-sprite-source-log-limit count] [--pvr-ta-sprite-sq-log path] [--pvr-ta-sprite-sq-log-limit count] [--store-queue-flush-log path] [--store-queue-flush-log-limit count] [--pvr-ta-sprite-status renderable|degenerate|nonfinite] [--fpu-anomaly-log path] [--fpu-anomaly-limit count] [--fpu-anomaly-kind all|nan|infinity] [--fpu-anomaly-instruction start-end] [--fpu-anomaly-register frN|xfN] [--fpu-anomaly-distinct] [--fpu-write-log path] [--fpu-write-limit count] [--fpu-write-register frN|xfN] [--fpu-write-instruction start-end] [--fpscr-log path] [--fpscr-limit count] [--fpscr-instruction start-end] [--fpu-snapshot-log path] [--fpu-snapshot-limit count] [--fpu-snapshot-pc start-end] [--fpu-snapshot-instruction start-end] [--cpu-snapshot-log path] [--cpu-snapshot-limit count] [--cpu-snapshot-pc start-end] [--cpu-snapshot-instruction start-end] [--fpu-memory-log path] [--fpu-memory-limit count] [--fpu-memory-register frN|drN] [--fpu-memory-instruction start-end] [--fpu-memory-address start-end] [--fpu-memory-pc start-end] [--pc-profile-log path] [--pc-profile-limit count] [--pc-profile-instruction start-end] [--wince-syscall-log path] [--wince-syscall-log-limit count] [--wince-scheduler-log path] [--device-log path] [--device-domain domain] [--device-kind kind] [--device-address start-end] [--memory-write-log path] [--memory-write-address start-end] [--memory-write-pc start-end] [--memory-write-limit count] [--memory-write-changed-only] [--memory-write-distinct] [--memory-read-log path] [--memory-read-address start-end] [--memory-read-pc start-end] [--memory-read-limit count] [--memory-read-distinct] [--memory-snapshot-log path] [--memory-snapshot-address start-end] [--memory-snapshot-max-bytes count] [--stop-on-unmapped] [--stop-on-device-domain domain] [--stop-on-pvr-ta-write] [--stop-after-gdrom-reads count] [--stop-on-aica-field name-or-offset] [--stop-on-aica-field-kind read|write] [--stop-on-aica-field-value value] [--initial-sp address] [--initial-sr address] [--media path-to-media] [--json]");
     Console.WriteLine("    --trace-pc, --fpu-snapshot-pc, --cpu-snapshot-pc, --fpu-memory-address, --fpu-memory-pc, --memory-write-address, --memory-write-pc, --memory-read-address, --memory-read-pc, and --memory-snapshot-address may be repeated for multiple ranges. --fpu-write-register and --fpu-memory-register may be repeated for multiple registers. --trace-instruction, --fpu-anomaly-instruction, --fpu-write-instruction, --fpscr-instruction, --fpu-snapshot-instruction, --cpu-snapshot-instruction, --fpu-memory-instruction, and --pc-profile-instruction accept N, START-END, START-, or -END.");
     Console.WriteLine("    --memory-poke-pc accepts PC:ADDRESS:VALUE, applies a one-shot 32-bit diagnostic patch before the matching PC executes, and may be repeated.");
     Console.WriteLine("  dcsharp fixtures <manifest.json> [--artifacts path] [--filter name] [--report-json path] [--validate-only] [--json]");

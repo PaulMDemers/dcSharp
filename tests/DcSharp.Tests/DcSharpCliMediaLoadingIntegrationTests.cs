@@ -846,6 +846,44 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandCanStopOnAicaFieldWrite()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateAicaStatusFieldWriteBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "10",
+                "--trace-tail",
+                "4",
+                "--stop-on-aica-field",
+                "SA2_AICA_STATUS_CANDIDATE",
+                "--stop-on-aica-field-kind",
+                "write");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: ConditionStop", result.StandardOutput);
+            Assert.Contains("Stopped on AICA field Write SA2_AICA_STATUS_CANDIDATE", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -1225,6 +1263,15 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
         0x00, 0x00, 0x00, 0x10
+    ];
+
+    private static byte[] CreateAicaStatusFieldWriteBootBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x24, 0x81, 0xA0
     ];
 
     private static byte[] CreateIpBinThatBranchesToSecondSector()

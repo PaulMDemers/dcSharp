@@ -1965,6 +1965,7 @@ public sealed record DreamcastAicaRamDriverFieldSummary(
 }
 
 public sealed record DreamcastAicaRamFieldAccessSummary(
+    ulong Sequence,
     MemoryAccessKind Kind,
     uint Offset,
     string OffsetHex,
@@ -1980,6 +1981,7 @@ public sealed record DreamcastAicaRamFieldAccessSummary(
 {
     public static DreamcastAicaRamFieldAccessSummary FromAccess(DreamcastAicaRamFieldAccess access) =>
         new(
+            access.Sequence,
             access.Kind,
             access.Offset,
             access.OffsetHex,

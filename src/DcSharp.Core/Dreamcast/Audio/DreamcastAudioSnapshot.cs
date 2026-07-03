@@ -156,6 +156,7 @@ public sealed record DreamcastAicaRamDriverField(
     string Area);
 
 public sealed record DreamcastAicaRamFieldAccess(
+    ulong Sequence,
     MemoryAccessKind Kind,
     uint Offset,
     string OffsetHex,
