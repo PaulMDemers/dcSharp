@@ -3351,6 +3351,14 @@ public sealed class DreamcastRunner
             return true;
         }
 
+        if (options.StopAfterPvrTaWrites is { } targetPvrTaWriteCount
+            && memory.PvrTaCommandWriteCount > previousPvrTaCommandWriteCount
+            && memory.PvrTaCommandWriteCount >= targetPvrTaWriteCount)
+        {
+            detail = $"Stopped after PVR TA command write count reached {memory.PvrTaCommandWriteCount}.";
+            return true;
+        }
+
         if (options.StopAfterGdromReads is { } targetReadCount
             && memory.GdromReadCommandCount > previousGdromReadCommandCount
             && memory.GdromReadCommandCount >= targetReadCount)
@@ -3531,6 +3539,7 @@ public sealed record DreamcastRunOptions(
     DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null,
     IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null,
     bool StopOnPvrTaWrite = false,
+    int? StopAfterPvrTaWrites = null,
     int? StopAfterGdromReads = null,
     DreamcastAicaFieldStop? AicaFieldStop = null);
 

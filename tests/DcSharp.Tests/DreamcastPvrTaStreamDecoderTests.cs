@@ -193,7 +193,6 @@ public class DreamcastPvrTaStreamDecoderTests
 
     [Theory]
     [InlineData(0xA084_0000u, "SpriteHeader", "Mode1", "Mode2", "Mode3", "Argb", "Dummy1")]
-    [InlineData(0x8000_0000u, "ModifierVolume", "Mode1", "Dummy0", "Dummy1", "Dummy2", "Dummy5")]
     [InlineData(0x2000_0000u, "UserClip", "Clip0", "Clip1", "Clip2", "Clip3", "Clip6")]
     public void TracksKnownNonPolygonHeaderPayloadWords(
         uint controlValue,
@@ -233,6 +232,44 @@ public class DreamcastPvrTaStreamDecoderTests
         Assert.Equal(payload3Name, decoded[4].PayloadWordName);
         Assert.Equal(payload6Name, decoded[7].PayloadWordName);
         Assert.Equal(0, decoded[7].PayloadWordsRemaining);
+    }
+
+    [Fact]
+    public void TracksModifierVolumePayloadWords()
+    {
+        var writes = new[]
+        {
+            CreateWrite("TA_INPUT", 0x8000_0000),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x0080_0400),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0xFFFF_FFFF),
+            CreateWrite("TA_INPUT", 0xFFFF_FFFF),
+            CreateWrite("TA_INPUT", 0xFFFF_FFFF),
+            CreateWrite("TA_INPUT", 0xFFFF_FFFF),
+            CreateWrite("TA_INPUT", 0x0000_0000),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0),
+            CreateWrite("TA_INPUT", 0x00C0_C0C0)
+        };
+
+        var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
+
+        Assert.Equal(16, decoded.Count);
+        Assert.Equal("Control", decoded[0].Role);
+        Assert.Equal("ModifierVolume", decoded[0].ControlKind);
+        Assert.Equal(15, decoded[0].PayloadWordsRemaining);
+        Assert.Equal("Payload", decoded[1].Role);
+        Assert.Equal("Mode1", decoded[1].PayloadWordName);
+        Assert.Equal(14, decoded[1].PayloadWordsRemaining);
+        Assert.Equal("Dummy5", decoded[7].PayloadWordName);
+        Assert.Equal(8, decoded[7].PayloadWordsRemaining);
+        Assert.Equal("Dummy13", decoded[15].PayloadWordName);
+        Assert.Equal(0, decoded[15].PayloadWordsRemaining);
     }
 
     [Theory]

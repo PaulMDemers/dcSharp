@@ -28,7 +28,7 @@ public static class DreamcastPvrTaParameterDecoder
             "Vertex" or "VertexEndOfStrip" => null,
             "PolygonHeader" => 7,
             "SpriteHeader" => 7,
-            "ModifierVolume" => 7,
+            "ModifierVolume" => 15,
             "UserClip" => 7,
             "YuvConverterData" => 0,
             _ => null

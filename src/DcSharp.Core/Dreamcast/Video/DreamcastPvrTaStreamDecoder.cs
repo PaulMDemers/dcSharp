@@ -210,6 +210,14 @@ public static class DreamcastPvrTaStreamDecoder
             4 => "Dummy3",
             5 => "Dummy4",
             6 => "Dummy5",
+            7 => "Dummy6",
+            8 => "Dummy7",
+            9 => "Dummy8",
+            10 => "Dummy9",
+            11 => "Dummy10",
+            12 => "Dummy11",
+            13 => "Dummy12",
+            14 => "Dummy13",
             _ => null
         };
 

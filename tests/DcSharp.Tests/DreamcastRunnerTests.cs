@@ -558,6 +558,22 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCanStopAfterPvrTaCommandWriteCount()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreateTwoPvrTaWritesBootBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 10,
+                TraceTailLength: 4,
+                StopAfterPvrTaWrites: 2));
+
+        Assert.Equal(DreamcastStopReason.ConditionStop, result.StopReason);
+        Assert.Contains("PVR TA command write count reached 2", result.StopDetail);
+        Assert.Equal(2, result.Video.PvrTaCommandWrites.Count);
+        Assert.Equal("0x10000004", result.Video.PvrTaCommandWrites[1].AddressHex);
+    }
+
+    [Fact]
     public void RunCanStopOnAicaFieldWrite()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -1371,6 +1387,17 @@ public class DreamcastRunnerTests
         0x01, 0xD1, // mov.l @(0x01,pc),r1
         0x02, 0x21, // mov.l r0,@r1
         0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x00, 0x00, 0x10
+    ];
+
+    private static byte[] CreateTwoPvrTaWritesBootBinary() =>
+    [
+        0x02, 0xD1, // mov.l @(0x02,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0x04, 0x71, // add #4,r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010008
         0x09, 0x00, // nop
         0x00, 0x00, 0x00, 0x10
     ];

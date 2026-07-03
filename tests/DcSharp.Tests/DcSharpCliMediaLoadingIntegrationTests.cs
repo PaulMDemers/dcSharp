@@ -846,6 +846,43 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandCanStopAfterPvrTaCommandWriteCount()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreateTwoPvrTaWritesBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "10",
+                "--trace-tail",
+                "4",
+                "--stop-after-pvr-ta-writes",
+                "2");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: ConditionStop", result.StandardOutput);
+            Assert.Contains("PVR TA command write count reached 2", result.StandardOutput);
+            Assert.Contains("taWrites=2", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MediaBootSmokeCommandCanStopOnAicaFieldWrite()
     {
         var repoRoot = FindRepoRoot();
@@ -1261,6 +1298,17 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0x01, 0xD1, // mov.l @(0x01,pc),r1
         0x02, 0x21, // mov.l r0,@r1
         0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x00, 0x00, 0x10
+    ];
+
+    private static byte[] CreateTwoPvrTaWritesBootBinary() =>
+    [
+        0x02, 0xD1, // mov.l @(0x02,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0x04, 0x71, // add #4,r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010008
         0x09, 0x00, // nop
         0x00, 0x00, 0x00, 0x10
     ];
