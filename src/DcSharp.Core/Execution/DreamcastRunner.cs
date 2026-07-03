@@ -69,6 +69,8 @@ public sealed class DreamcastRunner
                 scheduler.AdvanceBeforeInstruction(cpu.State.InstructionsExecuted);
                 ApplyMemoryPokesOnPc(memory, options.MemoryPokesOnPc, appliedMemoryPokesOnPc, cpu.State.Pc);
                 var deviceAccessCountBeforeStep = memory.DeviceAccesses.Count;
+                var pvrTaCommandWriteCountBeforeStep = memory.PvrTaCommandWriteCount;
+                var gdromReadCommandCountBeforeStep = memory.GdromReadCommandCount;
                 Sh4StepResult step;
                 var nextInstruction = cpu.State.InstructionsExecuted + 1;
                 var shouldCaptureFpuAnomalies = ShouldCaptureFpuAnomalies(options.FpuAnomalyCapture, fpuAnomalies, nextInstruction);
@@ -2841,6 +2843,12 @@ public sealed class DreamcastRunner
                         with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
                 }
 
+                if (ShouldStopOnProbeCondition(options, memory, pvrTaCommandWriteCountBeforeStep, gdromReadCommandCountBeforeStep, out var conditionDetail))
+                {
+                    return DreamcastRunResult.ConditionStop(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), conditionDetail, CaptureFinalMemorySnapshot(options, memory))
+                        with { PcProfile = CreatePcProfile(pcProfile, options.PcProfile) };
+                }
+
                 if (HasKosExitBanner(memory.SerialOutput))
                 {
                     return DreamcastRunResult.ProgramExit(load, cpu.State, memory, traceTail.ToArray(), traceLog.ToArray(), fpuAnomalies.ToArray(), fpuRegisterWrites.ToArray(), fpscrEvents.ToArray(), fpuSnapshots.ToArray(), fpuMemoryTransfers.ToArray(), cpuSnapshots.ToArray(), memory.DeviceAccesses.ToArray(), memory.WatchedWrites.ToArray(), memory.WatchedReads.ToArray(), memory.SerialOutput.ToArray(), memory.CreateAsicSnapshot(), memory.CreateVideoSnapshot(), memory.CreateAudioSnapshot(), memory.CreateMapleSnapshot(), scheduler.CreateSnapshot(), memory.CreateGdromSnapshot(), memory.CreateTimerSnapshot(), step.Pc, step.Opcode, "KOS exit banner observed", CaptureFinalMemorySnapshot(options, memory))
@@ -3326,6 +3334,32 @@ public sealed class DreamcastRunner
         return false;
     }
 
+    private static bool ShouldStopOnProbeCondition(
+        DreamcastRunOptions options,
+        DreamcastMemory memory,
+        int previousPvrTaCommandWriteCount,
+        int previousGdromReadCommandCount,
+        out string detail)
+    {
+        detail = string.Empty;
+
+        if (options.StopOnPvrTaWrite && memory.PvrTaCommandWriteCount > previousPvrTaCommandWriteCount)
+        {
+            detail = $"Stopped after PVR TA command write count reached {memory.PvrTaCommandWriteCount}.";
+            return true;
+        }
+
+        if (options.StopAfterGdromReads is { } targetReadCount
+            && memory.GdromReadCommandCount > previousGdromReadCommandCount
+            && memory.GdromReadCommandCount >= targetReadCount)
+        {
+            detail = $"Stopped after GD-ROM read command count reached {memory.GdromReadCommandCount}.";
+            return true;
+        }
+
+        return false;
+    }
+
     internal static bool IsSideEffectFreeIdleLoop(Sh4StepResult step, DreamcastMemory memory)
     {
         if (step.Opcode == 0xAFFE)
@@ -3474,7 +3508,9 @@ public sealed record DreamcastRunOptions(
     DreamcastPcProfileOptions? PcProfile = null,
     DreamcastFinalMemorySnapshotOptions? FinalMemorySnapshot = null,
     DreamcastCpuSnapshotCaptureOptions? CpuSnapshotCapture = null,
-    IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null);
+    IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null,
+    bool StopOnPvrTaWrite = false,
+    int? StopAfterGdromReads = null);
 
 public sealed record DreamcastMemoryPokeOnPc(uint Pc, uint Address, uint Value);
 
@@ -3858,6 +3894,39 @@ public sealed record DreamcastRunResult(
             FinalMemorySnapshot = finalMemorySnapshot
         };
 
+    public static DreamcastRunResult ConditionStop(
+        ElfLoadResult load,
+        Sh4State state,
+        DreamcastMemory memory,
+        IReadOnlyList<Sh4StepResult> traceTail,
+        IReadOnlyList<Sh4StepResult> traceLog,
+        IReadOnlyList<Sh4FpuAnomaly> fpuAnomalies,
+        IReadOnlyList<Sh4FpuRegisterWrite> fpuRegisterWrites,
+        IReadOnlyList<Sh4FpscrEvent> fpscrEvents,
+        IReadOnlyList<Sh4FpuSnapshot> fpuSnapshots,
+        IReadOnlyList<Sh4FpuMemoryTransfer> fpuMemoryTransfers,
+        IReadOnlyList<Sh4CpuSnapshot> cpuSnapshots,
+        IReadOnlyList<MemoryAccess> deviceAccesses,
+        IReadOnlyList<MemoryAccess> watchedMemoryWrites,
+        IReadOnlyList<MemoryAccess> watchedMemoryReads,
+        IReadOnlyList<byte> serialOutput,
+        DreamcastAsicSnapshot asic,
+        DreamcastVideoSnapshot video,
+        DreamcastAudioSnapshot audio,
+        DreamcastMapleSnapshot maple,
+        DreamcastSchedulerSnapshot scheduler,
+        DreamcastGdromSnapshot gdrom,
+        DreamcastTimerSnapshot timer,
+        string detail,
+        DreamcastMemorySnapshot? finalMemorySnapshot = null) =>
+        new(load, Sh4StateSnapshot.From(state, memory), traceTail, traceLog, fpuAnomalies, fpuRegisterWrites, fpscrEvents, deviceAccesses, watchedMemoryWrites, watchedMemoryReads, memory.CreateSystemRamWriteSummary(), serialOutput, asic, video, audio, maple, scheduler, DreamcastStopReason.ConditionStop, detail, state.Pc, null, gdrom, timer)
+        {
+            FpuSnapshots = fpuSnapshots,
+            FpuMemoryTransfers = fpuMemoryTransfers,
+            CpuSnapshots = cpuSnapshots,
+            FinalMemorySnapshot = finalMemorySnapshot
+        };
+
     public IReadOnlyList<Sh4FpuSnapshot> FpuSnapshots { get; init; } = [];
     public IReadOnlyList<Sh4FpuMemoryTransfer> FpuMemoryTransfers { get; init; } = [];
     public IReadOnlyList<Sh4CpuSnapshot> CpuSnapshots { get; init; } = [];
@@ -4041,5 +4110,6 @@ public enum DreamcastStopReason
     MemoryFault,
     FirmwareExit,
     ProgramExit,
-    DeviceAccessStop
+    DeviceAccessStop,
+    ConditionStop
 }

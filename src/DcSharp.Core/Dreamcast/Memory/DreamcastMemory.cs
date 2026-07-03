@@ -233,6 +233,10 @@ public sealed class DreamcastMemory
         new("High RAM init", 0x8C1D_0000, 0x150000)
     ];
 
+    internal int PvrTaCommandWriteCount => pvrTaCommandWrites.Count;
+
+    internal int GdromReadCommandCount => gdromReadCommands.Count;
+
     public DreamcastMemory(
         DreamcastControllerState? controllerA = null,
         DreamcastControllerState? controllerB = null,

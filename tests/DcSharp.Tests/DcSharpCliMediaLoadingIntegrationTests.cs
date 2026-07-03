@@ -811,6 +811,41 @@ public class DcSharpCliMediaLoadingIntegrationTests
     }
 
     [Fact]
+    public void MediaBootSmokeCommandCanStopOnPvrTaCommandWrite()
+    {
+        var repoRoot = FindRepoRoot();
+        var cli = FindCliAssembly(repoRoot);
+        var mediaDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(mediaDirectory);
+        var bootPath = Path.Combine(mediaDirectory, "1ST_READ.BIN");
+
+        try
+        {
+            File.WriteAllBytes(bootPath, CreatePvrTaWriteBootBinary());
+
+            var result = RunCli(
+                cli,
+                repoRoot,
+                "media",
+                "boot-smoke",
+                bootPath,
+                "--instructions",
+                "10",
+                "--trace-tail",
+                "4",
+                "--stop-on-pvr-ta-write");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Stopped: ConditionStop", result.StandardOutput);
+            Assert.Contains("PVR TA command write count reached 1", result.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(mediaDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RunCommandWritesAudioWav()
     {
         var repoRoot = FindRepoRoot();
@@ -898,6 +933,19 @@ public class DcSharpCliMediaLoadingIntegrationTests
 
     private static string FindCliAssembly(string repoRoot)
     {
+        var testAssemblyDirectory = Path.GetDirectoryName(typeof(DcSharpCliMediaLoadingIntegrationTests).Assembly.Location);
+        var testConfiguration = testAssemblyDirectory is null
+            ? null
+            : Directory.GetParent(testAssemblyDirectory)?.Name;
+        if (!string.IsNullOrWhiteSpace(testConfiguration))
+        {
+            var matchingAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", testConfiguration, "net10.0", "DcSharp.Cli.dll");
+            if (File.Exists(matchingAssembly))
+            {
+                return matchingAssembly;
+            }
+        }
+
         var releaseAssembly = Path.Combine(repoRoot, "src", "DcSharp.Cli", "bin", "Release", "net10.0", "DcSharp.Cli.dll");
         if (File.Exists(releaseAssembly))
         {
@@ -1168,6 +1216,15 @@ public class DcSharpCliMediaLoadingIntegrationTests
         0xFE, 0xAF, // bra 0x8C010004
         0x09, 0x00, // nop
         0x10, 0x00, 0x00, 0x08
+    ];
+
+    private static byte[] CreatePvrTaWriteBootBinary() =>
+    [
+        0x01, 0xD1, // mov.l @(0x01,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010004
+        0x09, 0x00, // nop
+        0x00, 0x00, 0x00, 0x10
     ];
 
     private static byte[] CreateIpBinThatBranchesToSecondSector()
