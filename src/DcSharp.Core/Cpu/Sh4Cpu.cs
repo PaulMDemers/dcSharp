@@ -11851,7 +11851,7 @@ public sealed class Sh4Cpu
         }
 
         const ulong instructionsPerIteration = 20;
-        var iterationsToSkip = maxInstructionsToSkip / instructionsPerIteration;
+        var iterationsToSkip = Math.Min(10_000UL, maxInstructionsToSkip / instructionsPerIteration);
         if (iterationsToSkip == 0)
         {
             return false;

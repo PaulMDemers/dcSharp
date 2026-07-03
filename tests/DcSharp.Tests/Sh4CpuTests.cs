@@ -25494,6 +25494,19 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void CapsSonicAdventure2ModifierVolumeCallbackPollLoopBatch()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ModifierVolumeCallbackPollLoop(memory);
+        var cpu = new Sh4Cpu(memory, 0x8C12_CB98);
+        var branch = StepUntilPc(cpu, 0x8C12_CBBE);
+
+        Assert.True(cpu.TryFastForwardSonicAdventure2ModifierVolumeCallbackPollLoop(branch, 400_000, out var skippedInstructions));
+        Assert.Equal(200_000UL, skippedInstructions);
+        Assert.Equal(200_020UL, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void DoesNotFastForwardSonicAdventure2ModifierVolumeCallbackPollLoopWhenCallbackTargetDiffers()
     {
         var memory = new DreamcastMemory();
