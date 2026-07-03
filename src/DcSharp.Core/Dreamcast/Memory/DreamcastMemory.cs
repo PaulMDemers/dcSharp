@@ -236,6 +236,8 @@ public sealed class DreamcastMemory
 
     internal int PvrTaCommandWriteCount => pvrTaCommandWrites.Count;
 
+    internal IReadOnlyList<DreamcastPvrTaCommandWrite> PvrTaCommandWrites => pvrTaCommandWrites;
+
     internal int GdromReadCommandCount => gdromReadCommands.Count;
 
     internal ulong AicaRamFieldAccessSequence => aicaRamFieldAccessSequence;

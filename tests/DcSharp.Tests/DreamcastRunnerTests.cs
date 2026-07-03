@@ -574,6 +574,23 @@ public class DreamcastRunnerTests
     }
 
     [Fact]
+    public void RunCanStopOnPvrTaControlKind()
+    {
+        var result = new DreamcastRunner().RunRawBinary(
+            CreatePolygonHeaderPvrTaWriteBootBinary(),
+            new DreamcastRunOptions(
+                InstructionLimit: 10,
+                TraceTailLength: 4,
+                PvrTaControlStop: new DreamcastPvrTaControlStop(Kind: "PolygonHeader", ListTypeName: "OpaquePolygon")));
+
+        Assert.Equal(DreamcastStopReason.ConditionStop, result.StopReason);
+        Assert.Contains("PVR TA control PolygonHeader list=OpaquePolygon value=0x80840000", result.StopDetail);
+        var write = Assert.Single(result.Video.PvrTaCommandWrites);
+        Assert.Equal("PolygonHeader", write.Kind);
+        Assert.Equal("OpaquePolygon", write.ListTypeName);
+    }
+
+    [Fact]
     public void RunCanStopOnAicaFieldWrite()
     {
         var result = new DreamcastRunner().RunRawBinary(
@@ -1399,6 +1416,18 @@ public class DreamcastRunnerTests
         0x02, 0x21, // mov.l r0,@r1
         0xFE, 0xAF, // bra 0x8C010008
         0x09, 0x00, // nop
+        0x00, 0x00, 0x00, 0x10
+    ];
+
+    private static byte[] CreatePolygonHeaderPvrTaWriteBootBinary() =>
+    [
+        0x02, 0xD0, // mov.l @(0x02,pc),r0
+        0x03, 0xD1, // mov.l @(0x03,pc),r1
+        0x02, 0x21, // mov.l r0,@r1
+        0xFE, 0xAF, // bra 0x8C010006
+        0x09, 0x00, // nop
+        0x00, 0x00,
+        0x00, 0x00, 0x84, 0x80,
         0x00, 0x00, 0x00, 0x10
     ];
 

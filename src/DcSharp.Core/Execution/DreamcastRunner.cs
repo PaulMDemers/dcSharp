@@ -3359,6 +3359,15 @@ public sealed class DreamcastRunner
             return true;
         }
 
+        if (options.PvrTaControlStop is { } pvrTaControlStop
+            && memory.PvrTaCommandWriteCount > previousPvrTaCommandWriteCount
+            && TryGetLatestPvrTaControlWrite(memory.PvrTaCommandWrites, out var pvrTaControlWrite)
+            && MatchesPvrTaControlStop(pvrTaControlStop, pvrTaControlWrite))
+        {
+            detail = $"Stopped after PVR TA control {pvrTaControlWrite.ControlKind} list={pvrTaControlWrite.Write.ListTypeName ?? "-"} value={pvrTaControlWrite.ControlValueHex} at write count {memory.PvrTaCommandWriteCount}.";
+            return true;
+        }
+
         if (options.StopAfterGdromReads is { } targetReadCount
             && memory.GdromReadCommandCount > previousGdromReadCommandCount
             && memory.GdromReadCommandCount >= targetReadCount)
@@ -3387,6 +3396,46 @@ public sealed class DreamcastRunner
         }
 
         return false;
+    }
+
+    private static bool TryGetLatestPvrTaControlWrite(IReadOnlyList<DreamcastPvrTaCommandWrite> writes, out DreamcastPvrTaStreamWrite controlWrite)
+    {
+        var decoded = DreamcastPvrTaStreamDecoder.Decode(writes);
+        if (decoded.Count > 0
+            && string.Equals(decoded[^1].Role, "Control", StringComparison.Ordinal))
+        {
+            controlWrite = decoded[^1];
+            return true;
+        }
+
+        controlWrite = default!;
+        return false;
+    }
+
+    private static bool MatchesPvrTaControlStop(DreamcastPvrTaControlStop stop, DreamcastPvrTaStreamWrite write)
+    {
+        if (stop.Kind is { } kind && !MatchesPvrTaControlKind(kind, write.ControlKind))
+        {
+            return false;
+        }
+
+        if (stop.ListTypeName is { } listTypeName
+            && !string.Equals(listTypeName, write.Write.ListTypeName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesPvrTaControlKind(string expectedKind, string actualKind)
+    {
+        if (string.Equals(expectedKind, "renderable", StringComparison.OrdinalIgnoreCase))
+        {
+            return actualKind is "PolygonHeader" or "SpriteHeader" or "Vertex" or "VertexEndOfStrip" or "SpriteVertex" or "SpriteVertexEndOfStrip";
+        }
+
+        return string.Equals(expectedKind, actualKind, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsSideEffectFreeIdleLoop(Sh4StepResult step, DreamcastMemory memory)
@@ -3540,8 +3589,13 @@ public sealed record DreamcastRunOptions(
     IReadOnlyList<DreamcastMemoryPokeOnPc>? MemoryPokesOnPc = null,
     bool StopOnPvrTaWrite = false,
     int? StopAfterPvrTaWrites = null,
+    DreamcastPvrTaControlStop? PvrTaControlStop = null,
     int? StopAfterGdromReads = null,
     DreamcastAicaFieldStop? AicaFieldStop = null);
+
+public sealed record DreamcastPvrTaControlStop(
+    string? Kind = null,
+    string? ListTypeName = null);
 
 public sealed record DreamcastAicaFieldStop(
     string? Name = null,

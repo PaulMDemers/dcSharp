@@ -231,11 +231,11 @@ This prevents retail games from becoming the only test suite.
 
 ### Sonic Adventure 2
 
-State: best current canary. SA2 now clears the custom AICA status/completion wall and reaches TA traffic. The latest targeted TA probe at `artifacts/tmp/sa2-ta-64-probe-v2.txt` stops on `--stop-after-pvr-ta-writes 64` at `PC=0x8C14B66C`, with 47 successful GD-ROM reads, 634 PVR register accesses, 64 TA command writes, and nonzero framebuffer bytes. The first 64 TA words are modifier-volume setup across opaque and translucent modifier lists rather than renderable polygon/vertex geometry; modifier-volume packets now decode as one control word plus 15 payload words.
+State: best current canary. SA2 now clears the custom AICA status/completion wall and reaches TA traffic. The latest targeted TA probes stop at 64 and 96 writes with 47 successful GD-ROM reads, nonzero framebuffer bytes, and repeated modifier-volume setup rather than renderable polygon/vertex geometry. `artifacts/tmp/sa2-ta-96-probe-release.txt` reaches `PC=0x8C12CACA` after `68,219,095` instructions and is still cycling modifier-volume control packets; modifier-volume packets now decode as one control word plus 15 payload words.
 
 Next:
 
-- Shift SA2 attention from initial modifier-volume setup to the first renderable polygon/sprite packet: continue threshold probes past 64 TA writes, verify list-control transitions, and make the preview renderer consume the first real geometry once it appears.
+- Shift SA2 attention from initial modifier-volume setup to the first renderable polygon/sprite packet: use `--stop-on-pvr-ta-control-kind renderable` and selective profiling past the 96-write point, then make the preview renderer consume the first real geometry once it appears.
 - Keep the AICA status clear modeled in memory, but replace the title-shaped completion shim with a more generic AICA service model once more games expose their mailbox lifecycles.
 - Keep shaving IP.BIN glyph/pattern-fill hotspots only when they block useful probe budgets.
 - Continue using `--stop-on-pvr-ta-write`, `--stop-after-pvr-ta-writes <count>`, and `--stop-after-gdrom-reads 48` for future SA2 probes; the TA threshold stop is the quickest way to slice the newly reached command stream.
