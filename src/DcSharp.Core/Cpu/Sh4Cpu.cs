@@ -11982,13 +11982,37 @@ public sealed class Sh4Cpu
     internal bool TryFastForwardSonicAdventure2BitUnpackByteBody(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
-        if (step.Pc != 0x8C0A_4B18
-            || step.Opcode != 0x65D3
-            || delayedBranchTarget is not null
+        if (delayedBranchTarget is not null
             || immediateBranchTarget is not null
-            || State.Pc != 0x8C0A_4B1A
-            || State.R[5] != State.R[13]
             || !IsSonicAdventure2BitUnpackLoop())
+        {
+            return false;
+        }
+
+        var entryInstructions = 0UL;
+        if (step.Pc == 0x8C0A_4B18
+            && step.Opcode == 0x65D3
+            && State.Pc == 0x8C0A_4B1A
+            && State.R[5] == State.R[13])
+        {
+            entryInstructions = 0;
+        }
+        else if (step.Pc == 0x8C0A_4B16
+            && step.Opcode == 0x8905
+            && State.Pc == 0x8C0A_4B18
+            && !State.T
+            && step.Trace.EndsWith(" ; not taken", StringComparison.Ordinal))
+        {
+            entryInstructions = 1;
+        }
+        else if (step.Pc == 0x8C0A_4B14
+            && step.Opcode == 0x3DA3
+            && State.Pc == 0x8C0A_4B16
+            && !State.T)
+        {
+            entryInstructions = 2;
+        }
+        else
         {
             return false;
         }
@@ -12010,9 +12034,10 @@ public sealed class Sh4Cpu
         const ulong subsequentPairInstructions = 67;
         var pairsToByteBoundary = (8 - outputBit) / 2;
         var pairsToLimit = (bitLimit - bitIndex) / 2;
-        var maxPairsByBudget = maxInstructionsToSkip < firstPairInstructions
+        var firstPairTotalInstructions = entryInstructions + firstPairInstructions;
+        var maxPairsByBudget = maxInstructionsToSkip < firstPairTotalInstructions
             ? 0
-            : 1 + ((maxInstructionsToSkip - firstPairInstructions) / subsequentPairInstructions);
+            : 1 + ((maxInstructionsToSkip - firstPairTotalInstructions) / subsequentPairInstructions);
         var pairsToSkip = Math.Min(Math.Min((ulong)pairsToByteBoundary, (ulong)pairsToLimit), maxPairsByBudget);
         if (pairsToSkip == 0)
         {
@@ -12054,7 +12079,7 @@ public sealed class Sh4Cpu
         State.R[13] = bitIndex;
         State.T = outputBit >= 8;
         State.Pc = outputBit >= 8 ? 0x8C0A_4B4A : 0x8C0A_4B14;
-        skippedInstructions = firstPairInstructions + ((pairsToSkip - 1) * subsequentPairInstructions);
+        skippedInstructions = firstPairTotalInstructions + ((pairsToSkip - 1) * subsequentPairInstructions);
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;

@@ -25581,6 +25581,37 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2BitUnpackByteBodyFromCompareEntry()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2BitUnpackLoop(normalMemory);
+        WriteSonicAdventure2BitUnpackLoop(fastMemory);
+        normalMemory.Write(0x8C20_0001, [0xAD]);
+        fastMemory.Write(0x8C20_0001, [0xAD]);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0A_4B14);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0A_4B14);
+        InitializeSonicAdventure2BitUnpackRegisters(normal);
+        InitializeSonicAdventure2BitUnpackRegisters(fast);
+        normal.State.R[13] = 8;
+        fast.State.R[13] = 8;
+        var normalStart = StepUntilPc(normal, 0x8C0A_4B14);
+        var fastStart = StepUntilPc(fast, 0x8C0A_4B14);
+
+        Assert.Equal(normalStart.Trace, fastStart.Trace);
+        Assert.Equal(0x8C0A_4B16u, fast.State.Pc);
+        Assert.False(fast.State.T);
+        Assert.True(fast.TryFastForwardSonicAdventure2BitUnpackByteBody(fastStart, 267, out var skippedInstructions));
+        Assert.Equal(267UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void FastForwardsSonicAdventure2BitUnpackByteStoreToInnerLoop()
     {
         var normalMemory = new DreamcastMemory();
