@@ -12061,6 +12061,91 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2BitUnpackByteStore(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4B4A
+            || step.Opcode != 0x51F4
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.Pc != 0x8C0A_4B4C
+            || !IsSonicAdventure2BitUnpackLoop())
+        {
+            return false;
+        }
+
+        const ulong innerLoopInstructions = 13;
+        const ulong outerLoopInstructions = 18;
+        if (maxInstructionsToSkip < innerLoopInstructions
+            || State.R[15] > uint.MaxValue - 0x10
+            || !memory.TryGetSystemRamOffset(State.R[15], 0x14, out _))
+        {
+            return false;
+        }
+
+        var byteOutputAddress = State.R[1];
+        if (!memory.TryGetSystemRamOffset(byteOutputAddress, 1, out _))
+        {
+            return false;
+        }
+
+        var countAddress = State.R[15] + 0x04;
+        var bitBaseAddress = State.R[15] + 0x0C;
+        var outputPointerAddress = State.R[15] + 0x10;
+        var storedCount = memory.ReadUInt32(countAddress);
+        var storedBitBase = memory.ReadUInt32(bitBaseAddress);
+        var storedOutputPointer = memory.ReadUInt32(outputPointerAddress);
+        if (byteOutputAddress != storedOutputPointer
+            || storedCount == uint.MaxValue
+            || storedOutputPointer == uint.MaxValue
+            || storedBitBase > uint.MaxValue - 8)
+        {
+            return false;
+        }
+
+        memory.Write(byteOutputAddress, [(byte)State.R[9]]);
+        var count = storedCount + 1;
+        var nextOutputPointer = storedOutputPointer + 1;
+        var nextBitBase = storedBitBase + 8;
+        memory.WriteUInt32(countAddress, count);
+        memory.WriteUInt32(outputPointerAddress, nextOutputPointer);
+        memory.WriteUInt32(bitBaseAddress, nextBitBase);
+        State.R[1] = nextBitBase;
+        State.R[2] = nextOutputPointer;
+        State.R[3] = count;
+        State.T = count >= State.R[11];
+        if (!State.T)
+        {
+            State.Pc = 0x8C0A_4B0E;
+            skippedInstructions = innerLoopInstructions;
+        }
+        else
+        {
+            if (maxInstructionsToSkip < outerLoopInstructions)
+            {
+                return false;
+            }
+
+            var outerIndex = memory.ReadUInt32(State.R[15]);
+            if (outerIndex == uint.MaxValue)
+            {
+                return false;
+            }
+
+            outerIndex++;
+            State.R[2] = outerIndex;
+            State.T = outerIndex >= State.R[10];
+            memory.WriteUInt32(State.R[15], outerIndex);
+            State.Pc = State.T ? 0x8C0A_4B70 : 0x8C0A_4AFA;
+            skippedInstructions = outerLoopInstructions;
+        }
+
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool TryReadSonicAdventure2PackedBit(uint baseAddress, uint bitIndex, out uint bit)
     {
         var byteAddress = baseAddress + (bitIndex >> 3);
@@ -12119,7 +12204,26 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C0A_4B40) == 0xE308
         && memory.ReadUInt16(0x8C0A_4B42) == 0x7C01
         && memory.ReadUInt16(0x8C0A_4B44) == 0x3C33
-        && memory.ReadUInt16(0x8C0A_4B46) == 0x8FE5;
+        && memory.ReadUInt16(0x8C0A_4B46) == 0x8FE5
+        && memory.ReadUInt16(0x8C0A_4B4A) == 0x51F4
+        && memory.ReadUInt16(0x8C0A_4B4C) == 0x2190
+        && memory.ReadUInt16(0x8C0A_4B4E) == 0x53F1
+        && memory.ReadUInt16(0x8C0A_4B50) == 0x7301
+        && memory.ReadUInt16(0x8C0A_4B52) == 0x1F31
+        && memory.ReadUInt16(0x8C0A_4B54) == 0x52F4
+        && memory.ReadUInt16(0x8C0A_4B56) == 0x7201
+        && memory.ReadUInt16(0x8C0A_4B58) == 0x1F24
+        && memory.ReadUInt16(0x8C0A_4B5A) == 0x51F3
+        && memory.ReadUInt16(0x8C0A_4B5C) == 0x7108
+        && memory.ReadUInt16(0x8C0A_4B5E) == 0x1F13
+        && memory.ReadUInt16(0x8C0A_4B60) == 0x53F1
+        && memory.ReadUInt16(0x8C0A_4B62) == 0x33B3
+        && memory.ReadUInt16(0x8C0A_4B64) == 0x8BD3
+        && memory.ReadUInt16(0x8C0A_4B66) == 0x62F2
+        && memory.ReadUInt16(0x8C0A_4B68) == 0x7201
+        && memory.ReadUInt16(0x8C0A_4B6A) == 0x32A3
+        && memory.ReadUInt16(0x8C0A_4B6C) == 0x8FC5
+        && memory.ReadUInt16(0x8C0A_4B6E) == 0x2F22;
 
     internal bool TryFastForwardSonicAdventure2ZeroByteMaskGroupScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
