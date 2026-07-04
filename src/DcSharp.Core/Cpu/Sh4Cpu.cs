@@ -11966,12 +11966,95 @@ public sealed class Sh4Cpu
         State.R[3] = 8;
         State.R[4] = baseAddress;
         State.R[5] = lastNegatedBitOffset;
+        State.R[6] = (bitIndex - 1) >> 3;
         State.R[9] = accumulator;
         State.R[12] = outputBit;
         State.R[13] = bitIndex;
         State.T = outputBit >= 8;
         State.Pc = outputBit >= 8 ? 0x8C0A_4B4A : 0x8C0A_4B14;
         skippedInstructions = 1 + (pairsToSkip * instructionsPerPair);
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2BitUnpackByteBody(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4B18
+            || step.Opcode != 0x65D3
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.Pc != 0x8C0A_4B1A
+            || State.R[5] != State.R[13]
+            || !IsSonicAdventure2BitUnpackLoop())
+        {
+            return false;
+        }
+
+        var bitIndex = State.R[13];
+        var bitLimit = State.R[10];
+        var outputBit = State.R[12];
+        if (State.R[8] is < 0x8C00_0000 or >= 0x8D00_0000
+            || bitIndex >= bitLimit
+            || bitIndex >= 0x8000_0000
+            || outputBit >= 8
+            || bitLimit - bitIndex < 2
+            || 8 - outputBit < 2)
+        {
+            return false;
+        }
+
+        const ulong firstPairInstructions = 64;
+        const ulong subsequentPairInstructions = 67;
+        var pairsToByteBoundary = (8 - outputBit) / 2;
+        var pairsToLimit = (bitLimit - bitIndex) / 2;
+        var maxPairsByBudget = maxInstructionsToSkip < firstPairInstructions
+            ? 0
+            : 1 + ((maxInstructionsToSkip - firstPairInstructions) / subsequentPairInstructions);
+        var pairsToSkip = Math.Min(Math.Min((ulong)pairsToByteBoundary, (ulong)pairsToLimit), maxPairsByBudget);
+        if (pairsToSkip == 0)
+        {
+            return false;
+        }
+
+        var accumulator = State.R[9];
+        var shiftedLastBit = 0u;
+        var lastNegatedBitOffset = 0u;
+        var lastBitIndex = bitIndex;
+        var baseAddress = State.R[8];
+        for (var pair = 0UL; pair < pairsToSkip; pair++)
+        {
+            if (!TryReadSonicAdventure2PackedBit(baseAddress, bitIndex, out var firstBit)
+                || !TryReadSonicAdventure2PackedBit(baseAddress, bitIndex + 1, out var secondBit))
+            {
+                return false;
+            }
+
+            accumulator |= firstBit << (int)outputBit;
+            bitIndex++;
+            outputBit++;
+            accumulator |= secondBit << (int)outputBit;
+            shiftedLastBit = secondBit << (int)outputBit;
+            lastBitIndex = bitIndex;
+            lastNegatedBitOffset = 0u - (bitIndex & 7u);
+            bitIndex++;
+            outputBit++;
+        }
+
+        State.R[0] = shiftedLastBit;
+        State.R[2] = 1;
+        State.R[3] = 8;
+        State.R[4] = baseAddress;
+        State.R[5] = lastNegatedBitOffset;
+        State.R[6] = lastBitIndex >> 3;
+        State.R[9] = accumulator;
+        State.R[12] = outputBit;
+        State.R[13] = bitIndex;
+        State.T = outputBit >= 8;
+        State.Pc = outputBit >= 8 ? 0x8C0A_4B4A : 0x8C0A_4B14;
+        skippedInstructions = firstPairInstructions + ((pairsToSkip - 1) * subsequentPairInstructions);
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
