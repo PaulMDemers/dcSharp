@@ -12074,7 +12074,7 @@ public sealed class Sh4Cpu
             return false;
         }
 
-        const ulong innerLoopInstructions = 13;
+        const ulong innerLoopInstructions = 16;
         const ulong outerLoopInstructions = 18;
         if (maxInstructionsToSkip < innerLoopInstructions
             || State.R[15] > uint.MaxValue - 0x10
@@ -12116,7 +12116,10 @@ public sealed class Sh4Cpu
         State.T = count >= State.R[11];
         if (!State.T)
         {
-            State.Pc = 0x8C0A_4B0E;
+            State.R[9] = State.R[14];
+            State.R[12] = State.R[14];
+            State.R[13] = nextBitBase;
+            State.Pc = 0x8C0A_4B14;
             skippedInstructions = innerLoopInstructions;
         }
         else
@@ -12140,6 +12143,54 @@ public sealed class Sh4Cpu
             skippedInstructions = outerLoopInstructions;
         }
 
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    internal bool TryFastForwardSonicAdventure2BitUnpackRowSetup(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4AFA
+            || step.Opcode != 0x1FE1
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.Pc != 0x8C0A_4AFC
+            || !IsSonicAdventure2BitUnpackLoop())
+        {
+            return false;
+        }
+
+        const ulong instructions = 12;
+        if (maxInstructionsToSkip < instructions
+            || State.R[15] > uint.MaxValue - 0x14
+            || !memory.TryGetSystemRamOffset(State.R[15], 0x18, out _))
+        {
+            return false;
+        }
+
+        var outerIndex = memory.ReadUInt32(State.R[15]);
+        var outputBase = memory.ReadUInt32(State.R[15] + 0x08);
+        var bitBase = memory.ReadUInt32(State.R[15] + 0x14);
+        if (outerIndex > uint.MaxValue / 3
+            || outputBase > uint.MaxValue - (outerIndex * 3))
+        {
+            return false;
+        }
+
+        var outputPointer = outputBase + (outerIndex * 3);
+        memory.WriteUInt32(State.R[15] + 0x10, outputPointer);
+        memory.WriteUInt32(State.R[15] + 0x0C, bitBase);
+        State.R[2] = outputBase;
+        State.R[3] = bitBase;
+        State.R[8] = outputPointer;
+        State.R[9] = State.R[14];
+        State.R[12] = State.R[14];
+        State.R[13] = bitBase;
+        State.T = (outerIndex & 0x8000_0000u) != 0;
+        State.Pc = 0x8C0A_4B14;
+        skippedInstructions = instructions;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
         immediateBranchTarget = null;
@@ -12181,6 +12232,19 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C0A_4A08) == 0x2329
         && memory.ReadUInt16(0x8C0A_4A0A) == 0x000B
         && memory.ReadUInt16(0x8C0A_4A0C) == 0x6033
+        && memory.ReadUInt16(0x8C0A_4AFA) == 0x1FE1
+        && memory.ReadUInt16(0x8C0A_4AFC) == 0x68F2
+        && memory.ReadUInt16(0x8C0A_4AFE) == 0x52F2
+        && memory.ReadUInt16(0x8C0A_4B00) == 0x6383
+        && memory.ReadUInt16(0x8C0A_4B02) == 0x4800
+        && memory.ReadUInt16(0x8C0A_4B04) == 0x383C
+        && memory.ReadUInt16(0x8C0A_4B06) == 0x382C
+        && memory.ReadUInt16(0x8C0A_4B08) == 0x1F84
+        && memory.ReadUInt16(0x8C0A_4B0A) == 0x53F5
+        && memory.ReadUInt16(0x8C0A_4B0C) == 0x1F33
+        && memory.ReadUInt16(0x8C0A_4B0E) == 0x5DF3
+        && memory.ReadUInt16(0x8C0A_4B10) == 0x6CE3
+        && memory.ReadUInt16(0x8C0A_4B12) == 0x69E3
         && memory.ReadUInt16(0x8C0A_4B14) == 0x3DA3
         && memory.ReadUInt16(0x8C0A_4B16) == 0x8905
         && memory.ReadUInt16(0x8C0A_4B18) == 0x65D3
