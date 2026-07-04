@@ -12140,6 +12140,87 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C0A_4AF2) == 0x36A2
         && memory.ReadUInt16(0x8C0A_4AF4) == 0x8BE0;
 
+    internal bool TryFastForwardSonicAdventure2NonzeroByteMaskWalk(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4AE6
+            || step.Opcode != 0x89F8
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C0A_4ADA
+            || !IsSonicAdventure2NonzeroByteMaskWalk())
+        {
+            return false;
+        }
+
+        const ulong instructionsPerIteration = 7;
+        var iterationsBudget = maxInstructionsToSkip / instructionsPerIteration;
+        var mask = State.R[12] & 0xFFu;
+        var value = State.R[4] & 0xFFu;
+        if (iterationsBudget == 0 || mask == 0 || value == 0)
+        {
+            return false;
+        }
+
+        var skippedIterations = 0UL;
+        var finalR2 = State.R[2];
+        var finalR3 = State.R[3];
+        var finalR4 = State.R[4];
+        var finalR5 = State.R[5];
+        var finalT = State.T;
+        var finalPc = State.Pc;
+        while (skippedIterations < iterationsBudget)
+        {
+            finalR2 = value;
+            finalR4 = value << 1;
+            finalR5++;
+            finalR3 = finalR4 & 0xFFu;
+            finalT = (finalR3 & mask) == 0;
+            skippedIterations++;
+
+            if (!finalT)
+            {
+                finalPc = 0x8C0A_4AE8;
+                break;
+            }
+
+            if (finalR3 == 0)
+            {
+                return false;
+            }
+
+            value = finalR3;
+            finalPc = 0x8C0A_4ADA;
+        }
+
+        if (skippedIterations == 0)
+        {
+            return false;
+        }
+
+        State.R[2] = finalR2;
+        State.R[3] = finalR3;
+        State.R[4] = finalR4;
+        State.R[5] = finalR5;
+        State.T = finalT;
+        State.Pc = finalPc;
+        skippedInstructions = skippedIterations * instructionsPerIteration;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool IsSonicAdventure2NonzeroByteMaskWalk() =>
+        memory.ReadUInt16(0x8C0A_4ADA) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4ADC) == 0x6423
+        && memory.ReadUInt16(0x8C0A_4ADE) == 0x4400
+        && memory.ReadUInt16(0x8C0A_4AE0) == 0x7501
+        && memory.ReadUInt16(0x8C0A_4AE2) == 0x634C
+        && memory.ReadUInt16(0x8C0A_4AE4) == 0x23C8
+        && memory.ReadUInt16(0x8C0A_4AE6) == 0x89F8
+        && memory.ReadUInt16(0x8C0A_4AE8) == 0x51F6;
+
     internal bool TryFastForwardSonicAdventure2EmptyCallbackTableScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
