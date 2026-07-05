@@ -12222,6 +12222,112 @@ public sealed class Sh4Cpu
         return true;
     }
 
+    internal bool TryFastForwardSonicAdventure2BitUnpackRows(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4AFA
+            || step.Opcode != 0x1FE1
+            || delayedBranchTarget is not null
+            || immediateBranchTarget is not null
+            || State.Pc != 0x8C0A_4AFC
+            || State.R[11] != 3
+            || State.R[14] != 0
+            || !IsSonicAdventure2BitUnpackLoop())
+        {
+            return false;
+        }
+
+        const ulong firstRowInstructions = 869;
+        const ulong subsequentRowInstructions = 870;
+        if (maxInstructionsToSkip < firstRowInstructions
+            || State.R[15] > uint.MaxValue - 0x14
+            || !memory.TryGetSystemRamOffset(State.R[15], 0x18, out _))
+        {
+            return false;
+        }
+
+        var outerIndex = memory.ReadUInt32(State.R[15]);
+        var outputBase = memory.ReadUInt32(State.R[15] + 0x08);
+        var bitBase = memory.ReadUInt32(State.R[15] + 0x14);
+        if (bitBase != 0
+            || outerIndex >= State.R[10]
+            || outerIndex > uint.MaxValue / 3)
+        {
+            return false;
+        }
+
+        var rowsByBudget = 1 + ((maxInstructionsToSkip - firstRowInstructions) / subsequentRowInstructions);
+        var rowsByLimit = (ulong)(State.R[10] - outerIndex);
+        var rowsToSkip = Math.Min(rowsByBudget, rowsByLimit);
+        if (rowsToSkip == 0)
+        {
+            return false;
+        }
+
+        var finalRowOutput = 0u;
+        var finalAccumulator = 0u;
+        var finalShiftedLastBit = 0u;
+        for (var row = 0UL; row < rowsToSkip; row++)
+        {
+            if (outerIndex > uint.MaxValue / 3)
+            {
+                return false;
+            }
+
+            var rowOffset = outerIndex * 3;
+            if (outputBase > uint.MaxValue - rowOffset)
+            {
+                return false;
+            }
+
+            var rowOutput = outputBase + rowOffset;
+            if (!memory.TryGetSystemRamOffset(rowOutput, 3, out _))
+            {
+                return false;
+            }
+
+            finalRowOutput = rowOutput;
+            for (var outputByte = 0u; outputByte < 3; outputByte++)
+            {
+                var bitIndex = outputByte * 8;
+                if (!TryReadSonicAdventure2PackedByte(rowOutput, bitIndex, out var decodedByte, out var shiftedLastBit))
+                {
+                    return false;
+                }
+
+                memory.Write(rowOutput + outputByte, [decodedByte]);
+                finalAccumulator = decodedByte;
+                finalShiftedLastBit = shiftedLastBit;
+            }
+
+            outerIndex++;
+        }
+
+        var nextOutputPointer = finalRowOutput + 3;
+        memory.WriteUInt32(State.R[15], outerIndex);
+        memory.WriteUInt32(State.R[15] + 0x04, 3);
+        memory.WriteUInt32(State.R[15] + 0x0C, 24);
+        memory.WriteUInt32(State.R[15] + 0x10, nextOutputPointer);
+        State.R[0] = finalShiftedLastBit;
+        State.R[1] = 24;
+        State.R[2] = outerIndex;
+        State.R[3] = 3;
+        State.R[4] = finalRowOutput;
+        State.R[5] = 0xFFFF_FFF9;
+        State.R[6] = 2;
+        State.R[8] = finalRowOutput;
+        State.R[9] = finalAccumulator;
+        State.R[12] = 8;
+        State.R[13] = 24;
+        State.T = outerIndex >= State.R[10];
+        State.Pc = State.T ? 0x8C0A_4B70 : 0x8C0A_4AFA;
+        skippedInstructions = firstRowInstructions + ((rowsToSkip - 1) * subsequentRowInstructions);
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
     private bool TryReadSonicAdventure2PackedBit(uint baseAddress, uint bitIndex, out uint bit)
     {
         var byteAddress = baseAddress + (bitIndex >> 3);
@@ -12232,6 +12338,30 @@ public sealed class Sh4Cpu
         }
 
         bit = (uint)((memory.ReadByte(byteAddress) >> (int)(bitIndex & 7)) & 1);
+        return true;
+    }
+
+    private bool TryReadSonicAdventure2PackedByte(uint baseAddress, uint bitIndex, out byte value, out uint shiftedLastBit)
+    {
+        value = 0;
+        shiftedLastBit = 0;
+        var accumulator = 0u;
+        for (var bit = 0u; bit < 8; bit++)
+        {
+            if (!TryReadSonicAdventure2PackedBit(baseAddress, bitIndex + bit, out var packedBit))
+            {
+                return false;
+            }
+
+            var shiftedBit = packedBit << (int)bit;
+            accumulator |= shiftedBit;
+            if (bit == 7)
+            {
+                shiftedLastBit = shiftedBit;
+            }
+        }
+
+        value = (byte)accumulator;
         return true;
     }
 
