@@ -12649,6 +12649,8 @@ public sealed class Sh4Cpu
             return false;
         }
 
+        var thresholdAddress = State.R[15] + 0x18;
+        var initialThreshold = memory.ReadUInt32(thresholdAddress);
         var state = new SonicAdventure2ByteMaskGroupState(
             State.R[1],
             State.R[2],
@@ -12659,7 +12661,8 @@ public sealed class Sh4Cpu
             State.R[7],
             State.R[13],
             State.T,
-            0x8C0A_4AB8);
+            0x8C0A_4AB8,
+            initialThreshold);
         var totalSkippedInstructions = 0UL;
         while (totalSkippedInstructions < maxInstructionsToSkip
             && TryExecuteSonicAdventure2ByteMaskGroup(state, out var nextState, out var groupInstructions)
@@ -12684,6 +12687,11 @@ public sealed class Sh4Cpu
         State.R[13] = state.R13;
         State.T = state.T;
         State.Pc = state.Pc;
+        if (state.Threshold != initialThreshold)
+        {
+            memory.WriteUInt32(thresholdAddress, state.Threshold);
+        }
+
         skippedInstructions = totalSkippedInstructions;
         State.InstructionsExecuted += skippedInstructions;
         delayedBranchTarget = null;
@@ -12699,7 +12707,8 @@ public sealed class Sh4Cpu
         next = current;
         skippedInstructions = 0;
         var baseAddress = current.R6;
-        if (baseAddress >= State.R[10]
+        if (current.Pc != 0x8C0A_4AB8
+            || baseAddress >= State.R[10]
             || baseAddress < 2
             || !memory.TryGetSystemRamOffset(baseAddress - 2, 3, out _))
         {
@@ -12713,8 +12722,7 @@ public sealed class Sh4Cpu
         const ulong takenThresholdTailInstructions = 6;
         const ulong updateThresholdTailInstructions = 7;
         var mask = State.R[12] & 0xFFu;
-        var thresholdAddress = State.R[15] + 0x18;
-        var threshold = memory.ReadUInt32(thresholdAddress);
+        var threshold = current.Threshold;
         var r2 = current.R2;
         var r3 = current.R3;
         var r4 = current.R4;
@@ -12778,10 +12786,11 @@ public sealed class Sh4Cpu
         }
 
         var loadedThreshold = threshold;
+        var nextThreshold = threshold;
         if (r5 < threshold)
         {
             groupInstructions += updateThresholdTailInstructions;
-            memory.WriteUInt32(thresholdAddress, r5);
+            nextThreshold = r5;
         }
         else
         {
@@ -12794,10 +12803,7 @@ public sealed class Sh4Cpu
         }
 
         var nextBaseAddress = baseAddress + 3;
-        if (nextBaseAddress >= State.R[10])
-        {
-            return false;
-        }
+        var terminalGroup = nextBaseAddress >= State.R[10];
 
         next = new SonicAdventure2ByteMaskGroupState(
             loadedThreshold,
@@ -12808,8 +12814,9 @@ public sealed class Sh4Cpu
             nextBaseAddress,
             r7,
             r13,
-            false,
-            0x8C0A_4AB8);
+            terminalGroup,
+            terminalGroup ? 0x8C0A_4AF6 : 0x8C0A_4AB8,
+            nextThreshold);
         skippedInstructions = groupInstructions;
         return true;
     }
@@ -12824,7 +12831,8 @@ public sealed class Sh4Cpu
         uint R7,
         uint R13,
         bool T,
-        uint Pc);
+        uint Pc,
+        uint Threshold);
 
     private bool IsSonicAdventure2ByteMaskGroupScan() =>
         IsSonicAdventure2ZeroByteMaskGroupScan()

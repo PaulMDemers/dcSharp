@@ -25870,6 +25870,67 @@ public class Sh4CpuTests
     }
 
     [Fact]
+    public void FastForwardsSonicAdventure2TerminalByteMaskGroup()
+    {
+        var normalMemory = new DreamcastMemory();
+        var fastMemory = new DreamcastMemory();
+        WriteSonicAdventure2ZeroByteMaskGroupScan(normalMemory);
+        WriteSonicAdventure2ZeroByteMaskGroupScan(fastMemory);
+        normalMemory.Write(0x8C20_0100, new byte[16]);
+        fastMemory.Write(0x8C20_0100, new byte[16]);
+        normalMemory.WriteUInt32(0x8C20_0200 + 0x18, 24);
+        fastMemory.WriteUInt32(0x8C20_0200 + 0x18, 24);
+        var normal = new Sh4Cpu(normalMemory, 0x8C0A_4AB8);
+        var fast = new Sh4Cpu(fastMemory, 0x8C0A_4AB8);
+        InitializeSonicAdventure2ZeroByteMaskGroupScanRegisters(normal);
+        InitializeSonicAdventure2ZeroByteMaskGroupScanRegisters(fast);
+        normal.State.R[10] = 0x8C20_0108;
+        fast.State.R[10] = 0x8C20_0108;
+        var normalBranch = StepUntilPc(normal, 0x8C0A_4AF4);
+        var fastBranch = StepUntilPc(fast, 0x8C0A_4AF4);
+
+        Assert.Equal(normalBranch.Trace, fastBranch.Trace);
+        Assert.Equal(0x8C0A_4AB8u, fast.State.Pc);
+        Assert.Equal(0x8C20_0105u, fast.State.R[6]);
+        Assert.True(fast.TryFastForwardSonicAdventure2ByteMaskGroupScan(fastBranch, 39, out var skippedInstructions));
+        Assert.Equal(39UL, skippedInstructions);
+        StepMany(normal, skippedInstructions);
+
+        Assert.Equal(0x8C0A_4AF6u, fast.State.Pc);
+        Assert.True(fast.State.T);
+        Assert.Equal(normal.State.Pc, fast.State.Pc);
+        Assert.Equal(normal.State.R, fast.State.R);
+        Assert.Equal(normal.State.T, fast.State.T);
+        Assert.Equal(normal.State.InstructionsExecuted, fast.State.InstructionsExecuted);
+    }
+
+    [Fact]
+    public void ByteMaskGroupScanDoesNotWriteThresholdWhenBudgetIsTooShort()
+    {
+        var memory = new DreamcastMemory();
+        WriteSonicAdventure2ZeroByteMaskGroupScan(memory);
+        memory.Write(0x8C20_0100, new byte[16]);
+        memory.WriteUInt32(0x8C20_0200 + 0x18, 24);
+        var cpu = new Sh4Cpu(memory, 0x8C0A_4AB8);
+        InitializeSonicAdventure2ZeroByteMaskGroupScanRegisters(cpu);
+        cpu.State.R[10] = 0x8C20_0108;
+        var branch = StepUntilPc(cpu, 0x8C0A_4AF4);
+        memory.WriteUInt32(0x8C20_0200 + 0x18, 25);
+        var pcBefore = cpu.State.Pc;
+        var registersBefore = cpu.State.R.ToArray();
+        var tBefore = cpu.State.T;
+        var instructionsBefore = cpu.State.InstructionsExecuted;
+
+        Assert.False(cpu.TryFastForwardSonicAdventure2ByteMaskGroupScan(branch, 38, out var skippedInstructions));
+        Assert.Equal(0UL, skippedInstructions);
+        Assert.Equal(25u, memory.ReadUInt32(0x8C20_0200 + 0x18));
+        Assert.Equal(pcBefore, cpu.State.Pc);
+        Assert.Equal(registersBefore, cpu.State.R);
+        Assert.Equal(tBefore, cpu.State.T);
+        Assert.Equal(instructionsBefore, cpu.State.InstructionsExecuted);
+    }
+
+    [Fact]
     public void ExecutesDisplacementWordStoreFromR0()
     {
         var memory = new DreamcastMemory();
