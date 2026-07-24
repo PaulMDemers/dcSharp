@@ -12444,6 +12444,228 @@ public sealed class Sh4Cpu
         && memory.ReadUInt16(0x8C0A_4B6C) == 0x8FC5
         && memory.ReadUInt16(0x8C0A_4B6E) == 0x2F22;
 
+    internal bool TryFastForwardSonicAdventure2ForwardByteMaskGroupScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
+    {
+        skippedInstructions = 0;
+        if (step.Pc != 0x8C0A_4AA6
+            || step.Opcode != 0x8BE0
+            || !step.Trace.EndsWith(" ; taken", StringComparison.Ordinal)
+            || delayedBranchTarget is not null
+            || State.Pc != 0x8C0A_4A6A
+            || !IsSonicAdventure2ForwardByteMaskGroupScan())
+        {
+            return false;
+        }
+
+        if (State.R[6] >= State.R[10]
+            || State.R[11] != 3
+            || (State.R[12] & 0xFFu) == 0
+            || State.R[14] != 0
+            || !memory.TryGetSystemRamOffset(State.R[15] + 0x14, 4, out _))
+        {
+            return false;
+        }
+
+        var thresholdAddress = State.R[15] + 0x14;
+        var initialThreshold = memory.ReadUInt32(thresholdAddress);
+        var state = new SonicAdventure2ByteMaskGroupState(
+            State.R[1],
+            State.R[2],
+            State.R[3],
+            State.R[4],
+            State.R[5],
+            State.R[6],
+            State.R[7],
+            State.R[13],
+            State.T,
+            0x8C0A_4A6A,
+            initialThreshold);
+        var totalSkippedInstructions = 0UL;
+        while (totalSkippedInstructions < maxInstructionsToSkip
+            && TryExecuteSonicAdventure2ForwardByteMaskGroup(state, out var nextState, out var groupInstructions)
+            && groupInstructions <= maxInstructionsToSkip - totalSkippedInstructions)
+        {
+            totalSkippedInstructions += groupInstructions;
+            state = nextState;
+        }
+
+        if (totalSkippedInstructions == 0)
+        {
+            return false;
+        }
+
+        State.R[1] = state.R1;
+        State.R[2] = state.R2;
+        State.R[3] = state.R3;
+        State.R[4] = state.R4;
+        State.R[5] = state.R5;
+        State.R[6] = state.R6;
+        State.R[7] = state.R7;
+        State.R[13] = state.R13;
+        State.T = state.T;
+        State.Pc = state.Pc;
+        if (state.Threshold != initialThreshold)
+        {
+            memory.WriteUInt32(thresholdAddress, state.Threshold);
+        }
+
+        skippedInstructions = totalSkippedInstructions;
+        State.InstructionsExecuted += skippedInstructions;
+        delayedBranchTarget = null;
+        immediateBranchTarget = null;
+        return true;
+    }
+
+    private bool TryExecuteSonicAdventure2ForwardByteMaskGroup(
+        SonicAdventure2ByteMaskGroupState current,
+        out SonicAdventure2ByteMaskGroupState next,
+        out ulong skippedInstructions)
+    {
+        next = current;
+        skippedInstructions = 0;
+        var baseAddress = current.R6;
+        if (current.Pc != 0x8C0A_4A6A
+            || baseAddress >= State.R[10]
+            || !memory.TryGetSystemRamOffset(baseAddress, 3, out _))
+        {
+            return false;
+        }
+
+        const ulong entryInstructions = 3;
+        const ulong zeroByteLoopInstructions = 9;
+        const ulong nonzeroPrefixInstructions = 12;
+        const ulong allZeroPostScanInstructions = 3;
+        const ulong takenThresholdTailInstructions = 6;
+        const ulong updateThresholdTailInstructions = 7;
+        var mask = State.R[12] & 0xFFu;
+        var threshold = current.Threshold;
+        var r2 = current.R2;
+        var r4 = current.R4;
+        var r5 = 0u;
+        var r7 = baseAddress;
+        var r13 = 0u;
+        var groupInstructions = entryInstructions;
+        var foundNonzero = false;
+
+        while (r13 < State.R[11])
+        {
+            r4 = memory.ReadByte(r7);
+            r2 = r4 & 0xFFu;
+            groupInstructions += zeroByteLoopInstructions;
+            if (r2 != 0)
+            {
+                foundNonzero = true;
+                break;
+            }
+
+            r13++;
+            r5 += 8;
+            r7++;
+        }
+
+        if (foundNonzero)
+        {
+            groupInstructions += nonzeroPrefixInstructions - zeroByteLoopInstructions;
+            r2 = r4 & 0xFFu;
+            if ((r2 & mask) == 0)
+            {
+                var value = r4 & 0xFFu;
+                do
+                {
+                    r4 = value >> 1;
+                    r5++;
+                    r2 = r4 & 0xFFu;
+                    groupInstructions += 7;
+                    if ((r2 & mask) != 0)
+                    {
+                        break;
+                    }
+
+                    if (r2 == 0)
+                    {
+                        return false;
+                    }
+
+                    value = r2;
+                }
+                while (true);
+            }
+        }
+        else
+        {
+            groupInstructions += allZeroPostScanInstructions;
+            r2 = 0;
+            r4 = 0;
+        }
+
+        var loadedThreshold = threshold;
+        var nextThreshold = threshold;
+        if (r5 < threshold)
+        {
+            groupInstructions += updateThresholdTailInstructions;
+            nextThreshold = r5;
+        }
+        else
+        {
+            groupInstructions += takenThresholdTailInstructions;
+        }
+
+        if (baseAddress > uint.MaxValue - 3)
+        {
+            return false;
+        }
+
+        var nextBaseAddress = baseAddress + 3;
+        var terminalGroup = nextBaseAddress >= State.R[10];
+        next = new SonicAdventure2ByteMaskGroupState(
+            loadedThreshold,
+            r2,
+            current.R3,
+            r4,
+            r5,
+            nextBaseAddress,
+            r7,
+            r13,
+            terminalGroup,
+            terminalGroup ? 0x8C0A_4AA8 : 0x8C0A_4A6A,
+            nextThreshold);
+        skippedInstructions = groupInstructions;
+        return true;
+    }
+
+    private bool IsSonicAdventure2ForwardByteMaskGroupScan() =>
+        memory.ReadUInt16(0x8C0A_4A6A) == 0x6DE3
+        && memory.ReadUInt16(0x8C0A_4A6C) == 0x65E3
+        && memory.ReadUInt16(0x8C0A_4A6E) == 0x6763
+        && memory.ReadUInt16(0x8C0A_4A70) == 0x6470
+        && memory.ReadUInt16(0x8C0A_4A72) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4A74) == 0x2228
+        && memory.ReadUInt16(0x8C0A_4A76) == 0x8B04
+        && memory.ReadUInt16(0x8C0A_4A78) == 0x7D01
+        && memory.ReadUInt16(0x8C0A_4A7A) == 0x3DB3
+        && memory.ReadUInt16(0x8C0A_4A7C) == 0x7508
+        && memory.ReadUInt16(0x8C0A_4A7E) == 0x7701
+        && memory.ReadUInt16(0x8C0A_4A80) == 0x8BF6
+        && memory.ReadUInt16(0x8C0A_4A82) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4A84) == 0x2228
+        && memory.ReadUInt16(0x8C0A_4A86) == 0x8908
+        && memory.ReadUInt16(0x8C0A_4A88) == 0xA004
+        && memory.ReadUInt16(0x8C0A_4A8A) == 0x0009
+        && memory.ReadUInt16(0x8C0A_4A8C) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4A8E) == 0x6423
+        && memory.ReadUInt16(0x8C0A_4A90) == 0x4401
+        && memory.ReadUInt16(0x8C0A_4A92) == 0x7501
+        && memory.ReadUInt16(0x8C0A_4A94) == 0x624C
+        && memory.ReadUInt16(0x8C0A_4A96) == 0x22C8
+        && memory.ReadUInt16(0x8C0A_4A98) == 0x89F8
+        && memory.ReadUInt16(0x8C0A_4A9A) == 0x51F5
+        && memory.ReadUInt16(0x8C0A_4A9C) == 0x3513
+        && memory.ReadUInt16(0x8C0A_4A9E) == 0x8D01
+        && memory.ReadUInt16(0x8C0A_4AA0) == 0x7603
+        && memory.ReadUInt16(0x8C0A_4AA2) == 0x1F55
+        && memory.ReadUInt16(0x8C0A_4AA4) == 0x36A2
+        && memory.ReadUInt16(0x8C0A_4AA6) == 0x8BE0;
+
     internal bool TryFastForwardSonicAdventure2ZeroByteMaskGroupScan(Sh4StepResult step, ulong maxInstructionsToSkip, out ulong skippedInstructions)
     {
         skippedInstructions = 0;
